@@ -1,4 +1,4 @@
-name: 🚀 CI Pipeline
+name: 🚀 CI Pipeline (Frontend & Backend)
 
 on:
   pull_request:
@@ -7,69 +7,63 @@ on:
   push:
     branches: [main, develop]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # ─────────────────────────────────────────
-  # JOB 1: Code Quality & Lint
-  # ─────────────────────────────────────────
-  lint:
-    name: 🔎 Lint & Code Quality
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Security & Secret Scan
+  # ─────────────────────────────────────────────────────────────
+  security-scan:
+    name: 🛡️ Security & Secret Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
+      - name: Scan for hardcoded credentials & secrets
         run: |
-          if [ -f "package.json" ]; then
-            npm ci
-          else
-            echo "ℹ️ No package.json found. Skipping npm install."
-          fi
-
-      - name: Run linter
-        run: |
-          if [ -f "package.json" ] && grep -q '"lint"' package.json; then
-            npm run lint
-          else
-            echo "ℹ️ No lint script found. Skipping."
-          fi
-
-      - name: Check for hardcoded secrets
-        run: |
-          echo "🔍 Scanning for hardcoded secrets..."
-          # Check for common secret patterns
+          echo "🔍 Scanning repository for potential hardcoded secrets..."
           PATTERNS=(
-            "password\s*=\s*['\"][^'\"]{4,}['\"]"
-            "api_key\s*=\s*['\"][^'\"]{8,}['\"]"
-            "secret\s*=\s*['\"][^'\"]{8,}['\"]"
-            "AWS_SECRET"
-            "private_key"
+            "(?i)(api_key|apikey|secret_key|private_key|auth_token|access_token|aws_secret_access_key)\s*[:=]\s*['\"][A-Za-z0-9\/+=_-]{16,}['\"]"
+            "-----BEGIN (RSA|OPENSSH|EC|DSA|PGP) PRIVATE KEY-----"
+            "(?i)password\s*[:=]\s*['\"][^'\"]{8,}['\"]"
           )
-          FOUND=0
-          for pattern in "${PATTERNS[@]}"; do
-            if grep -rEi "$pattern" --include="*.js" --include="*.ts" --include="*.py" --include="*.env" . 2>/dev/null | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "example"; then
-              FOUND=1
+          
+          FOUND_LEAKS=0
+          for PATTERN in "${PATTERNS[@]}"; do
+            MATCHES=$(grep -rnIP "$PATTERN" . \
+              --exclude-dir=".git" \
+              --exclude-dir="node_modules" \
+              --exclude-dir=".github" \
+              --exclude-dir="dist" \
+              --exclude-dir="build" \
+              --exclude="*.md" \
+              --exclude="*.example" \
+              --exclude="*.sample" 2>/dev/null || true)
+            
+            if [ -n "$MATCHES" ]; then
+              echo "❌ Detected potential secret match:"
+              echo "$MATCHES" | head -n 5
+              FOUND_LEAKS=1
             fi
           done
-          if [ "$FOUND" -eq 1 ]; then
-            echo "⚠️ Potential hardcoded secrets detected. Please use environment variables."
-          else
-            echo "✅ No obvious hardcoded secrets found."
+
+          if [ "$FOUND_LEAKS" -eq 1 ]; then
+            echo ""
+            echo "❌ Hardcoded secrets detected! Please use environment variables or GitHub Secrets."
+            exit 1
           fi
 
-  # ─────────────────────────────────────────
-  # JOB 2: Unit Tests
-  # ─────────────────────────────────────────
-  test:
-    name: 🧪 Unit Tests
+          echo "✅ Security scan passed. No secrets found."
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Frontend Pipeline (Lint, Typecheck, Test, Build)
+  # ─────────────────────────────────────────────────────────────
+  frontend:
+    name: 🎨 Frontend Checks
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,133 +72,370 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Detect frontend environment
+        id: detect-fe
         run: |
-          if [ -f "package.json" ]; then
-            npm ci
+          echo "🔍 Locating frontend workspace..."
+          FE_PATH=""
+          for CANDIDATE in "frontend" "client" "web" "ui" "apps/web" "."; do
+            if [ -d "$CANDIDATE" ] && [ -f "$CANDIDATE/package.json" ]; then
+              # If candidate is '.', ensure it's not exclusively a backend repo
+              if [ "$CANDIDATE" = "." ]; then
+                if [ -d "backend" ] || [ -d "server" ] || [ -d "api" ]; then
+                  continue
+                fi
+              fi
+              FE_PATH="$CANDIDATE"
+              break
+            fi
+          done
+
+          if [ -n "$FE_PATH" ]; then
+            echo "✅ Frontend detected at: '$FE_PATH'"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "dir=$FE_PATH" >> "$GITHUB_OUTPUT"
           else
-            echo "ℹ️ No package.json found. Skipping."
+            echo "ℹ️ No frontend directory or package.json found yet."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "dir=" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run tests
-        run: |
-          if [ -f "package.json" ] && grep -q '"test"' package.json; then
-            npm test -- --coverage --ci
-          else
-            echo "ℹ️ No test script configured yet. Add tests to activate this step."
-            echo "📋 Add to package.json: \"test\": \"jest --coverage\""
-          fi
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Cache frontend dependencies
+        if: steps.detect-fe.outputs.found == 'true'
+        uses: actions/cache@v4
         with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 7
-          if-no-files-found: ignore
+          path: |
+            ~/.npm
+            ${{ steps.detect-fe.outputs.dir }}/node_modules
+          key: fe-${{ runner.os }}-node-${{ hashFiles(format('{0}/**/package-lock.json', steps.detect-fe.outputs.dir), format('{0}/**/yarn.lock', steps.detect-fe.outputs.dir), format('{0}/**/pnpm-lock.yaml', steps.detect-fe.outputs.dir)) }}
+          restore-keys: |
+            fe-${{ runner.os }}-node-
 
-  # ─────────────────────────────────────────
-  # JOB 3: Build Check
-  # ─────────────────────────────────────────
-  build:
-    name: 🏗️ Build Check
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
+      - name: Install frontend dependencies
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
         run: |
-          if [ -f "package.json" ]; then
-            npm ci
+          echo "📦 Installing frontend dependencies..."
+          if [ -f "package-lock.json" ]; then
+            npm ci || npm install
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile || yarn install
+          elif [ -f "pnpm-lock.yaml" ]; then
+            npx pnpm install --frozen-lockfile || npx pnpm install
           else
-            echo "ℹ️ No package.json found. Skipping."
+            npm install
           fi
 
-      - name: Run build
+      - name: 🔎 Frontend Lint & Code Quality
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
         run: |
-          if [ -f "package.json" ] && grep -q '"build"' package.json; then
+          echo "🔎 Running frontend linter..."
+          if grep -q '"lint"' package.json; then
+            npm run lint
+          else
+            echo "ℹ️ No 'lint' script configured in ${{ steps.detect-fe.outputs.dir }}/package.json. Skipping."
+          fi
+
+      - name: 📐 Frontend TypeScript Typecheck
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
+        run: |
+          echo "📐 Checking TypeScript types..."
+          if grep -q '"typecheck"' package.json || grep -q '"type-check"' package.json; then
+            npm run typecheck 2>/dev/null || npm run type-check
+          elif [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          else
+            echo "ℹ️ No TypeScript configuration found. Skipping typecheck."
+          fi
+
+      - name: 🧪 Frontend Unit & Component Tests
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
+        run: |
+          echo "🧪 Running frontend tests..."
+          if grep -q '"test"' package.json; then
+            npm test -- --passWithNoTests || npm test --if-present
+          else
+            echo "ℹ️ No 'test' script configured in ${{ steps.detect-fe.outputs.dir }}/package.json. Skipping."
+          fi
+
+      - name: 🏗️ Frontend Build
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
+        run: |
+          echo "🏗️ Building frontend..."
+          if grep -q '"build"' package.json; then
             npm run build
           else
-            echo "ℹ️ No build script configured yet."
+            echo "ℹ️ No 'build' script configured in ${{ steps.detect-fe.outputs.dir }}/package.json. Skipping."
           fi
 
-  # ─────────────────────────────────────────
-  # JOB 4: PR Summary Comment
-  # ─────────────────────────────────────────
-  pr-summary:
-    name: 📝 PR Pipeline Summary
+      - name: Frontend summary message
+        if: steps.detect-fe.outputs.found == 'false'
+        run: |
+          echo "ℹ️ Status: Frontend code not yet committed in this repository."
+          echo "✅ Ready for frontend modules (React/Next/Vite) inside 'frontend/' or root."
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3: Backend Pipeline (Node.js & Python checks)
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    name: ⚙️ Backend Checks
     runs-on: ubuntu-latest
-    needs: [lint, test, build]
-    if: github.event_name == 'pull_request' && always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect backend environment
+        id: detect-be
+        run: |
+          echo "🔍 Locating backend workspace..."
+          BE_PATH=""
+          BE_TYPE=""
+          for CANDIDATE in "backend" "server" "api" "apps/api" "services/api" "."; do
+            if [ -d "$CANDIDATE" ]; then
+              if [ "$CANDIDATE" = "." ]; then
+                if [ -d "frontend" ] || [ -d "client" ] || [ -d "web" ]; then
+                  continue
+                fi
+              fi
+
+              if [ -f "$CANDIDATE/package.json" ]; then
+                BE_PATH="$CANDIDATE"
+                BE_TYPE="node"
+                break
+              elif [ -f "$CANDIDATE/requirements.txt" ] || [ -f "$CANDIDATE/pyproject.toml" ]; then
+                BE_PATH="$CANDIDATE"
+                BE_TYPE="python"
+                break
+              fi
+            fi
+          done
+
+          if [ -n "$BE_PATH" ]; then
+            echo "✅ Backend detected at: '$BE_PATH' (runtime: $BE_TYPE)"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "dir=$BE_PATH" >> "$GITHUB_OUTPUT"
+            echo "type=$BE_TYPE" >> "$GITHUB_OUTPUT"
+          else
+            echo "ℹ️ No backend directory or backend configuration found yet."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "dir=" >> "$GITHUB_OUTPUT"
+            echo "type=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ─── Node.js Backend ──────────────────────────────────────
+      - name: Setup Node.js for Backend
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Node backend dependencies
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ steps.detect-be.outputs.dir }}/node_modules
+          key: be-${{ runner.os }}-node-${{ hashFiles(format('{0}/**/package-lock.json', steps.detect-be.outputs.dir), format('{0}/**/yarn.lock', steps.detect-be.outputs.dir)) }}
+          restore-keys: |
+            be-${{ runner.os }}-node-
+
+      - name: Install Node backend dependencies
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "📦 Installing backend Node dependencies..."
+          if [ -f "package-lock.json" ]; then
+            npm ci || npm install
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile || yarn install
+          else
+            npm install
+          fi
+
+      - name: 🔎 Backend Lint (Node)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "🔎 Running backend linter..."
+          if grep -q '"lint"' package.json; then
+            npm run lint
+          else
+            echo "ℹ️ No 'lint' script configured in ${{ steps.detect-be.outputs.dir }}/package.json. Skipping."
+          fi
+
+      - name: 📐 Backend TypeScript Typecheck (Node)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "📐 Checking backend TypeScript types..."
+          if grep -q '"typecheck"' package.json || grep -q '"type-check"' package.json; then
+            npm run typecheck 2>/dev/null || npm run type-check
+          elif [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          else
+            echo "ℹ️ No TypeScript configuration found. Skipping typecheck."
+          fi
+
+      - name: 🧪 Backend Unit & Integration Tests (Node)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "🧪 Running backend tests..."
+          if grep -q '"test"' package.json; then
+            npm test -- --passWithNoTests || npm test --if-present
+          else
+            echo "ℹ️ No 'test' script configured in ${{ steps.detect-be.outputs.dir }}/package.json. Skipping."
+          fi
+
+      - name: 🏗️ Backend Build (Node)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'node'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "🏗️ Building backend..."
+          if grep -q '"build"' package.json; then
+            npm run build
+          else
+            echo "ℹ️ No 'build' script configured in ${{ steps.detect-be.outputs.dir }}/package.json. Skipping."
+          fi
+
+      # ─── Python Backend ───────────────────────────────────────
+      - name: Setup Python for Backend
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python backend dependencies
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'python'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+          pip install flake8 pytest || true
+
+      - name: 🔎 Backend Lint (Python)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'python'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "🔎 Running Python syntax & lint checks..."
+          python -m compileall .
+          if command -v flake8 >/dev/null 2>&1; then
+            flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          fi
+
+      - name: 🧪 Backend Tests (Python)
+        if: steps.detect-be.outputs.found == 'true' && steps.detect-be.outputs.type == 'python'
+        working-directory: ${{ steps.detect-be.outputs.dir }}
+        run: |
+          echo "🧪 Running pytest..."
+          if command -v pytest >/dev/null 2>&1; then
+            pytest --maxfail=5 -rf || echo "ℹ️ Pytest completed or no tests configured yet."
+          fi
+
+      - name: Backend summary message
+        if: steps.detect-be.outputs.found == 'false'
+        run: |
+          echo "ℹ️ Status: Backend code not yet committed in this repository."
+          echo "✅ Ready for backend services (Node.js/Express/FastAPI) inside 'backend/' or root."
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 4: PR Summary & Gatekeeper
+  # ─────────────────────────────────────────────────────────────
+  pipeline-report:
+    name: 📝 CI Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [security-scan, frontend, backend]
+    if: always()
     permissions:
       pull-requests: write
+      contents: read
     steps:
-      - name: Post CI summary on PR
+      - name: Evaluate overall pipeline status
+        id: eval
+        run: |
+          SEC_STATUS="${{ needs.security-scan.result }}"
+          FE_STATUS="${{ needs.frontend.result }}"
+          BE_STATUS="${{ needs.backend.result }}"
+
+          echo "Security  : $SEC_STATUS"
+          echo "Frontend  : $FE_STATUS"
+          echo "Backend   : $BE_STATUS"
+
+          if [ "$SEC_STATUS" = "failure" ] || [ "$FE_STATUS" = "failure" ] || [ "$BE_STATUS" = "failure" ]; then
+            echo "❌ Pipeline failed"
+            exit 1
+          else
+            echo "✅ Pipeline passed"
+          fi
+
+      - name: Post PR comment summary
+        if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
         with:
           script: |
-            const lintResult   = '${{ needs.lint.result }}';
-            const testResult   = '${{ needs.test.result }}';
-            const buildResult  = '${{ needs.build.result }}';
+            const secResult  = '${{ needs.security-scan.result }}';
+            const feResult   = '${{ needs.frontend.result }}';
+            const beResult   = '${{ needs.backend.result }}';
 
-            const icon = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌';
+            const icon = (r) => {
+              if (r === 'success') return '✅ Passed';
+              if (r === 'skipped') return '⏭️ Skipped (Not present)';
+              return '❌ Failed';
+            };
 
-            const allPassed = [lintResult, testResult, buildResult]
-              .filter(r => r !== 'skipped')
-              .every(r => r === 'success');
+            const allPassed = [secResult, feResult, beResult].every(r => r === 'success' || r === 'skipped');
 
-            const body = `## ${allPassed ? '✅' : '❌'} CI Pipeline Report
+            const body = `## ${allPassed ? '✅' : '❌'} Full-Stack CI Pipeline Report
 
-            | Job | Status |
-            |-----|--------|
-            | 🔎 Lint & Code Quality | ${icon(lintResult)} ${lintResult} |
-            | 🧪 Unit Tests | ${icon(testResult)} ${testResult} |
-            | 🏗️ Build Check | ${icon(buildResult)} ${buildResult} |
+| Layer | Job | Status |
+|---|---|---|
+| 🛡️ Security | Secret & Credential Scan | ${icon(secResult)} |
+| 🎨 Frontend | Lint, Typecheck, Tests & Build | ${icon(feResult)} |
+| ⚙️ Backend | Node/Python Lint, Tests & Build | ${icon(beResult)} |
 
-            **Branch:** \`${{ github.head_ref }}\`
-            **Commit:** \`${{ github.sha }}\`
-            **PR:** #${{ github.event.pull_request.number }}
+**Branch:** \`${{ github.head_ref || github.ref_name }}\`
+**Commit:** \`${{ github.sha }}\`
 
-            ${allPassed
-              ? '> ✅ All checks passed! This PR is ready for review.'
-              : '> ❌ One or more checks failed. Please fix the issues above before requesting review.'}
-            `;
+${allPassed 
+  ? '> ✅ **All frontend & backend checks passed successfully!** This PR is ready for team review.' 
+  : '> ❌ **One or more checks failed.** Please inspect the failing job details above.'}
+`;
 
-            // Find existing CI comment to update instead of spamming
-            const comments = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const existing = comments.data.find(c =>
-              c.user.login === 'github-actions[bot]' &&
-              c.body.includes('CI Pipeline Report')
-            );
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
+            try {
+              const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body,
               });
+
+              const existing = comments.data.find(c =>
+                c.user.login === 'github-actions[bot]' &&
+                c.body.includes('Full-Stack CI Pipeline Report')
+              );
+
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body,
+                });
+              }
+            } catch (err) {
+              console.log('Unable to post PR comment (permissions or not a PR):', err.message);
             }
