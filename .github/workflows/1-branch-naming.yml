@@ -1,0 +1,64 @@
+name: 🌿 Branch Naming Convention
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check-branch-name:
+    name: Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch naming convention
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "🔍 Checking branch: $BRANCH"
+
+          # Allowed patterns:
+          # feature/ISSUE-NUMBER-short-description   e.g. feature/12-user-auth
+          # fix/ISSUE-NUMBER-short-description        e.g. fix/34-login-bug
+          # hotfix/ISSUE-NUMBER-short-description     e.g. hotfix/1-critical-crash
+          # chore/short-description                   e.g. chore/update-deps
+          # docs/short-description                    e.g. docs/update-readme
+          # release/v1.2.0                            e.g. release/v1.2.0
+
+          VALID_PATTERN="^(feature|fix|hotfix|chore|docs|release|qa|refactor)\/[a-z0-9][a-z0-9/_-]*$"
+
+          if echo "$BRANCH" | grep -Eq "$VALID_PATTERN"; then
+            echo "✅ Branch name '$BRANCH' follows the convention."
+          else
+            echo ""
+            echo "❌ Branch name '$BRANCH' does NOT follow the required convention."
+            echo ""
+            echo "📋 Required format:"
+            echo "   feature/<issue-number>-short-description"
+            echo "   fix/<issue-number>-short-description"
+            echo "   hotfix/<issue-number>-short-description"
+            echo "   chore/short-description"
+            echo "   docs/short-description"
+            echo "   release/v<version>"
+            echo ""
+            echo "✅ Good examples:"
+            echo "   feature/12-contact-import-csv"
+            echo "   fix/34-deal-value-null"
+            echo "   hotfix/1-login-crash"
+            echo "   chore/update-dependencies"
+            echo "   release/v1.2.0"
+            echo ""
+            echo "❌ Bad examples:"
+            echo "   my-branch"
+            echo "   patch-1"
+            echo "   dev"
+            exit 1
+          fi
+
+      - name: Extract issue number from branch name
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          # Try to extract issue number from branch name like feature/12-description
+          ISSUE_NUM=$(echo "$BRANCH" | grep -oP '(?<=/)\d+(?=-)' || echo "")
+          if [ -n "$ISSUE_NUM" ]; then
+            echo "🔗 Branch is linked to issue #$ISSUE_NUM"
+          else
+            echo "ℹ️ No issue number detected in branch name (optional for chore/docs/release branches)"
+          fi
