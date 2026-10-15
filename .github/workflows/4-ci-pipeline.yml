@@ -1,0 +1,210 @@
+name: 🚀 CI Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop, staging]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+
+jobs:
+  # ─────────────────────────────────────────
+  # JOB 1: Code Quality & Lint
+  # ─────────────────────────────────────────
+  lint:
+    name: 🔎 Lint & Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+          else
+            echo "ℹ️ No package.json found. Skipping npm install."
+          fi
+
+      - name: Run linter
+        run: |
+          if [ -f "package.json" ] && grep -q '"lint"' package.json; then
+            npm run lint
+          else
+            echo "ℹ️ No lint script found. Skipping."
+          fi
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔍 Scanning for hardcoded secrets..."
+          # Check for common secret patterns
+          PATTERNS=(
+            "password\s*=\s*['\"][^'\"]{4,}['\"]"
+            "api_key\s*=\s*['\"][^'\"]{8,}['\"]"
+            "secret\s*=\s*['\"][^'\"]{8,}['\"]"
+            "AWS_SECRET"
+            "private_key"
+          )
+          FOUND=0
+          for pattern in "${PATTERNS[@]}"; do
+            if grep -rEi "$pattern" --include="*.js" --include="*.ts" --include="*.py" --include="*.env" . 2>/dev/null | grep -v "node_modules" | grep -v ".git" | grep -v "test" | grep -v "example"; then
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then
+            echo "⚠️ Potential hardcoded secrets detected. Please use environment variables."
+          else
+            echo "✅ No obvious hardcoded secrets found."
+          fi
+
+  # ─────────────────────────────────────────
+  # JOB 2: Unit Tests
+  # ─────────────────────────────────────────
+  test:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+          else
+            echo "ℹ️ No package.json found. Skipping."
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -f "package.json" ] && grep -q '"test"' package.json; then
+            npm test -- --coverage --ci
+          else
+            echo "ℹ️ No test script configured yet. Add tests to activate this step."
+            echo "📋 Add to package.json: \"test\": \"jest --coverage\""
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────
+  # JOB 3: Build Check
+  # ─────────────────────────────────────────
+  build:
+    name: 🏗️ Build Check
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm ci
+          else
+            echo "ℹ️ No package.json found. Skipping."
+          fi
+
+      - name: Run build
+        run: |
+          if [ -f "package.json" ] && grep -q '"build"' package.json; then
+            npm run build
+          else
+            echo "ℹ️ No build script configured yet."
+          fi
+
+  # ─────────────────────────────────────────
+  # JOB 4: PR Summary Comment
+  # ─────────────────────────────────────────
+  pr-summary:
+    name: 📝 PR Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, build]
+    if: github.event_name == 'pull_request' && always()
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post CI summary on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lintResult   = '${{ needs.lint.result }}';
+            const testResult   = '${{ needs.test.result }}';
+            const buildResult  = '${{ needs.build.result }}';
+
+            const icon = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌';
+
+            const allPassed = [lintResult, testResult, buildResult]
+              .filter(r => r !== 'skipped')
+              .every(r => r === 'success');
+
+            const body = `## ${allPassed ? '✅' : '❌'} CI Pipeline Report
+
+            | Job | Status |
+            |-----|--------|
+            | 🔎 Lint & Code Quality | ${icon(lintResult)} ${lintResult} |
+            | 🧪 Unit Tests | ${icon(testResult)} ${testResult} |
+            | 🏗️ Build Check | ${icon(buildResult)} ${buildResult} |
+
+            **Branch:** \`${{ github.head_ref }}\`
+            **Commit:** \`${{ github.sha }}\`
+            **PR:** #${{ github.event.pull_request.number }}
+
+            ${allPassed
+              ? '> ✅ All checks passed! This PR is ready for review.'
+              : '> ❌ One or more checks failed. Please fix the issues above before requesting review.'}
+            `;
+
+            // Find existing CI comment to update instead of spamming
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.data.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('CI Pipeline Report')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
