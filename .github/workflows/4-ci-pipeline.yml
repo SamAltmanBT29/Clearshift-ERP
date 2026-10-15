@@ -395,19 +395,19 @@ jobs:
 
             const body = `## ${allPassed ? '✅' : '❌'} Full-Stack CI Pipeline Report
 
-| Layer | Job | Status |
-|---|---|---|
-| 🛡️ Security | Secret & Credential Scan | ${icon(secResult)} |
-| 🎨 Frontend | Lint, Typecheck, Tests & Build | ${icon(feResult)} |
-| ⚙️ Backend | Node/Python Lint, Tests & Build | ${icon(beResult)} |
+            | Layer | Job | Status |
+            |---|---|---|
+            | 🛡️ Security | Secret & Credential Scan | ${icon(secResult)} |
+            | 🎨 Frontend | Lint, Typecheck, Tests & Build | ${icon(feResult)} |
+            | ⚙️ Backend | Node/Python Lint, Tests & Build | ${icon(beResult)} |
 
-**Branch:** \`${{ github.head_ref || github.ref_name }}\`
-**Commit:** \`${{ github.sha }}\`
+            **Branch:** \`${{ github.head_ref || github.ref_name }}\`
+            **Commit:** \`${{ github.sha }}\`
 
-${allPassed 
-  ? '> ✅ **All frontend & backend checks passed successfully!** This PR is ready for team review.' 
-  : '> ❌ **One or more checks failed.** Please inspect the failing job details above.'}
-`;
+            ${allPassed 
+            ? '> ✅ **All frontend & backend checks passed successfully!** This PR is ready for team review.' 
+            : '> ❌ **One or more checks failed.** Please inspect the failing job details above.'}
+            `;
 
             try {
               const comments = await github.rest.issues.listComments({
