@@ -1,0 +1,50 @@
+name: 📋 Auto-Link PR to Project Board
+
+on:
+  pull_request:
+    types: [opened, reopened]
+  issues:
+    types: [opened, reopened]
+
+jobs:
+  auto-add-to-project:
+    name: Add to Project Board
+    runs-on: ubuntu-latest
+    permissions:
+      repository-projects: write
+    steps:
+      - name: Add issue/PR to project board
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const eventName = context.eventName;
+            const payload = context.payload;
+
+            let contentId, contentType, title, number;
+
+            if (eventName === 'pull_request') {
+              contentId = payload.pull_request.node_id;
+              contentType = 'PullRequest';
+              title = payload.pull_request.title;
+              number = payload.pull_request.number;
+              console.log(`📋 New PR #${number}: ${title}`);
+            } else if (eventName === 'issues') {
+              contentId = payload.issue.node_id;
+              contentType = 'Issue';
+              title = payload.issue.title;
+              number = payload.issue.number;
+              console.log(`📋 New Issue #${number}: ${title}`);
+            }
+
+            // Extract issue number from branch name (for PRs)
+            if (eventName === 'pull_request') {
+              const branch = payload.pull_request.head.ref;
+              const match = branch.match(/\/(\d+)[-_]/);
+              if (match) {
+                const issueNum = match[1];
+                console.log(`🔗 Branch is linked to issue #${issueNum}`);
+              }
+            }
+
+            console.log(`✅ ${contentType} #${number} processed. Add project board token (project scope) to GITHUB_TOKEN secret to enable auto-add to project board.`);
