@@ -1,0 +1,79 @@
+name: 🔍 Commit Message Validator
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-commits:
+    name: Validate All Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          echo "🔍 Validating commit messages in this PR..."
+          echo ""
+
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          # Get all commits in this PR
+          COMMITS=$(git log --format="%H %s" $BASE..$HEAD)
+
+          if [ -z "$COMMITS" ]; then
+            echo "ℹ️ No new commits found. Skipping."
+            exit 0
+          fi
+
+          # Conventional commit pattern
+          PATTERN="^(feat|fix|chore|docs|refactor|test|style|perf|hotfix|ci|revert|merge)(\(.+\))?: .{3,}"
+
+          FAILED=0
+          TOTAL=0
+
+          while IFS= read -r line; do
+            SHA=$(echo "$line" | awk '{print $1}')
+            MSG=$(echo "$line" | cut -d' ' -f2-)
+            TOTAL=$((TOTAL + 1))
+
+            # Skip merge commits
+            if echo "$MSG" | grep -iq "^Merge"; then
+              echo "⏭️  Skipping merge commit: $MSG"
+              continue
+            fi
+
+            if echo "$MSG" | grep -Eq "$PATTERN"; then
+              echo "✅ [$SHA] $MSG"
+            else
+              echo "❌ [$SHA] $MSG"
+              FAILED=$((FAILED + 1))
+            fi
+          done <<< "$COMMITS"
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Total commits checked: $TOTAL"
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "❌ $FAILED commit(s) have invalid message format."
+            echo ""
+            echo "📋 Required format: type(scope): description"
+            echo ""
+            echo "✅ Good examples:"
+            echo "   feat(contacts): add email validation on import"
+            echo "   fix(deals): handle null close date #34"
+            echo "   chore(deps): upgrade axios to v1.6"
+            echo "   docs(api): update contact endpoints"
+            echo "   test(inventory): add unit tests for stock valuation"
+            echo ""
+            echo "📌 Allowed types: feat | fix | chore | docs | refactor | test | style | perf | hotfix | ci | revert"
+            exit 1
+          else
+            echo "✅ All commits follow the convention!"
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
