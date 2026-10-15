@@ -1,0 +1,99 @@
+name: 🔗 PR Issue Link Validator
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  validate-pr:
+    name: Validate PR has Linked Issue & Proper Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title format
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          echo "🔍 PR Title: $TITLE"
+
+          # Must follow: type(scope): description
+          # e.g. feat(contacts): add CSV import
+          #      fix(deals): null value on deal creation
+          #      chore(deps): update dependencies
+          VALID_TITLE="^(feat|fix|chore|docs|refactor|test|style|perf|hotfix|ci|revert)(\(.+\))?: .{5,}"
+
+          if echo "$TITLE" | grep -Eq "$VALID_TITLE"; then
+            echo "✅ PR title follows Conventional Commits format."
+          else
+            echo ""
+            echo "❌ PR title does NOT follow the required format."
+            echo ""
+            echo "📋 Required format:  type(scope): description"
+            echo ""
+            echo "✅ Good examples:"
+            echo "   feat(contacts): add CSV import pipeline"
+            echo "   fix(deals): null value on deal creation #34"
+            echo "   chore(deps): update node dependencies"
+            echo "   docs(api): update swagger endpoint docs"
+            echo ""
+            echo "📌 Allowed types: feat | fix | chore | docs | refactor | test | style | perf | hotfix | ci | revert"
+            exit 1
+          fi
+
+      - name: Check PR body has linked issue
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "🔍 Checking PR body for linked issue..."
+
+          BRANCH="${{ github.head_ref }}"
+
+          # Skip issue link check for chore, docs, release branches
+          if echo "$BRANCH" | grep -Eq "^(chore|docs|release|refactor)\/"; then
+            echo "ℹ️ Branch type '$BRANCH' does not require a linked issue. Skipping."
+            exit 0
+          fi
+
+          # Check for any of: Closes #N, Fixes #N, Resolves #N, Related to #N
+          ISSUE_LINK_PATTERN="(closes|fixes|resolves|related to|linked to) #[0-9]+"
+
+          if echo "$PR_BODY" | grep -iEq "$ISSUE_LINK_PATTERN"; then
+            ISSUE=$(echo "$PR_BODY" | grep -iEo "$ISSUE_LINK_PATTERN" | head -1)
+            echo "✅ PR is linked to an issue: '$ISSUE'"
+          else
+            echo ""
+            echo "❌ PR body does NOT contain a linked issue."
+            echo ""
+            echo "📋 Your PR body must include one of:"
+            echo "   Closes #<issue-number>"
+            echo "   Fixes #<issue-number>"
+            echo "   Resolves #<issue-number>"
+            echo "   Related to #<issue-number>"
+            echo ""
+            echo "✅ Example PR body:"
+            echo '   ## Summary'
+            echo '   Added CSV import for contacts module.'
+            echo ''
+            echo '   Closes #12'
+            exit 1
+          fi
+
+      - name: Check PR has description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "🔍 Checking PR has a meaningful description..."
+          BODY_LENGTH=${#PR_BODY}
+          if [ "$BODY_LENGTH" -lt 50 ]; then
+            echo "❌ PR description is too short (less than 50 characters). Please describe what this PR does."
+            exit 1
+          fi
+          echo "✅ PR description looks good ($BODY_LENGTH characters)."
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ PR Validation PASSED"
+          echo "   Branch  : ${{ github.head_ref }}"
+          echo "   Title   : ${{ github.event.pull_request.title }}"
+          echo "   PR #    : ${{ github.event.pull_request.number }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
