@@ -1,0 +1,75 @@
+name: 🛡️ PMO Dual Approval Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+jobs:
+  verify-pmo-approvals:
+    name: Validate Mandatory PMO Reviews (Soldier224K & amankoli09)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PMO Approvals
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          echo "🔍 Fetching reviews for PR #${PR_NUMBER} in ${REPO}..."
+          
+          # Fetch reviews via GitHub CLI / API
+          REVIEWS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews?per_page=100")
+          
+          # Compute latest review state per user (reviews are chronological)
+          SOLDIER_STATE=$(echo "$REVIEWS" | jq -r '[.[] | select(.user.login | ascii_downcase == "soldier224k")] | last | .state // "NONE"')
+          AMAN_STATE=$(echo "$REVIEWS" | jq -r '[.[] | select(.user.login | ascii_downcase == "amankoli09")] | last | .state // "NONE"')
+          
+          AUTHOR_LOWER=$(echo "$PR_AUTHOR" | tr '[:upper:]' '[:lower:]')
+          
+          # Check if author is one of the reviewers
+          if [ "$AUTHOR_LOWER" = "soldier224k" ]; then
+            SOLDIER_STATE="AUTHOR"
+          fi
+          if [ "$AUTHOR_LOWER" = "amankoli09" ]; then
+            AMAN_STATE="AUTHOR"
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 CLEARSHIFT V1 PMO MANDATORY REVIEW GATE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  PR Author    : @${PR_AUTHOR}"
+          echo "  @Soldier224K : ${SOLDIER_STATE}"
+          echo "  @amankoli09  : ${AMAN_STATE}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+
+          FAILED=0
+
+          # Validate Soldier224K
+          if [ "$SOLDIER_STATE" != "APPROVED" ] && [ "$SOLDIER_STATE" != "AUTHOR" ]; then
+            echo "❌ MISSING APPROVAL: @Soldier224K has not approved this pull request."
+            FAILED=1
+          else
+            echo "✅ @Soldier224K verified (${SOLDIER_STATE})."
+          fi
+
+          # Validate amankoli09
+          if [ "$AMAN_STATE" != "APPROVED" ] && [ "$AMAN_STATE" != "AUTHOR" ]; then
+            echo "❌ MISSING APPROVAL: @amankoli09 has not approved this pull request."
+            FAILED=1
+          else
+            echo "✅ @amankoli09 verified (${AMAN_STATE})."
+          fi
+
+          echo ""
+          if [ "$FAILED" -eq 1 ]; then
+            echo "⛔ GATE BLOCKED: Both @Soldier224K and @amankoli09 must review and approve before this PR can pass or be merged."
+            exit 1
+          else
+            echo "🎉 GATE PASSED: Mandatory PMO dual approvals verified. PR is cleared for PMO merge."
+            exit 0
+          fi
