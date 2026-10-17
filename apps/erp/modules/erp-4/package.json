@@ -1,0 +1,21 @@
+{
+  "name": "@clearshift/erp-finance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ERP-4 Finance & Accounting module — ClearShift ERP",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --project erp-finance",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clearshift/contracts": "*",
+    "@clearshift/database": "*",
+    "drizzle-orm": "^0.36.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "typescript": "^5.7.0"
+  }
+}

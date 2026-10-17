@@ -1,33 +1,30 @@
-## 📋 Pull Request Summary
-<!-- What does this PR do? One sentence. -->
+## 🎯 Issue Reference
+<!-- Using "Closes #<issue_id>" will automatically close the issue when merged -->
+Closes #<ISSUE_NUMBER>
 
-## 🎯 Module
-<!-- e.g. CRM · Contacts | ERP · Finance -->
+## 📝 Summary of Changes
+- Briefly describe what was implemented or modified.
+- Mention key components, APIs, or schema changes introduced.
 
-## 🔗 Linked Issue
-Closes #<!-- issue number -->
+## 🛠 Type of Change
+- [ ] 🗄 Backend (Schema / API / Business Logic)
+- [ ] 🎨 Frontend (UI / Forms / State Management)
+- [ ] 🧪 Testing (Unit / Integration / E2E)
+- [ ] 🔄 Migration / Data Adapter
+- [ ] 🔒 Security / Auth / Audit
 
-## 🔄 Type of Change
-- [ ] ✨ New Feature
-- [ ] 🐛 Bug Fix
-- [ ] 🔗 Integration
-- [ ] 📊 Data / Migration
-- [ ] 🎨 UI Change
-- [ ] ♻️ Refactor / Chore
+## ✅ Acceptance Criteria Checklist
+- [ ] Implemented domain invariants and requirements specified in the issue.
+- [ ] No hardcoded or mock-only data remains in production code paths.
+- [ ] Clean keyboard navigation, accessible states (empty, loading, error) handled (if frontend).
+- [ ] OpenAPI contracts and data dictionaries updated (if backend).
 
-## ✅ Checklist
-- [ ] Code follows team coding standards
-- [ ] Self-reviewed the code
-- [ ] Added / updated unit tests
-- [ ] No console errors or warnings
-- [ ] Linked to the correct GitHub Project board item
-- [ ] Screenshots attached (for UI changes)
+## 📸 Verification & Closure Evidence
+<!-- Attach evidence below: test output, terminal run logs, or UI screenshots -->
+- **Test Results**: Passed local tests (`npm test` / CI check pass).
+- **Screenshots / Video**: *(Paste image or link here if frontend)*
+- **Synthetic Data**: Verified using synthetic data fixtures.
 
-## 🧪 Testing Done
-<!-- Describe how you tested this change -->
-
-## 📸 Screenshots (if UI change)
-<!-- Before / After screenshots -->
-
-## 💬 Notes for Reviewer
-<!-- Anything the reviewer should pay special attention to -->
+## 👥 Reviewers & Sign-off
+- **Author**: @<your-github-username>
+- **Team**: (e.g., ERP-1 / CRM-2 / PTL)

@@ -14,27 +14,21 @@ jobs:
           TITLE="${{ github.event.pull_request.title }}"
           echo "🔍 PR Title: $TITLE"
 
-          # Must follow: type(scope): description
-          # e.g. feat(contacts): add CSV import
-          #      fix(deals): null value on deal creation
-          #      chore(deps): update dependencies
-          VALID_TITLE="^(feat|fix|chore|docs|refactor|test|style|perf|hotfix|ci|revert)(\(.+\))?: .{5,}"
+          # Allowed formats:
+          # 1. Team format: [MODULE-ID] description (e.g. [ERP1-04] Implement product list screen)
+          # 2. Conventional commits: type(scope): description (e.g. feat(contacts): add CSV import)
+          VALID_TITLE="^(\[[A-Za-z0-9_-]+\]\s*.{5,}|(feat|fix|chore|docs|refactor|test|style|perf|hotfix|ci|revert)(\(.+\))?: .{5,})"
 
           if echo "$TITLE" | grep -Eq "$VALID_TITLE"; then
-            echo "✅ PR title follows Conventional Commits format."
+            echo "✅ PR title follows the required format."
           else
             echo ""
             echo "❌ PR title does NOT follow the required format."
             echo ""
-            echo "📋 Required format:  type(scope): description"
-            echo ""
-            echo "✅ Good examples:"
-            echo "   feat(contacts): add CSV import pipeline"
-            echo "   fix(deals): null value on deal creation #34"
-            echo "   chore(deps): update node dependencies"
-            echo "   docs(api): update swagger endpoint docs"
-            echo ""
-            echo "📌 Allowed types: feat | fix | chore | docs | refactor | test | style | perf | hotfix | ci | revert"
+            echo "📋 Required format:"
+            echo "   [MODULE-ID] Brief description of the change"
+            echo "   e.g. [ERP1-04] Implement product list screen and filter controls"
+            echo "   or Conventional Commits: type(scope): description"
             exit 1
           fi
 

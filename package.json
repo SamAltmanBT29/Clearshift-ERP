@@ -1,0 +1,35 @@
+{
+  "name": "clearshift-erp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ClearShift ERP — monorepo root",
+  "workspaces": [
+    "apps/*",
+    "apps/erp/modules/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:migrate": "node packages/database/scripts/migrate.js",
+    "db:migrate:test": "cross-env NODE_ENV=test node packages/database/scripts/migrate.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "cross-env": "^7.0.3",
+    "eslint": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  }
+}
