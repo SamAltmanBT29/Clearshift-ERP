@@ -1,0 +1,1007 @@
+openapi: "3.1.0"
+
+info:
+  title: ClearShift ERP — Finance & Accounting API
+  description: |
+    **ERP-4 Finance & Accounting module** — public REST contract.
+
+    Base path: `/api/v1/erp-finance`
+
+    Implements:
+    - Chart of Accounts (FR-ERP4-01)
+    - Journal Entries with double-entry validation (FR-ERP4-02, BR-ERP4-01)
+    - Trial Balance report (FR-ERP4-03)
+    - Opening Balances (FR-ERP4-04)
+    - Accounting Period management (BR-ERP4-02)
+
+    All amounts are returned as **string-encoded decimals** (numeric strings)
+    to avoid IEEE-754 floating-point rounding. Clients must use a
+    fixed-precision decimal library for arithmetic.
+
+    All timestamps are ISO 8601 with timezone (UTC).
+  version: "1.0.0"
+  contact:
+    name: ClearShift Engineering — ERP Team
+  license:
+    name: Private
+
+servers:
+  - url: http://localhost:3000/api/v1/erp-finance
+    description: Local development server
+  - url: https://api.clearshift.internal/api/v1/erp-finance
+    description: Staging / production
+
+tags:
+  - name: Accounts
+    description: Chart of Accounts management
+  - name: Journal Entries
+    description: Double-entry journal creation, posting, and reversal
+  - name: Trial Balance
+    description: Period-scoped trial balance report
+  - name: Opening Balances
+    description: One-time opening balance loads
+
+# ────────────────────────────────────────────────────────────────────────────
+# Paths
+# ────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Chart of Accounts ──────────────────────────────────────────────────────
+  /accounts:
+    get:
+      operationId: listAccounts
+      tags: [Accounts]
+      summary: List all accounts in the Chart of Accounts
+      description: |
+        Returns all accounts. Supports filtering by type and active status.
+        Ordered by `code` ascending.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/AccountType"
+          description: Filter by account classification
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status (default true)
+        - name: currency_code
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            pattern: "^[A-Z]{3}$"
+          description: Filter by ISO 4217 currency code
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createAccount
+      tags: [Accounts]
+      summary: Create a new account (seed/admin/editor only)
+      description: |
+        Adds a new leaf or header account to the Chart of Accounts.
+        Requires `finance:accounts:write` permission.
+        Account `code` must be globally unique within the module.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountRequest"
+            examples:
+              assetAccount:
+                summary: Create a bank asset account
+                value:
+                  code: "1010-BANK"
+                  name: "Main Current Account"
+                  type: "asset"
+                  currency_code: "INR"
+                  is_posting_account: true
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Account code already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:accounts:write]
+
+  # ── Journal Entries ─────────────────────────────────────────────────────────
+  /journal-entries:
+    get:
+      operationId: listJournalEntries
+      tags: [Journal Entries]
+      summary: List journal entries
+      description: |
+        Returns a paginated list of journal entries.
+        Optionally filter by period (YYYY-MM) and/or status.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+            example: "2026-04"
+          description: Fiscal period label YYYY-MM
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/JournalEntryStatus"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Paginated journal entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntryListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createJournalEntry
+      tags: [Journal Entries]
+      summary: Create a new journal entry (draft)
+      description: |
+        Creates a journal entry in **draft** status.
+
+        Domain invariants enforced at API layer:
+        - `SUM(debit_amount) == SUM(credit_amount)` at 4 decimal places
+        - Each line must carry exactly one of debit > 0 OR credit > 0
+        - At least 2 lines required
+
+        Draft entries can be edited; only `POST /journal-entries/{id}/post`
+        transitions them to `posted`.
+
+        If `idempotency_key` is supplied and a matching entry already exists,
+        the existing entry is returned (HTTP 200) without creating a duplicate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJournalEntryRequest"
+            examples:
+              simpleEntry:
+                summary: Debit Expense, Credit Bank
+                value:
+                  period_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  posting_date: "2026-04-15"
+                  description: "Office supplies purchase"
+                  currency_code: "INR"
+                  lines:
+                    - account_id: "1111-1111-1111-1111-111111111111"
+                      debit_amount: "5000.0000"
+                      credit_amount: "0.0000"
+                      line_narration: "Stationery expense"
+                    - account_id: "2222-2222-2222-2222-222222222222"
+                      debit_amount: "0.0000"
+                      credit_amount: "5000.0000"
+                      line_narration: "Bank payment"
+      responses:
+        "201":
+          description: Journal entry created as draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "200":
+          description: Existing entry returned (idempotent duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: |
+            Unprocessable — period is locked/soft-closed, or entry is unbalanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /journal-entries/{id}:
+    get:
+      operationId: getJournalEntry
+      tags: [Journal Entries]
+      summary: Get a single journal entry with its lines
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Journal entry with lines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /journal-entries/{id}/post:
+    post:
+      operationId: postJournalEntry
+      tags: [Journal Entries]
+      summary: Post a draft journal entry (makes it immutable)
+      description: |
+        Validates and posts a draft entry:
+        1. Validates that the accounting period is `open` (or `soft_closed` for admins)
+        2. Re-validates that debits == credits at 4dp (guard against concurrent edits)
+        3. Transitions `status` → `posted`, sets `posted_at` and `posted_by_user_id`
+        4. Posted entries are **immutable**; corrections require a reversal entry.
+
+        Requires `finance:journal:post` permission.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Entry posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Entry is already posted or reversed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Period is locked, or entry is unbalanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:journal:post]
+
+  /journal-entries/{id}/reverse:
+    post:
+      operationId: reverseJournalEntry
+      tags: [Journal Entries]
+      summary: Reverse a posted journal entry
+      description: |
+        Creates a compensating reversal entry (debit↔credit swapped) and
+        links the original entry's `reversed_by_entry_id` to the new entry.
+
+        The original entry transitions to `status = 'reversed'`.
+        Requires `finance:journal:post` permission.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReverseJournalEntryRequest"
+      responses:
+        "201":
+          description: Reversal entry created; original entry marked reversed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Entry is not in posted status and cannot be reversed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:journal:post]
+
+  # ── Trial Balance ───────────────────────────────────────────────────────────
+  /trial-balance:
+    get:
+      operationId: getTrialBalance
+      tags: [Trial Balance]
+      summary: Generate the trial balance for a period
+      description: |
+        Returns debit and credit totals grouped by account and currency
+        for all **posted** journal entries within the given fiscal period.
+
+        Opening balances are included in `opening_balance` and `closing_balance`
+        columns.
+
+        **Note**: Unlike currencies are never summed together.
+        The `totals` object reports totals per currency; `is_balanced` is
+        `true` only when every currency group balances independently.
+
+        FR-ERP4-03
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+            example: "2026-04"
+          description: Fiscal period in YYYY-MM format
+        - name: currency_code
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            pattern: "^[A-Z]{3}$"
+          description: "Optional: filter results to a single currency"
+      responses:
+        "200":
+          description: Trial balance for the given period
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrialBalanceResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No accounting period found for the given label
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Opening Balances ────────────────────────────────────────────────────────
+  /opening-balances:
+    post:
+      operationId: createOpeningBalances
+      tags: [Opening Balances]
+      summary: Load opening balances (one-time per account/currency)
+      description: |
+        Bulk-loads opening balances for the chart of accounts.
+
+        Each `(account_id, currency_code)` pair is unique — attempting to load
+        a balance for a pair that already has one returns a `409` or a skipped
+        entry in the response, depending on server configuration.
+
+        Requires `finance:opening-balances:write` permission.
+        FR-ERP4-04
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOpeningBalancesRequest"
+            examples:
+              bulkLoad:
+                summary: Load opening balances for 3 accounts
+                value:
+                  balances:
+                    - account_id: "aaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+                      currency_code: "INR"
+                      balance_amount: "150000.0000"
+                      as_of_date: "2026-04-01"
+                    - account_id: "ffff-gggg-hhhh-iiii-jjjjjjjjjjjj"
+                      currency_code: "INR"
+                      balance_amount: "-25000.0000"
+                      as_of_date: "2026-04-01"
+      responses:
+        "201":
+          description: Opening balances created (partial success reported in `skipped`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOpeningBalancesResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:opening-balances:write]
+
+# ────────────────────────────────────────────────────────────────────────────
+# Components
+# ────────────────────────────────────────────────────────────────────────────
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the resource
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+
+    AccountType:
+      type: string
+      enum: [asset, liability, income, expense]
+      description: Account classification per standard chart-of-accounts taxonomy
+
+    JournalEntryStatus:
+      type: string
+      enum: [draft, posted, reversed, voided]
+
+    PeriodStatus:
+      type: string
+      enum: [open, soft_closed, locked]
+
+    Account:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - type
+        - currency_code
+        - is_active
+        - is_posting_account
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          maxLength: 32
+          example: "1010-BANK"
+        name:
+          type: string
+          maxLength: 255
+          example: "Main Current Account"
+        type:
+          $ref: "#/components/schemas/AccountType"
+        currency_code:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "INR"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        is_posting_account:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateAccountRequest:
+      type: object
+      required: [code, name, type]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          $ref: "#/components/schemas/AccountType"
+        currency_code:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: "INR"
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        is_posting_account:
+          type: boolean
+          default: true
+
+    AccountListResponse:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Account"
+        total:
+          type: integer
+          minimum: 0
+
+    JournalLine:
+      type: object
+      required:
+        - id
+        - journal_entry_id
+        - account_id
+        - debit_amount
+        - credit_amount
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        journal_entry_id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        debit_amount:
+          type: string
+          description: Non-negative decimal string (4dp)
+          example: "5000.0000"
+        credit_amount:
+          type: string
+          description: Non-negative decimal string (4dp)
+          example: "0.0000"
+        line_narration:
+          type: string
+          maxLength: 255
+          nullable: true
+        department_ref:
+          type: string
+          maxLength: 64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    JournalEntry:
+      type: object
+      required:
+        - id
+        - entry_number
+        - period_id
+        - posting_date
+        - status
+        - description
+        - currency_code
+        - created_by_user_id
+        - lines
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        entry_number:
+          type: string
+          example: "JV-2026-0001"
+        period_id:
+          type: string
+          format: uuid
+        posting_date:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/JournalEntryStatus"
+        description:
+          type: string
+        currency_code:
+          type: string
+          minLength: 3
+          maxLength: 3
+        source_reference:
+          type: string
+          nullable: true
+        idempotency_key:
+          type: string
+          nullable: true
+        created_by_user_id:
+          type: string
+          format: uuid
+        posted_by_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        posted_at:
+          type: string
+          format: date-time
+          nullable: true
+        reversed_by_entry_id:
+          type: string
+          format: uuid
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateJournalLineRequest:
+      type: object
+      required: [account_id]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        debit_amount:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          default: "0.0000"
+        credit_amount:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          default: "0.0000"
+        line_narration:
+          type: string
+          maxLength: 255
+          nullable: true
+        department_ref:
+          type: string
+          maxLength: 64
+          nullable: true
+
+    CreateJournalEntryRequest:
+      type: object
+      required: [period_id, posting_date, description, currency_code, lines]
+      properties:
+        period_id:
+          type: string
+          format: uuid
+        posting_date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        currency_code:
+          type: string
+          minLength: 3
+          maxLength: 3
+        source_reference:
+          type: string
+          maxLength: 128
+          nullable: true
+        idempotency_key:
+          type: string
+          maxLength: 128
+          nullable: true
+        lines:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/CreateJournalLineRequest"
+
+    JournalEntryListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEntry"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+
+    ReverseJournalEntryRequest:
+      type: object
+      properties:
+        reversal_date:
+          type: string
+          format: date
+          nullable: true
+        reversal_description:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    TrialBalanceRow:
+      type: object
+      required:
+        - account_id
+        - account_code
+        - account_name
+        - account_type
+        - currency_code
+        - total_debit
+        - total_credit
+        - net_balance
+        - opening_balance
+        - closing_balance
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        account_code:
+          type: string
+        account_name:
+          type: string
+        account_type:
+          $ref: "#/components/schemas/AccountType"
+        currency_code:
+          type: string
+        total_debit:
+          type: string
+          description: Sum of all debit amounts in this account for the period
+        total_credit:
+          type: string
+          description: Sum of all credit amounts in this account for the period
+        net_balance:
+          type: string
+          description: "total_debit - total_credit (signed)"
+        opening_balance:
+          type: string
+          description: Balance at start of period (from opening_balances or prior-period closing)
+        closing_balance:
+          type: string
+          description: "opening_balance + net_balance"
+
+    TrialBalanceResponse:
+      type: object
+      required: [period, generated_at, rows, totals]
+      properties:
+        period:
+          type: string
+          pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+        generated_at:
+          type: string
+          format: date-time
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrialBalanceRow"
+        totals:
+          type: object
+          required: [total_debit, total_credit, difference, is_balanced]
+          properties:
+            total_debit:
+              type: string
+            total_credit:
+              type: string
+            difference:
+              type: string
+              description: Should be "0.0000" for a balanced ledger
+            is_balanced:
+              type: boolean
+
+    OpeningBalance:
+      type: object
+      required:
+        - id
+        - account_id
+        - currency_code
+        - balance_amount
+        - as_of_date
+        - loaded_by_user_id
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          format: uuid
+        currency_code:
+          type: string
+        balance_amount:
+          type: string
+          description: Signed decimal (negative = contra / deficit)
+        as_of_date:
+          type: string
+          format: date
+        source_reference:
+          type: string
+          nullable: true
+        loaded_by_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    CreateOpeningBalancesRequest:
+      type: object
+      required: [balances]
+      properties:
+        balances:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [account_id, currency_code, balance_amount, as_of_date]
+            properties:
+              account_id:
+                type: string
+                format: uuid
+              currency_code:
+                type: string
+                minLength: 3
+                maxLength: 3
+              balance_amount:
+                type: string
+                pattern: "^-?\\d+(\\.\\d{1,4})?$"
+              as_of_date:
+                type: string
+                format: date
+              source_reference:
+                type: string
+                maxLength: 128
+                nullable: true
+
+    CreateOpeningBalancesResponse:
+      type: object
+      required: [created, skipped]
+      properties:
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningBalance"
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [account_id, currency_code, reason]
+            properties:
+              account_id:
+                type: string
+                format: uuid
+              currency_code:
+                type: string
+              reason:
+                type: string
+
+    ApiError:
+      type: object
+      required: [statusCode, error, message]
+      properties:
+        statusCode:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items: {}
