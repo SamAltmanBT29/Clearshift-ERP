@@ -15,9 +15,11 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       include: [
         'apps/erp/modules/erp-4/domain/**',
+        'apps/erp/modules/erp-4/src/**',
         'packages/contracts/src/**',
         'packages/database/src/**',
       ],
+      exclude: ['**/node_modules/**', '**/dist/**', '**/server.ts'],
       thresholds: {
         // Acceptance criterion: ≥ 80% coverage
         lines: 80,
