@@ -1,20 +1,14 @@
 <div align="center">
 
-# <span style="color: #fda4af;">ClearShift</span> <span style="color: #9ca3af;">ERP</span>
-
-<p style="font-size: 16px;">
-  <span style="color: #fda4af; font-weight: 600;">Enterprise Resource Planning</span>
-  <span style="color: #6b7280;">&bull;</span>
-  <span style="color: #9ca3af;">Data Migration & Cleanup Target System</span>
-</p>
+# <span style="color: #FDA4AF;">ClearShift</span> <span style="color: #9CA3AF;">ERP</span>
 
 <p>
-  <span style="background-color: #2b1b24; color: #fda4af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #4a2838;">Node 24 LTS</span>
-  <span style="background-color: #1f242c; color: #9ca3af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #374151;">TypeScript Strict</span>
-  <span style="background-color: #2b1b24; color: #fda4af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #4a2838;">PostgreSQL 18</span>
-  <span style="background-color: #1f242c; color: #9ca3af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #374151;">Drizzle ORM</span>
-  <span style="background-color: #2b1b24; color: #fda4af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #4a2838;">Fastify 5</span>
-  <span style="background-color: #1f242c; color: #9ca3af; padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #374151;">Vitest</span>
+  <img src="https://img.shields.io/badge/Node.js-24_LTS-FDA4AF?style=for-the-badge&logo=nodedotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/TypeScript-Strict-9CA3AF?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-18-FDA4AF?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Drizzle-ORM-9CA3AF?style=for-the-badge&logo=drizzle&logoColor=white" />
+  <img src="https://img.shields.io/badge/Fastify-5-FDA4AF?style=for-the-badge&logo=fastify&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vitest-Testing-9CA3AF?style=for-the-badge&logo=vitest&logoColor=white" />
 </p>
 
 </div>
