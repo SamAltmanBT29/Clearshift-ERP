@@ -17,6 +17,7 @@ Closes #<ISSUE_NUMBER>
 - [ ] Implemented domain invariants and requirements specified in the issue.
 - [ ] No hardcoded or mock-only data remains in production code paths.
 - [ ] Clean keyboard navigation, accessible states (empty, loading, error) handled (if frontend).
+- [ ] 🎨 Frontend follows Minimal White Theme, accessibility (labels/alt), and uses global :root tokens / @clearshift/ui.
 - [ ] OpenAPI contracts and data dictionaries updated (if backend).
 
 ## 📸 Verification & Closure Evidence

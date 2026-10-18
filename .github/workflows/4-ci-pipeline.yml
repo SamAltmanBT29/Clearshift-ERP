@@ -127,6 +127,16 @@ jobs:
             npm install
           fi
 
+      - name: 🎨 Validate Frontend Design & Architecture Guidelines
+        if: steps.detect-fe.outputs.found == 'true'
+        working-directory: ${{ steps.detect-fe.outputs.dir }}
+        run: |
+          if [ -f "scripts/validate-frontend.js" ]; then
+            node scripts/validate-frontend.js
+          else
+            echo "ℹ️ scripts/validate-frontend.js not found. Skipping."
+          fi
+
       - name: 🔎 Frontend Lint & Code Quality
         if: steps.detect-fe.outputs.found == 'true'
         working-directory: ${{ steps.detect-fe.outputs.dir }}
