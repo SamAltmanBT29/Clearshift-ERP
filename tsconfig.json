@@ -40,7 +40,8 @@
       "@cs/mod-erp2": ["./apps/erp/modules/erp-2/src/index.ts"],
       "@cs/mod-erp3": ["./apps/erp/modules/erp-3/src/index.ts"],
       "@cs/mod-erp4": ["./apps/erp/modules/erp-4/src/index.ts"],
-      "@cs/mod-erp5": ["./apps/erp/modules/erp-5/src/index.ts"]
+      "@cs/mod-erp5": ["./apps/erp/modules/erp-5/src/index.ts"],
+      "zod": ["./node_modules/zod", "./apps/api/node_modules/zod"]
     }
   },
   "include": [
