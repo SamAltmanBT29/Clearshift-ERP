@@ -56,6 +56,27 @@ paths:
         Returns all accounts. Supports filtering by type and active status.
         Ordered by `code` ascending.
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (deterministic paging, hard cap of 100)
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Server-side case-insensitive search across code and name
         - name: type
           in: query
           schema:
@@ -65,7 +86,7 @@ paths:
           in: query
           schema:
             type: boolean
-          description: Filter by active status (default true)
+          description: Filter by active status
         - name: currency_code
           in: query
           schema:
@@ -81,8 +102,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /accounts/{id}:
+    get:
+      operationId: getAccount
+      tags: [Accounts]
+      summary: Get an account by ID
+      description: Returns a single account in the Chart of Accounts by UUID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique account identifier
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -145,6 +204,34 @@ paths:
         Returns a paginated list of journal entries.
         Optionally filter by period (YYYY-MM) and/or status.
       parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (deterministic paging, hard cap of 100)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Optional alias for pageSize (capped at 100)
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Server-side case-insensitive search across entry_number and description
         - name: period
           in: query
           schema:
@@ -152,23 +239,37 @@ paths:
             pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
             example: "2026-04"
           description: Fiscal period label YYYY-MM
+        - name: period_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by accounting period UUID
         - name: status
           in: query
           schema:
             $ref: "#/components/schemas/JournalEntryStatus"
-        - name: page
+          description: Filter by journal entry status
+        - name: from_date
           in: query
           schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: limit
+            type: string
+            format: date
+          description: Filter entries on or after posting date (inclusive)
+        - name: to_date
           in: query
           schema:
-            type: integer
-            minimum: 1
-            maximum: 200
-            default: 50
+            type: string
+            format: date
+          description: Filter entries on or before posting date (inclusive)
+        - name: currency_code
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            pattern: "^[A-Z]{3}$"
+          description: Filter by ISO 4217 currency code
       responses:
         "200":
           description: Paginated journal entries
@@ -484,6 +585,178 @@ paths:
       security:
         - BearerAuth: [finance:opening-balances:write]
 
+    get:
+      operationId: listOpeningBalances
+      tags: [Opening Balances]
+      summary: List opening balances
+      description: Returns a paginated list of opening balances with bounded paging (hard cap of 100).
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (deterministic paging, hard cap of 100)
+        - name: account_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by account UUID
+        - name: currency_code
+          in: query
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            pattern: "^[A-Z]{3}$"
+          description: Filter by ISO 4217 currency code
+      responses:
+        "200":
+          description: Paginated opening balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpeningBalanceListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /opening-balances/{id}:
+    get:
+      operationId: getOpeningBalance
+      tags: [Opening Balances]
+      summary: Get opening balance by ID
+      description: Returns a single opening balance record by UUID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique opening balance identifier
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpeningBalance"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Opening balance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Accounting Periods ──────────────────────────────────────────────────────
+  /periods:
+    get:
+      operationId: listPeriods
+      tags: [Accounting Periods]
+      summary: List accounting periods
+      description: Returns a paginated list of fiscal periods with bounded paging (hard cap of 100).
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (deterministic paging, hard cap of 100)
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PeriodStatus"
+          description: Filter by period lifecycle status
+        - name: fiscal_year
+          in: query
+          schema:
+            type: string
+          description: Filter by fiscal year label (e.g. FY2026-27)
+      responses:
+        "200":
+          description: Paginated accounting periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeriodListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /periods/{id}:
+    get:
+      operationId: getPeriod
+      tags: [Accounting Periods]
+      summary: Get an accounting period by ID
+      description: Returns a single accounting period by UUID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique period identifier
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriod"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Accounting period not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
 # ────────────────────────────────────────────────────────────────────────────
 # Components
 # ────────────────────────────────────────────────────────────────────────────
@@ -635,13 +908,23 @@ components:
 
     AccountListResponse:
       type: object
-      required: [data, total]
+      required: [data, total, page, pageSize, totalPages]
       properties:
         data:
           type: array
           items:
             $ref: "#/components/schemas/Account"
         total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
           type: integer
           minimum: 0
 
@@ -809,7 +1092,7 @@ components:
 
     JournalEntryListResponse:
       type: object
-      required: [data, total, page, limit]
+      required: [data, total, page, pageSize, totalPages]
       properties:
         data:
           type: array
@@ -821,9 +1104,17 @@ components:
         page:
           type: integer
           minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
         limit:
           type: integer
           minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
 
     ReverseJournalEntryRequest:
       type: object
@@ -991,6 +1282,95 @@ components:
                 type: string
               reason:
                 type: string
+
+    OpeningBalanceListResponse:
+      type: object
+      required: [data, total, page, pageSize, totalPages]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningBalance"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    AccountingPeriod:
+      type: object
+      required:
+        - id
+        - period_label
+        - start_date
+        - end_date
+        - status
+        - fiscal_year
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        period_label:
+          type: string
+          pattern: "^\\d{4}-(0[1-9]|1[0-2])$"
+          example: "2026-04"
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/PeriodStatus"
+        fiscal_year:
+          type: string
+          example: "FY2026-27"
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_by_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PeriodListResponse:
+      type: object
+      required: [data, total, page, pageSize, totalPages]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountingPeriod"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
 
     ApiError:
       type: object

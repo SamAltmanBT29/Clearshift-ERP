@@ -193,3 +193,38 @@
 | Trial balance: unlike currencies never summed | Application (computeTrialBalance) | Groups by (account_id, currency_code) |
 | Closed period rejects posting | Application (assertPeriodAcceptsPosting) | BR-ERP4-02 |
 | Monetary values use NUMERIC(20,4), not FLOAT | **Database** (column type) | IEEE-754 floats are forbidden |
+
+---
+
+## 8. V1 API Endpoints & Bounded Pagination Specification
+
+**Issue Reference**: [#37 (ERP4-02)](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/37)  
+**Base Path**: `/api/v1/erp-finance`  
+**OpenAPI Specification**: `packages/contracts/openapi/erp-4.yaml`  
+**Contracts Export**: `packages/contracts/src/erp-4.ts`
+
+### 8.1 Paging and Search Contract
+- **Bounded Pagination**: All collection endpoints require `page` (default `1`, min `1`) and `pageSize` (default `20`, max `100`). Any request where `pageSize > 100` is rejected with `HTTP 400 Bad Request`.
+- **Server-Side Search**: Case-insensitive substring filtering on text fields (`search` parameter for `code`/`name` in accounts, `entry_number`/`description` in journal entries).
+- **Deterministic Sort**: Stable sort order (e.g. `code ASC, id ASC` for accounts; `posting_date DESC, entry_number DESC, id DESC` for journal entries).
+- **Safe Envelope**: All errors conform to the standard `ApiError` envelope (`statusCode`, `error`, `message`, `details`).
+
+### 8.2 Endpoints Index
+
+| Method | Endpoint | Query / Body Parameters | Status Codes | Description |
+|---|---|---|---|---|
+| `GET` | `/accounts` | `page`, `pageSize`, `search`, `type`, `is_active`, `currency_code` | 200, 400, 401 | List chart of accounts with bounded paging |
+| `GET` | `/accounts/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Retrieve single account by ID |
+| `POST` | `/accounts` | Body: `code`, `name`, `type`, `currency_code?`, `parent_id?`, `description?`, `is_posting_account?` | 201, 400, 409, 401 | Create new account (seed/admin) |
+| `GET` | `/journal-entries` | `page`, `pageSize`, `period`, `period_id`, `status`, `from_date`, `to_date`, `currency_code`, `search` | 200, 400, 401 | List journal entries with filter & stable sort |
+| `GET` | `/journal-entries/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get journal entry with lines |
+| `POST` | `/journal-entries` | Body: `period_id`, `posting_date`, `description`, `currency_code`, `lines`, `idempotency_key?` | 201, 200 (idempotent), 400, 401 | Create draft journal entry |
+| `POST` | `/journal-entries/:id/post` | Path: `id` (UUID) | 200, 400, 403, 404, 422, 401 | Post draft entry; enforces balancing & period lock |
+| `POST` | `/journal-entries/:id/reverse` | Path: `id` (UUID), Body: `reason`, `reversal_date?`, `reversal_description?` | 200, 400, 404, 422, 401 | Reverse posted entry via compensating reversal |
+| `GET` | `/trial-balance` | `period` (YYYY-MM, required), `currency_code?` | 200, 400, 404, 401 | Generate trial balance grouped by account/currency |
+| `GET` | `/opening-balances` | `page`, `pageSize`, `account_id?`, `currency_code?` | 200, 400, 401 | List loaded opening balances |
+| `GET` | `/opening-balances/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get single opening balance by ID |
+| `POST` | `/opening-balances` | Body: `balances: Array<{account_id, currency_code, balance_amount, as_of_date, source_reference?}>` | 201, 400, 401 | Bulk-load opening balances (one-time per account/currency) |
+| `GET` | `/periods` | `page`, `pageSize`, `status?`, `fiscal_year?` | 200, 400, 401 | List fiscal accounting periods |
+| `GET` | `/periods/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get accounting period by ID |
+

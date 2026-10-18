@@ -87,10 +87,52 @@ export const CreateAccountRequestSchema = z.object({
 });
 export type CreateAccountRequest = z.infer<typeof CreateAccountRequestSchema>;
 
-/** GET /api/v1/erp-finance/accounts — response wrapper. */
+/** Common URL ID parameter schema. */
+export const IdParamSchema = z.object({
+  id: UuidSchema,
+});
+export type IdParam = z.infer<typeof IdParamSchema>;
+
+/** Generic pagination query parameters with hard cap of 100. */
+export const PaginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+});
+export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
+
+/** GET /api/v1/erp-finance/accounts — query params. */
+export const AccountListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+  search: z.string().trim().max(100).optional(),
+  type: AccountTypeEnum.optional(),
+  is_active: z
+    .union([
+      z.boolean(),
+      z.enum(['true', 'false']).transform((v) => v === 'true'),
+    ])
+    .optional(),
+  currency_code: CurrencyCode.optional(),
+});
+export type AccountListQuery = z.infer<typeof AccountListQuerySchema>;
+
+/** GET /api/v1/erp-finance/accounts — response wrapper with bounded paging metadata. */
 export const AccountListResponseSchema = z.object({
   data: z.array(AccountSchema),
   total: z.number().int().nonnegative(),
+  page: z.number().int().positive().default(1),
+  pageSize: z.number().int().positive().default(20),
+  totalPages: z.number().int().nonnegative().default(1),
 });
 export type AccountListResponse = z.infer<typeof AccountListResponseSchema>;
 
@@ -204,12 +246,23 @@ export const CreateJournalEntryRequestSchema = z
   );
 export type CreateJournalEntryRequest = z.infer<typeof CreateJournalEntryRequestSchema>;
 
-/** GET /api/v1/erp-finance/journal-entries — list query params. */
+/** GET /api/v1/erp-finance/journal-entries — list query params with bounded pagination. */
 export const JournalEntryListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  search: z.string().trim().max(100).optional(),
   period: PeriodLabel.optional(),
+  period_id: UuidSchema.optional(),
   status: JournalEntryStatusEnum.optional(),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(200).default(50),
+  from_date: z.string().date().optional(),
+  to_date: z.string().date().optional(),
+  currency_code: CurrencyCode.optional(),
 });
 export type JournalEntryListQuery = z.infer<typeof JournalEntryListQuerySchema>;
 
@@ -218,7 +271,9 @@ export const JournalEntryListResponseSchema = z.object({
   data: z.array(JournalEntrySchema),
   total: z.number().int().nonnegative(),
   page: z.number().int().positive(),
-  limit: z.number().int().positive(),
+  pageSize: z.number().int().positive().default(20),
+  limit: z.number().int().positive().optional(),
+  totalPages: z.number().int().nonnegative().default(1),
 });
 export type JournalEntryListResponse = z.infer<typeof JournalEntryListResponseSchema>;
 
@@ -322,6 +377,75 @@ export const CreateOpeningBalancesResponseSchema = z.object({
   ),
 });
 export type CreateOpeningBalancesResponse = z.infer<typeof CreateOpeningBalancesResponseSchema>;
+
+/** GET /api/v1/erp-finance/opening-balances — query params with bounded pagination. */
+export const OpeningBalanceListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+  account_id: UuidSchema.optional(),
+  currency_code: CurrencyCode.optional(),
+});
+export type OpeningBalanceListQuery = z.infer<typeof OpeningBalanceListQuerySchema>;
+
+/** GET /api/v1/erp-finance/opening-balances — response wrapper with bounded paging. */
+export const OpeningBalanceListResponseSchema = z.object({
+  data: z.array(OpeningBalanceSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
+});
+export type OpeningBalanceListResponse = z.infer<typeof OpeningBalanceListResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accounting Period schemas
+// GET /api/v1/erp-finance/periods
+// GET /api/v1/erp-finance/periods/:id
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Response shape for an accounting period. */
+export const AccountingPeriodSchema = z.object({
+  id: UuidSchema,
+  period_label: PeriodLabel,
+  start_date: z.string().date(),
+  end_date: z.string().date(),
+  status: PeriodStatusEnum,
+  fiscal_year: z.string().min(1).max(9),
+  closed_at: z.string().datetime().nullable(),
+  closed_by_user_id: UuidSchema.nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type AccountingPeriod = z.infer<typeof AccountingPeriodSchema>;
+
+/** GET /api/v1/erp-finance/periods — list query params with bounded pagination. */
+export const PeriodListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+  status: PeriodStatusEnum.optional(),
+  fiscal_year: z.string().optional(),
+});
+export type PeriodListQuery = z.infer<typeof PeriodListQuerySchema>;
+
+/** GET /api/v1/erp-finance/periods — response wrapper. */
+export const PeriodListResponseSchema = z.object({
+  data: z.array(AccountingPeriodSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
+});
+export type PeriodListResponse = z.infer<typeof PeriodListResponseSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared error response
