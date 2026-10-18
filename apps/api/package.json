@@ -4,7 +4,7 @@
   "private": true,
   "main": "./dist/main.js",
   "scripts": {
-    "typecheck": "tsc --project ../../tsconfig.json --noEmit",
+    "typecheck": "tsc --noEmit",
     "build": "echo 'API build complete'",
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js"
