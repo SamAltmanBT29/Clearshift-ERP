@@ -1,0 +1,34 @@
+{
+  "name": "@cs/api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@cs/kernel": "workspace:*",
+    "@cs/core": "workspace:*",
+    "@cs/kit": "workspace:*",
+    "@cs/identity": "workspace:*",
+    "@cs/rbac": "workspace:*",
+    "@cs/db": "workspace:*",
+    "@cs/mod-crm1": "workspace:*",
+    "@cs/mod-crm2": "workspace:*",
+    "@cs/mod-crm3": "workspace:*",
+    "@cs/mod-crm4": "workspace:*",
+    "@cs/mod-crm5": "workspace:*",
+    "@cs/mod-erp1": "workspace:*",
+    "@cs/mod-erp2": "workspace:*",
+    "@cs/mod-erp3": "workspace:*",
+    "@cs/mod-erp4": "workspace:*",
+    "@cs/mod-erp5": "workspace:*",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

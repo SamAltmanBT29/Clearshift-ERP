@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@cs/kernel": ["platform/kernel/src/index.ts"],
+      "@cs/core": ["core/src/index.ts"],
+      "@cs/kit": ["kit/src/index.ts"],
+      "@cs/db": ["platform/db/src/index.ts"],
+      "@cs/identity": ["platform/identity/src/index.ts"],
+      "@cs/rbac": ["platform/rbac/src/index.ts"],
+      "@cs/ui": ["ui/src/index.ts"],
+      "@cs/mod-*": ["modules/*/src/index.ts"]
+    }
+  }
+}

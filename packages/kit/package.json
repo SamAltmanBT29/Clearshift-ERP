@@ -1,0 +1,19 @@
+{
+  "name": "@cs/kit",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@cs/kernel": "workspace:*",
+    "@cs/core": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
