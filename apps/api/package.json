@@ -21,7 +21,8 @@
     "@cs/mod-erp3": "*",
     "@cs/mod-erp4": "*",
     "@cs/mod-erp5": "*",
-    "fastify": "^5.2.0"
+    "fastify": "^5.2.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
