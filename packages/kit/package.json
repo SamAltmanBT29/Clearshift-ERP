@@ -9,8 +9,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
-    "@cs/core": "workspace:*",
+    "@cs/kernel": "*",
+    "@cs/core": "*",
     "zod": "^3.23.8"
   },
   "devDependencies": {

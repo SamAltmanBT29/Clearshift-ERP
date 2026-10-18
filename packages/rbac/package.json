@@ -9,8 +9,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
-    "@cs/identity": "workspace:*",
+    "@cs/kernel": "*",
+    "@cs/identity": "*",
     "fastify": "^5.2.0"
   },
   "devDependencies": {

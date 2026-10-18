@@ -13,9 +13,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
-    "@cs/core": "workspace:*",
-    "@cs/kit": "workspace:*"
+    "@cs/kernel": "*",
+    "@cs/core": "*",
+    "@cs/kit": "*"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

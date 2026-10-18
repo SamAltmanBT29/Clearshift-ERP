@@ -9,7 +9,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
+    "@cs/kernel": "*",
     "drizzle-orm": "^0.36.0",
     "pg": "^8.13.0",
     "zod": "^3.23.8"

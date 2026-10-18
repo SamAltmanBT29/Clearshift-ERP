@@ -68,13 +68,16 @@ export async function verifyAccessToken(token: string): Promise<HubTokenClaims> 
     audience: "clearshift"
   });
 
-  return {
+  const claims: HubTokenClaims = {
     iss: payload.iss as string,
     aud: payload.aud as string,
     sub: payload.sub as string,
     jti: payload.jti as string,
     exp: payload.exp as number,
-    roles: (payload["roles"] as RoleType[]) || [],
-    employee_id: payload["employee_id"] as string | undefined
+    roles: (payload["roles"] as RoleType[]) || []
   };
+  if (typeof payload["employee_id"] === "string") {
+    claims.employee_id = payload["employee_id"];
+  }
+  return claims;
 }

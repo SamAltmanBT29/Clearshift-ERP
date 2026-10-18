@@ -9,7 +9,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
+    "@cs/kernel": "*",
     "argon2": "^0.41.1",
     "fastify-plugin": "^6.0.1",
     "jose": "^5.9.6",

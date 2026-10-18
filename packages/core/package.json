@@ -9,7 +9,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "workspace:*",
+    "@cs/kernel": "*",
     "decimal.js": "^10.4.3"
   },
   "devDependencies": {

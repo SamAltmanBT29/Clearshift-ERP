@@ -1,9 +1,4 @@
 import { FastifyInstance } from "fastify";
-import crm1 from "@cs/mod-crm1";
-import crm2 from "@cs/mod-crm2";
-import crm3 from "@cs/mod-crm3";
-import crm4 from "@cs/mod-crm4";
-import crm5 from "@cs/mod-crm5";
 import erp1 from "@cs/mod-erp1";
 import erp2 from "@cs/mod-erp2";
 import erp3 from "@cs/mod-erp3";
@@ -11,11 +6,6 @@ import erp4 from "@cs/mod-erp4";
 import erp5 from "@cs/mod-erp5";
 
 export const ALL_MODULES = [
-  crm1,
-  crm2,
-  crm3,
-  crm4,
-  crm5,
   erp1,
   erp2,
   erp3,

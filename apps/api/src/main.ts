@@ -7,7 +7,7 @@ import { registerBusinessModules } from "./module-registry.js";
 export function buildServer(): FastifyInstance {
   const app = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL || "info"
+      level: process.env["LOG_LEVEL"] || "info"
     }
   });
 
@@ -32,10 +32,11 @@ export function buildServer(): FastifyInstance {
       return;
     }
 
-    request.log.error(error);
+    const err = error as Error;
+    request.log.error(err);
     reply.status(500).send({
       code: "INTERNAL_SERVER_ERROR",
-      message: error.message || "An unexpected error occurred",
+      message: err?.message || "An unexpected error occurred",
       details: [],
       correlation_id: correlationId
     });
@@ -69,9 +70,9 @@ export function buildServer(): FastifyInstance {
   return app;
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (process.env["NODE_ENV"] !== "test") {
   const server = buildServer();
-  const port = Number(process.env.PORT) || 3000;
+  const port = Number(process.env["PORT"]) || 3000;
   server.listen({ port, host: "0.0.0.0" }, (err, address) => {
     if (err) {
       server.log.error(err);

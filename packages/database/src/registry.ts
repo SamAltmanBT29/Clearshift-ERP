@@ -10,7 +10,7 @@ export function getDatabasePool(connectionString?: string): pg.Pool {
   if (!pool) {
     const connStr =
       connectionString ||
-      process.env.DATABASE_URL ||
+      process.env["DATABASE_URL"] ||
       "postgresql://cs_app:app_secret_123@localhost:5432/clearshift";
     
     pool = new Pool({
