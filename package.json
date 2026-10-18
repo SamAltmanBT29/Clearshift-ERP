@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ClearShift ERP — monorepo root",
+  "description": "ClearShift ERP \u2014 monorepo root",
   "workspaces": [
     "apps/*",
     "apps/erp/modules/*",
@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "validate:frontend": "node scripts/validate-frontend.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
