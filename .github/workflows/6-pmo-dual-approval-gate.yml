@@ -1,4 +1,4 @@
-name: 🛡️ PMO Dual Approval Gate
+name: 🛡️ PMO Approval Gate
 
 on:
   pull_request:
@@ -39,7 +39,7 @@ jobs:
 
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "📋 CLEARSHIFT V1 PMO MANDATORY REVIEW GATE"
+          echo "📋 CLEARSHIFT V1 PMO REVIEW GATE (PMO LEAD SIGN-OFF)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  PR Author    : @${PR_AUTHOR}"
           echo "  @Soldier224K : ${SOLDIER_STATE}"
@@ -49,27 +49,37 @@ jobs:
 
           FAILED=0
 
-          # Validate Soldier224K
-          if [ "$SOLDIER_STATE" != "APPROVED" ] && [ "$SOLDIER_STATE" != "AUTHOR" ]; then
-            echo "❌ MISSING APPROVAL: @Soldier224K has not approved this pull request."
-            FAILED=1
+          if [ "$AUTHOR_LOWER" = "soldier224k" ]; then
+            if [ "$AMAN_STATE" != "APPROVED" ]; then
+              echo "❌ MISSING APPROVAL: PR author is @Soldier224K; requires review approval from @amankoli09."
+              FAILED=1
+            else
+              echo "✅ PMO Lead approval verified: @amankoli09 has approved."
+            fi
+          elif [ "$AUTHOR_LOWER" = "amankoli09" ]; then
+            if [ "$SOLDIER_STATE" != "APPROVED" ]; then
+              echo "❌ MISSING APPROVAL: PR author is @amankoli09; requires review approval from @Soldier224K."
+              FAILED=1
+            else
+              echo "✅ PMO Lead approval verified: @Soldier224K has approved."
+            fi
           else
-            echo "✅ @Soldier224K verified (${SOLDIER_STATE})."
-          fi
-
-          # Validate amankoli09
-          if [ "$AMAN_STATE" != "APPROVED" ] && [ "$AMAN_STATE" != "AUTHOR" ]; then
-            echo "❌ MISSING APPROVAL: @amankoli09 has not approved this pull request."
-            FAILED=1
-          else
-            echo "✅ @amankoli09 verified (${AMAN_STATE})."
+            # Module Team / Contributor PR: Either PMO Lead can approve
+            if [ "$SOLDIER_STATE" != "APPROVED" ] && [ "$AMAN_STATE" != "APPROVED" ]; then
+              echo "❌ MISSING APPROVAL: Pull request requires approval from at least one PMO Lead (@Soldier224K or @amankoli09)."
+              FAILED=1
+            else
+              echo "✅ PMO Lead approval verified:"
+              [ "$SOLDIER_STATE" = "APPROVED" ] && echo "   - Approved by @Soldier224K"
+              [ "$AMAN_STATE" = "APPROVED" ] && echo "   - Approved by @amankoli09"
+            fi
           fi
 
           echo ""
           if [ "$FAILED" -eq 1 ]; then
-            echo "⛔ GATE BLOCKED: Both @Soldier224K and @amankoli09 must review and approve before this PR can pass or be merged."
+            echo "⛔ GATE BLOCKED: Required PMO approval not yet satisfied."
             exit 1
           else
-            echo "🎉 GATE PASSED: Mandatory PMO dual approvals verified. PR is cleared for PMO merge."
+            echo "🎉 GATE PASSED: PMO review approval verified. PR is cleared for PMO merge."
             exit 0
           fi
