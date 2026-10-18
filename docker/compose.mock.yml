@@ -1,0 +1,18 @@
+name: clearshift-mock
+
+services:
+  prism:
+    image: stoplight/prism:5
+    container_name: clearshift-prism-mock
+    restart: unless-stopped
+    command: mock -h 0.0.0.0 -p 4010 /contracts/openapi/crm1.yaml
+    volumes:
+      - ../contracts:/contracts:ro
+    ports:
+      - "4010:4010"
+    networks:
+      - clearshift-net
+
+networks:
+  clearshift-net:
+    driver: bridge

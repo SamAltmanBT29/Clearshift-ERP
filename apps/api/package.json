@@ -1,0 +1,31 @@
+{
+  "name": "@cs/api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "echo 'API build complete'",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@cs/kernel": "*",
+    "@cs/core": "*",
+    "@cs/kit": "*",
+    "@cs/identity": "*",
+    "@cs/rbac": "*",
+    "@cs/db": "*",
+    "@cs/mod-erp1": "*",
+    "@cs/mod-erp2": "*",
+    "@cs/mod-erp3": "*",
+    "@cs/mod-erp4": "*",
+    "@cs/mod-erp5": "*",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

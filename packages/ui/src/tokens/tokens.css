@@ -1,0 +1,55 @@
+/* ClearShift Design System Tokens (Section 3.2 / PLT-08) */
+:root {
+  --cs-bg: #FFFFFF;
+  --cs-surface: #F5F6F8;
+  --cs-border: #D0D5DD;
+  --cs-text: #111827;
+  --cs-text-muted: #4B5563;
+  --cs-accent: #1D4ED8;
+  --cs-ok: #166534;
+  --cs-ok-bg: #DCFCE7;
+  --cs-warn: #92400E;
+  --cs-warn-bg: #FEF3C7;
+  --cs-err: #B91C1C;
+  --cs-err-bg: #FEE2E2;
+  --cs-focus: 0 0 0 2px #FFFFFF, 0 0 0 4px #1D4ED8;
+
+  /* Spacing Grid (4px base) */
+  --cs-s-1: 4px;
+  --cs-s-2: 8px;
+  --cs-s-3: 12px;
+  --cs-s-4: 16px;
+  --cs-s-5: 20px;
+  --cs-s-6: 24px;
+  --cs-s-8: 32px;
+  --cs-s-10: 40px;
+  --cs-s-12: 48px;
+
+  /* Radius */
+  --cs-r-sm: 2px;
+  --cs-r-md: 4px;
+  --cs-r-lg: 8px;
+
+  /* Typography */
+  --cs-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --cs-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-theme="dark"],
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cs-bg: #0B0F14;
+    --cs-surface: #131A22;
+    --cs-border: #2A3441;
+    --cs-text: #F3F4F6;
+    --cs-text-muted: #A8B3C2;
+    --cs-accent: #7AA2FF;
+    --cs-ok: #86EFAC;
+    --cs-ok-bg: #0F2A1A;
+    --cs-warn: #FCD34D;
+    --cs-warn-bg: #2E2208;
+    --cs-err: #FCA5A5;
+    --cs-err-bg: #341212;
+    --cs-focus: 0 0 0 2px #0B0F14, 0 0 0 4px #7AA2FF;
+  }
+}

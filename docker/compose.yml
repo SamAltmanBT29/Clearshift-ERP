@@ -1,0 +1,91 @@
+name: clearshift
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: clearshift-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clearshift
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb/00-roles.sql:/docker-entrypoint-initdb.d/00-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clearshift"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clearshift-net
+
+  redis:
+    image: redis:8-alpine
+    container_name: clearshift-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - clearshift-net
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: clearshift-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://cs_app:app_secret_123@postgres:5432/clearshift
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_signing_secret_min_32_chars_long
+      KEY_ENC_SECRET: dev_key_enc_secret_min_32_bytes_
+      BANK_ENC_KEY: dev_bank_encryption_key_32_bytes_
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - clearshift-net
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: clearshift-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://cs_app:app_secret_123@postgres:5432/clearshift
+      REDIS_URL: redis://redis:6379
+      BANK_ENC_KEY: dev_bank_encryption_key_32_bytes_
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - clearshift-net
+
+networks:
+  clearshift-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
