@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*",
+    "../../packages/kernel/src/**/*",
+    "../../packages/core/src/**/*",
+    "../../packages/kit/src/**/*",
+    "../../packages/identity/src/**/*",
+    "../../packages/rbac/src/**/*",
+    "../../packages/database/src/**/*",
+    "../erp/modules/*/src/**/*"
+  ]
+}

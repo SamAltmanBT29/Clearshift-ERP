@@ -22,7 +22,26 @@
     "rootDir": ".",
     "paths": {
       "@clearshift/database": ["./packages/database/src/index.ts"],
-      "@clearshift/contracts": ["./packages/contracts/src/index.ts"]
+      "@clearshift/contracts": ["./packages/contracts/src/index.ts"],
+      "@cs/kernel": ["./packages/kernel/src/index.ts"],
+      "@cs/kernel/*": ["./packages/kernel/src/*"],
+      "@cs/core": ["./packages/core/src/index.ts"],
+      "@cs/core/*": ["./packages/core/src/*"],
+      "@cs/kit": ["./packages/kit/src/index.ts"],
+      "@cs/kit/*": ["./packages/kit/src/*"],
+      "@cs/identity": ["./packages/identity/src/index.ts"],
+      "@cs/identity/*": ["./packages/identity/src/*"],
+      "@cs/rbac": ["./packages/rbac/src/index.ts"],
+      "@cs/rbac/*": ["./packages/rbac/src/*"],
+      "@cs/db": ["./packages/database/src/index.ts"],
+      "@cs/db/*": ["./packages/database/src/*"],
+      "@cs/ui": ["./packages/ui/src/index.ts"],
+      "@cs/mod-erp1": ["./apps/erp/modules/erp-1/src/index.ts"],
+      "@cs/mod-erp2": ["./apps/erp/modules/erp-2/src/index.ts"],
+      "@cs/mod-erp3": ["./apps/erp/modules/erp-3/src/index.ts"],
+      "@cs/mod-erp4": ["./apps/erp/modules/erp-4/src/index.ts"],
+      "@cs/mod-erp5": ["./apps/erp/modules/erp-5/src/index.ts"],
+      "zod": ["./node_modules/zod", "./apps/api/node_modules/zod"]
     }
   },
   "include": [

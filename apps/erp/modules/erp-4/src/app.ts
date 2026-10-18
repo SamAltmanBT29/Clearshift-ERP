@@ -28,12 +28,6 @@ export interface AuthenticatedUser {
   role: string;
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: AuthenticatedUser;
-  }
-}
-
 export function buildApp(options: AppOptions = {}): FastifyInstance {
   const app = fastify({
     logger: false,
@@ -124,14 +118,21 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
         role = match[1];
       }
 
-      request.user = { id, role };
+      (request as any).user = {
+        id,
+        role,
+        sub: id,
+        roles: [role],
+      };
       return;
     }
 
     // Default system context when auth is not strictly required
-    request.user = {
+    (request as any).user = {
       id: 'ffffffff-0001-0001-0001-000000000001',
       role: 'finance_admin',
+      sub: 'ffffffff-0001-0001-0001-000000000001',
+      roles: ['finance_admin'],
     };
   });
 

@@ -1350,6 +1350,20 @@ describe('ERP-4 Finance & Accounting API — List & Read Endpoints', () => {
       const notFoundOb = await repository.getOpeningBalance(ACCT_BANK_ID, 'EUR');
       expect(notFoundOb).toBeNull();
     });
+
+    it('exercises erp4Resolver in public.ts', async () => {
+      const { erp4Resolver } = await import('../../src/public.js');
+      expect(await erp4Resolver.exists('account', '1010')).toBe(true);
+      expect(await erp4Resolver.exists('period', '2026-04')).toBe(true);
+      expect(await erp4Resolver.exists('journal_entry', 'jv-1')).toBe(true);
+      expect(await erp4Resolver.exists('unknown', 'xyz')).toBe(false);
+
+      const acct = await erp4Resolver.get('account', 'test-id');
+      expect(acct).toEqual({ id: 'test-id', code: '1010', type: 'asset' });
+
+      const other = await erp4Resolver.get('unknown', 'test-id');
+      expect(other).toBeNull();
+    });
   });
 });
 

@@ -1,16 +1,23 @@
 {
-  "name": "@clearshift/erp-finance",
-  "version": "0.1.0",
+  "name": "@cs/mod-erp4",
+  "version": "1.0.0",
   "private": true,
-  "description": "ERP-4 Finance & Accounting module — ClearShift ERP",
-  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./public": "./dist/public.js"
+  },
   "scripts": {
-    "test": "vitest run --project erp-finance",
-    "typecheck": "tsc --noEmit"
+    "build": "tsc",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@clearshift/contracts": "*",
-    "@clearshift/database": "*",
+    "@cs/core": "*",
+    "@cs/db": "*",
+    "@cs/kernel": "*",
+    "@cs/kit": "*",
     "drizzle-orm": "^0.36.0",
     "fastify": "^5.12.7",
     "zod": "^3.24.0"
