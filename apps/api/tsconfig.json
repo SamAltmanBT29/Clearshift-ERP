@@ -6,7 +6,12 @@
   },
   "include": [
     "src/**/*",
-    "../../packages/*/src/**/*",
+    "../../packages/kernel/src/**/*",
+    "../../packages/core/src/**/*",
+    "../../packages/kit/src/**/*",
+    "../../packages/identity/src/**/*",
+    "../../packages/rbac/src/**/*",
+    "../../packages/database/src/**/*",
     "../erp/modules/*/src/**/*"
   ]
 }
