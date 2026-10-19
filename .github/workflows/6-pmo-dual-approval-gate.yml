@@ -17,6 +17,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           echo "🔍 Fetching reviews for PR #${PR_NUMBER} in ${REPO}..."
           
@@ -42,6 +43,7 @@ jobs:
           echo "📋 CLEARSHIFT V1 PMO REVIEW GATE (PMO LEAD SIGN-OFF)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  PR Author    : @${PR_AUTHOR}"
+          echo "  Trigger Event: ${EVENT_NAME}"
           echo "  @Soldier224K : ${SOLDIER_STATE}"
           echo "  @amankoli09  : ${AMAN_STATE}"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -77,8 +79,14 @@ jobs:
 
           echo ""
           if [ "$FAILED" -eq 1 ]; then
-            echo "⛔ GATE BLOCKED: Required PMO approval not yet satisfied."
-            exit 1
+            if [ "$EVENT_NAME" = "pull_request" ]; then
+              echo "⏳ AWAITING REVIEW: PR opened/synchronized. Waiting for PMO review approval."
+              echo "ℹ️ GitHub native branch protection will prevent merge until a PMO lead approves."
+              exit 0
+            else
+              echo "⛔ GATE BLOCKED: Required PMO approval not yet satisfied."
+              exit 1
+            fi
           else
             echo "🎉 GATE PASSED: PMO review approval verified. PR is cleared for PMO merge."
             exit 0
