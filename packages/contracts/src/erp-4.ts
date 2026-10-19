@@ -261,6 +261,30 @@ export const CreateJournalEntryRequestSchema = z
   );
 export type CreateJournalEntryRequest = z.infer<typeof CreateJournalEntryRequestSchema>;
 
+/**
+ * BR-ERP4-01: Validates that total debits equal total credits.
+ * Supports both frontend models ({ debit, credit }) and API/DB models ({ debit_amount, credit_amount }).
+ */
+export function isJournalEntryBalanced(
+  lines: Array<{
+    debit?: number | string;
+    credit?: number | string;
+    debit_amount?: number | string;
+    credit_amount?: number | string;
+  }>
+): boolean {
+  if (!lines || lines.length < 2) return false;
+  const totalDebit = lines.reduce((sum, l) => {
+    const val = l.debit !== undefined ? Number(l.debit) : Number(l.debit_amount ?? 0);
+    return sum + Math.round(val * 10000);
+  }, 0);
+  const totalCredit = lines.reduce((sum, l) => {
+    const val = l.credit !== undefined ? Number(l.credit) : Number(l.credit_amount ?? 0);
+    return sum + Math.round(val * 10000);
+  }, 0);
+  return totalDebit === totalCredit;
+}
+
 /** PATCH /api/v1/erp-finance/journal-entries/:id — request body (draft edits). */
 export const UpdateJournalEntryRequestSchema = z
   .object({
@@ -527,3 +551,51 @@ export const ApiErrorSchema = z.object({
   correlation_id: z.string().optional(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Frontend Compatibility & View Model Type Aliases
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AccountsFilterQuery {
+  page?: number;
+  limit?: number;
+  pageSize?: number;
+  search?: string;
+  type?: AccountType;
+  isActive?: boolean;
+  is_active?: boolean;
+  currencyCode?: string;
+  currency_code?: string;
+}
+
+export interface PaginatedAccountsResponse {
+  items: Account[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type CreateAccountInput = CreateAccountRequest;
+export type CreateJournalEntryInput = CreateJournalEntryRequest;
+export type CreateOpeningBalancesInput = CreateOpeningBalancesRequest;
+export type OpeningBalancesResponse = CreateOpeningBalancesResponse;
+
+export interface JournalEntriesFilterQuery {
+  page?: number;
+  limit?: number;
+  pageSize?: number;
+  period?: string;
+  status?: JournalEntryStatus;
+  search?: string;
+  currencyCode?: string;
+  currency_code?: string;
+}
+
+export interface PaginatedJournalEntriesResponse {
+  items: JournalEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

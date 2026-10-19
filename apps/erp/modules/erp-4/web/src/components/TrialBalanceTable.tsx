@@ -21,7 +21,9 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
     return <SkeletonTable columns={6} rows={6} />;
   }
 
-  if (!data || data.items.length === 0) {
+  const items = data?.items || (data as any)?.rows || [];
+
+  if (!data || items.length === 0) {
     return (
       <div>
         <div className="cs-filter-bar" role="search" aria-label="Trial balance period selector">
@@ -47,7 +49,12 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
     );
   }
 
-  const difference = Math.abs(data.totalDebit - data.totalCredit);
+  const totalDebit = Number(data.totalDebit ?? (data as any).totals?.total_debit ?? 0);
+  const totalCredit = Number(data.totalCredit ?? (data as any).totals?.total_credit ?? 0);
+  const difference = Math.abs(totalDebit - totalCredit);
+  const isBalanced = data.isBalanced ?? (data as any).totals?.is_balanced ?? (totalDebit === totalCredit);
+  const currencyCode = data.currencyCode || (data as any).currency_code || 'USD';
+  const accountCount = data.accountCount ?? items.length;
 
   return (
     <div>
@@ -82,8 +89,8 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
           <div>
             <div className="cs-balance-item-title">Total Debits</div>
             <div className="cs-balance-item-val" style={{ color: 'var(--color-primary)' }}>
-              {data.currencyCode}{' '}
-              {data.totalDebit.toLocaleString('en-US', {
+              {currencyCode}{' '}
+              {totalDebit.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -92,8 +99,8 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
           <div>
             <div className="cs-balance-item-title">Total Credits</div>
             <div className="cs-balance-item-val" style={{ color: 'var(--color-primary)' }}>
-              {data.currencyCode}{' '}
-              {data.totalCredit.toLocaleString('en-US', {
+              {currencyCode}{' '}
+              {totalCredit.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -107,7 +114,7 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
                 color: difference === 0 ? 'var(--color-success)' : 'var(--color-error)',
               }}
             >
-              {data.currencyCode}{' '}
+              {currencyCode}{' '}
               {difference.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -118,8 +125,8 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
 
         <div>
           <StatusBadge
-            label={data.isBalanced ? '✓ Invariant Verified: Balanced' : '✗ Unbalanced Entries'}
-            variant={data.isBalanced ? 'success' : 'error'}
+            label={isBalanced ? '✓ Invariant Verified: Balanced' : '✗ Unbalanced Entries'}
+            variant={isBalanced ? 'success' : 'error'}
           />
         </div>
       </div>
@@ -132,54 +139,64 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
               <th className="cs-th" scope="col">Code</th>
               <th className="cs-th" scope="col">Account Name</th>
               <th className="cs-th" scope="col">Category</th>
-              <th className="cs-th cs-text-right" scope="col">Debit ({data.currencyCode})</th>
-              <th className="cs-th cs-text-right" scope="col">Credit ({data.currencyCode})</th>
+              <th className="cs-th cs-text-right" scope="col">Debit ({currencyCode})</th>
+              <th className="cs-th cs-text-right" scope="col">Credit ({currencyCode})</th>
               <th className="cs-th cs-text-right" scope="col">Net Balance</th>
             </tr>
           </thead>
           <tbody>
-            {data.items.map((row) => (
-              <tr key={row.accountId} className="cs-tr">
-                <td className="cs-td">
-                  <span className="cs-code">{row.accountCode}</span>
-                </td>
-                <td className="cs-td" style={{ fontWeight: 600 }}>
-                  {row.accountName}
-                </td>
-                <td className="cs-td">
-                  <StatusBadge type={row.accountType} />
-                </td>
-                <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {row.debit > 0
-                    ? row.debit.toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : '—'}
-                </td>
-                <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {row.credit > 0
-                    ? row.credit.toLocaleString('en-US', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : '—'}
-                </td>
-                <td
-                  className="cs-td cs-text-right"
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontWeight: 600,
-                    color: row.netBalance < 0 ? 'var(--color-error)' : 'var(--color-text)',
-                  }}
-                >
-                  {row.netBalance.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-              </tr>
-            ))}
+            {items.map((row: any) => {
+              const accountId = row.accountId || row.account_id || '';
+              const accountCode = row.accountCode || row.account_code || '';
+              const accountName = row.accountName || row.account_name || '';
+              const accountType = row.accountType || row.account_type || 'asset';
+              const debit = Number(row.debit ?? row.total_debit ?? 0);
+              const credit = Number(row.credit ?? row.total_credit ?? 0);
+              const netBalance = Number(row.netBalance ?? row.net_balance ?? 0);
+
+              return (
+                <tr key={accountId} className="cs-tr">
+                  <td className="cs-td">
+                    <span className="cs-code">{accountCode}</span>
+                  </td>
+                  <td className="cs-td" style={{ fontWeight: 600 }}>
+                    {accountName}
+                  </td>
+                  <td className="cs-td">
+                    <StatusBadge type={accountType} />
+                  </td>
+                  <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {debit > 0
+                      ? debit.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      : '—'}
+                  </td>
+                  <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {credit > 0
+                      ? credit.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      : '—'}
+                  </td>
+                  <td
+                    className="cs-td cs-text-right"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: netBalance < 0 ? 'var(--color-error)' : 'var(--color-text)',
+                    }}
+                  >
+                    {netBalance.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr
@@ -191,16 +208,16 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
               }}
             >
               <td className="cs-td" colSpan={3}>
-                Grand Total ({data.accountCount} active accounts)
+                Grand Total ({accountCount} active accounts)
               </td>
               <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
-                {data.totalDebit.toLocaleString('en-US', {
+                {totalDebit.toLocaleString('en-US', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </td>
               <td className="cs-td cs-text-right" style={{ fontFamily: 'var(--font-mono)' }}>
-                {data.totalCredit.toLocaleString('en-US', {
+                {totalCredit.toLocaleString('en-US', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}

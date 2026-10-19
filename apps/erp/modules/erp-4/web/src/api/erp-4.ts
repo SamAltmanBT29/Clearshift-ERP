@@ -1,10 +1,15 @@
 import type {
   Account,
-  AccountListQuery,
-  CreateAccountRequest,
+  AccountsFilterQuery,
+  PaginatedAccountsResponse,
+  CreateAccountInput,
   JournalEntry,
+  JournalEntriesFilterQuery,
+  PaginatedJournalEntriesResponse,
+  CreateJournalEntryInput,
   TrialBalanceResponse,
-  CreateOpeningBalancesRequest,
+  CreateOpeningBalancesInput,
+  OpeningBalancesResponse,
 } from '@clearshift/contracts';
 
 const API_BASE = '/api/v1/erp-finance';
@@ -47,14 +52,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     );
   }
 
-  return response.json();
+  return (await response.json()) as T;
 }
 
 export interface NormalizedAccountsResponse {
   items: Account[];
+  data: Account[];
   total: number;
   page: number;
   limit: number;
+  pageSize: number;
   totalPages: number;
 }
 
@@ -63,37 +70,74 @@ export interface NormalizedAccountsResponse {
  * Normalizes between backend `data`/`pageSize` and frontend `items`/`limit`.
  */
 export async function fetchAccounts(
-  query: any = { page: 1, limit: 20 }
+  query: AccountsFilterQuery = { page: 1, limit: 20 }
 ): Promise<NormalizedAccountsResponse> {
   const params = new URLSearchParams();
   const page = query.page || 1;
-  const pageSize = query.pageSize || query.limit || 20;
+  const limit = query.limit !== undefined ? query.limit : (query.pageSize !== undefined ? query.pageSize : 20);
 
   params.set('page', String(page));
-  params.set('pageSize', String(pageSize));
+  if (query.limit !== undefined) {
+    params.set('limit', String(query.limit));
+  } else {
+    params.set('pageSize', String(limit));
+  }
   if (query.search) params.set('search', query.search);
   if (query.type) params.set('type', query.type);
-  if (typeof query.isActive === 'boolean') params.set('is_active', String(query.isActive));
-  if (typeof query.is_active === 'boolean') params.set('is_active', String(query.is_active));
-  if (query.currencyCode) params.set('currency_code', query.currencyCode);
-  if (query.currency_code) params.set('currency_code', query.currency_code);
+  if (typeof query.isActive === 'boolean') {
+    params.set('isActive', String(query.isActive));
+  } else if (typeof query.is_active === 'boolean') {
+    params.set('is_active', String(query.is_active));
+  }
+  if (query.currencyCode) {
+    params.set('currencyCode', query.currencyCode);
+  } else if (query.currency_code) {
+    params.set('currency_code', query.currency_code);
+  }
 
   const qs = params.toString();
   const res = await request<any>(`/accounts${qs ? `?${qs}` : ''}`);
 
+  const rawItems = res.items || res.data || [];
+  const items = rawItems.map((item: any) => ({
+    id: item.id,
+    code: item.code,
+    name: item.name,
+    type: item.type,
+    currencyCode: item.currencyCode || item.currency_code || 'INR',
+    currency_code: item.currency_code || item.currencyCode || 'INR',
+    parentId: item.parentId || item.parent_id || null,
+    parent_id: item.parent_id || item.parentId || null,
+    description: item.description || null,
+    isActive: item.isActive !== undefined ? Boolean(item.isActive) : (item.is_active !== undefined ? Boolean(item.is_active) : true),
+    is_active: item.is_active !== undefined ? Boolean(item.is_active) : (item.isActive !== undefined ? Boolean(item.isActive) : true),
+    isPostingAccount: item.isPostingAccount !== undefined ? Boolean(item.isPostingAccount) : (item.is_posting_account !== undefined ? Boolean(item.is_posting_account) : true),
+    is_posting_account: item.is_posting_account !== undefined ? Boolean(item.is_posting_account) : (item.isPostingAccount !== undefined ? Boolean(item.isPostingAccount) : true),
+    balance: Number(item.balance ?? 0),
+    createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+    created_at: item.created_at || item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
+    updated_at: item.updated_at || item.updatedAt || new Date().toISOString(),
+  }));
+
+  const total = Number(res.total ?? items.length);
+  const totalPages = Number(res.totalPages ?? (Math.ceil(total / limit) || 1));
+
   return {
-    items: res.data || res.items || [],
-    total: res.total ?? 0,
-    page: res.page ?? page,
-    limit: res.pageSize || res.limit || pageSize,
-    totalPages: res.totalPages ?? 1,
+    items,
+    data: items,
+    total,
+    page: Number(res.page ?? page),
+    limit,
+    pageSize: limit,
+    totalPages,
   };
 }
 
 /**
  * Create a new account in Chart of Accounts (Admin / Editor only).
  */
-export async function createAccount(data: any): Promise<Account> {
+export async function createAccount(data: CreateAccountInput): Promise<Account> {
   return request<Account>('/accounts', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -113,6 +157,8 @@ export interface NormalizedTrialBalanceResponse {
     credit: number;
     netBalance: number;
   }>;
+  rows?: any[];
+  totals?: any;
   totalDebit: number;
   totalCredit: number;
   isBalanced: boolean;
@@ -128,34 +174,36 @@ export async function fetchTrialBalance(
   period: string,
   currencyCode = 'USD'
 ): Promise<NormalizedTrialBalanceResponse> {
-  const params = new URLSearchParams({ period, currency_code: currencyCode });
+  const params = new URLSearchParams({ period, currencyCode });
   const res = await request<any>(`/trial-balance?${params.toString()}`);
 
   const rawRows = res.rows || res.items || [];
   const items = rawRows.map((r: any) => ({
-    accountId: r.account_id || r.accountId || '',
-    accountCode: r.account_code || r.accountCode || '',
-    accountName: r.account_name || r.accountName || '',
-    accountType: r.account_type || r.accountType || 'asset',
-    currencyCode: r.currency_code || r.currencyCode || currencyCode,
-    debit: Number(r.total_debit ?? r.debit ?? 0),
-    credit: Number(r.total_credit ?? r.credit ?? 0),
-    netBalance: Number(r.net_balance ?? r.netBalance ?? 0),
+    accountId: r.accountId || r.account_id || '',
+    accountCode: r.accountCode || r.account_code || '',
+    accountName: r.accountName || r.account_name || '',
+    accountType: r.accountType || r.account_type || 'asset',
+    currencyCode: r.currencyCode || r.currency_code || currencyCode,
+    debit: Number(r.debit ?? r.total_debit ?? 0),
+    credit: Number(r.credit ?? r.total_credit ?? 0),
+    netBalance: Number(r.netBalance ?? r.net_balance ?? 0),
   }));
 
-  const totalDebit = Number(res.totals?.total_debit ?? res.totalDebit ?? 0);
-  const totalCredit = Number(res.totals?.total_credit ?? res.totalCredit ?? 0);
-  const isBalanced = res.totals?.is_balanced ?? res.isBalanced ?? (totalDebit === totalCredit);
+  const totalDebit = Number(res.totalDebit ?? res.totals?.total_debit ?? 0);
+  const totalCredit = Number(res.totalCredit ?? res.totals?.total_credit ?? 0);
+  const isBalanced = res.isBalanced ?? res.totals?.is_balanced ?? (totalDebit === totalCredit);
 
   return {
     period: res.period || period,
     currencyCode,
     items,
+    rows: rawRows,
+    totals: res.totals,
     totalDebit,
     totalCredit,
     isBalanced,
     accountCount: items.length,
-    generatedAt: res.generated_at ? new Date(res.generated_at) : new Date(),
+    generatedAt: res.generatedAt ? new Date(res.generatedAt) : (res.generated_at ? new Date(res.generated_at) : new Date()),
   };
 }
 
@@ -163,17 +211,26 @@ export async function fetchTrialBalance(
  * Fetch bounded paginated Journal Entries.
  */
 export async function fetchJournalEntries(
-  query: any = { page: 1, limit: 20 }
-): Promise<any> {
+  query: JournalEntriesFilterQuery = { page: 1, limit: 20 }
+): Promise<PaginatedJournalEntriesResponse> {
   const params = new URLSearchParams();
   if (query.page) params.set('page', String(query.page));
-  if (query.limit || query.pageSize) params.set('pageSize', String(query.limit || query.pageSize));
+  if (query.limit || query.pageSize) params.set('limit', String(query.limit || query.pageSize));
   if (query.period) params.set('period', query.period);
   if (query.status) params.set('status', query.status);
   if (query.search) params.set('search', query.search);
+  if (query.currencyCode) params.set('currencyCode', query.currencyCode);
 
   const qs = params.toString();
-  return request<any>(`/journal-entries${qs ? `?${qs}` : ''}`);
+  const res = await request<any>(`/journal-entries${qs ? `?${qs}` : ''}`);
+
+  return {
+    items: res.items || res.data || [],
+    total: res.total ?? 0,
+    page: res.page ?? query.page ?? 1,
+    limit: res.limit || res.pageSize || query.limit || query.pageSize || 20,
+    totalPages: res.totalPages ?? 1,
+  };
 }
 
 /**
@@ -186,7 +243,9 @@ export async function fetchJournalEntryById(id: string): Promise<JournalEntry> {
 /**
  * Create draft journal entry with balanced lines.
  */
-export async function createJournalEntry(data: any): Promise<JournalEntry> {
+export async function createJournalEntry(
+  data: CreateJournalEntryInput
+): Promise<JournalEntry> {
   return request<JournalEntry>('/journal-entries', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -214,8 +273,10 @@ export async function reverseJournalEntry(id: string): Promise<JournalEntry> {
 /**
  * Load one-time opening balances.
  */
-export async function createOpeningBalances(data: any): Promise<any> {
-  return request<any>('/opening-balances', {
+export async function createOpeningBalances(
+  data: CreateOpeningBalancesInput
+): Promise<OpeningBalancesResponse> {
+  return request<OpeningBalancesResponse>('/opening-balances', {
     method: 'POST',
     body: JSON.stringify(data),
   });
