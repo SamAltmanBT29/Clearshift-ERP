@@ -323,6 +323,30 @@ CREATE INDEX IF NOT EXISTS opening_balances_account_id_idx
     ON erp4.opening_balances (account_id);
 
 -- ────────────────────────────────────────────────────────────────────────────
+-- 8b. Table: erp4.import_receipts (Idempotency & Migration Audit Receipts)
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS erp4.import_receipts (
+    id                  UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id            UUID           NOT NULL,
+    source_row          INTEGER        NOT NULL,
+    entity              VARCHAR(64)    NOT NULL,
+    schema_version      INTEGER        NOT NULL DEFAULT 1,
+    idempotency_key     VARCHAR(128)   NOT NULL,
+    target_id           UUID           NOT NULL,
+    kind                VARCHAR(16)    NOT NULL DEFAULT 'created',
+    created_at          TIMESTAMPTZ    NOT NULL DEFAULT now(),
+
+    CONSTRAINT import_receipts_idempotency_key_unique
+        UNIQUE (idempotency_key)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS import_receipts_idempotency_key_unique_idx
+    ON erp4.import_receipts (idempotency_key);
+
+CREATE INDEX IF NOT EXISTS import_receipts_batch_row_idx
+    ON erp4.import_receipts (batch_id, source_row);
+
+-- ────────────────────────────────────────────────────────────────────────────
 -- 9. Record migration as applied (idempotency guard)
 -- ────────────────────────────────────────────────────────────────────────────
 INSERT INTO public.schema_migrations (migration)

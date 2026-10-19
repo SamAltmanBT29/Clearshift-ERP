@@ -111,6 +111,67 @@ paths:
       security:
         - BearerAuth: []
 
+    post:
+      operationId: createAccount
+      tags: [Accounts]
+      summary: Create a new account (seed/admin/editor only)
+      description: |
+        Adds a new leaf or header account to the Chart of Accounts.
+        Requires `finance:accounts:write` permission.
+        Account `code` must be globally unique within the module.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountRequest"
+            examples:
+              assetAccount:
+                summary: Create a bank asset account
+                value:
+                  code: "1010-BANK"
+                  name: "Main Current Account"
+                  type: "asset"
+                  currency_code: "INR"
+                  is_posting_account: true
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "200":
+          description: Existing account returned (idempotent duplicate)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Account code already exists or idempotency key conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Unprocessable entity (currency mismatch or parent error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:accounts:write]
+
   /accounts/{id}:
     get:
       operationId: getAccount
@@ -147,32 +208,31 @@ paths:
       security:
         - BearerAuth: []
 
-    post:
-      operationId: createAccount
+    patch:
+      operationId: updateAccount
       tags: [Accounts]
-      summary: Create a new account (seed/admin/editor only)
+      summary: Update mutable account fields (admin/editor only)
       description: |
-        Adds a new leaf or header account to the Chart of Accounts.
-        Requires `finance:accounts:write` permission.
-        Account `code` must be globally unique within the module.
+        Updates mutable fields on an account: name, description, is_active,
+        is_posting_account, parent_id. Protected system fields (id, code,
+        currency_code, created_at, updated_at) are immutable and cannot be changed.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique account identifier
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateAccountRequest"
-            examples:
-              assetAccount:
-                summary: Create a bank asset account
-                value:
-                  code: "1010-BANK"
-                  name: "Main Current Account"
-                  type: "asset"
-                  currency_code: "INR"
-                  is_posting_account: true
+              $ref: "#/components/schemas/UpdateAccountRequest"
       responses:
-        "201":
-          description: Account created
+        "200":
+          description: Account updated successfully
           content:
             application/json:
               schema:
@@ -183,8 +243,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
-        "409":
-          description: Account code already exists
+        "404":
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Unprocessable entity (cyclic hierarchy or parent account error)
           content:
             application/json:
               schema:
@@ -303,6 +369,8 @@ paths:
 
         If `idempotency_key` is supplied and a matching entry already exists,
         the existing entry is returned (HTTP 200) without creating a duplicate.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -373,6 +441,45 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    patch:
+      operationId: updateJournalEntry
+      tags: [Journal Entries]
+      summary: Update a draft journal entry
+      description: |
+        Updates draft journal entry header or lines.
+        Only entries in `draft` status may be updated; posted entries are immutable (returns 422).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateJournalEntryRequest"
+      responses:
+        "200":
+          description: Journal entry updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Entry is immutable (posted/reversed/voided) or lines unbalanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -471,10 +578,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Entry is not reversible or target period locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
         - BearerAuth: [finance:journal:post]
+
+  /journal-entries/{id}/void:
+    post:
+      operationId: voidJournalEntry
+      tags: [Journal Entries]
+      summary: Void a draft journal entry
+      description: |
+        Voids an unposted draft journal entry.
+        Only entries in `draft` status may be voided; posted entries cannot be voided and must be reversed.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Journal entry voided successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Entry is immutable (cannot void posted entry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
   # ── Trial Balance ───────────────────────────────────────────────────────────
   /trial-balance:
@@ -548,6 +693,8 @@ paths:
 
         Requires `finance:opening-balances:write` permission.
         FR-ERP4-04
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -580,6 +727,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -777,6 +930,14 @@ components:
         type: string
         format: uuid
       description: UUID of the resource
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: Optional client-assigned idempotency key for safe retries
 
   responses:
     Unauthorized:
@@ -905,6 +1066,35 @@ components:
         is_posting_account:
           type: boolean
           default: true
+        idempotency_key:
+          type: string
+          maxLength: 255
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+
+    UpdateAccountRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        is_active:
+          type: boolean
+        is_posting_account:
+          type: boolean
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
 
     AccountListResponse:
       type: object
@@ -1084,11 +1274,60 @@ components:
           type: string
           maxLength: 128
           nullable: true
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
         lines:
           type: array
           minItems: 2
           items:
             $ref: "#/components/schemas/CreateJournalLineRequest"
+
+    UpdateJournalLineRequest:
+      type: object
+      required: [account_id]
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        debit_amount:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          default: "0.0000"
+        credit_amount:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          default: "0.0000"
+        line_narration:
+          type: string
+          maxLength: 255
+          nullable: true
+        department_ref:
+          type: string
+          maxLength: 64
+          nullable: true
+
+    UpdateJournalEntryRequest:
+      type: object
+      properties:
+        period_id:
+          type: string
+          format: uuid
+        posting_date:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        lines:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/UpdateJournalLineRequest"
 
     JournalEntryListResponse:
       type: object
@@ -1236,6 +1475,12 @@ components:
       type: object
       required: [balances]
       properties:
+        idempotency_key:
+          type: string
+          maxLength: 255
+        batch_id:
+          type: string
+          format: uuid
         balances:
           type: array
           minItems: 1
@@ -1260,6 +1505,15 @@ components:
                 type: string
                 maxLength: 128
                 nullable: true
+              idempotency_key:
+                type: string
+                maxLength: 255
+              batch_id:
+                type: string
+                format: uuid
+              source_row:
+                type: integer
+                minimum: 0
 
     CreateOpeningBalancesResponse:
       type: object
@@ -1282,6 +1536,50 @@ components:
                 type: string
               reason:
                 type: string
+        receipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportReceipt"
+
+    ImportReceipt:
+      type: object
+      required:
+        - id
+        - batch_id
+        - source_row
+        - entity
+        - schema_version
+        - idempotency_key
+        - target_id
+        - kind
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        entity:
+          type: string
+          maxLength: 64
+        schema_version:
+          type: integer
+          minimum: 1
+        idempotency_key:
+          type: string
+          maxLength: 255
+        target_id:
+          type: string
+        kind:
+          type: string
+          enum: [created, updated, replayed, skipped]
+        created_at:
+          type: string
+          format: date-time
 
     OpeningBalanceListResponse:
       type: object
@@ -1380,8 +1678,14 @@ components:
           type: integer
         error:
           type: string
+        code:
+          type: string
+          description: Stable machine-readable error code
         message:
           type: string
         details:
           type: array
           items: {}
+        correlation_id:
+          type: string
+          description: Request correlation tracking ID

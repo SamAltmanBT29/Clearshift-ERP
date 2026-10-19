@@ -84,8 +84,21 @@ export const CreateAccountRequestSchema = z.object({
   parent_id: UuidSchema.optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
   is_posting_account: z.boolean().default(true),
+  idempotency_key: z.string().max(128).optional().nullable(),
+  batch_id: UuidSchema.optional().nullable(),
+  source_row: z.number().int().nonnegative().optional().nullable(),
 });
 export type CreateAccountRequest = z.infer<typeof CreateAccountRequestSchema>;
+
+/** PATCH /api/v1/erp-finance/accounts/:id — request body. */
+export const UpdateAccountRequestSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  is_active: z.boolean().optional(),
+  is_posting_account: z.boolean().optional(),
+  parent_id: UuidSchema.optional().nullable(),
+});
+export type UpdateAccountRequest = z.infer<typeof UpdateAccountRequestSchema>;
 
 /** Common URL ID parameter schema. */
 export const IdParamSchema = z.object({
@@ -221,6 +234,8 @@ export const CreateJournalEntryRequestSchema = z
     currency_code: CurrencyCode,
     source_reference: z.string().max(128).optional().nullable(),
     idempotency_key: z.string().max(128).optional().nullable(),
+    batch_id: UuidSchema.optional().nullable(),
+    source_row: z.number().int().nonnegative().optional().nullable(),
     lines: z
       .array(CreateJournalLineRequestSchema)
       .min(2, 'A journal entry must have at least 2 lines'),
@@ -245,6 +260,38 @@ export const CreateJournalEntryRequestSchema = z
     }
   );
 export type CreateJournalEntryRequest = z.infer<typeof CreateJournalEntryRequestSchema>;
+
+/** PATCH /api/v1/erp-finance/journal-entries/:id — request body (draft edits). */
+export const UpdateJournalEntryRequestSchema = z
+  .object({
+    posting_date: z.string().date().optional(),
+    description: z.string().min(1).max(2000).optional(),
+    period_id: UuidSchema.optional(),
+    lines: z
+      .array(CreateJournalLineRequestSchema)
+      .min(2, 'A journal entry must have at least 2 lines')
+      .optional(),
+  })
+  .refine(
+    (entry) => {
+      if (!entry.lines) return true;
+      const totalDebit = entry.lines.reduce(
+        (sum, l) => sum + Math.round(parseFloat(l.debit_amount) * 10000),
+        0
+      );
+      const totalCredit = entry.lines.reduce(
+        (sum, l) => sum + Math.round(parseFloat(l.credit_amount) * 10000),
+        0
+      );
+      return totalDebit === totalCredit;
+    },
+    {
+      message:
+        'Journal entry is not balanced: SUM(debit_amount) must equal SUM(credit_amount) at 4 decimal precision',
+      path: ['lines'],
+    }
+  );
+export type UpdateJournalEntryRequest = z.infer<typeof UpdateJournalEntryRequestSchema>;
 
 /** GET /api/v1/erp-finance/journal-entries — list query params with bounded pagination. */
 export const JournalEntryListQuerySchema = z.object({
@@ -341,11 +388,30 @@ export const OpeningBalanceItemSchema = z.object({
     .regex(/^-?\d+(\.\d{1,4})?$/, 'Balance amount must be a signed decimal with up to 4 dp'),
   as_of_date: z.string().date(),
   source_reference: z.string().max(128).optional().nullable(),
+  idempotency_key: z.string().max(128).optional().nullable(),
+  batch_id: UuidSchema.optional().nullable(),
+  source_row: z.number().int().nonnegative().optional().nullable(),
 });
 export type OpeningBalanceItem = z.infer<typeof OpeningBalanceItemSchema>;
 
+/** Import receipt record schema (Decision C4 & KIT-08). */
+export const ImportReceiptSchema = z.object({
+  id: UuidSchema,
+  batch_id: UuidSchema,
+  source_row: z.number().int().nonnegative(),
+  entity: z.string().min(1).max(64),
+  schema_version: z.number().int().positive().default(1),
+  idempotency_key: z.string().min(1).max(128),
+  target_id: UuidSchema,
+  kind: z.enum(['created', 'linked']).default('created'),
+  created_at: z.string().datetime(),
+});
+export type ImportReceipt = z.infer<typeof ImportReceiptSchema>;
+
 /** POST /api/v1/erp-finance/opening-balances — request body (bulk). */
 export const CreateOpeningBalancesRequestSchema = z.object({
+  batch_id: UuidSchema.optional().nullable(),
+  idempotency_key: z.string().max(128).optional().nullable(),
   balances: z
     .array(OpeningBalanceItemSchema)
     .min(1, 'At least one opening balance item is required'),
@@ -375,6 +441,7 @@ export const CreateOpeningBalancesResponseSchema = z.object({
       reason: z.string(),
     })
   ),
+  receipts: z.array(ImportReceiptSchema).optional(),
 });
 export type CreateOpeningBalancesResponse = z.infer<typeof CreateOpeningBalancesResponseSchema>;
 
@@ -454,7 +521,9 @@ export type PeriodListResponse = z.infer<typeof PeriodListResponseSchema>;
 export const ApiErrorSchema = z.object({
   statusCode: z.number().int(),
   error: z.string(),
+  code: z.string().optional(),
   message: z.string(),
   details: z.array(z.unknown()).optional(),
+  correlation_id: z.string().optional(),
 });
 export type ApiError = z.infer<typeof ApiErrorSchema>;

@@ -155,7 +155,29 @@
 
 ---
 
-## 6. Database Constraints Reference
+## 6. `erp4.import_receipts` — Idempotency & Import Receipts
+
+**Purpose**: Persists receipt records for mutation idempotency and external data load provenance.  
+**KIT Reference**: KIT-08 / Decision C4  
+
+| Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
+|---|---|---|---|---|---|
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
+| `batch_id` | `UUID` | NOT NULL | — | Batch identifier for bulk import | — |
+| `source_row` | `INTEGER` | NOT NULL | — | Zero-indexed line/row in source file | CHECK (>= 0) |
+| `entity` | `VARCHAR(64)` | NOT NULL | — | Target entity name (e.g. `account`, `journal_entry`, `opening_balance`) | — |
+| `schema_version` | `INTEGER` | NOT NULL | `1` | Schema version of imported entity | — |
+| `idempotency_key` | `VARCHAR(255)` | NOT NULL | — | Stable idempotency key from header or payload | UNIQUE |
+| `target_id` | `VARCHAR(64)` | NOT NULL | — | ID of the created/updated target record | — |
+| `kind` | `VARCHAR(32)` | NOT NULL | `'created'` | Operation outcome: `created`, `updated`, `replayed`, `skipped` | — |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | Receipt creation timestamp | — |
+
+**Constraints**:
+- `import_receipts_idempotency_key_unique`: UNIQUE on `(idempotency_key)`
+
+---
+
+## 7. Database Constraints Reference
 
 | Constraint Name | Table | Type | Rule | FR/BR |
 |---|---|---|---|---|
@@ -172,10 +194,11 @@
 | `jl_not_both_debit_and_credit` | journal_lines | CHECK | `NOT (debit > 0 AND credit > 0)` | BR-ERP4-01 |
 | `jl_at_least_one_nonzero` | journal_lines | CHECK | `debit > 0 OR credit > 0` | BR-ERP4-01 |
 | `opening_balances_account_currency_unique` | opening_balances | UNIQUE | one opening balance per account+currency | FR-ERP4-04 |
+| `import_receipts_idempotency_key_unique` | import_receipts | UNIQUE | unique receipt per idempotency key | KIT-08 |
 
 ---
 
-## 7. Domain Rules
+## 8. Domain Rules
 
 | Rule | Enforcement Layer | Notes |
 |---|---|---|
@@ -186,7 +209,7 @@
 | Account code is globally unique | **Database** (UNIQUE) | accounts_code_unique |
 | Period must be open (or soft_closed for admin) before posting | Application (domain engine) | DB does not know the user's role |
 | Opening balance is loaded once per account+currency | **Database** (UNIQUE) | opening_balances_account_currency_unique |
-| Idempotency key is globally unique when set | **Database** (PARTIAL UNIQUE) | Allows NULL for manual entries |
+| Idempotency key is globally unique when set | **Database** (PARTIAL UNIQUE) + receipts | Prevents duplicate mutations |
 | Posted entries are immutable | Application + DB triggers | No UPDATE on posted lines (enforced by API layer) |
 | Corrections use reversal entries, not edits | Application (status machine) | assertValidStatusTransition() |
 | All lines of one entry share one currency_code | Application | V1: no FX conversion |
@@ -196,35 +219,39 @@
 
 ---
 
-## 8. V1 API Endpoints & Bounded Pagination Specification
+## 9. V1 API Endpoints & Bounded Pagination Specification
 
-**Issue Reference**: [#37 (ERP4-02)](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/37)  
+**Issue References**: [#37 (ERP4-02)](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/37), [#38 (ERP4-03)](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/38)  
 **Base Path**: `/api/v1/erp-finance`  
 **OpenAPI Specification**: `packages/contracts/openapi/erp-4.yaml`  
 **Contracts Export**: `packages/contracts/src/erp-4.ts`
 
-### 8.1 Paging and Search Contract
+### 9.1 Paging and Search Contract
 - **Bounded Pagination**: All collection endpoints require `page` (default `1`, min `1`) and `pageSize` (default `20`, max `100`). Any request where `pageSize > 100` is rejected with `HTTP 400 Bad Request`.
 - **Server-Side Search**: Case-insensitive substring filtering on text fields (`search` parameter for `code`/`name` in accounts, `entry_number`/`description` in journal entries).
 - **Deterministic Sort**: Stable sort order (e.g. `code ASC, id ASC` for accounts; `posting_date DESC, entry_number DESC, id DESC` for journal entries).
-- **Safe Envelope**: All errors conform to the standard `ApiError` envelope (`statusCode`, `error`, `message`, `details`).
+- **Safe Envelope**: All errors conform to the standard `ApiError` envelope (`statusCode`, `error`, `message`, `details`, `code`, `correlation_id`).
 
-### 8.2 Endpoints Index
+### 9.2 Endpoints Index
 
 | Method | Endpoint | Query / Body Parameters | Status Codes | Description |
 |---|---|---|---|---|
 | `GET` | `/accounts` | `page`, `pageSize`, `search`, `type`, `is_active`, `currency_code` | 200, 400, 401 | List chart of accounts with bounded paging |
 | `GET` | `/accounts/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Retrieve single account by ID |
-| `POST` | `/accounts` | Body: `code`, `name`, `type`, `currency_code?`, `parent_id?`, `description?`, `is_posting_account?` | 201, 400, 409, 401 | Create new account (seed/admin) |
+| `POST` | `/accounts` | Body: `code`, `name`, `type`, `currency_code?`, `parent_id?`, `description?`, `is_posting_account?`, `idempotency_key?`, `batch_id?`, `source_row?` | 201, 200, 400, 403, 409, 422, 401 | Create new account (seed/admin/editor only) |
+| `PATCH` | `/accounts/:id` | Path: `id` (UUID), Body: `name?`, `description?`, `is_active?`, `is_posting_account?`, `parent_id?` | 200, 400, 403, 404, 422, 401 | Update mutable account fields (admin/editor only) |
 | `GET` | `/journal-entries` | `page`, `pageSize`, `period`, `period_id`, `status`, `from_date`, `to_date`, `currency_code`, `search` | 200, 400, 401 | List journal entries with filter & stable sort |
 | `GET` | `/journal-entries/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get journal entry with lines |
-| `POST` | `/journal-entries` | Body: `period_id`, `posting_date`, `description`, `currency_code`, `lines`, `idempotency_key?` | 201, 200 (idempotent), 400, 401 | Create draft journal entry |
+| `POST` | `/journal-entries` | Body: `period_id`, `posting_date`, `description`, `currency_code`, `lines`, `idempotency_key?`, `batch_id?`, `source_row?` | 201, 200 (idempotent), 400, 409, 422, 401 | Create draft journal entry |
+| `PATCH` | `/journal-entries/:id` | Path: `id` (UUID), Body: `period_id?`, `posting_date?`, `description?`, `lines?` | 200, 400, 404, 422, 401 | Update draft journal entry (immutable once posted) |
 | `POST` | `/journal-entries/:id/post` | Path: `id` (UUID) | 200, 400, 403, 404, 422, 401 | Post draft entry; enforces balancing & period lock |
 | `POST` | `/journal-entries/:id/reverse` | Path: `id` (UUID), Body: `reason`, `reversal_date?`, `reversal_description?` | 200, 400, 404, 422, 401 | Reverse posted entry via compensating reversal |
+| `POST` | `/journal-entries/:id/void` | Path: `id` (UUID) | 200, 400, 404, 422, 401 | Void draft journal entry |
 | `GET` | `/trial-balance` | `period` (YYYY-MM, required), `currency_code?` | 200, 400, 404, 401 | Generate trial balance grouped by account/currency |
 | `GET` | `/opening-balances` | `page`, `pageSize`, `account_id?`, `currency_code?` | 200, 400, 401 | List loaded opening balances |
 | `GET` | `/opening-balances/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get single opening balance by ID |
-| `POST` | `/opening-balances` | Body: `balances: Array<{account_id, currency_code, balance_amount, as_of_date, source_reference?}>` | 201, 400, 401 | Bulk-load opening balances (one-time per account/currency) |
+| `POST` | `/opening-balances` | Body: `balances: Array<OpeningBalanceItem>`, `idempotency_key?`, `batch_id?` | 201, 400, 409, 401 | Bulk-load opening balances (one-time per account/currency) |
 | `GET` | `/periods` | `page`, `pageSize`, `status?`, `fiscal_year?` | 200, 400, 401 | List fiscal accounting periods |
 | `GET` | `/periods/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get accounting period by ID |
+
 

@@ -1,11 +1,13 @@
 /**
  * ERP-4 Finance — Journal Entries Routes
  *
- * GET  /journal-entries            - List journal entries with filter, search, stable sort, and bounded paging
- * GET  /journal-entries/:id        - Get a single journal entry with lines
- * POST /journal-entries            - Create a new journal entry (draft)
- * POST /journal-entries/:id/post   - Approve and post entry (locks entry, enforces double-entry & period guards)
- * POST /journal-entries/:id/reverse- Reverse a posted entry via compensating reversal
+ * GET   /journal-entries            - List journal entries with filter, search, stable sort, and bounded paging
+ * GET   /journal-entries/:id        - Get a single journal entry with lines
+ * POST  /journal-entries            - Create a new journal entry (draft)
+ * PATCH /journal-entries/:id        - Edit draft entry
+ * POST  /journal-entries/:id/post   - Approve and post entry (locks entry, enforces double-entry & period guards)
+ * POST  /journal-entries/:id/reverse- Reverse a posted entry via compensating reversal
+ * POST  /journal-entries/:id/void   - Void draft entry
  *
  * @module erp4/routes/journal-entries
  */
@@ -14,6 +16,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   JournalEntryListQuerySchema,
   CreateJournalEntryRequestSchema,
+  UpdateJournalEntryRequestSchema,
   ReverseJournalEntryRequestSchema,
   IdParamSchema,
 } from '@clearshift/contracts';
@@ -45,10 +48,24 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
 
   // POST /journal-entries - Create draft journal entry
   fastify.post('/journal-entries', async (request, reply) => {
-    const body = CreateJournalEntryRequestSchema.parse(request.body);
+    const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
+    const rawBody = (request.body && typeof request.body === 'object') ? request.body : {};
+    const body = CreateJournalEntryRequestSchema.parse({
+      ...rawBody,
+      ...(idempotencyHeader && !(rawBody as any).idempotency_key && { idempotency_key: idempotencyHeader }),
+    });
     const user = (request as unknown as { user: { id: string; role?: string } }).user;
     const { entry, created } = await financeService.createJournalEntry(body, user.id);
     return reply.status(created ? 201 : 200).send(entry);
+  });
+
+  // PATCH /journal-entries/:id - Update draft journal entry
+  fastify.patch('/journal-entries/:id', async (request, reply) => {
+    const params = IdParamSchema.parse(request.params);
+    const body = UpdateJournalEntryRequestSchema.parse(request.body);
+    const user = (request as unknown as { user: { id: string; role?: string } }).user;
+    const updated = await financeService.updateJournalEntry(params.id, body, user.id);
+    return reply.status(200).send(updated);
   });
 
   // POST /journal-entries/:id/post - Post entry to ledger
@@ -67,4 +84,13 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     const result = await financeService.reverseJournalEntry(params.id, body, user);
     return reply.status(200).send(result);
   });
+
+  // POST /journal-entries/:id/void - Void draft entry
+  fastify.post('/journal-entries/:id/void', async (request, reply) => {
+    const params = IdParamSchema.parse(request.params);
+    const user = (request as unknown as { user: { id: string; role?: string } }).user;
+    const voided = await financeService.voidJournalEntry(params.id, user);
+    return reply.status(200).send(voided);
+  });
 };
+

@@ -304,6 +304,84 @@ export function assertEntryIsReversible(
   }
 }
 
+/**
+ * Asserts that a journal entry is in a state that permits direct editing.
+ *
+ * Posted entries are strictly immutable. Corrections use reversal entries.
+ *
+ * @throws DomainError with code ENTRY_IMMUTABLE
+ */
+export function assertEntryIsEditable(
+  entryId: string,
+  currentStatus: JournalEntryStatus
+): void {
+  if (currentStatus !== 'draft') {
+    throw new DomainError(
+      'ENTRY_IMMUTABLE',
+      `Journal entry "${entryId}" cannot be edited because its status is "${currentStatus}". ` +
+        `Posted entries are immutable. Corrections use reversal entries, not direct edits.`,
+      { entry_id: entryId, status: currentStatus }
+    );
+  }
+}
+
+/**
+ * Asserts that a journal entry can be cancelled/voided.
+ * Only draft entries can be voided.
+ *
+ * @throws DomainError with code ENTRY_IMMUTABLE
+ */
+export function assertEntryIsVoidable(
+  entryId: string,
+  currentStatus: JournalEntryStatus
+): void {
+  if (currentStatus !== 'draft') {
+    throw new DomainError(
+      'ENTRY_IMMUTABLE',
+      `Journal entry "${entryId}" cannot be voided because its status is "${currentStatus}". ` +
+        `Only draft entries can be voided. Corrections to posted entries use reversals.`,
+      { entry_id: entryId, status: currentStatus }
+    );
+  }
+}
+
+/**
+ * Validates that setting parent_id does not create a self-reference or circular hierarchy cycle.
+ *
+ * @throws DomainError with code CYCLE_DETECTED
+ */
+export function assertNoAccountCycle(
+  accountId: string,
+  proposedParentId: string | null | undefined,
+  getParentFn?: (id: string) => string | null | undefined
+): void {
+  if (!proposedParentId) return;
+
+  if (accountId === proposedParentId) {
+    throw new DomainError(
+      'CYCLE_DETECTED',
+      `Account "${accountId}" cannot have itself as parent_id.`,
+      { account_id: accountId, proposed_parent_id: proposedParentId }
+    );
+  }
+
+  if (getParentFn) {
+    let current: string | null | undefined = proposedParentId;
+    const visited = new Set<string>([accountId]);
+    while (current) {
+      if (visited.has(current)) {
+        throw new DomainError(
+          'CYCLE_DETECTED',
+          `Circular parent hierarchy detected: account "${accountId}" is in the ancestor chain of "${proposedParentId}".`,
+          { account_id: accountId, proposed_parent_id: proposedParentId }
+        );
+      }
+      visited.add(current);
+      current = getParentFn(current);
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Trial balance computation (FR-ERP4-03)
 // ─────────────────────────────────────────────────────────────────────────────

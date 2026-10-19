@@ -15,10 +15,12 @@ import { randomUUID } from 'node:crypto';
 import type {
   Account,
   CreateAccountRequest,
+  UpdateAccountRequest,
   AccountListQuery,
   AccountListResponse,
   JournalEntry,
   CreateJournalEntryRequest,
+  UpdateJournalEntryRequest,
   JournalEntryListQuery,
   JournalEntryListResponse,
   ReverseJournalEntryRequest,
@@ -33,12 +35,16 @@ import type {
   AccountingPeriod,
   PeriodListQuery,
   PeriodListResponse,
+  ImportReceipt,
 } from '@clearshift/contracts';
 import {
   assertDoubleEntryBalanced,
   assertJournalLineValid,
   assertPeriodAcceptsPosting,
   assertEntryIsReversible,
+  assertEntryIsEditable,
+  assertEntryIsVoidable,
+  assertNoAccountCycle,
   computeTrialBalance,
   computeTrialBalanceTotals,
   DomainError,
@@ -55,7 +61,8 @@ export class ServiceError extends Error {
     public readonly statusCode: number,
     public readonly error: string,
     message: string,
-    public readonly details: unknown[] = []
+    public readonly details: unknown[] = [],
+    public readonly code: string = 'SERVICE_ERROR'
   ) {
     super(message);
     this.name = 'ServiceError';
@@ -63,32 +70,38 @@ export class ServiceError extends Error {
 }
 
 export class NotFoundError extends ServiceError {
-  constructor(entity: string, id: string) {
-    super(404, 'Not Found', `${entity} with identifier "${id}" was not found.`);
+  constructor(entity: string, id: string, details: unknown[] = [], code: string = 'NOT_FOUND') {
+    super(404, 'Not Found', `${entity} with identifier "${id}" was not found.`, details, code);
   }
 }
 
 export class ConflictError extends ServiceError {
-  constructor(message: string) {
-    super(409, 'Conflict', message);
+  constructor(message: string, details: unknown[] = [], code: string = 'CONFLICT') {
+    super(409, 'Conflict', message, details, code);
+  }
+}
+
+export class IdempotencyConflictError extends ServiceError {
+  constructor(message: string, details: unknown[] = []) {
+    super(409, 'Conflict', message, details, 'IDEMPOTENCY_CONFLICT');
   }
 }
 
 export class BadRequestError extends ServiceError {
-  constructor(message: string, details: unknown[] = []) {
-    super(400, 'Bad Request', message, details);
+  constructor(message: string, details: unknown[] = [], code: string = 'BAD_REQUEST') {
+    super(400, 'Bad Request', message, details, code);
   }
 }
 
 export class UnprocessableError extends ServiceError {
-  constructor(message: string, details: unknown[] = []) {
-    super(422, 'Unprocessable Entity', message, details);
+  constructor(message: string, details: unknown[] = [], code: string = 'UNPROCESSABLE_ENTITY') {
+    super(422, 'Unprocessable Entity', message, details, code);
   }
 }
 
 export class ForbiddenError extends ServiceError {
-  constructor(message: string = 'Forbidden') {
-    super(403, 'Forbidden', message);
+  constructor(message: string = 'Forbidden', code: string = 'FORBIDDEN') {
+    super(403, 'Forbidden', message, [], code);
   }
 }
 
@@ -130,20 +143,129 @@ export class FinanceService {
     return account;
   }
 
-  async createAccount(data: CreateAccountRequest): Promise<Account> {
-    const existing = await this.repository.getAccountByCode(data.code);
-    if (existing) {
-      throw new ConflictError(`Account with code "${data.code}" already exists.`);
-    }
-
-    if (data.parent_id) {
-      const parent = await this.repository.getAccountById(data.parent_id);
-      if (!parent) {
-        throw new BadRequestError(`Parent account with ID "${data.parent_id}" not found.`);
+  async createAccount(
+    data: CreateAccountRequest
+  ): Promise<{ account: Account; created: boolean; receipt?: ImportReceipt }> {
+    // 1. Idempotency check
+    if (data.idempotency_key) {
+      const receipt = await this.repository.getImportReceiptByIdempotencyKey(data.idempotency_key);
+      if (receipt) {
+        const target = await this.repository.getAccountById(receipt.target_id);
+        if (target) {
+          if (target.code.toLowerCase() !== data.code.toLowerCase()) {
+            throw new IdempotencyConflictError(
+              `Idempotency key "${data.idempotency_key}" was previously used for account "${target.code}".`,
+              [{ field: 'idempotency_key', message: 'Conflicting idempotency key', code: 'IDEMPOTENCY_CONFLICT' }]
+            );
+          }
+          return { account: target, created: false, receipt };
+        }
       }
     }
 
-    return this.repository.createAccount(data);
+    // 2. Code uniqueness (FR-ERP4-01)
+    const existing = await this.repository.getAccountByCode(data.code);
+    if (existing) {
+      throw new ConflictError(
+        `Account with code "${data.code}" already exists.`,
+        [{ field: 'code', message: `Account code "${data.code}" is already in use`, code: 'DUPLICATE_CODE' }],
+        'DUPLICATE_CODE'
+      );
+    }
+
+    // 3. Parent account validation & currency consistency
+    if (data.parent_id) {
+      const parent = await this.repository.getAccountById(data.parent_id);
+      if (!parent) {
+        throw new BadRequestError(
+          `Parent account with ID "${data.parent_id}" not found.`,
+          [{ field: 'parent_id', message: 'Parent account does not exist', code: 'PARENT_NOT_FOUND' }],
+          'PARENT_NOT_FOUND'
+        );
+      }
+      if (data.currency_code && parent.currency_code !== data.currency_code) {
+        throw new UnprocessableError(
+          `Currency mismatch: parent account uses "${parent.currency_code}", but new account specifies "${data.currency_code}".`,
+          [{ field: 'currency_code', message: 'Parent and child must use same currency', code: 'CURRENCY_MISMATCH' }],
+          'CURRENCY_MISMATCH'
+        );
+      }
+    }
+
+    // 4. Persistence
+    const account = await this.repository.createAccount(data);
+
+    // 5. Persist import receipt in same transaction / atomic boundary if batch/idempotency provided
+    let receipt: ImportReceipt | undefined;
+    if (data.idempotency_key && data.batch_id && data.source_row !== undefined && data.source_row !== null) {
+      receipt = await this.repository.createImportReceipt({
+        batch_id: data.batch_id,
+        source_row: data.source_row,
+        entity: 'account',
+        schema_version: 1,
+        idempotency_key: data.idempotency_key,
+        target_id: account.id,
+        kind: 'created',
+      });
+    }
+
+    return { account, created: true, ...(receipt && { receipt }) };
+  }
+
+  async updateAccount(id: string, updates: UpdateAccountRequest): Promise<Account> {
+    const existing = await this.repository.getAccountById(id);
+    if (!existing) {
+      throw new NotFoundError('Account', id);
+    }
+
+    // Never accept protected/system-maintained fields as authoritative from browser
+    // Only mutable fields: name, description, is_active, is_posting_account, parent_id
+    if (updates.parent_id !== undefined) {
+      if (updates.parent_id === id) {
+        throw new UnprocessableError(
+          `Account "${id}" cannot have itself as parent_id.`,
+          [{ field: 'parent_id', message: 'Self-referential parent is not allowed', code: 'CYCLE_DETECTED' }],
+          'CYCLE_DETECTED'
+        );
+      }
+
+      if (updates.parent_id !== null) {
+        const parent = await this.repository.getAccountById(updates.parent_id);
+        if (!parent) {
+          throw new UnprocessableError(
+            `Parent account with ID "${updates.parent_id}" not found.`,
+            [{ field: 'parent_id', message: 'Parent account not found', code: 'PARENT_NOT_FOUND' }],
+            'PARENT_NOT_FOUND'
+          );
+        }
+
+        // Circular hierarchy check
+        let curr: string | null | undefined = updates.parent_id;
+        const visited = new Set<string>([id]);
+        while (curr) {
+          if (visited.has(curr)) {
+            throw new UnprocessableError(
+              `Circular parent hierarchy detected: account "${id}" is in the ancestor chain of "${updates.parent_id}".`,
+              [{ field: 'parent_id', message: 'Circular parent hierarchy detected', code: 'CYCLE_DETECTED' }],
+              'CYCLE_DETECTED'
+            );
+          }
+          visited.add(curr);
+          const a = await this.repository.getAccountById(curr);
+          curr = a?.parent_id;
+        }
+      }
+    }
+
+    const filteredUpdates: Partial<Account> = {
+      ...(updates.name !== undefined && { name: updates.name }),
+      ...(updates.description !== undefined && { description: updates.description }),
+      ...(updates.is_active !== undefined && { is_active: updates.is_active }),
+      ...(updates.is_posting_account !== undefined && { is_posting_account: updates.is_posting_account }),
+      ...(updates.parent_id !== undefined && { parent_id: updates.parent_id }),
+    };
+
+    return this.repository.updateAccount(id, filteredUpdates);
   }
 
   // ── Accounting Periods ─────────────────────────────────────────────────────
@@ -212,22 +334,32 @@ export class FinanceService {
   async createJournalEntry(
     data: CreateJournalEntryRequest,
     userId: string
-  ): Promise<{ entry: JournalEntry; created: boolean }> {
-    // Idempotency check
+  ): Promise<{ entry: JournalEntry; created: boolean; receipt?: ImportReceipt }> {
+    // 1. Idempotency check
     if (data.idempotency_key) {
       const existing = await this.repository.getJournalEntryByIdempotencyKey(data.idempotency_key);
       if (existing) {
-        return { entry: existing, created: false };
+        if (
+          existing.currency_code !== data.currency_code ||
+          existing.period_id !== data.period_id
+        ) {
+          throw new IdempotencyConflictError(
+            `Idempotency key "${data.idempotency_key}" was previously used with different journal entry parameters.`,
+            [{ field: 'idempotency_key', message: 'Conflicting idempotency key parameters', code: 'IDEMPOTENCY_CONFLICT' }]
+          );
+        }
+        const receipt = await this.repository.getImportReceiptByIdempotencyKey(data.idempotency_key);
+        return { entry: existing, created: false, ...(receipt && { receipt }) };
       }
     }
 
-    // Validate period exists
+    // 2. Validate period exists
     const period = await this.repository.getPeriodById(data.period_id);
     if (!period) {
       throw new BadRequestError(`Accounting period with ID "${data.period_id}" was not found.`);
     }
 
-    // Validate lines per-line constraints (BR-ERP4-01)
+    // 3. Validate lines per-line constraints (BR-ERP4-01)
     if (!data.lines || data.lines.length < 2) {
       throw new BadRequestError('A journal entry must contain at least 2 lines.');
     }
@@ -253,7 +385,7 @@ export class FinanceService {
       }
     }
 
-    // Validate double-entry balance invariant at 4 decimal places (BR-ERP4-01)
+    // 4. Validate double-entry balance invariant at 4 decimal places (BR-ERP4-01)
     try {
       assertDoubleEntryBalanced(
         data.lines.map((l) => ({
@@ -278,7 +410,113 @@ export class FinanceService {
       created_by_user_id: userId,
     });
 
-    return { entry, created: true };
+    // 5. Persist import receipt in same transaction / atomic boundary if import metadata provided
+    let receipt: ImportReceipt | undefined;
+    if (data.idempotency_key && data.batch_id && data.source_row !== undefined && data.source_row !== null) {
+      receipt = await this.repository.createImportReceipt({
+        batch_id: data.batch_id,
+        source_row: data.source_row,
+        entity: 'journal_entry',
+        schema_version: 1,
+        idempotency_key: data.idempotency_key,
+        target_id: entry.id,
+        kind: 'created',
+      });
+    }
+
+    return { entry, created: true, ...(receipt && { receipt }) };
+  }
+
+  async updateJournalEntry(
+    id: string,
+    updates: UpdateJournalEntryRequest,
+    _userId: string
+  ): Promise<JournalEntry> {
+    const entry = await this.repository.getJournalEntryById(id);
+    if (!entry) {
+      throw new NotFoundError('Journal entry', id);
+    }
+
+    // Status machine: only draft entries can be edited.
+    // Posted entries are immutable. Corrections use reversal entries.
+    try {
+      assertEntryIsEditable(entry.id, entry.status);
+    } catch (err) {
+      if (err instanceof DomainError) {
+        throw new UnprocessableError(err.message, [err.context ?? {}], err.code);
+      }
+      throw err;
+    }
+
+    let periodId = entry.period_id;
+    if (updates.period_id && updates.period_id !== entry.period_id) {
+      const period = await this.repository.getPeriodById(updates.period_id);
+      if (!period) {
+        throw new BadRequestError(`Accounting period with ID "${updates.period_id}" was not found.`);
+      }
+      periodId = updates.period_id;
+    }
+
+    let lines = entry.lines;
+    if (updates.lines) {
+      if (updates.lines.length < 2) {
+        throw new BadRequestError('A journal entry must contain at least 2 lines.');
+      }
+
+      for (let idx = 0; idx < updates.lines.length; idx++) {
+        const line = updates.lines[idx]!;
+        assertJournalLineValid(
+          {
+            account_id: line.account_id,
+            debit_amount: line.debit_amount ?? '0.0000',
+            credit_amount: line.credit_amount ?? '0.0000',
+          },
+          idx
+        );
+
+        const acct = await this.repository.getAccountById(line.account_id);
+        if (!acct) {
+          throw new BadRequestError(`Account "${line.account_id}" does not exist.`);
+        }
+        if (!acct.is_posting_account) {
+          throw new BadRequestError(`Account "${acct.code}" is a header account and cannot receive postings.`);
+        }
+      }
+
+      try {
+        assertDoubleEntryBalanced(
+          updates.lines.map((l) => ({
+            account_id: l.account_id,
+            debit_amount: l.debit_amount ?? '0.0000',
+            credit_amount: l.credit_amount ?? '0.0000',
+          })),
+          entry.currency_code
+        );
+      } catch (err) {
+        if (err instanceof DomainError) {
+          throw new UnprocessableError(err.message, [err.context], 'UNBALANCED_ENTRY');
+        }
+        throw err;
+      }
+
+      lines = updates.lines.map((l) => ({
+        id: randomUUID(),
+        journal_entry_id: id,
+        account_id: l.account_id,
+        debit_amount: l.debit_amount ?? '0.0000',
+        credit_amount: l.credit_amount ?? '0.0000',
+        line_narration: l.line_narration ?? null,
+        department_ref: l.department_ref ?? null,
+        created_at: new Date().toISOString(),
+      }));
+    }
+
+    return this.repository.updateJournalEntry(id, {
+      ...(updates.posting_date && { posting_date: updates.posting_date }),
+      ...(updates.description && { description: updates.description }),
+      period_id: periodId,
+      lines,
+    });
   }
 
   async postJournalEntry(id: string, user: { id: string; role?: string }): Promise<JournalEntry> {
@@ -290,7 +528,9 @@ export class FinanceService {
     // Status machine: only draft entries can be posted
     if (entry.status !== 'draft') {
       throw new UnprocessableError(
-        `Journal entry ${entry.entry_number} cannot be posted from status "${entry.status}". Posted entries are immutable.`
+        `Journal entry ${entry.entry_number} cannot be posted from status "${entry.status}". Posted entries are immutable.`,
+        [{ field: 'status', message: `Cannot transition from ${entry.status} to posted`, code: 'INVALID_STATUS_TRANSITION' }],
+        'INVALID_STATUS_TRANSITION'
       );
     }
 
@@ -308,7 +548,8 @@ export class FinanceService {
       if (err instanceof DomainError) {
         throw new UnprocessableError(
           `Cannot post unbalanced journal entry: ${err.message}`,
-          [err.context]
+          [err.context],
+          'UNBALANCED_ENTRY'
         );
       }
       throw err;
@@ -317,7 +558,7 @@ export class FinanceService {
     // Period posting guard (BR-ERP4-02): closed month rejects posting
     const period = await this.repository.getPeriodById(entry.period_id);
     if (!period) {
-      throw new UnprocessableError(`Accounting period for entry "${id}" does not exist.`);
+      throw new UnprocessableError(`Accounting period for entry "${id}" does not exist.`, [], 'PERIOD_NOT_FOUND');
     }
 
     try {
@@ -328,11 +569,16 @@ export class FinanceService {
     } catch (err) {
       if (err instanceof DomainError) {
         if (err.code === 'PERIOD_LOCKED') {
-          throw new UnprocessableError(`Cannot post entry: period "${period.period_label}" is locked.`);
+          throw new UnprocessableError(
+            `Cannot post entry: period "${period.period_label}" is locked.`,
+            [err.context ?? {}],
+            'PERIOD_LOCKED'
+          );
         }
         if (err.code === 'PERIOD_SOFT_CLOSED') {
           throw new ForbiddenError(
-            `Cannot post entry: period "${period.period_label}" is soft-closed and requires finance_admin role.`
+            `Cannot post entry: period "${period.period_label}" is soft-closed and requires finance_admin role.`,
+            'PERIOD_SOFT_CLOSED'
           );
         }
       }
@@ -362,7 +608,11 @@ export class FinanceService {
       assertEntryIsReversible(entry.id, entry.status);
     } catch (err) {
       if (err instanceof DomainError) {
-        throw new UnprocessableError(`Cannot reverse journal entry: ${err.message}`);
+        throw new UnprocessableError(
+          `Cannot reverse journal entry: ${err.message}`,
+          [err.context ?? {}],
+          'NOT_REVERSIBLE'
+        );
       }
       throw err;
     }
@@ -370,7 +620,7 @@ export class FinanceService {
     // Period posting guard on reversal date/period
     const period = await this.repository.getPeriodById(entry.period_id);
     if (!period) {
-      throw new UnprocessableError(`Accounting period for entry "${id}" does not exist.`);
+      throw new UnprocessableError(`Accounting period for entry "${id}" does not exist.`, [], 'PERIOD_NOT_FOUND');
     }
 
     try {
@@ -380,7 +630,19 @@ export class FinanceService {
       );
     } catch (err) {
       if (err instanceof DomainError) {
-        throw new UnprocessableError(`Cannot reverse entry into period "${period.period_label}": ${err.message}`);
+        if (err.code === 'PERIOD_LOCKED') {
+          throw new UnprocessableError(
+            `Cannot reverse entry into period "${period.period_label}": period is locked.`,
+            [err.context ?? {}],
+            'PERIOD_LOCKED'
+          );
+        }
+        if (err.code === 'PERIOD_SOFT_CLOSED') {
+          throw new ForbiddenError(
+            `Cannot reverse entry into period "${period.period_label}": period is soft-closed and requires finance_admin role.`,
+            'PERIOD_SOFT_CLOSED'
+          );
+        }
       }
       throw err;
     }
@@ -425,6 +687,30 @@ export class FinanceService {
     });
 
     return { original: updatedOriginal, reversal: postedReversal };
+  }
+
+  async voidJournalEntry(id: string, _user: { id: string; role?: string }): Promise<JournalEntry> {
+    const entry = await this.repository.getJournalEntryById(id);
+    if (!entry) {
+      throw new NotFoundError('Journal entry', id);
+    }
+
+    if (entry.status === 'voided') {
+      return entry;
+    }
+
+    try {
+      assertEntryIsVoidable(entry.id, entry.status);
+    } catch (err) {
+      if (err instanceof DomainError) {
+        throw new UnprocessableError(err.message, [err.context ?? {}], err.code);
+      }
+      throw err;
+    }
+
+    return this.repository.updateJournalEntryStatus(id, {
+      status: 'voided',
+    });
   }
 
   // ── Trial Balance ──────────────────────────────────────────────────────────
@@ -547,8 +833,45 @@ export class FinanceService {
   ): Promise<CreateOpeningBalancesResponse> {
     const created: OpeningBalance[] = [];
     const skipped: Array<{ account_id: string; currency_code: string; reason: string }> = [];
+    const receipts: ImportReceipt[] = [];
 
-    for (const item of data.balances) {
+    // 1. Batch idempotency check
+    if (data.idempotency_key) {
+      const existingReceipt = await this.repository.getImportReceiptByIdempotencyKey(data.idempotency_key);
+      if (existingReceipt) {
+        const existingBalances: OpeningBalance[] = [];
+        for (const item of data.balances) {
+          const b = await this.repository.getOpeningBalance(item.account_id, item.currency_code);
+          if (b) {
+            existingBalances.push(b);
+          }
+        }
+        return { created: existingBalances, skipped: [], receipts: [existingReceipt] };
+      }
+    }
+
+    for (let idx = 0; idx < data.balances.length; idx++) {
+      const item = data.balances[idx]!;
+
+      // Item idempotency check
+      if (item.idempotency_key) {
+        const itemReceipt = await this.repository.getImportReceiptByIdempotencyKey(item.idempotency_key);
+        if (itemReceipt) {
+          const target = await this.repository.getOpeningBalanceById(itemReceipt.target_id);
+          if (target) {
+            if (target.account_id !== item.account_id || target.currency_code !== item.currency_code) {
+              throw new IdempotencyConflictError(
+                `Idempotency key "${item.idempotency_key}" was previously used with different balance parameters.`,
+                [{ field: 'idempotency_key', message: 'Conflicting idempotency key parameters', code: 'IDEMPOTENCY_CONFLICT' }]
+              );
+            }
+            created.push(target);
+            receipts.push(itemReceipt);
+            continue;
+          }
+        }
+      }
+
       // Verify account exists
       const account = await this.repository.getAccountById(item.account_id);
       if (!account) {
@@ -581,8 +904,36 @@ export class FinanceService {
       });
 
       created.push(balance);
+
+      const effectiveBatchId = item.batch_id ?? data.batch_id;
+      const effectiveSourceRow = item.source_row ?? idx;
+      if (item.idempotency_key && effectiveBatchId) {
+        const rec = await this.repository.createImportReceipt({
+          batch_id: effectiveBatchId,
+          source_row: effectiveSourceRow,
+          entity: 'opening_balance',
+          schema_version: 1,
+          idempotency_key: item.idempotency_key,
+          target_id: balance.id,
+          kind: 'created',
+        });
+        receipts.push(rec);
+      }
     }
 
-    return { created, skipped };
+    if (data.idempotency_key && created.length > 0) {
+      const batchReceipt = await this.repository.createImportReceipt({
+        batch_id: data.batch_id ?? randomUUID(),
+        source_row: 0,
+        entity: 'opening_balances_batch',
+        schema_version: 1,
+        idempotency_key: data.idempotency_key,
+        target_id: created[0]!.id,
+        kind: 'created',
+      });
+      receipts.push(batchReceipt);
+    }
+
+    return { created, skipped, ...(receipts.length > 0 && { receipts }) };
   }
 }

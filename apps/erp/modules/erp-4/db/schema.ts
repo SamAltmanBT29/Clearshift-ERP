@@ -28,6 +28,7 @@ import {
   date,
   boolean,
   numeric,
+  integer,
   uniqueIndex,
   index,
   check,
@@ -491,6 +492,41 @@ export const erp4OpeningBalances = erp4Schema.table(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Table 6 — erp4_import_receipts (Idempotency & Migration Audit Receipts)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Durable import receipts table (Decision C4 & KIT-08).
+ * Persisted in the same PostgreSQL transaction as the target mutation.
+ */
+export const erp4ImportReceipts = erp4Schema.table(
+  'import_receipts',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+
+    batch_id: uuid('batch_id').notNull(),
+    source_row: integer('source_row').notNull(),
+    entity: varchar('entity', { length: 64 }).notNull(),
+    schema_version: integer('schema_version').notNull().default(1),
+    idempotency_key: varchar('idempotency_key', { length: 128 }).notNull(),
+    target_id: uuid('target_id').notNull(),
+    kind: varchar('kind', { length: 16 }).notNull().default('created'),
+
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (table) => ({
+    // Unique idempotency key — guarantees zero duplicate mutations
+    idempotencyKeyUniqueIdx: uniqueIndex('import_receipts_idempotency_key_unique').on(
+      table.idempotency_key
+    ),
+    batchRowIdx: index('import_receipts_batch_row_idx').on(table.batch_id, table.source_row),
+  })
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Relation type helpers (used by the application layer for type inference)
 // ─────────────────────────────────────────────────────────────────────────────
 export type Erp4Account = typeof erp4Accounts.$inferSelect;
@@ -507,3 +543,6 @@ export type NewErp4JournalLine = typeof erp4JournalLines.$inferInsert;
 
 export type Erp4OpeningBalance = typeof erp4OpeningBalances.$inferSelect;
 export type NewErp4OpeningBalance = typeof erp4OpeningBalances.$inferInsert;
+
+export type Erp4ImportReceipt = typeof erp4ImportReceipts.$inferSelect;
+export type NewErp4ImportReceipt = typeof erp4ImportReceipts.$inferInsert;
