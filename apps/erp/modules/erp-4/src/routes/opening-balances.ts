@@ -42,7 +42,12 @@ export const openingBalancesRoutes: FastifyPluginAsync<OpeningBalancesRouteOptio
 
   // POST /opening-balances - Bulk load opening balances
   fastify.post('/opening-balances', async (request, reply) => {
-    const body = CreateOpeningBalancesRequestSchema.parse(request.body);
+    const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
+    const rawBody = (request.body && typeof request.body === 'object') ? request.body : {};
+    const body = CreateOpeningBalancesRequestSchema.parse({
+      ...rawBody,
+      ...(idempotencyHeader && !(rawBody as any).idempotency_key && { idempotency_key: idempotencyHeader }),
+    });
     const user = (request as unknown as { user: { id: string; role?: string } }).user;
     const response = await financeService.createOpeningBalances(body, user.id);
     return reply.status(201).send(response);

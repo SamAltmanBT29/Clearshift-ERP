@@ -28,6 +28,7 @@ import type {
   OpeningBalanceListQuery,
   AccountingPeriod,
   PeriodListQuery,
+  ImportReceipt,
 } from '@clearshift/contracts';
 import {
   FIXTURE_ACCOUNT_CASH,
@@ -52,6 +53,7 @@ export interface FinanceRepository {
   getAccountById(id: string): Promise<Account | null>;
   getAccountByCode(code: string): Promise<Account | null>;
   createAccount(data: CreateAccountRequest & { id?: string }): Promise<Account>;
+  updateAccount(id: string, updates: Partial<Account>): Promise<Account>;
 
   // Accounting Periods
   listPeriods(query: PeriodListQuery): Promise<{ periods: AccountingPeriod[]; total: number }>;
@@ -66,6 +68,7 @@ export interface FinanceRepository {
   createJournalEntry(
     data: CreateJournalEntryRequest & { id?: string; entry_number: string; created_by_user_id: string }
   ): Promise<JournalEntry>;
+  updateJournalEntry(id: string, updates: Partial<JournalEntry>): Promise<JournalEntry>;
   updateJournalEntryStatus(
     id: string,
     updates: {
@@ -89,6 +92,20 @@ export interface FinanceRepository {
     source_reference?: string | null;
     loaded_by_user_id: string;
   }): Promise<OpeningBalance>;
+
+  // Import Receipts
+  getImportReceiptByIdempotencyKey(key: string): Promise<ImportReceipt | null>;
+  createImportReceipt(receipt: {
+    id?: string;
+    batch_id: string;
+    source_row: number;
+    entity: string;
+    schema_version?: number;
+    idempotency_key: string;
+    target_id: string;
+    kind?: 'created' | 'linked';
+    created_at?: string;
+  }): Promise<ImportReceipt>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,6 +117,7 @@ export class InMemoryFinanceRepository implements FinanceRepository {
   private periods: Map<string, AccountingPeriod> = new Map();
   private journalEntries: Map<string, JournalEntry> = new Map();
   private openingBalances: Map<string, OpeningBalance> = new Map();
+  private importReceipts: Map<string, ImportReceipt> = new Map();
 
   constructor(seedWithFixtures: boolean = true) {
     if (seedWithFixtures) {
@@ -283,6 +301,27 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     return account;
   }
 
+  async updateAccount(id: string, updates: Partial<Account>): Promise<Account> {
+    const existing = this.accounts.get(id);
+    if (!existing) {
+      throw new Error(`Account ${id} not found`);
+    }
+    const updated: Account = {
+      ...existing,
+      name: updates.name !== undefined ? updates.name : existing.name,
+      description: updates.description !== undefined ? updates.description : existing.description,
+      is_active: updates.is_active !== undefined ? updates.is_active : existing.is_active,
+      is_posting_account:
+        updates.is_posting_account !== undefined
+          ? updates.is_posting_account
+          : existing.is_posting_account,
+      parent_id: updates.parent_id !== undefined ? updates.parent_id : existing.parent_id,
+      updated_at: new Date().toISOString(),
+    };
+    this.accounts.set(id, updated);
+    return updated;
+  }
+
   // ── Accounting Periods ─────────────────────────────────────────────────────
 
   async listPeriods(query: PeriodListQuery): Promise<{ periods: AccountingPeriod[]; total: number }> {
@@ -463,6 +502,25 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     return entry;
   }
 
+  async updateJournalEntry(id: string, updates: Partial<JournalEntry>): Promise<JournalEntry> {
+    const entry = this.journalEntries.get(id);
+    if (!entry) {
+      throw new Error(`Journal entry ${id} not found`);
+    }
+
+    const updated: JournalEntry = {
+      ...entry,
+      posting_date: updates.posting_date !== undefined ? updates.posting_date : entry.posting_date,
+      description: updates.description !== undefined ? updates.description : entry.description,
+      period_id: updates.period_id !== undefined ? updates.period_id : entry.period_id,
+      lines: updates.lines !== undefined ? updates.lines : entry.lines,
+      updated_at: new Date().toISOString(),
+    };
+
+    this.journalEntries.set(id, updated);
+    return updated;
+  }
+
   async updateJournalEntryStatus(
     id: string,
     updates: {
@@ -560,5 +618,42 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     };
     this.openingBalances.set(ob.id, ob);
     return ob;
+  }
+
+  // ── Import Receipts ────────────────────────────────────────────────────────
+
+  async getImportReceiptByIdempotencyKey(key: string): Promise<ImportReceipt | null> {
+    for (const receipt of this.importReceipts.values()) {
+      if (receipt.idempotency_key === key) {
+        return receipt;
+      }
+    }
+    return null;
+  }
+
+  async createImportReceipt(receipt: {
+    id?: string;
+    batch_id: string;
+    source_row: number;
+    entity: string;
+    schema_version?: number;
+    idempotency_key: string;
+    target_id: string;
+    kind?: 'created' | 'linked';
+    created_at?: string;
+  }): Promise<ImportReceipt> {
+    const item: ImportReceipt = {
+      id: receipt.id ?? randomUUID(),
+      batch_id: receipt.batch_id,
+      source_row: receipt.source_row,
+      entity: receipt.entity,
+      schema_version: receipt.schema_version ?? 1,
+      idempotency_key: receipt.idempotency_key,
+      target_id: receipt.target_id,
+      kind: receipt.kind ?? 'created',
+      created_at: receipt.created_at ?? new Date().toISOString(),
+    };
+    this.importReceipts.set(item.id, item);
+    return item;
   }
 }
