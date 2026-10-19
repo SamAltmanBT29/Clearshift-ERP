@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearShift ERP-4 — Finance & Accounting</title>
+  <style>
+    /* ClearShift ERP-4 Minimal White Theme & Component Tokens */
+    :root {
+      --color-background: #ffffff;
+      --color-surface: #f9fafb;
+      --color-surface-hover: #f3f4f6;
+      --color-text: #111827;
+      --color-text-muted: #6b7280;
+      --color-text-subtle: #9ca3af;
+      
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --border-focus: #2563eb;
+
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-primary-text: #ffffff;
+
+      --color-success: #166534;
+      --color-success-bg: #dcfce7;
+      --color-success-border: #bbf7d0;
+
+      --color-warning: #92400e;
+      --color-warning-bg: #fef3c7;
+      --color-warning-border: #fde68a;
+
+      --color-error: #991b1b;
+      --color-error-bg: #fee2e2;
+      --color-error-border: #fecaca;
+
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-surface);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      padding: var(--space-6);
+      line-height: 1.5;
+    }
+
+    .cs-preview-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-subtle);
+    }
+
+    /* Header */
+    .cs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: var(--space-5);
+    }
+
+    .cs-header-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-text);
+      letter-spacing: -0.02em;
+    }
+
+    .cs-header-desc {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      margin-top: var(--space-1);
+    }
+
+    /* Stats Grid */
+    .cs-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .cs-stat-card {
+      background: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cs-stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .cs-stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-text);
+      margin-top: var(--space-1);
+    }
+
+    .cs-stat-sub {
+      font-size: 12px;
+      color: var(--color-text-subtle);
+      margin-top: var(--space-1);
+    }
+
+    /* Tab Controls */
+    .cs-tabs-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-5);
+    }
+
+    .cs-tabs {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .cs-tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: var(--space-2) var(--space-4);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .cs-tab-btn:hover {
+      color: var(--color-text);
+    }
+
+    .cs-tab-btn.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .cs-state-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    /* Filter Bar */
+    .cs-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      align-items: center;
+      background: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .cs-input, .cs-select {
+      background: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      font-size: 14px;
+      color: var(--color-text);
+      font-family: inherit;
+    }
+
+    .cs-input-search {
+      min-width: 260px;
+      flex: 1;
+    }
+
+    .cs-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-4);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      font-family: inherit;
+    }
+
+    .cs-btn-primary {
+      background-color: var(--color-primary);
+      color: var(--color-primary-text);
+    }
+
+    .cs-btn-primary:hover {
+      background-color: var(--color-primary-hover);
+    }
+
+    .cs-btn-secondary {
+      background-color: var(--color-background);
+      color: var(--color-text);
+      border-color: var(--border-subtle);
+    }
+
+    .cs-btn-secondary:hover {
+      background-color: var(--color-surface-hover);
+    }
+
+    .cs-btn-sm {
+      padding: var(--space-1) var(--space-3);
+      font-size: 12px;
+    }
+
+    /* Tables */
+    .cs-table-container {
+      background: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: var(--space-4);
+    }
+
+    .cs-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .cs-th {
+      background-color: var(--color-surface);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-td {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--color-text);
+      vertical-align: middle;
+    }
+
+    .cs-tr:hover {
+      background-color: var(--color-surface);
+    }
+
+    .cs-text-right {
+      text-align: right;
+    }
+
+    .cs-code {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    /* Soft Pill Badges */
+    .cs-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+
+    .cs-badge-asset { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+    .cs-badge-liability { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+    .cs-badge-equity { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+    .cs-badge-income { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+    .cs-badge-expense { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .cs-badge-success { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success-border); }
+    .cs-badge-error { background: var(--color-error-bg); color: var(--color-error); border-color: var(--color-error-border); }
+    .cs-badge-muted { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--border-subtle); }
+
+    /* Trial Balance Banner */
+    .cs-balance-banner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+      gap: var(--space-4);
+    }
+
+    .cs-balance-totals {
+      display: flex;
+      gap: var(--space-8);
+      flex-wrap: wrap;
+    }
+
+    .cs-balance-item-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+    }
+
+    .cs-balance-item-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      font-family: var(--font-mono);
+    }
+
+    /* Pagination */
+    .cs-pagination-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--color-text-muted);
+      padding: var(--space-2) 0;
+    }
+
+    /* Skeleton Loading State */
+    .cs-skeleton-cell {
+      height: 18px;
+      background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+      background-size: 200% 100%;
+      animation: cs-shimmer 1.5s infinite;
+      border-radius: var(--radius-sm);
+    }
+
+    @keyframes cs-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Empty State */
+    .cs-empty-state {
+      text-align: center;
+      padding: var(--space-8) var(--space-4);
+    }
+
+    .cs-empty-icon {
+      font-size: 36px;
+      margin-bottom: var(--space-2);
+    }
+
+    /* Error State */
+    .cs-error-card {
+      text-align: center;
+      padding: var(--space-6) var(--space-4);
+      border: 1px solid var(--color-error-border);
+      background: var(--color-error-bg);
+      border-radius: var(--radius-md);
+      margin: var(--space-4) 0;
+      color: var(--color-error);
+    }
+  </style>
+</head>
+<body>
+
+  <main class="cs-preview-container">
+    <!-- Header -->
+    <header class="cs-header">
+      <div>
+        <h1 class="cs-header-title">Finance & Accounting (ERP-4)</h1>
+        <p class="cs-header-desc">
+          General Ledger, Chart of Accounts Master, and Period-End Trial Balance Verification.
+        </p>
+      </div>
+      <div>
+        <button type="button" class="cs-btn cs-btn-primary" aria-label="Add new account">
+          + Add Account
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Cards -->
+    <section class="cs-stats-grid" aria-label="Overview Metrics">
+      <div class="cs-stat-card">
+        <div class="cs-stat-label">Total Accounts</div>
+        <div class="cs-stat-value">124</div>
+        <div class="cs-stat-sub">Across 5 GL classifications</div>
+      </div>
+      <div class="cs-stat-card">
+        <div class="cs-stat-label">Asset Accounts</div>
+        <div class="cs-stat-value" style="color: var(--color-success)">48</div>
+        <div class="cs-stat-sub">Current, Fixed & Bank Accounts</div>
+      </div>
+      <div class="cs-stat-card">
+        <div class="cs-stat-label">Liabilities</div>
+        <div class="cs-stat-value" style="color: var(--color-error)">32</div>
+        <div class="cs-stat-sub">Accounts Payable & Accruals</div>
+      </div>
+      <div class="cs-stat-card">
+        <div class="cs-stat-label">Ledger Integrity</div>
+        <div class="cs-stat-value" style="color: var(--color-primary)">Balanced</div>
+        <div class="cs-stat-sub">Double-entry invariant: Debits = Credits</div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs & State Toggle Showcase -->
+    <div class="cs-tabs-bar">
+      <nav class="cs-tabs" role="tablist" aria-label="Module Views">
+        <button type="button" id="tab-accounts" class="cs-tab-btn active" onclick="switchView('accounts')">
+          Chart of Accounts
+        </button>
+        <button type="button" id="tab-tb" class="cs-tab-btn" onclick="switchView('tb')">
+          Trial Balance Report
+        </button>
+      </nav>
+
+      <div class="cs-state-selector">
+        <label for="state-sim-select">UI State Preview:</label>
+        <select id="state-sim-select" class="cs-select" onchange="switchState(this.value)">
+          <option value="normal">Active Data View</option>
+          <option value="loading">⏳ Loading Skeleton State</option>
+          <option value="empty">📄 Polished Empty State</option>
+          <option value="error">⚠️ Recoverable Error State</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- VIEW 1: CHART OF ACCOUNTS -->
+    <section id="view-accounts">
+      <div class="cs-filter-bar" role="search">
+        <input type="text" id="search-input" class="cs-input cs-input-search" placeholder="Search accounts by code or name..." oninput="filterRows()" aria-label="Search accounts">
+        <select id="type-filter" class="cs-select" onchange="filterRows()" aria-label="Filter by type">
+          <option value="">All Account Types</option>
+          <option value="asset">Asset</option>
+          <option value="liability">Liability</option>
+          <option value="equity">Equity</option>
+          <option value="income">Income</option>
+          <option value="expense">Expense</option>
+        </select>
+        <select id="status-filter" class="cs-select" onchange="filterRows()" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <option value="active">Active Only</option>
+          <option value="archived">Archived</option>
+        </select>
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" onclick="resetFilters()">Reset Filters</button>
+      </div>
+
+      <div class="cs-table-container">
+        <table class="cs-table" aria-label="Chart of Accounts">
+          <thead>
+            <tr class="cs-tr">
+              <th class="cs-th">Code</th>
+              <th class="cs-th">Account Name</th>
+              <th class="cs-th">Type</th>
+              <th class="cs-th">Currency</th>
+              <th class="cs-th cs-text-right">Balance</th>
+              <th class="cs-th">Status</th>
+            </tr>
+          </thead>
+          <tbody id="accounts-tbody">
+            <tr class="cs-tr" data-type="asset" data-code="1010" data-name="Operating Checking" data-status="active">
+              <td class="cs-td"><span class="cs-code">1010</span></td>
+              <td class="cs-td"><strong>Operating Checking</strong><div style="font-size:12px;color:var(--color-text-muted)">Primary corporate cash account</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-asset">Asset</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">84,520.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+            <tr class="cs-tr" data-type="asset" data-code="1020" data-name="Payroll Reserve" data-status="active">
+              <td class="cs-td"><span class="cs-code">1020</span></td>
+              <td class="cs-td"><strong>Payroll Reserve</strong><div style="font-size:12px;color:var(--color-text-muted)">Escrow cash for bi-weekly employee salary</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-asset">Asset</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">35,000.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+            <tr class="cs-tr" data-type="liability" data-code="2010" data-name="Accounts Payable (Trade)" data-status="active">
+              <td class="cs-td"><span class="cs-code">2010</span></td>
+              <td class="cs-td"><strong>Accounts Payable (Trade)</strong><div style="font-size:12px;color:var(--color-text-muted)">Vendor bills from purchase orders</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-liability">Liability</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">28,450.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+            <tr class="cs-tr" data-type="equity" data-code="3010" data-name="Common Stock" data-status="active">
+              <td class="cs-td"><span class="cs-code">3010</span></td>
+              <td class="cs-td"><strong>Common Stock</strong><div style="font-size:12px;color:var(--color-text-muted)">Paid-in capital from shareholders</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-equity">Equity</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">50,000.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+            <tr class="cs-tr" data-type="income" data-code="4010" data-name="SaaS Subscription Revenue" data-status="active">
+              <td class="cs-td"><span class="cs-code">4010</span></td>
+              <td class="cs-td"><strong>SaaS Subscription Revenue</strong><div style="font-size:12px;color:var(--color-text-muted)">Monthly recurring subscription billing</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-income">Income</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">62,800.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+            <tr class="cs-tr" data-type="expense" data-code="5010" data-name="Cloud Infrastructure & Hosting" data-status="active">
+              <td class="cs-td"><span class="cs-code">5010</span></td>
+              <td class="cs-td"><strong>Cloud Infrastructure & Hosting</strong><div style="font-size:12px;color:var(--color-text-muted)">AWS & DB hosting monthly operational costs</div></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-expense">Expense</span></td>
+              <td class="cs-td"><span class="cs-code">USD</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">14,200.00</td>
+              <td class="cs-td"><span class="cs-badge cs-badge-success">Active</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="cs-pagination-bar">
+        <div>Showing page <strong>1</strong> of <strong>7</strong> (<strong>124</strong> accounts total)</div>
+        <div style="display:flex;gap:var(--space-2)">
+          <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" disabled>&larr; Previous</button>
+          <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm">Next &rarr;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: TRIAL BALANCE -->
+    <section id="view-tb" style="display:none">
+      <div class="cs-filter-bar">
+        <label for="period-input" style="font-weight:600;font-size:13px">Accounting Period:</label>
+        <input type="month" id="period-input" class="cs-input" value="2026-10" aria-label="Accounting Period">
+        <button type="button" class="cs-btn cs-btn-secondary cs-btn-sm" onclick="alert('Trial balance recomputed!')">Recompute</button>
+      </div>
+
+      <!-- Invariant Verification Banner -->
+      <div class="cs-balance-banner" role="region" aria-label="Trial balance summary">
+        <div class="cs-balance-totals">
+          <div>
+            <div class="cs-balance-item-title">Total Debits</div>
+            <div class="cs-balance-item-val" style="color:var(--color-primary)">USD 133,720.00</div>
+          </div>
+          <div>
+            <div class="cs-balance-item-title">Total Credits</div>
+            <div class="cs-balance-item-val" style="color:var(--color-primary)">USD 133,720.00</div>
+          </div>
+          <div>
+            <div class="cs-balance-item-title">Variance / Difference</div>
+            <div class="cs-balance-item-val" style="color:var(--color-success)">USD 0.00</div>
+          </div>
+        </div>
+        <div>
+          <span class="cs-badge cs-badge-success" style="font-size:13px;padding:4px 12px">
+            ✓ Invariant Verified: Balanced
+          </span>
+        </div>
+      </div>
+
+      <div class="cs-table-container">
+        <table class="cs-table" aria-label="Trial Balance Sheet">
+          <thead>
+            <tr class="cs-tr">
+              <th class="cs-th">Code</th>
+              <th class="cs-th">Account Name</th>
+              <th class="cs-th">Category</th>
+              <th class="cs-th cs-text-right">Debit (USD)</th>
+              <th class="cs-th cs-text-right">Credit (USD)</th>
+              <th class="cs-th cs-text-right">Net Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">1010</span></td>
+              <td class="cs-td"><strong>Operating Checking</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-asset">Asset</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">84,520.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">84,520.00</td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">1020</span></td>
+              <td class="cs-td"><strong>Payroll Reserve</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-asset">Asset</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">35,000.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">35,000.00</td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">2010</span></td>
+              <td class="cs-td"><strong>Accounts Payable</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-liability">Liability</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">28,450.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">-28,450.00</td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">3010</span></td>
+              <td class="cs-td"><strong>Common Stock</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-equity">Equity</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">50,000.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">-50,000.00</td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">4010</span></td>
+              <td class="cs-td"><strong>SaaS Revenue</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-income">Income</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">62,800.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">-62,800.00</td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><span class="cs-code">5010</span></td>
+              <td class="cs-td"><strong>Infrastructure Costs</strong></td>
+              <td class="cs-td"><span class="cs-badge cs-badge-expense">Expense</span></td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">14,200.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);color:var(--color-text-subtle)">—</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono);font-weight:600">14,200.00</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="cs-tr" style="background:var(--color-surface);font-weight:700">
+              <td class="cs-td" colspan="3">Grand Total (Balanced)</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">133,720.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">133,720.00</td>
+              <td class="cs-td cs-text-right" style="font-family:var(--font-mono)">0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- SIMULATED MANDATORY UI STATES -->
+    <!-- 1. Skeleton Loading -->
+    <section id="state-loading" style="display:none">
+      <div class="cs-table-container">
+        <table class="cs-table">
+          <thead>
+            <tr class="cs-tr">
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:40%"></div></th>
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:60%"></div></th>
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:50%"></div></th>
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:40%"></div></th>
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:50%"></div></th>
+              <th class="cs-th"><div class="cs-skeleton-cell" style="width:40%"></div></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cs-tr">
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:60%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:80%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:50%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:40%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:70%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:50%"></div></td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:55%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:75%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:45%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:35%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:65%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:45%"></div></td>
+            </tr>
+            <tr class="cs-tr">
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:60%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:85%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:55%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:45%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:70%"></div></td>
+              <td class="cs-td"><div class="cs-skeleton-cell" style="width:50%"></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="text-align:center;padding:16px;color:var(--color-text-muted);font-size:13px">
+          ⏳ Loading records from ERP-4 Finance API...
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Empty State -->
+    <section id="state-empty" style="display:none">
+      <div class="cs-empty-state">
+        <div class="cs-empty-icon" aria-hidden="true">📂</div>
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:4px">No accounts found</h3>
+        <p style="font-size:14px;color:var(--color-text-muted);max-width:400px;margin:0 auto 16px">
+          No records match your selected filter or query. Click below to reset or add a new account.
+        </p>
+        <button type="button" class="cs-btn cs-btn-secondary" onclick="switchState('normal')">
+          Reset Filters & Refresh
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. Error State -->
+    <section id="state-error" style="display:none">
+      <div class="cs-error-card">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:4px">⚠️ Failed to Load Finance API</h3>
+        <p style="font-size:14px;margin-bottom:16px">
+          Unable to establish connection to /api/v1/erp-finance/accounts. Connection timed out.
+        </p>
+        <button type="button" class="cs-btn cs-btn-secondary" onclick="switchState('normal')">
+          Retry Request
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    function switchView(view) {
+      document.getElementById('view-accounts').style.display = view === 'accounts' ? 'block' : 'none';
+      document.getElementById('view-tb').style.display = view === 'tb' ? 'block' : 'none';
+      document.getElementById('tab-accounts').className = 'cs-tab-btn ' + (view === 'accounts' ? 'active' : '');
+      document.getElementById('tab-tb').className = 'cs-tab-btn ' + (view === 'tb' ? 'active' : '');
+      hideStates();
+    }
+
+    function switchState(state) {
+      if (state === 'normal') {
+        const isTb = document.getElementById('tab-tb').classList.contains('active');
+        switchView(isTb ? 'tb' : 'accounts');
+      } else {
+        document.getElementById('view-accounts').style.display = 'none';
+        document.getElementById('view-tb').style.display = 'none';
+        document.getElementById('state-loading').style.display = state === 'loading' ? 'block' : 'none';
+        document.getElementById('state-empty').style.display = state === 'empty' ? 'block' : 'none';
+        document.getElementById('state-error').style.display = state === 'error' ? 'block' : 'none';
+      }
+    }
+
+    function hideStates() {
+      document.getElementById('state-loading').style.display = 'none';
+      document.getElementById('state-empty').style.display = 'none';
+      document.getElementById('state-error').style.display = 'none';
+      document.getElementById('state-sim-select').value = 'normal';
+    }
+
+    function filterRows() {
+      const search = document.getElementById('search-input').value.toLowerCase();
+      const type = document.getElementById('type-filter').value.toLowerCase();
+      const status = document.getElementById('status-filter').value.toLowerCase();
+      const rows = document.querySelectorAll('#accounts-tbody tr');
+
+      rows.forEach(r => {
+        const code = r.getAttribute('data-code').toLowerCase();
+        const name = r.getAttribute('data-name').toLowerCase();
+        const rType = r.getAttribute('data-type').toLowerCase();
+        const rStatus = r.getAttribute('data-status').toLowerCase();
+
+        const matchSearch = !search || code.includes(search) || name.includes(search);
+        const matchType = !type || rType === type;
+        const matchStatus = !status || rStatus === status;
+
+        r.style.display = (matchSearch && matchType && matchStatus) ? '' : 'none';
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('type-filter').value = '';
+      document.getElementById('status-filter').value = '';
+      filterRows();
+    }
+  </script>
+</body>
+</html>
