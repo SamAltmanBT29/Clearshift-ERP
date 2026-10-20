@@ -3,15 +3,20 @@ import type {
   Account,
   AccountsFilterQuery,
   TrialBalanceResponse,
+  JournalEntry,
 } from '@clearshift/contracts';
-import { fetchAccounts, fetchTrialBalance } from '../api/erp-4.js';
+import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
 import { FilterBar } from '../components/FilterBar.js';
-import { ErrorState, EmptyState } from '../components/StateViews.js';
+import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
+import { JournalEntryFormPage } from './JournalEntryFormPage.js';
+import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
 
 export const AccountsListPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance'>('accounts');
+  const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance' | 'journal-entries'>('accounts');
 
   // Accounts List State
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -37,6 +42,12 @@ export const AccountsListPage: React.FC = () => {
   const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
   const [tbError, setTbError] = useState<string | null>(null);
+
+  // Journal Entries State
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [isEntriesLoading, setIsEntriesLoading] = useState(false);
+  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesTotal, setEntriesTotal] = useState(0);
 
   // Fetch Accounts from real API
   const loadAccounts = useCallback(async (currentFilters: AccountsFilterQuery) => {
@@ -68,19 +79,41 @@ export const AccountsListPage: React.FC = () => {
     }
   }, []);
 
+  // Fetch Journal Entries from real API
+  const loadJournalEntries = useCallback(async () => {
+    setIsEntriesLoading(true);
+    setEntriesError(null);
+    try {
+      const response = await fetchJournalEntries({ page: 1, limit: 20 });
+      setJournalEntries(response.items);
+      setEntriesTotal(response.total);
+    } catch (err: any) {
+      setEntriesError(err?.message || 'Failed to fetch journal entries');
+    } finally {
+      setIsEntriesLoading(false);
+    }
+  }, []);
+
   // Trigger accounts fetch on filter or page change
   useEffect(() => {
-    if (activeTab === 'accounts') {
+    if (activeTab === 'accounts' && currentView === 'list') {
       loadAccounts(filters);
     }
-  }, [filters, activeTab, loadAccounts]);
+  }, [filters, activeTab, currentView, loadAccounts]);
 
   // Trigger trial balance fetch on period change
   useEffect(() => {
-    if (activeTab === 'trial-balance') {
+    if (activeTab === 'trial-balance' && currentView === 'list') {
       loadTrialBalance(period);
     }
-  }, [period, activeTab, loadTrialBalance]);
+  }, [period, activeTab, currentView, loadTrialBalance]);
+
+  // Trigger journal entries fetch on tab change
+  useEffect(() => {
+    if (activeTab === 'journal-entries' && currentView === 'list') {
+      loadJournalEntries();
+    }
+  }, [activeTab, currentView, loadJournalEntries]);
 
   // Handle filter changes (strictly resets to page 1 as mandated by acceptance criteria)
   const handleFilterChange = (updated: Partial<AccountsFilterQuery>) => {
@@ -108,18 +141,65 @@ export const AccountsListPage: React.FC = () => {
     }));
   };
 
+  // Switch to detail view for a specific journal entry
+  const handleViewDetail = (id: string) => {
+    setSelectedEntryId(id);
+    setCurrentView('detail-journal');
+  };
+
   // Derive high-level stats
   const assetCount = accounts.filter((a) => a.type === 'asset').length;
   const liabilityCount = accounts.filter((a) => a.type === 'liability').length;
+
+  // Render Form Page View
+  if (currentView === 'create-journal') {
+    return (
+      <JournalEntryFormPage
+        onBackToList={() => {
+          setCurrentView('list');
+          if (activeTab === 'journal-entries') loadJournalEntries();
+        }}
+        onViewEntryDetail={(id) => {
+          setSelectedEntryId(id);
+          setCurrentView('detail-journal');
+        }}
+      />
+    );
+  }
+
+  // Render Detail Page View
+  if (currentView === 'detail-journal' && selectedEntryId) {
+    return (
+      <JournalEntryDetailPage
+        entryId={selectedEntryId}
+        onBackToList={() => {
+          setCurrentView('list');
+          if (activeTab === 'journal-entries') loadJournalEntries();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="cs-module-root">
       {/* Module Title & Header */}
       <header className="cs-header">
-        <h1 className="cs-header-title">Finance & Accounting (ERP-4)</h1>
-        <p className="cs-header-desc">
-          General Ledger, Chart of Accounts, and Period-End Trial Balance Verification.
-        </p>
+        <div>
+          <h1 className="cs-header-title">Finance & Accounting (ERP-4)</h1>
+          <p className="cs-header-desc">
+            General Ledger, Chart of Accounts, Journal Entries, and Period-End Trial Balance Verification.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="cs-btn cs-btn-primary"
+            onClick={() => setCurrentView('create-journal')}
+            aria-label="Create new journal entry"
+          >
+            + New Journal Entry
+          </button>
+        </div>
       </header>
 
       {/* Top Level Metric Summary Tiles */}
@@ -176,6 +256,17 @@ export const AccountsListPage: React.FC = () => {
         >
           Trial Balance View
         </button>
+        <button
+          type="button"
+          role="tab"
+          id="tab-journal-entries"
+          aria-selected={activeTab === 'journal-entries'}
+          aria-controls="panel-journal-entries"
+          className={`cs-tab-btn ${activeTab === 'journal-entries' ? 'active' : ''}`}
+          onClick={() => setActiveTab('journal-entries')}
+        >
+          Journal Entries
+        </button>
       </nav>
 
       {/* Tab Panels */}
@@ -224,6 +315,83 @@ export const AccountsListPage: React.FC = () => {
               onPeriodChange={setPeriod}
               onRefresh={() => loadTrialBalance(period)}
             />
+          )}
+        </section>
+      )}
+
+      {activeTab === 'journal-entries' && (
+        <section id="panel-journal-entries" role="tabpanel" aria-labelledby="tab-journal-entries">
+          {entriesError ? (
+            <ErrorState
+              title="Unable to load journal entries"
+              message={entriesError}
+              onRetry={loadJournalEntries}
+            />
+          ) : isEntriesLoading ? (
+            <SkeletonTable columns={6} rows={6} />
+          ) : journalEntries.length === 0 ? (
+            <EmptyState
+              icon="📄"
+              title="No journal entries found"
+              message="No journal entries recorded. Create your first double-entry transaction."
+              actionLabel="+ New Journal Entry"
+              onAction={() => setCurrentView('create-journal')}
+            />
+          ) : (
+            <div className="cs-table-container">
+              <table className="cs-table" aria-label="Journal Entries Directory">
+                <thead>
+                  <tr className="cs-tr">
+                    <th className="cs-th">Entry #</th>
+                    <th className="cs-th">Posting Date</th>
+                    <th className="cs-th">Period</th>
+                    <th className="cs-th">Currency</th>
+                    <th className="cs-th">Description</th>
+                    <th className="cs-th">Status</th>
+                    <th className="cs-th cs-text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journalEntries.map((entry) => (
+                    <tr key={entry.id} className="cs-tr">
+                      <td className="cs-td">
+                        <span className="cs-code" style={{ fontWeight: 600 }}>
+                          {entry.entry_number || entry.id.substring(0, 8)}
+                        </span>
+                      </td>
+                      <td className="cs-td">{entry.posting_date}</td>
+                      <td className="cs-td">
+                        <span className="cs-code">{entry.period_id || 'Active'}</span>
+                      </td>
+                      <td className="cs-td">{entry.currency_code}</td>
+                      <td className="cs-td">{entry.description}</td>
+                      <td className="cs-td">
+                        <StatusBadge
+                          label={entry.status.toUpperCase()}
+                          variant={
+                            entry.status === 'posted'
+                              ? 'success'
+                              : entry.status === 'reversed'
+                              ? 'error'
+                              : 'muted'
+                          }
+                        />
+                      </td>
+                      <td className="cs-td cs-text-right">
+                        <button
+                          type="button"
+                          className="cs-btn cs-btn-secondary cs-btn-sm"
+                          onClick={() => handleViewDetail(entry.id)}
+                          aria-label={`View entry ${entry.entry_number || entry.id}`}
+                        >
+                          View Details →
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       )}

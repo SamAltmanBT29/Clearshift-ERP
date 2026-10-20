@@ -12,7 +12,7 @@ For the canonical, detailed version see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-4 Finance & Accounting |
-| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation) |
+| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation), #39 (Chart of Accounts & Trial Balance UI), #40 (Journal Entry Builder & Live Balance Checker UI), #41 (Domain Relationships) |
 | **PostgreSQL Schema** | `erp4` |
 | **API Base** | `/api/v1/erp-finance` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-4.yaml` |
@@ -66,6 +66,21 @@ All collection endpoints support bounded pagination (`page`, `pageSize <= 100`, 
 - **Opening Balances (`OPENING_BALANCE_ACCOUNT`)**: Loaded once per account/currency pair (`FR-ERP4-04`). Duplicate attempts are safely reported and skipped.
 - **Cross-Module References (Decision C7)**: Cross-module references (e.g. department refs to ERP-5, source invoices to ERP-3) are verified via the `ReferenceResolver` port. No cross-schema foreign keys or direct writes are allowed.
 - **Immediate Read Consistency**: Trial balance and detail endpoints immediately reflect posted and reversed movements without delay.
+
+## Frontend Screens & Review Workflows (Issues #39 & #40)
+
+The ERP-4 frontend implements the Minimal White Theme design system using CSS variables, semantic HTML, and the three mandatory UI states (loading skeleton, empty state, and error state with retry):
+
+| Screen / Component | File Path | Purpose & Domain Invariant Enforced |
+|---|---|---|
+| **AccountsListPage** | `apps/erp/modules/erp-4/web/src/pages/AccountsListPage.tsx` | Master financial overview; tabbed view for Chart of Accounts, Trial Balance, and Journal Entries queue; initiates form creation and detail navigation. |
+| **JournalEntryFormPage** | `apps/erp/modules/erp-4/web/src/pages/JournalEntryFormPage.tsx` | Full-page creation workflow with breadcrumb back-link, pre-flight account caching, inline GL account modal, and draft/post submission actions. |
+| **JournalEntryDetailPage** | `apps/erp/modules/erp-4/web/src/pages/JournalEntryDetailPage.tsx` | Read-only ledger record view showing header metadata, balanced line items table, posting date, irreversible Post Draft confirmation, and Reversal entry trigger. |
+| **JournalLinesEditor** | `apps/erp/modules/erp-4/web/src/components/forms/JournalLinesEditor.tsx` | Live double-entry balance checker (`BR-ERP4-01`); enforces mutual exclusivity of debit/credit per line, non-negative amounts, and minimum 2 lines requirement. |
+| **JournalEntryForm** | `apps/erp/modules/erp-4/web/src/components/forms/JournalEntryForm.tsx` | Header fields (date, period, currency, description) and line items; client-side validation; preserves user input on server rejection. |
+| **AccountCreateModal** | `apps/erp/modules/erp-4/web/src/components/forms/AccountCreateModal.tsx` | Accessible modal dialog for creating posting GL accounts on the fly without losing in-flight journal draft data. |
+| **TrialBalanceTable** | `apps/erp/modules/erp-4/web/src/components/TrialBalanceTable.tsx` | Grouped debit/credit totals by account and period-end balance banner (`totalDebit === totalCredit`). |
+
 
 
 
