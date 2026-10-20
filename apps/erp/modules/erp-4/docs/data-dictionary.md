@@ -253,5 +253,82 @@
 | `POST` | `/opening-balances` | Body: `balances: Array<OpeningBalanceItem>`, `idempotency_key?`, `batch_id?` | 201, 400, 409, 401 | Bulk-load opening balances (one-time per account/currency) |
 | `GET` | `/periods` | `page`, `pageSize`, `status?`, `fiscal_year?` | 200, 400, 401 | List fiscal accounting periods |
 | `GET` | `/periods/:id` | Path: `id` (UUID) | 200, 400, 404, 401 | Get accounting period by ID |
+| `PATCH` | `/periods/:id` | Path: `id` (UUID), Body: `status` | 200, 400, 401, 403, 404, 422 | Update accounting period lifecycle status |
+
+---
+
+## 10. Domain Relationships & State Transitions (Issue #41)
+
+### 10.1 Intra-Module Relationship Catalog
+
+| Relationship Name | From Entity | From Field | Target Entity | Cardinality | Required? | Validation Rules & Invariants | Error Code |
+|---|---|---|---|---|---|---|---|
+| `ACCOUNT_PARENT` | `Account` | `parent_id` | `Account` | Many-to-One | Optional | Child and parent must share currency; ancestor cycle detection (no self/loop references); parent must exist | `PARENT_NOT_FOUND`, `CYCLE_DETECTED`, `CURRENCY_MISMATCH` |
+| `JOURNAL_ENTRY_PERIOD` | `JournalEntry` | `period_id` | `AccountingPeriod` | Many-to-One | Required | Period must exist; locked period unconditionally rejects posting/draft creation; soft-closed requires `finance_admin` role | `PERIOD_NOT_FOUND`, `PERIOD_LOCKED`, `PERIOD_SOFT_CLOSED` |
+| `JOURNAL_LINE_ENTRY` | `JournalLine` | `journal_entry_id` | `JournalEntry` | Many-to-One | Required | Minimum 2 lines required per entry; entry and lines commit atomically | `MINIMUM_LINES_REQUIRED` |
+| `JOURNAL_LINE_ACCOUNT` | `JournalLine` | `account_id` | `Account` | Many-to-One | Required | Account must exist, be active (`is_active = true`), have posting capability (`is_posting_account = true`), and match entry currency | `ACCOUNT_NOT_FOUND`, `ACCOUNT_INACTIVE`, `CANNOT_POST_TO_HEADER_ACCOUNT`, `CURRENCY_MISMATCH` |
+| `JOURNAL_ENTRY_REVERSAL` | `JournalEntry` | `reversed_by_entry_id` | `JournalEntry` | One-to-One | Optional | Only posted entries can be reversed; reversal entry has swapped debit/credit legs and references original; original marks status = `reversed` | `ILLEGAL_STATUS_TRANSITION` |
+| `OPENING_BALANCE_ACCOUNT` | `OpeningBalance` | `account_id` | `Account` | Many-to-One | Required | Account must be active, posting account, and currency must match; loaded once per account+currency pair | `ACCOUNT_NOT_FOUND`, `ACCOUNT_INACTIVE`, `CANNOT_POST_TO_HEADER_ACCOUNT`, `DUPLICATE_OPENING_BALANCE` |
+
+### 10.2 Cross-Module Integrity via ReferenceResolver (Decision C7)
+
+ClearShift ERP enforces clean architectural boundaries: no cross-module database foreign keys or direct writes to foreign schemas are permitted. External references are validated via the contract-approved `ReferenceResolver` port:
+
+| Relationship Name | Source Field | Target Module | Target Entity | Handling for Absent Values | Error Code on Invalid Reference |
+|---|---|---|---|---|---|
+| `JOURNAL_LINE_DEPARTMENT` | `lines[].department_ref` | ERP-5 (HR / Organization) | `department` | Renders approved warning `OPTIONAL_REFERENCE_ABSENT` | `DEPARTMENT_NOT_FOUND` (422) |
+| `JOURNAL_ENTRY_SOURCE` | `source_reference` (e.g. `invoice:UUID`) | ERP-3 (Sales / Billing) | `invoice`, `sales_order` | Permitted null; validated if formatted as cross-module reference | `SOURCE_ENTITY_NOT_FOUND` (422) |
+
+When an optional relationship is absent, the system emits an approved warning object `{ code: 'OPTIONAL_REFERENCE_ABSENT', relationship, field, message }` instead of fabricating or inventing synthetic records.
+
+### 10.3 State Transition Matrices (FSM)
+
+#### Journal Entry FSM
+```
+        ┌─────────────┐
+        │    draft    │
+        └──────┬──────┘
+         ┌─────┴─────┐
+         ▼           ▼
+   ┌───────────┐ ┌──────────┐
+   │  posted   │ │  voided  │ (terminal)
+   └─────┬─────┘ └──────────┘
+         │
+         ▼
+   ┌───────────┐
+   │ reversed  │ (terminal)
+   └───────────┘
+```
+- `draft -> posted`: Validates double-entry exact balance (`BR-ERP4-01`) and period posting guard (`BR-ERP4-02`).
+- `draft -> voided`: Marks draft cancelled without affecting general ledger balances.
+- `posted -> reversed`: Creates compensating reversal entry with swapped debit/credit legs.
+- All other transitions (`posted -> draft`, `reversed -> *`, `voided -> *`) are strictly FORBIDDEN (`ILLEGAL_STATUS_TRANSITION`).
+
+#### Accounting Period FSM
+```
+        ┌─────────────┐
+        │    open     │◄────────┐
+        └──────┬──────┘         │
+         ┌─────┴─────┐          │
+         ▼           ▼          │
+   ┌───────────┐ ┌──────────┐   │
+   │soft_closed│─┤  locked  │   │
+   └─────┬─────┘ └──────────┘   │
+         │           ▲          │
+         └───────────┼──────────┘
+                     │
+```
+- `open -> soft_closed`: Soft-close period (finance_admin or admin). Postings require elevated privileges.
+- `open -> locked`: Fully lock period (admin only).
+- `soft_closed -> open`: Re-open period (admin only).
+- `soft_closed -> locked`: Fully lock period (admin only).
+- `locked -> *`: FORBIDDEN (terminal immutable state; cannot be re-opened).
+
+### 10.4 Read-Model Consistency & Authoritative Derived Totals
+
+- **Immediate Consistency**: Upon successful mutation, subsequent reads from `/accounts`, `/journal-entries/:id`, and `/trial-balance` immediately reflect the authoritative persisted state without eventual consistency delays.
+- **Double-Entry Balance Invariant (`BR-ERP4-01`)**: `SUM(debit) == SUM(credit)` enforced within explicit currency at 4 decimal places (`NUMERIC(20,4)`).
+- **Trial Balance Aggregation**: Computed strictly from posted and reversed ledger movements plus one-time opening balances. Unlike currencies are segregated; `totals.is_balanced` asserts global double-entry equality.
+
 
 

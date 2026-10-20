@@ -538,6 +538,48 @@ export const PeriodListResponseSchema = z.object({
 });
 export type PeriodListResponse = z.infer<typeof PeriodListResponseSchema>;
 
+/** PATCH /api/v1/erp-finance/periods/:id — request body. */
+export const UpdatePeriodRequestSchema = z.object({
+  status: PeriodStatusEnum.optional(),
+});
+export type UpdatePeriodRequest = z.infer<typeof UpdatePeriodRequestSchema>;
+
+/** Optional relationship warning shape. */
+export const RelationshipWarningSchema = z.object({
+  relationship: z.string(),
+  field: z.string(),
+  code: z.literal('OPTIONAL_REFERENCE_ABSENT'),
+  message: z.string(),
+});
+export type RelationshipWarning = z.infer<typeof RelationshipWarningSchema>;
+
+export const RELATIONSHIP_ERROR_CODES = {
+  PARENT_NOT_FOUND: 'PARENT_NOT_FOUND',
+  CYCLE_DETECTED: 'CYCLE_DETECTED',
+  CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
+  ACCOUNT_NOT_FOUND: 'ACCOUNT_NOT_FOUND',
+  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
+  CANNOT_POST_TO_HEADER_ACCOUNT: 'CANNOT_POST_TO_HEADER_ACCOUNT',
+  PERIOD_NOT_FOUND: 'PERIOD_NOT_FOUND',
+  PERIOD_LOCKED: 'PERIOD_LOCKED',
+  PERIOD_SOFT_CLOSED: 'PERIOD_SOFT_CLOSED',
+  INVALID_PERIOD_TRANSITION: 'INVALID_PERIOD_TRANSITION',
+  MINIMUM_LINES_REQUIRED: 'MINIMUM_LINES_REQUIRED',
+  LINE_DEBIT_AND_CREDIT: 'LINE_DEBIT_AND_CREDIT',
+  LINE_ZERO_AMOUNTS: 'LINE_ZERO_AMOUNTS',
+  UNBALANCED_ENTRY: 'UNBALANCED_ENTRY',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  ENTRY_IMMUTABLE: 'ENTRY_IMMUTABLE',
+  NOT_REVERSIBLE: 'NOT_REVERSIBLE',
+  DUPLICATE_OPENING_BALANCE: 'DUPLICATE_OPENING_BALANCE',
+  MISSING_REQUIRED_REFERENCE: 'MISSING_REQUIRED_REFERENCE',
+  INVALID_REFERENCE: 'INVALID_REFERENCE',
+  DEPARTMENT_NOT_FOUND: 'DEPARTMENT_NOT_FOUND',
+  SOURCE_ENTITY_NOT_FOUND: 'SOURCE_ENTITY_NOT_FOUND',
+  INVALID_ENUM_VALUE: 'INVALID_ENUM_VALUE',
+  READ_MODEL_INCONSISTENT: 'READ_MODEL_INCONSISTENT',
+} as const;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared error response
 // ─────────────────────────────────────────────────────────────────────────────

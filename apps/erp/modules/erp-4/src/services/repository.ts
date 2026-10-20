@@ -60,6 +60,7 @@ export interface FinanceRepository {
   getPeriodById(id: string): Promise<AccountingPeriod | null>;
   getPeriodByLabel(label: string): Promise<AccountingPeriod | null>;
   createPeriod(data: Omit<AccountingPeriod, 'created_at' | 'updated_at'> & { created_at?: string; updated_at?: string }): Promise<AccountingPeriod>;
+  updatePeriod(id: string, updates: Partial<AccountingPeriod>): Promise<AccountingPeriod>;
 
   // Journal Entries
   listJournalEntries(query: JournalEntryListQuery): Promise<{ entries: JournalEntry[]; total: number }>;
@@ -382,6 +383,22 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     };
     this.periods.set(period.id, period);
     return period;
+  }
+
+  async updatePeriod(id: string, updates: Partial<AccountingPeriod>): Promise<AccountingPeriod> {
+    const existing = this.periods.get(id);
+    if (!existing) {
+      throw new Error(`Accounting period ${id} not found`);
+    }
+    const updated: AccountingPeriod = {
+      ...existing,
+      status: updates.status !== undefined ? updates.status : existing.status,
+      closed_at: updates.closed_at !== undefined ? updates.closed_at : existing.closed_at,
+      closed_by_user_id: updates.closed_by_user_id !== undefined ? updates.closed_by_user_id : existing.closed_by_user_id,
+      updated_at: new Date().toISOString(),
+    };
+    this.periods.set(id, updated);
+    return updated;
   }
 
   // ── Journal Entries ────────────────────────────────────────────────────────
