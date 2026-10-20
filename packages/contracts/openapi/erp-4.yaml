@@ -910,6 +910,62 @@ paths:
       security:
         - BearerAuth: []
 
+    patch:
+      operationId: updatePeriod
+      tags: [Accounting Periods]
+      summary: Update accounting period lifecycle status
+      description: |
+        Updates the lifecycle status of an accounting period.
+        Enforces FSM transitions:
+        - `open` -> `soft_closed` (finance_admin or admin role)
+        - `open` -> `locked` (admin role)
+        - `soft_closed` -> `open` (admin role)
+        - `soft_closed` -> `locked` (admin role)
+        - `locked` -> any (FORBIDDEN, terminal status)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique period identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePeriodRequest"
+      responses:
+        "200":
+          description: Period successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingPeriod"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Accounting period not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Illegal period state transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: [finance:periods:write]
+
 # ────────────────────────────────────────────────────────────────────────────
 # Components
 # ────────────────────────────────────────────────────────────────────────────
@@ -1689,3 +1745,25 @@ components:
         correlation_id:
           type: string
           description: Request correlation tracking ID
+
+    UpdatePeriodRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/PeriodStatus"
+
+    RelationshipWarning:
+      type: object
+      required: [code, message, relationship, field]
+      properties:
+        code:
+          type: string
+          example: "OPTIONAL_REFERENCE_ABSENT"
+        message:
+          type: string
+        relationship:
+          type: string
+        field:
+          type: string
+

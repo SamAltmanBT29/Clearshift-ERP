@@ -54,5 +54,18 @@ All collection endpoints support bounded pagination (`page`, `pageSize <= 100`, 
 | `POST` | `/api/v1/erp-finance/opening-balances` | Bulk-load opening balances (one-time per account/currency) |
 | `GET` | `/api/v1/erp-finance/periods` | List fiscal accounting periods |
 | `GET` | `/api/v1/erp-finance/periods/:id` | Get accounting period by UUID |
+| `PATCH` | `/api/v1/erp-finance/periods/:id` | Update accounting period status (`open` -> `soft_closed` -> `locked`) |
+
+## Domain Relationships & State Rules (Issue #41)
+
+- **Chart of Accounts Hierarchy (`ACCOUNT_PARENT`)**: Child accounts may reference parent accounts in the same currency. Circular ancestor references and self-references are detected and rejected (`CYCLE_DETECTED`). Absent parent references emit approved warning `OPTIONAL_REFERENCE_ABSENT`.
+- **Period Posting Guard (`JOURNAL_ENTRY_PERIOD`)**: Locked periods reject all postings unconditionally (`PERIOD_LOCKED`). Soft-closed periods require `finance_admin` or `admin` role (`PERIOD_SOFT_CLOSED`).
+- **Journal Line Constraints (`JOURNAL_LINE_ACCOUNT`)**: Accounts must exist, be active, and have `is_posting_account = true`. Header accounts reject postings (`CANNOT_POST_TO_HEADER_ACCOUNT`).
+- **Double-Entry Exact Balance (`BR-ERP4-01`)**: `SUM(debit) == SUM(credit)` within currency precision. Unbalanced entries are rejected at draft creation and posting (`UNBALANCED_ENTRY`).
+- **Journal Entry Immutability & Reversal**: Posted entries are immutable. Reversals create a compensating entry with opposite debits/credits, linking bidirectionally via `reversed_by_entry_id`.
+- **Opening Balances (`OPENING_BALANCE_ACCOUNT`)**: Loaded once per account/currency pair (`FR-ERP4-04`). Duplicate attempts are safely reported and skipped.
+- **Cross-Module References (Decision C7)**: Cross-module references (e.g. department refs to ERP-5, source invoices to ERP-3) are verified via the `ReferenceResolver` port. No cross-schema foreign keys or direct writes are allowed.
+- **Immediate Read Consistency**: Trial balance and detail endpoints immediately reflect posted and reversed movements without delay.
+
 
 

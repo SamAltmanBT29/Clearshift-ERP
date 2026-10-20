@@ -17,12 +17,14 @@ import { FinanceService, ServiceError } from './services/finance.service.js';
 import { DomainError } from '../domain/engine.js';
 import type { FinanceRepository } from './services/repository.js';
 import { InMemoryFinanceRepository } from './services/repository.js';
+import type { ReferenceResolver } from '@cs/kernel';
 import { erpFinanceRoutes } from './routes/index.js';
 
 export interface AppOptions {
-  repository?: FinanceRepository;
-  financeService?: FinanceService;
-  authRequired?: boolean;
+  repository?: FinanceRepository | undefined;
+  financeService?: FinanceService | undefined;
+  referenceResolver?: ReferenceResolver | undefined;
+  authRequired?: boolean | undefined;
 }
 
 export interface AuthenticatedUser {
@@ -36,7 +38,9 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   });
 
   const repository = options.repository ?? new InMemoryFinanceRepository(true);
-  const financeService = options.financeService ?? new FinanceService(repository);
+  const financeService =
+    options.financeService ??
+    new FinanceService({ repository, referenceResolver: options.referenceResolver });
   const authRequired = options.authRequired ?? false;
 
   // ── Global Error Handler ───────────────────────────────────────────────────
