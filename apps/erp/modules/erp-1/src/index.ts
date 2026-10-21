@@ -1,4 +1,5 @@
 import { erp1Resolver } from "./public.js";
+export * from "./public.js";
 
 export const moduleDefinition = {
   id: "erp1",
