@@ -482,3 +482,163 @@
   font-weight: 700;
   color: var(--color-text);
 }
+
+/* Forms & Inputs */
+.cs-form-container {
+  background: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-6);
+}
+
+.cs-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.cs-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cs-form-label-required::after {
+  content: " *";
+  color: var(--color-error);
+}
+
+.cs-form-helper {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.cs-form-error {
+  font-size: 12px;
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.cs-input-error {
+  border-color: var(--color-error) !important;
+}
+
+/* Live Balance Checker Box */
+.cs-live-balance-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.cs-live-balance-metrics {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.cs-live-balance-metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.cs-live-balance-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.cs-live-balance-value {
+  font-size: 18px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Buttons Extension */
+.cs-btn-danger {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+  border-color: var(--color-error-border);
+}
+
+.cs-btn-danger:hover {
+  background-color: var(--color-error);
+  color: #ffffff;
+}
+
+/* Modal Window */
+.cs-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(17, 24, 39, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+
+.cs-modal-card {
+  background: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.cs-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-modal-body {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cs-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--color-surface);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
