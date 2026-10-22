@@ -239,5 +239,35 @@ describe('ERP-5 mutation API client', () => {
 
       expect((error as HrApiError).code).toBe('HR_API_MALFORMED_RESPONSE');
     });
+
+    it('falls back to a readable message when the error body is not JSON', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('<html>gateway error</html>', { status: 502 }))
+      );
+
+      const error = await createEmployee(EMPLOYEE_PAYLOAD).catch((cause: unknown) => cause);
+
+      expect((error as HrApiError).status).toBe(502);
+      expect((error as HrApiError).message.length).toBeGreaterThan(0);
+    });
+
+    it('lets an aborted request through, so a cancelled screen shows no error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          const aborted = new Error('The operation was aborted.');
+          aborted.name = 'AbortError';
+          throw aborted;
+        })
+      );
+
+      const error = await createEmployee(EMPLOYEE_PAYLOAD).catch((cause: unknown) => cause);
+
+      // The abort is re-thrown as it is — it must not be dressed up as a
+      // failure the operator would be offered a retry for.
+      expect((error as Error).name).toBe('AbortError');
+      expect(error).not.toBeInstanceOf(HrApiError);
+    });
   });
 });
