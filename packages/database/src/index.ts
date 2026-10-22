@@ -1,3 +1,4 @@
+export * from "../../../apps/erp/modules/erp-2/db/schema.js";
 export * from "../../../apps/erp/modules/erp-4/db/schema.js";
 export * from "../../../apps/erp/modules/erp-5/db/schema.js";
 export * from "./registry.js";

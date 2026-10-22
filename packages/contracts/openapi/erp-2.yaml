@@ -1,0 +1,674 @@
+openapi: "3.1.0"
+
+info:
+  title: ClearShift ERP — Vendors & Purchasing API
+  description: |
+    **ERP-2 Vendors & Purchasing module** — public REST contract.
+
+    Base path: `/api/v1/erp-vendors`
+
+    Implements:
+    - Vendor list with search and create/edit (FR-ERP2-01, FR-ERP2-02)
+    - Purchase orders with product-linked lines, quantity, price, and server-side calculated totals (FR-ERP2-03, FR-ERP2-05)
+    - Purchase order lifecycle status: Draft -> Sent -> Received -> Closed (FR-ERP2-04)
+    - Server-side bank detail masking (FR-ERP2-06): format `XXXX-XXXX-7890` everywhere
+    - Domain invariants: product reference validation (BR-ERP2-01), non-negative decimal arithmetic (NUMERIC 18,2)
+
+    All amounts are returned as string-encoded decimals to eliminate IEEE-754 floating-point drift.
+    All timestamps are ISO 8601 with timezone (UTC).
+  version: "1.0.0"
+  contact:
+    name: ClearShift Engineering — Procurement Team
+  license:
+    name: Private
+
+servers:
+  - url: http://localhost:3000/api/v1/erp-vendors
+    description: Local development server
+  - url: https://api.clearshift.internal/api/v1/erp-vendors
+    description: Staging / production
+
+tags:
+  - name: Vendors
+    description: Vendor management and search
+  - name: Purchase Orders
+    description: Purchase order lifecycle, lines, and state transitions
+
+paths:
+
+  # ── Vendors ───────────────────────────────────────────────────────────────
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [Vendors]
+      summary: List vendors
+      description: Returns a bounded page of vendors with server-side name search.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Search vendors by name or tax number
+      responses:
+        "200":
+          description: A paginated page of vendors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedVendors"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createVendor
+      tags: [Vendors]
+      summary: Create vendor
+      description: Creates a new vendor. Masked bank details are enforced at serialization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorRequest"
+      responses:
+        "201":
+          description: Vendor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /vendors/{id}:
+    patch:
+      operationId: patchVendor
+      tags: [Vendors]
+      summary: Update vendor
+      description: Updates mutable fields of an existing vendor.
+      parameters:
+        - $ref: "#/components/parameters/EntityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchVendorRequest"
+      responses:
+        "200":
+          description: Vendor updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Purchase Orders ───────────────────────────────────────────────────────
+  /purchase-orders:
+    get:
+      operationId: listPurchaseOrders
+      tags: [Purchase Orders]
+      summary: List purchase orders
+      description: Returns a bounded page of purchase orders with optional filtering.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: vendor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by vendor UUID
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PurchaseOrderStatus"
+          description: Filter by purchase order status
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: Filter by PO number
+      responses:
+        "200":
+          description: A paginated page of purchase orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedPurchaseOrders"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createPurchaseOrder
+      tags: [Purchase Orders]
+      summary: Create purchase order
+      description: |
+        Creates a purchase order with line items.
+        Order total is computed server-side from lines using decimal arithmetic (FR-ERP2-05).
+        Every line references an existing product (BR-ERP2-01).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePurchaseOrderRequest"
+      responses:
+        "201":
+          description: Purchase order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /purchase-orders/{id}:
+    get:
+      operationId: getPurchaseOrder
+      tags: [Purchase Orders]
+      summary: Get purchase order details
+      description: Retrieves a single purchase order by UUID including lines.
+      parameters:
+        - $ref: "#/components/parameters/EntityId"
+      responses:
+        "200":
+          description: Purchase order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    patch:
+      operationId: patchPurchaseOrderStatus
+      tags: [Purchase Orders]
+      summary: Update purchase order status
+      description: |
+        Advances purchase order status through allowed flow:
+        Draft -> Sent -> Received -> Closed (FR-ERP2-04).
+        Backwards transitions or terminal mutations are rejected with 422.
+      parameters:
+        - $ref: "#/components/parameters/EntityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchPurchaseOrderStatusRequest"
+      responses:
+        "200":
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Unprocessable"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: 1-based page index
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (capped at 100)
+    EntityId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID primary key
+
+  responses:
+    BadRequest:
+      description: Invalid request structure or missing required fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Insufficient permissions for operation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: Unique constraint violation or idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Unprocessable:
+      description: Business invariant violation (e.g. invalid status transition or missing product reference)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalError:
+      description: Unexpected server failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+    ApiError:
+      type: object
+      description: Canonical error envelope ({ code, message, details, correlation_id })
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              code:
+                type: string
+        correlation_id:
+          type: string
+      additionalProperties: false
+
+    PurchaseOrderStatus:
+      type: string
+      enum: [draft, sent, received, closed]
+      description: Purchase order lifecycle status (FR-ERP2-04)
+
+    Vendor:
+      type: object
+      required: [id, name, tax_number, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tax_number:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        address_line:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        country:
+          type: string
+          nullable: true
+        bank_masked:
+          type: string
+          pattern: '^XXXX-XXXX-\d{4}$'
+          nullable: true
+          description: Masked bank account display (FR-ERP2-06)
+        source_system:
+          type: string
+          nullable: true
+        source_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    PurchaseOrderLine:
+      type: object
+      required: [id, po_id, product_id, line_number, quantity, price, line_total, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        po_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+          description: Logical reference to ERP-1 product
+        line_number:
+          type: integer
+          minimum: 1
+        quantity:
+          type: string
+          pattern: '^(?!0(\.0+)?$)\d+(\.\d{1,4})?$'
+        price:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+        line_total:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    PurchaseOrder:
+      type: object
+      required: [id, po_number, vendor_id, order_date, status, currency, total, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        po_number:
+          type: string
+        vendor_id:
+          type: string
+          format: uuid
+        order_date:
+          type: string
+          format: date
+        status:
+          $ref: "#/components/schemas/PurchaseOrderStatus"
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        total:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+        notes:
+          type: string
+          nullable: true
+        source_system:
+          type: string
+          nullable: true
+        source_id:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrderLine"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    CreateVendorRequest:
+      type: object
+      required: [name, tax_number]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        tax_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          maxLength: 64
+          nullable: true
+        address_line:
+          type: string
+          maxLength: 255
+          nullable: true
+        city:
+          type: string
+          maxLength: 120
+          nullable: true
+        country:
+          type: string
+          maxLength: 64
+          nullable: true
+        bank_details:
+          type: string
+          maxLength: 128
+          description: Raw bank account number to be masked on server-side serialization
+        source_system:
+          type: string
+          maxLength: 64
+        source_id:
+          type: string
+          maxLength: 128
+      additionalProperties: false
+
+    PatchVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        tax_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          maxLength: 64
+          nullable: true
+        address_line:
+          type: string
+          maxLength: 255
+          nullable: true
+        city:
+          type: string
+          maxLength: 120
+          nullable: true
+        country:
+          type: string
+          maxLength: 64
+          nullable: true
+        bank_details:
+          type: string
+          maxLength: 128
+      additionalProperties: false
+
+    CreatePoLineInput:
+      type: object
+      required: [product_id, quantity, price]
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: string
+          pattern: '^(?!0(\.0+)?$)\d+(\.\d{1,4})?$'
+        price:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+      additionalProperties: false
+
+    CreatePurchaseOrderRequest:
+      type: object
+      required: [po_number, vendor_id, order_date, lines]
+      properties:
+        po_number:
+          type: string
+          pattern: '^[A-Za-z0-9_-]+$'
+        vendor_id:
+          type: string
+          format: uuid
+        order_date:
+          type: string
+          format: date
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          default: INR
+        notes:
+          type: string
+          maxLength: 1000
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CreatePoLineInput"
+        source_system:
+          type: string
+          maxLength: 64
+        source_id:
+          type: string
+          maxLength: 128
+      additionalProperties: false
+
+    PatchPurchaseOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/PurchaseOrderStatus"
+      additionalProperties: false
+
+    PaginatedVendors:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vendor"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+      additionalProperties: false
+
+    PaginatedPurchaseOrders:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrder"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+      additionalProperties: false
