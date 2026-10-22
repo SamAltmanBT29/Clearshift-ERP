@@ -1,12 +1,16 @@
 /**
  * ERP-1 Products & Inventory — Drizzle ORM Schema
  *
- * Tables:
- *   erp1_categories    — Product categories (one-level hierarchy per FR-ERP1-03)
- *   erp1_warehouses    — Warehouses (one default warehouse in V1 per FR-ERP1-05)
- *   erp1_products      — Product master data with unique SKU & decimal price (FR-ERP1-01, FR-ERP1-02, BR-ERP1-01)
- *   erp1_stock_levels  — Non-negative stock quantities per product/warehouse (FR-ERP1-06, BR-ERP1-02)
+ * Logical SDS tables:
+ *   erp1_categories      — Product categories (one-level hierarchy per FR-ERP1-03)
+ *   erp1_warehouses      — Warehouses (one warehouse in V1 per FR-ERP1-05)
+ *   erp1_products        — Product master data with unique SKU & decimal price (FR-ERP1-01, FR-ERP1-02, BR-ERP1-01)
+ *   erp1_stock_levels    — Non-negative stock quantities per product/warehouse (FR-ERP1-06, BR-ERP1-02)
  *   erp1_import_receipts — Durable idempotency receipts for migration loads (Decision C4 & KIT-08)
+ *
+ * Physical tables live in the module schema: erp1.categories, erp1.warehouses,
+ * erp1.products, erp1.stock_levels and erp1.import_receipts. This is the same
+ * schema convention used by ERP-4 and ERP-5 (see the ERP-1 data dictionary DR-1).
  *
  * @module erp1/db/schema
  */
@@ -92,6 +96,10 @@ export const erp1Warehouses = erp1Schema.table(
   },
   (table) => [
     uniqueIndex('erp1_warehouses_code_idx').on(table.code),
+    // FR-ERP1-05: V1 operates exactly one warehouse. A unique index on a
+    // constant expression makes a second warehouse impossible at the database
+    // boundary, not only in the application layer.
+    uniqueIndex('erp1_warehouses_single_idx').on(sql`(true)`),
   ]
 );
 
@@ -111,8 +119,8 @@ export const erp1Products = erp1Schema.table(
       onDelete: 'set null',
     }),
     unitOfMeasure: unitOfMeasureEnum('unit_of_measure').notNull(),
-    price: numeric('price', { precision: 12, scale: 2 }).notNull(),
-    currency: varchar('currency', { length: 3 }).notNull().default('USD'),
+    price: numeric('price', { precision: 19, scale: 4 }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull(),
     taxRate: numeric('tax_rate', { precision: 5, scale: 2 }).notNull().default('0.00'),
     sourceSystem: varchar('source_system', { length: 64 }),
     sourceId: varchar('source_id', { length: 128 }),
@@ -131,6 +139,7 @@ export const erp1Products = erp1Schema.table(
     index('erp1_products_source_idx').on(table.sourceSystem, table.sourceId),
     check('check_erp1_products_price_non_negative', sql`price >= 0`),
     check('check_erp1_products_tax_rate_non_negative', sql`tax_rate >= 0`),
+    check('check_erp1_products_currency_format', sql`currency ~ '^[A-Z]{3}$'`),
   ]
 );
 
@@ -149,9 +158,9 @@ export const erp1StockLevels = erp1Schema.table(
     warehouseId: uuid('warehouse_id')
       .notNull()
       .references(() => erp1Warehouses.id, { onDelete: 'cascade' }),
-    quantity: numeric('quantity', { precision: 12, scale: 2 })
+    quantity: numeric('quantity', { precision: 19, scale: 4 })
       .notNull()
-      .default('0.00'),
+      .default('0.0000'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -175,19 +184,33 @@ export const erp1ImportReceipts = erp1Schema.table(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     batchId: uuid('batch_id').notNull(),
-    sourceRowIndex: integer('source_row_index').notNull(),
+    sourceRow: integer('source_row').notNull(),
+    entity: varchar('entity', { length: 64 }).notNull(),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    idempotencyKey: varchar('idempotency_key', { length: 128 }).notNull(),
     targetId: uuid('target_id').notNull(),
-    targetEntity: varchar('target_entity', { length: 64 })
-      .notNull()
-      .default('product'),
-    idempotencyKey: varchar('idempotency_key', { length: 255 }).notNull(),
+    kind: varchar('kind', { length: 16 }).notNull().default('created'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex('erp1_import_receipts_idempotency_idx').on(table.idempotencyKey),
-    index('erp1_import_receipts_batch_idx').on(table.batchId),
+    uniqueIndex('erp1_import_receipts_idempotency_key_unique').on(
+      table.idempotencyKey
+    ),
+    index('erp1_import_receipts_batch_row_idx').on(
+      table.batchId,
+      table.sourceRow
+    ),
+    check('check_erp1_import_receipts_source_row_positive', sql`source_row >= 1`),
+    check(
+      'check_erp1_import_receipts_schema_version_positive',
+      sql`schema_version >= 1`
+    ),
+    check(
+      'check_erp1_import_receipts_kind_allowed',
+      sql`kind IN ('created', 'linked')`
+    ),
   ]
 );
 
