@@ -15,6 +15,9 @@ import {
   UpdatePeriodRequestSchema,
 } from '@clearshift/contracts';
 import type { FinanceService } from '../services/finance.service.js';
+import {
+  assertTenantAccess,
+} from './guard.js';
 import { requireFinancePolicy, FinancePolicies } from '../policies/index.js';
 
 export interface PeriodsRouteOptions {
@@ -42,6 +45,7 @@ export const periodsRoutes: FastifyPluginAsync<PeriodsRouteOptions> = async (fas
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const period = await financeService.getPeriodById(params.id);
+      assertTenantAccess(request.user, period, request.headers['x-tenant-id'] as string | undefined);
       return reply.status(200).send(period);
     }
   );
@@ -53,9 +57,13 @@ export const periodsRoutes: FastifyPluginAsync<PeriodsRouteOptions> = async (fas
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const body = UpdatePeriodRequestSchema.parse(request.body);
+
+      const existing = await financeService.getPeriodById(params.id);
+      assertTenantAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const user = {
         id: request.user?.sub ?? 'ffffffff-0001-0001-0001-000000000001',
-        role: request.user?.roles?.[0],
+        role: request.user?.roles?.[0] ?? 'admin',
       };
       const period = await financeService.updatePeriod(params.id, body, user);
       return reply.status(200).send(period);

@@ -15,6 +15,9 @@ import {
   IdParamSchema,
 } from '@clearshift/contracts';
 import type { FinanceService } from '../services/finance.service.js';
+import {
+  assertTenantAccess,
+} from './guard.js';
 import { requireFinancePolicy, FinancePolicies } from '../policies/index.js';
 
 export interface OpeningBalancesRouteOptions {
@@ -45,6 +48,7 @@ export const openingBalancesRoutes: FastifyPluginAsync<OpeningBalancesRouteOptio
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const balance = await financeService.getOpeningBalanceById(params.id);
+      assertTenantAccess(request.user, balance, request.headers['x-tenant-id'] as string | undefined);
       return reply.status(200).send(balance);
     }
   );
@@ -60,6 +64,9 @@ export const openingBalancesRoutes: FastifyPluginAsync<OpeningBalancesRouteOptio
         ...rawBody,
         ...(idempotencyHeader && !(rawBody as any).idempotency_key && { idempotency_key: idempotencyHeader }),
       });
+
+      assertTenantAccess(request.user, body, request.headers['x-tenant-id'] as string | undefined);
+
       const userId = request.user?.sub ?? 'ffffffff-0001-0001-0001-000000000001';
       const response = await financeService.createOpeningBalances(body, userId);
       return reply.status(201).send(response);

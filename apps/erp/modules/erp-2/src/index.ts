@@ -8,6 +8,7 @@ import { erp2Resolver } from './public.js';
 import { erpVendorsRoutes } from './routes/index.js';
 
 export * from './app.js';
+export * from './domain/index.js';
 export * from './public.js';
 export * from './services/erp2.service.js';
 export * from './services/repository.js';
@@ -22,4 +23,8 @@ export const moduleDefinition = {
   routes: erpVendorsRoutes,
 };
 
+export const erp2Descriptor = moduleDefinition;
+
 export default moduleDefinition;
+
+

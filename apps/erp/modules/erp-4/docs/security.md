@@ -1,7 +1,7 @@
 # ERP-4 Finance & Accounting — Security, Authorization, Sensitive-Field Protection & Audit
 
 **SDS Reference**: ClearShift System Design Specification §4.8, §7.9  
-**Issue**: [#44](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/44) — `[ERP4-09] ERP-4 Finance and Accounting: Authorization, sensitive-field protection, audit and safe logging`  
+**Issues**: [#44](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/44) (`[ERP4-09] ERP-4 Finance and Accounting: Authorization, sensitive-field protection, audit and safe logging`), [#171](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/171) (`[ERP4-15] ERP-4 Finance and Accounting: Module authorization policy integration`)  
 **Dependencies**: PLT-05 (Authentication & JWT Verification), PLT-06 (Role-Based Access Control), PLT-10 (Audit Service & Logging)  
 **Status**: Implemented & Verified  
 
@@ -12,9 +12,10 @@
 Financial systems are high-risk trust domains. The ERP-4 Finance & Accounting module requires defense-in-depth across:
 1. **Asymmetric Server-Side Authentication**: Cryptographic token verification using EdDSA public keys from `@cs/identity` (PLT-05).
 2. **Endpoint-Level Authorization & Default-Deny**: Strict alignment with the SDS §4.8 matrix via preHandler policy guards (PLT-06).
-3. **Field-Level Sensitive Data Masking**: Dynamic data masking and redaction for banking identifiers, compensation figures, government IDs, and credentials.
-4. **Append-Only Immutable Audit Trail**: Structured event emission via `@cs/core` `AuditService` capturing who, what, when, and outcome without secret leakage (PLT-10).
-5. **Enforced Domain Invariants**: Exact double-entry balancing (`BR-ERP4-01`) and accounting period posting guards (`BR-ERP4-02`).
+3. **Object-Level Multi-Tenant & Cross-User Guards**: Multi-tenant boundary isolation and draft mutation protection.
+4. **Field-Level Sensitive Data Masking**: Dynamic data masking and redaction for banking identifiers, compensation figures, government IDs, and credentials.
+5. **Append-Only Immutable Audit Trail**: Structured event emission via `@cs/core` `AuditService` capturing who, what, when, and outcome without secret leakage (PLT-10).
+6. **Enforced Domain Invariants**: Exact double-entry balancing (`BR-ERP4-01`) and accounting period posting guards (`BR-ERP4-02`).
 
 ```
                     ┌───────────────────────────────┐
@@ -35,6 +36,8 @@ Financial systems are high-risk trust domains. The ERP-4 Finance & Accounting mo
        │     Checks request.user.roles against SDS matrix        │
        │                                                         │
        │  3. Route Handlers & FinanceService:                    │
+       │     assertTenantAccess(user, entity)                    │
+       │     assertObjectMutationAccess(user, draft)             │
        │     BR-ERP4-01: Double-Entry Exact Balance Assertion   │
        │     BR-ERP4-02: Period Status Guard                     │
        │     Erp4AuditService: Append-Only Immutable Audit Event │
@@ -79,24 +82,24 @@ The ERP-4 module enforces the authoritative SDS §4.8 permission matrix with a s
 
 | Endpoint | Method | Policy Key | Viewer | Editor | Analyst | Runner | Admin | Auditor / Staff Notes |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|---|
-| `/accounts` | `GET` | `finance.accounts.read` |  |  |  | ❌ |  | Auditor allowed |
-| `/accounts/:id` | `GET` | `finance.accounts.read` |  |  |  | ❌ |  | Auditor allowed |
-| `/accounts` | `POST` | `finance.accounts.create` | ❌ |  | ❌ | ❌ |  | Admin & Editor only |
-| `/accounts/:id` | `PATCH` | `finance.accounts.update` | ❌ |  | ❌ | ❌ |  | Admin & Editor only |
-| `/journal-entries` | `GET` | `finance.journal.read` |  |  |  | ❌ |  | Auditor allowed |
-| `/journal-entries/:id` | `GET` | `finance.journal.read` |  |  |  | ❌ |  | Auditor allowed |
-| `/journal-entries` | `POST` | `finance.journal.create` | ❌ |  | ❌ |  |  | Runner & Editor can draft |
-| `/journal-entries/:id` | `PATCH` | `finance.journal.update` | ❌ |  | ❌ | ❌ |  | Editor & Admin only |
-| `/journal-entries/:id/post` | `POST` | `finance.journal.post` | ❌ |  | ❌ | ❌ |  | Staff can post in open periods |
-| `/journal-entries/:id/reverse` | `POST` | `finance.journal.reverse` | ❌ |  | ❌ | ❌ |  | Editor & Admin only |
-| `/journal-entries/:id/void` | `POST` | `finance.journal.void` | ❌ |  | ❌ | ❌ |  | Editor & Admin only |
-| `/trial-balance` | `GET` | `finance.trial_balance.read` |  |  |  | ❌ |  | Read-only analytical view |
-| `/opening-balances` | `GET` | `finance.opening_balances.read` |  |  |  |  |  | All roles can inspect |
-| `/opening-balances/:id` | `GET` | `finance.opening_balances.read` |  |  |  |  |  | All roles can inspect |
-| `/opening-balances` | `POST` | `finance.opening_balances.load` | ❌ | ❌ | ❌ |  |  | Migration Runner & Admin |
-| `/periods` | `GET` | `finance.periods.read` |  |  |  | ❌ |  | General read |
-| `/periods/:id` | `GET` | `finance.periods.read` |  |  |  | ❌ |  | General read |
-| `/periods/:id` | `PATCH` | `finance.periods.update` | ❌ | ❌ | ❌ | ❌ |  | Admin only |
+| `/accounts` | `GET` | `finance.accounts.read` | ✅ | ✅ | ✅ | ❌ | ✅ | Auditor allowed |
+| `/accounts/:id` | `GET` | `finance.accounts.read` | ✅ | ✅ | ✅ | ❌ | ✅ | Auditor allowed |
+| `/accounts` | `POST` | `finance.accounts.create` | ❌ | ✅ | ❌ | ❌ | ✅ | Admin & Editor only |
+| `/accounts/:id` | `PATCH` | `finance.accounts.update` | ❌ | ✅ | ❌ | ❌ | ✅ | Admin & Editor only |
+| `/journal-entries` | `GET` | `finance.journal.read` | ✅ | ✅ | ✅ | ❌ | ✅ | Auditor allowed |
+| `/journal-entries/:id` | `GET` | `finance.journal.read` | ✅ | ✅ | ✅ | ❌ | ✅ | Auditor allowed |
+| `/journal-entries` | `POST` | `finance.journal.create` | ❌ | ✅ | ❌ | ✅ | ✅ | Runner & Editor can draft |
+| `/journal-entries/:id` | `PATCH` | `finance.journal.update` | ❌ | ✅ | ❌ | ❌ | ✅ | Editor & Admin only |
+| `/journal-entries/:id/post` | `POST` | `finance.journal.post` | ❌ | ✅ | ❌ | ❌ | ✅ | Staff can post in open periods |
+| `/journal-entries/:id/reverse` | `POST` | `finance.journal.reverse` | ❌ | ✅ | ❌ | ❌ | ✅ | Editor & Admin only |
+| `/journal-entries/:id/void` | `POST` | `finance.journal.void` | ❌ | ✅ | ❌ | ❌ | ✅ | Editor & Admin only |
+| `/trial-balance` | `GET` | `finance.trial_balance.read` | ✅ | ✅ | ✅ | ❌ | ✅ | Read-only analytical view |
+| `/opening-balances` | `GET` | `finance.opening_balances.read` | ✅ | ✅ | ✅ | ✅ | ✅ | All roles can inspect |
+| `/opening-balances/:id` | `GET` | `finance.opening_balances.read` | ✅ | ✅ | ✅ | ✅ | ✅ | All roles can inspect |
+| `/opening-balances` | `POST` | `finance.opening_balances.load` | ❌ | ❌ | ❌ | ✅ | ✅ | Migration Runner & Admin |
+| `/periods` | `GET` | `finance.periods.read` | ✅ | ✅ | ✅ | ❌ | ✅ | General read |
+| `/periods/:id` | `GET` | `finance.periods.read` | ✅ | ✅ | ✅ | ❌ | ✅ | General read |
+| `/periods/:id` | `PATCH` | `finance.periods.update` | ❌ | ❌ | ❌ | ❌ | ✅ | Admin only |
 
 ### HTTP 403 Forbidden Contract
 ```json
@@ -111,11 +114,25 @@ The ERP-4 module enforces the authoritative SDS §4.8 permission matrix with a s
 
 ---
 
-## 4. Field-Level Sensitive Data Protection & Masking
+## 4. Object-Level Authorization Guards
+
+### Multi-Tenant Boundary Isolation (`assertTenantAccess`)
+- Evaluates caller tenant context against resource tenant bindings.
+- Tenant context is read from JWT claims and `X-Tenant-Id` headers.
+- If caller tenant mismatches resource tenant, the request is aborted with HTTP 403 `OBJECT_ACCESS_DENIED`.
+
+### Cross-User Draft Mutation Protection (`assertObjectMutationAccess`)
+- Non-admin users cannot mutate or void journal entry drafts created by a different user (`created_by` / `created_by_user_id`).
+- Unauthorized modification attempts reject with HTTP 403 `CROSS_USER_MUTATION_FORBIDDEN`.
+- Administrators possess tenant-wide management override to modify or void drafts when necessary.
+
+---
+
+## 5. Field-Level Sensitive Data Protection & Masking
 
 Financial records often carry personal identifiable information (PII), employee compensation details, and banking credentials. Dynamic field-level masking is enforced across JSON API responses, tabular CSV exports, error envelopes, and audit logs.
 
-### 4.1 Masking Specifications
+### 5.1 Masking Specifications
 
 | Data Category | Field Patterns | Applied Transformation | Visibility Rule |
 |---|---|---|---|
@@ -124,14 +141,14 @@ Financial records often carry personal identifiable information (PII), employee 
 | **Government IDs** | `tax_id`, `ssn`, `national_id`, `pan` | Retains last 4 digits: `***-**-6789` | Masked for non-admin roles |
 | **Credentials & Secrets** | `password`, `password_hash`, `token`, `secret`, `api_key` | Hard replaced with `"[REDACTED]"` | **Never** visible to any role under any circumstance |
 
-### 4.2 CSV Tabular Export Protection
+### 5.2 CSV Tabular Export Protection
 When exporting trial balance or journal ledger datasets via CSV:
 - Sensitive columns are processed through `maskCsvExportRecords` before serialization.
 - Bank accounts appear as `XXXX-XXXX-7890`.
 - Salary amounts are zeroed for non-admin callers.
 - An append-only audit event (`export.generated`) is recorded capturing row count, export format, actor, and correlation ID.
 
-### 4.3 Safe Logging & HTTP 500 Sanitization
+### 5.3 Safe Logging & HTTP 500 Sanitization
 - Internal server error (HTTP 500) messages strip raw SQL queries, stack traces, and database connection strings.
 - Outbound 500 envelopes return:
   ```json
@@ -146,11 +163,11 @@ When exporting trial balance or journal ledger datasets via CSV:
 
 ---
 
-## 5. Append-Only Audit Trail (PLT-10)
+## 6. Append-Only Audit Trail (PLT-10)
 
 The ERP-4 module integrates with `@cs/core` `AuditService` via the `Erp4AuditService` adapter.
 
-### 5.1 Audited Events
+### 6.1 Audited Events
 
 1. `journal.posted`: Emitted upon posting a draft journal entry. Captures entry number, period ID, currency code, and total amount.
 2. `journal.reversed`: Emitted upon creating a compensating reversal entry. Captures original entry ID, reversal entry ID, actor, and reason.
@@ -160,12 +177,12 @@ The ERP-4 module integrates with `@cs/core` `AuditService` via the `Erp4AuditSer
 6. `period.status_changed`: Emitted when an accounting period transitions status (e.g. `open` -> `soft_closed` -> `locked`).
 7. `export.generated`: Emitted when financial data exports are generated.
 
-### 5.2 Privacy Guarantee in Audit Metadata
+### 6.2 Privacy Guarantee in Audit Metadata
 All audit event metadata passes through `redactSensitiveData` from `@cs/core`. Secrets, passwords, full bank account numbers, and personal tokens are scrubbed before storage in the append-only audit log.
 
 ---
 
-## 6. Mandatory Domain Invariant: Double-Entry Exact Balancing (BR-ERP4-01)
+## 7. Mandatory Domain Invariant: Double-Entry Exact Balancing (BR-ERP4-01)
 
 1. **Exact Balancing Rule**:
    $$\sum \text{debits} = \sum \text{credits}$$
