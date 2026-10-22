@@ -1,12 +1,12 @@
 # ERP-2 Vendors & Purchasing — Data Dictionary
 
-**SDS Reference**: ClearShift ERP v2.0, §4.3 (FR-ERP2-01..06, BR-ERP2-01), §4.7 (ERP-2 tables)  
-**Architecture Reference**: ClearShift V1 Master Architecture Spec §5 (ERD), §6.1 (slot 01), Decision C7 (intra-module FKs only)  
-**Module**: ERP-2 Vendors & Purchasing (Group 7)  
-**Issue**: [#16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/16) — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations`  
-**PostgreSQL Schema**: `erp2`  
-**API Base**: `/api/v1/erp-vendors`  
-**Version**: V1.0  
+**SDS Reference**: ClearShift ERP v2.0, §4.3 (FR-ERP2-01..06, BR-ERP2-01), §4.7 (ERP-2 tables)
+**Architecture Reference**: ClearShift V1 Master Architecture Spec §5 (ERD), §6.1 (slot 01), Decision C7 (intra-module FKs only)
+**Module**: ERP-2 Vendors & Purchasing (Group 7)
+**Issue**: [#16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/16) — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations`
+**PostgreSQL Schema**: `erp2`
+**API Base**: `/api/v1/erp-vendors`
+**Version**: V1.0
 
 ---
 
@@ -42,9 +42,9 @@
 
 ## 2. `erp2.vendors` — Vendor Master
 
-**Purpose**: Stores supplier and vendor records.  
-**FR Reference**: FR-ERP2-01 (list/search by name), FR-ERP2-02 (create/edit vendor), FR-ERP2-06 (bank detail masking)  
-**Owner**: ERP-2  
+**Purpose**: Stores supplier and vendor records.
+**FR Reference**: FR-ERP2-01 (list/search by name), FR-ERP2-02 (create/edit vendor), FR-ERP2-06 (bank detail masking)
+**Owner**: ERP-2
 
 | Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
 |---|---|---|---|---|---|
@@ -72,9 +72,9 @@
 
 ## 3. `erp2.purchase_orders` — Purchase Order Header
 
-**Purpose**: Stores purchase order headers and tracking status.  
-**FR Reference**: FR-ERP2-03 (PO with lines), FR-ERP2-04 (status lifecycle), FR-ERP2-05 (total calculation)  
-**Owner**: ERP-2  
+**Purpose**: Stores purchase order headers and tracking status.
+**FR Reference**: FR-ERP2-03 (PO with lines), FR-ERP2-04 (status lifecycle), FR-ERP2-05 (total calculation)
+**Owner**: ERP-2
 
 | Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
 |---|---|---|---|---|---|
@@ -101,9 +101,9 @@
 
 ## 4. `erp2.po_lines` — Purchase Order Lines
 
-**Purpose**: Stores line items belonging to a purchase order.  
-**FR Reference**: FR-ERP2-03 (lines with product, quantity, price), BR-ERP2-01 (product validation), FR-ERP2-05 (server calculation)  
-**Owner**: ERP-2  
+**Purpose**: Stores line items belonging to a purchase order.
+**FR Reference**: FR-ERP2-03 (lines with product, quantity, price), BR-ERP2-01 (product validation), FR-ERP2-05 (server calculation)
+**Owner**: ERP-2
 
 | Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
 |---|---|---|---|---|---|
@@ -126,9 +126,9 @@
 
 ## 5. `erp2.import_receipts` — Idempotency & Migration Audit
 
-**Purpose**: Durable import receipts persisted in the same transaction as target business mutations.  
-**KIT Reference**: KIT-08 / Master Architecture Spec §6.1 slot 01  
-**Owner**: ERP-2  
+**Purpose**: Durable import receipts persisted in the same transaction as target business mutations.
+**KIT Reference**: KIT-08 / Master Architecture Spec §6.1 slot 01
+**Owner**: ERP-2
 
 | Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
 |---|---|---|---|---|---|
