@@ -16,6 +16,7 @@ export default defineConfig({
       include: [
         'apps/erp/modules/erp-4/domain/**',
         'apps/erp/modules/erp-4/src/**',
+        'apps/erp/modules/erp-5/db/**',
         'packages/contracts/src/**',
         'packages/database/src/**',
       ],
