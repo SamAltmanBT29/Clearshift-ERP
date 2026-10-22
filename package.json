@@ -10,8 +10,12 @@
     "packages/*"
   ],
   "scripts": {
+    "compose:up": "docker compose -f infra/compose.yaml up -d --wait",
+    "compose:down": "docker compose -f infra/compose.yaml down -v",
     "db:migrate": "node packages/database/scripts/migrate.js",
     "db:migrate:test": "cross-env NODE_ENV=test node packages/database/scripts/migrate.js",
+    "db:seed": "node --experimental-strip-types infra/scripts/seed.ts",
+    "db:reset": "npm run compose:down && npm run compose:up && npm run db:migrate && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
