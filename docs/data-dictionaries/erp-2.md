@@ -9,7 +9,7 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #22: ERP2-07 (Migration Kit Adapter and Durable Import Receipts) |
+| **Issues** | #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #22: ERP2-07 (Migration Kit Adapter) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -141,3 +141,73 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
    - Identical 3x replays produce 1 business row and 1 receipt (HTTP 200/201).
    - Key reuse with mismatched payload returns HTTP 409 Conflict with zero database mutation.
    - Unexpected infrastructure failure (HTTP 503) rolls back the transaction and is not recorded as a rejected business record.
+
+---
+
+## 7. Synthetic Demo & Runbook
+
+### 7.1 Local Verification & Test Execution
+
+Run the complete ERP-2 API test suite:
+
+```bash
+# Run unit & API test suite for list/read and domain invariants
+npx vitest run apps/erp/modules/erp-2/tests/api/list.test.ts
+
+# Run complete ERP-2 test suite (vendors, purchase-orders, idempotency)
+npx vitest run apps/erp/modules/erp-2/tests/
+```
+
+### 7.2 Synthetic Endpoint Demo Flow
+
+#### 1. List Vendors with Bounded Paging & Search
+```bash
+# Bounded pagination (page 1, pageSize 20) with search by legal business name
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/vendors?page=1&pageSize=20&search=Acme" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with `items: [...]`, `total: 1`, `page: 1`, `pageSize: 20`, `totalPages: 1`, with `bank_masked: "XXXX-XXXX-7890"`.
+
+#### 2. Read Single Vendor by ID
+```bash
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/vendors/00000000-0000-0000-0000-000000000001" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with full vendor profile, bank details masked to `XXXX-XXXX-7890`.
+
+#### 3. Create Purchase Order with ERP-1 Product Verification
+```bash
+curl -X POST "http://localhost:3000/api/v1/erp-vendors/purchase-orders" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer role:purchasing_admin" \
+  -d '{
+    "vendor_id": "00000000-0000-0000-0000-000000000001",
+    "order_date": "2026-03-20",
+    "currency": "USD",
+    "lines": [
+      {
+        "product_id": "11111111-1111-1111-1111-111111111111",
+        "quantity": "5.00",
+        "price": "30.00"
+      }
+    ]
+  }'
+```
+*Expected Output*: HTTP 201 with `status: "Draft"`, `total: "150.00"` (recalculated server-side).
+
+#### 4. Filter Purchase Orders by Status
+```bash
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/purchase-orders?status=Draft&page=1&pageSize=10" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with list of Draft POs.
+
+#### 5. Transition Purchase Order Status
+```bash
+curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000-0000-0000-0001-000000000001" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer role:purchasing_admin" \
+  -d '{ "status": "Sent" }'
+```
+*Expected Output*: HTTP 200 with `status: "Sent"`. Attempting to transition back to `Draft` returns HTTP 422 `INVALID_STATUS_TRANSITION`.
+

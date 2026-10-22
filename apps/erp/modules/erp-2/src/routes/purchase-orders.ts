@@ -39,7 +39,7 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
     }
 
     const { purchaseOrders, total } = await service.listPurchaseOrders(parsed.data);
-    const totalPages = Math.ceil(total / parsed.data.pageSize);
+    const totalPages = Math.ceil(total / parsed.data.pageSize) || 1;
 
     return reply.status(200).send({
       items: purchaseOrders,
