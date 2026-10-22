@@ -1,0 +1,937 @@
+/**
+ * ERP-5 HR & Employees — Domain Service
+ *
+ * Owns every business rule of the ERP-5 write path:
+ *   - FR-ERP5-01/02  employee master, unique employee number, masked salary
+ *   - FR-ERP5-03     departments with an optional, acyclic parent hierarchy
+ *   - FR-ERP5-04     leave records with a valid date range
+ *   - FR-ERP5-05     no credentials, no application roles (Hub Identity owns them)
+ *   - FR-ERP5-06     one department/month payroll aggregate, no employee rows
+ *   - BR-ERP5-01     join date can never precede the birth date
+ *   - BR-ERP5-02     salary is masked before it leaves the service
+ *   - KIT-08         the import receipt commits in the same transaction as the
+ *                    target mutation, and a repeated idempotency key performs
+ *                    no second mutation
+ *
+ * The service returns the **public projection** of an employee — the raw
+ * `salary` column never leaves this layer, so a careless route cannot leak
+ * it (BR-ERP5-02).
+ *
+ * @module erp5/services/hr.service
+ */
+
+import {
+  HR_DEFAULT_CURRENCY,
+  HR_DOMAIN_RULES,
+  HR_IMPORT_ONLY_FIELDS,
+  maskHrSalary,
+  type CreateHrDepartmentRequest,
+  type CreateHrEmployeeRequest,
+  type CreateHrLeaveRequest,
+  type CreateHrPayrollTotalRequest,
+  type HrDepartment,
+  type HrEmployee,
+  type HrEmployeeView,
+  type HrImportReceipt,
+  type HrLeave,
+  type HrPayrollTotal,
+  type UpdateHrDepartmentRequest,
+  type UpdateHrEmployeeRequest,
+} from '@clearshift/contracts';
+import {
+  HrDomainError,
+  assertDepartmentHierarchyAcyclic,
+  assertJoinDateNotBeforeBirthDate,
+  assertLeaveDateRange,
+  assertNoIdentityCredentials,
+  assertPayrollAggregateHasNoEmployeeRows,
+  assertPayrollAmountNotNegative,
+  assertSalaryNotNegative,
+} from '../domain/rules.js';
+import {
+  HrBadRequestError,
+  HrConflictError,
+  HrIdempotencyConflictError,
+  HrNotFoundError,
+  HrServiceError,
+  HrUnprocessableError,
+} from './errors.js';
+import type { HrRepository } from './repository.js';
+
+/** Result of a create operation. `created` is false for an idempotent replay. */
+export interface HrMutationResult<T> {
+  entity: T;
+  created: boolean;
+  receipt?: HrImportReceipt;
+}
+
+/** The import provenance of a write, once it has been validated. */
+export interface HrImportProvenance {
+  batch_id: string;
+  source_row: number;
+  idempotency_key: string;
+}
+
+/** Target entity names stored on `erp5.import_receipts.entity`. */
+export const HR_IMPORT_ENTITIES = {
+  DEPARTMENT: 'department',
+  EMPLOYEE: 'employee',
+  LEAVE: 'leave',
+  PAYROLL_TOTAL: 'payroll_total',
+} as const;
+
+/** Schema version of the ERP-5 target entities (KIT-08 receipt column). */
+const HR_TARGET_SCHEMA_VERSION = 1;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalises a decimal string so two numerically equal amounts compare equal
+ * regardless of their scale (`125000` ≡ `125000.0000`).
+ */
+export function normalizeHrAmount(value: string): string {
+  const match = /^(\d+)(?:\.(\d*))?$/.exec(value.trim());
+  if (!match) {
+    return value.trim();
+  }
+  const whole = match[1] ?? '0';
+  const fraction = (match[2] ?? '').padEnd(4, '0').slice(0, 4);
+  return `${whole}.${fraction}`;
+}
+
+function toUnprocessable(error: HrDomainError): HrUnprocessableError {
+  const field = typeof error.context['field'] === 'string' ? error.context['field'] : undefined;
+  return new HrUnprocessableError(
+    error.message,
+    field !== undefined
+      ? [{ field, message: error.message, code: error.code }]
+      : [{ message: error.message, code: error.code }],
+    error.code
+  );
+}
+
+/**
+ * Resolves the import provenance of a write.
+ *
+ * The three fields travel together: an idempotency key without a batch and a
+ * source row cannot produce a durable receipt, so a partial triple is
+ * rejected instead of being silently ignored.
+ */
+export function resolveImportProvenance(input: {
+  batch_id?: string | undefined;
+  source_row?: number | undefined;
+  idempotency_key?: string | undefined;
+}): HrImportProvenance | null {
+  const present = [input.batch_id, input.source_row, input.idempotency_key].filter(
+    (value) => value !== undefined
+  );
+
+  if (present.length === 0) {
+    return null;
+  }
+
+  if (present.length !== 3) {
+    throw new HrBadRequestError(
+      'Import provenance requires batch_id, source_row and an idempotency key together.',
+      [
+        {
+          field: 'idempotency_key',
+          message:
+            'batch_id, source_row and idempotency_key must be supplied together',
+          code: HR_DOMAIN_RULES.IMPORT_PROVENANCE_REQUIRED,
+        },
+      ],
+      HR_DOMAIN_RULES.IMPORT_PROVENANCE_REQUIRED
+    );
+  }
+
+  return {
+    batch_id: input.batch_id as string,
+    source_row: input.source_row as number,
+    idempotency_key: input.idempotency_key as string,
+  };
+}
+
+/**
+ * Rejects source-identity fields on a write that carries no import
+ * provenance — a browser may never set them.
+ */
+function assertImportOnlyFieldsAllowed(
+  input: Readonly<Record<string, unknown>>,
+  provenance: HrImportProvenance | null
+): void {
+  if (provenance !== null) {
+    return;
+  }
+  const offending = HR_IMPORT_ONLY_FIELDS.find((field) => input[field] !== undefined);
+  if (offending !== undefined) {
+    throw new HrBadRequestError(
+      `The field "${offending}" is system-maintained and may only be set by an import write.`,
+      [
+        {
+          field: offending,
+          message: 'Field is system-maintained and cannot be set by a user write',
+          code: HR_DOMAIN_RULES.PROTECTED_FIELD,
+        },
+      ],
+      HR_DOMAIN_RULES.PROTECTED_FIELD
+    );
+  }
+}
+
+/**
+ * Rejects a payload that carries an identity credential.
+ *
+ * C3 — HR stores no credentials and grants no application roles.
+ */
+function assertPayloadHasNoCredentials(payload: Readonly<Record<string, unknown>>): void {
+  try {
+    assertNoIdentityCredentials(payload);
+  } catch (error) {
+    if (error instanceof HrDomainError) {
+      throw new HrBadRequestError(
+        error.message,
+        [
+          {
+            field: String(error.context['field'] ?? 'payload'),
+            message: error.message,
+            code: error.code,
+          },
+        ],
+        error.code
+      );
+    }
+    throw error;
+  }
+}
+
+/** Builds the masked public projection of an employee (BR-ERP5-02). */
+export function toHrEmployeeView(employee: HrEmployee): HrEmployeeView {
+  return {
+    id: employee.id,
+    employee_no: employee.employee_no,
+    first_name: employee.first_name,
+    last_name: employee.last_name,
+    birth_date: employee.birth_date,
+    join_date: employee.join_date,
+    department_id: employee.department_id,
+    job_title: employee.job_title,
+    salary_display: maskHrSalary(),
+    currency_code: employee.currency_code,
+    created_at: employee.created_at,
+    updated_at: employee.updated_at,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class HrService {
+  private readonly repository: HrRepository;
+
+  constructor(repository: HrRepository) {
+    this.repository = repository;
+  }
+
+  // ── Departments (FR-ERP5-03) ─────────────────────────────────────────────
+
+  async createDepartment(
+    input: CreateHrDepartmentRequest
+  ): Promise<HrMutationResult<HrDepartment>> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+    const provenance = resolveImportProvenance(input);
+    assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
+
+    return this.repository.transaction(async (tx) => {
+      if (provenance !== null) {
+        const replay = await this.replayDepartment(tx, provenance, input);
+        if (replay) {
+          return replay;
+        }
+      }
+
+      const duplicate = await tx.getDepartmentByCode(input.code);
+      if (duplicate) {
+        throw new HrConflictError(
+          `A department with the code "${input.code}" already exists.`,
+          [
+            {
+              field: 'code',
+              message: `Department code "${input.code}" is already in use`,
+              code: HR_DOMAIN_RULES.DEPARTMENT_CODE_DUPLICATE,
+            },
+          ],
+          HR_DOMAIN_RULES.DEPARTMENT_CODE_DUPLICATE
+        );
+      }
+
+      const parentId = input.parent_id ?? null;
+      if (parentId !== null) {
+        const parent = await tx.getDepartmentById(parentId);
+        if (!parent) {
+          throw new HrNotFoundError(
+            'Parent department',
+            parentId,
+            HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+            [
+              {
+                field: 'parent_id',
+                message: 'The referenced parent department does not exist',
+                code: HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+              },
+            ]
+          );
+        }
+      }
+
+      const department = await tx.createDepartment({
+        name: input.name,
+        code: input.code,
+        parent_id: parentId,
+      });
+
+      const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.DEPARTMENT, department.id);
+
+      return {
+        entity: department,
+        created: true,
+        ...(receipt !== null && { receipt }),
+      };
+    });
+  }
+
+  async updateDepartment(
+    id: string,
+    input: UpdateHrDepartmentRequest
+  ): Promise<HrDepartment> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+
+    return this.repository.transaction(async (tx) => {
+      const existing = await tx.getDepartmentById(id);
+      if (!existing) {
+        throw new HrNotFoundError('Department', id);
+      }
+
+      if (input.parent_id !== undefined && input.parent_id !== null) {
+        if (input.parent_id === id) {
+          throw new HrUnprocessableError(
+            'A department cannot be its own parent.',
+            [
+              {
+                field: 'parent_id',
+                message: 'A department cannot be its own parent',
+                code: HR_DOMAIN_RULES.DEPARTMENT_SELF_PARENT,
+              },
+            ],
+            HR_DOMAIN_RULES.DEPARTMENT_SELF_PARENT
+          );
+        }
+
+        const parent = await tx.getDepartmentById(input.parent_id);
+        if (!parent) {
+          throw new HrNotFoundError('Parent department', input.parent_id, HR_DOMAIN_RULES.DEPARTMENT_REQUIRED, [
+            {
+              field: 'parent_id',
+              message: 'The referenced parent department does not exist',
+              code: HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+            },
+          ]);
+        }
+
+        const ancestors = await tx.listDepartmentAncestors(input.parent_id);
+        try {
+          assertDepartmentHierarchyAcyclic(
+            id,
+            input.parent_id,
+            ancestors.map((ancestor) => ancestor.id)
+          );
+        } catch (error) {
+          if (error instanceof HrDomainError) {
+            throw toUnprocessable(error);
+          }
+          throw error;
+        }
+      }
+
+      if (input.code !== undefined && input.code !== existing.code) {
+        const duplicate = await tx.getDepartmentByCode(input.code);
+        if (duplicate) {
+          throw new HrConflictError(
+            `A department with the code "${input.code}" already exists.`,
+            [
+              {
+                field: 'code',
+                message: `Department code "${input.code}" is already in use`,
+                code: HR_DOMAIN_RULES.DEPARTMENT_CODE_DUPLICATE,
+              },
+            ],
+            HR_DOMAIN_RULES.DEPARTMENT_CODE_DUPLICATE
+          );
+        }
+      }
+
+      const updates: {
+        name?: string;
+        code?: string;
+        parent_id?: string | null;
+      } = {};
+      if (input.name !== undefined) {
+        updates.name = input.name;
+      }
+      if (input.code !== undefined) {
+        updates.code = input.code;
+      }
+      if (input.parent_id !== undefined) {
+        updates.parent_id = input.parent_id;
+      }
+
+      return tx.updateDepartment(id, updates);
+    });
+  }
+
+  // ── Employees (FR-ERP5-01/02, BR-ERP5-01/02) ─────────────────────────────
+
+  async createEmployee(input: CreateHrEmployeeRequest): Promise<HrMutationResult<HrEmployeeView>> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+    const provenance = resolveImportProvenance(input);
+    assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
+
+    try {
+      assertJoinDateNotBeforeBirthDate(input.birth_date, input.join_date);
+      assertSalaryNotNegative(input.salary);
+    } catch (error) {
+      if (error instanceof HrDomainError) {
+        throw toUnprocessable(error);
+      }
+      throw error;
+    }
+
+    return this.repository.transaction(async (tx) => {
+      if (provenance !== null) {
+        const replay = await this.replayEmployee(tx, provenance, input);
+        if (replay) {
+          return replay;
+        }
+      }
+
+      const duplicate = await tx.getEmployeeByEmployeeNo(input.employee_no);
+      if (duplicate) {
+        throw new HrConflictError(
+          `An employee with the employee number "${input.employee_no}" already exists.`,
+          [
+            {
+              field: 'employee_no',
+              message: `Employee number "${input.employee_no}" is already in use`,
+              code: HR_DOMAIN_RULES.EMPLOYEE_NO_DUPLICATE,
+            },
+          ],
+          HR_DOMAIN_RULES.EMPLOYEE_NO_DUPLICATE
+        );
+      }
+
+      if (input.source_system !== undefined && input.source_id !== undefined) {
+        const duplicateSource = await tx.getEmployeeBySourceIdentity(
+          input.source_system,
+          input.source_id
+        );
+        if (duplicateSource) {
+          throw new HrConflictError(
+            'An employee with the same source identity already exists.',
+            [
+              {
+                field: 'source_id',
+                message: 'The source identity is already in use',
+                code: HR_DOMAIN_RULES.SOURCE_IDENTITY_DUPLICATE,
+              },
+            ],
+            HR_DOMAIN_RULES.SOURCE_IDENTITY_DUPLICATE
+          );
+        }
+      }
+
+      const department = await tx.getDepartmentById(input.department_id);
+      if (!department) {
+        throw new HrNotFoundError('Department', input.department_id, HR_DOMAIN_RULES.DEPARTMENT_REQUIRED, [
+          {
+            field: 'department_id',
+            message: 'The referenced department does not exist',
+            code: HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+          },
+        ]);
+      }
+
+      const employee = await tx.createEmployee({
+        employee_no: input.employee_no,
+        first_name: input.first_name,
+        last_name: input.last_name,
+        birth_date: input.birth_date,
+        join_date: input.join_date,
+        department_id: input.department_id,
+        job_title: input.job_title,
+        salary: input.salary,
+        currency_code: input.currency_code ?? HR_DEFAULT_CURRENCY,
+        source_system: input.source_system ?? null,
+        source_id: input.source_id ?? null,
+      });
+
+      const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.EMPLOYEE, employee.id);
+
+      return {
+        entity: toHrEmployeeView(employee),
+        created: true,
+        ...(receipt !== null && { receipt }),
+      };
+    });
+  }
+
+  async updateEmployee(id: string, input: UpdateHrEmployeeRequest): Promise<HrEmployeeView> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+
+    return this.repository.transaction(async (tx) => {
+      const existing = await tx.getEmployeeById(id);
+      if (!existing) {
+        throw new HrNotFoundError('Employee', id);
+      }
+
+      const birthDate = input.birth_date ?? existing.birth_date;
+      const joinDate = input.join_date ?? existing.join_date;
+      try {
+        assertJoinDateNotBeforeBirthDate(birthDate, joinDate);
+      } catch (error) {
+        if (error instanceof HrDomainError) {
+          throw toUnprocessable(error);
+        }
+        throw error;
+      }
+
+      if (input.salary !== undefined) {
+        try {
+          assertSalaryNotNegative(input.salary);
+        } catch (error) {
+          if (error instanceof HrDomainError) {
+            throw toUnprocessable(error);
+          }
+          throw error;
+        }
+      }
+
+      if (input.department_id !== undefined && input.department_id !== existing.department_id) {
+        const department = await tx.getDepartmentById(input.department_id);
+        if (!department) {
+          throw new HrNotFoundError('Department', input.department_id, HR_DOMAIN_RULES.DEPARTMENT_REQUIRED, [
+            {
+              field: 'department_id',
+              message: 'The referenced department does not exist',
+              code: HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+            },
+          ]);
+        }
+      }
+
+      if (input.employee_no !== undefined && input.employee_no !== existing.employee_no) {
+        const duplicate = await tx.getEmployeeByEmployeeNo(input.employee_no);
+        if (duplicate) {
+          throw new HrConflictError(
+            `An employee with the employee number "${input.employee_no}" already exists.`,
+            [
+              {
+                field: 'employee_no',
+                message: `Employee number "${input.employee_no}" is already in use`,
+                code: HR_DOMAIN_RULES.EMPLOYEE_NO_DUPLICATE,
+              },
+            ],
+            HR_DOMAIN_RULES.EMPLOYEE_NO_DUPLICATE
+          );
+        }
+      }
+
+      const updates: {
+        employee_no?: string;
+        first_name?: string;
+        last_name?: string;
+        birth_date?: string;
+        join_date?: string;
+        department_id?: string;
+        job_title?: string;
+        salary?: string;
+      } = {};
+      if (input.employee_no !== undefined) {
+        updates.employee_no = input.employee_no;
+      }
+      if (input.first_name !== undefined) {
+        updates.first_name = input.first_name;
+      }
+      if (input.last_name !== undefined) {
+        updates.last_name = input.last_name;
+      }
+      if (input.birth_date !== undefined) {
+        updates.birth_date = input.birth_date;
+      }
+      if (input.join_date !== undefined) {
+        updates.join_date = input.join_date;
+      }
+      if (input.department_id !== undefined) {
+        updates.department_id = input.department_id;
+      }
+      if (input.job_title !== undefined) {
+        updates.job_title = input.job_title;
+      }
+      if (input.salary !== undefined) {
+        updates.salary = input.salary;
+      }
+
+      const updated = await tx.updateEmployee(id, updates);
+      return toHrEmployeeView(updated);
+    });
+  }
+
+  // ── Leave (FR-ERP5-04) ───────────────────────────────────────────────────
+
+  async createLeave(input: CreateHrLeaveRequest): Promise<HrMutationResult<HrLeave>> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+    const provenance = resolveImportProvenance(input);
+    assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
+
+    try {
+      assertLeaveDateRange(input.date_from, input.date_to);
+    } catch (error) {
+      if (error instanceof HrDomainError) {
+        throw toUnprocessable(error);
+      }
+      throw error;
+    }
+
+    return this.repository.transaction(async (tx) => {
+      if (provenance !== null) {
+        const replay = await this.replayLeave(tx, provenance, input);
+        if (replay) {
+          return replay;
+        }
+      }
+
+      const employee = await tx.getEmployeeById(input.employee_id);
+      if (!employee) {
+        throw new HrNotFoundError('Employee', input.employee_id, HR_DOMAIN_RULES.EMPLOYEE_REQUIRED, [
+          {
+            field: 'employee_id',
+            message: 'The referenced employee does not exist',
+            code: HR_DOMAIN_RULES.EMPLOYEE_REQUIRED,
+          },
+        ]);
+      }
+
+      const record = await tx.createLeave({
+        employee_id: input.employee_id,
+        date_from: input.date_from,
+        date_to: input.date_to,
+        type: input.type,
+        status: input.status ?? 'pending',
+      });
+
+      const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.LEAVE, record.id);
+
+      return {
+        entity: record,
+        created: true,
+        ...(receipt !== null && { receipt }),
+      };
+    });
+  }
+
+  // ── Payroll totals (FR-ERP5-06) ───────────────────────────────────────────
+
+  async createPayrollTotal(
+    input: CreateHrPayrollTotalRequest
+  ): Promise<HrMutationResult<HrPayrollTotal>> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+    try {
+      assertPayrollAggregateHasNoEmployeeRows(input as unknown as Record<string, unknown>);
+    } catch (error) {
+      if (error instanceof HrDomainError) {
+        throw new HrBadRequestError(
+          error.message,
+          [
+            {
+              field: String(error.context['field'] ?? 'payload'),
+              message: error.message,
+              code: error.code,
+            },
+          ],
+          error.code
+        );
+      }
+      throw error;
+    }
+
+    const provenance = resolveImportProvenance(input);
+    assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
+
+    try {
+      assertPayrollAmountNotNegative(input.total_amount);
+    } catch (error) {
+      if (error instanceof HrDomainError) {
+        throw toUnprocessable(error);
+      }
+      throw error;
+    }
+
+    return this.repository.transaction(async (tx) => {
+      if (provenance !== null) {
+        const replay = await this.replayPayrollTotal(tx, provenance, input);
+        if (replay) {
+          return replay;
+        }
+      }
+
+      const department = await tx.getDepartmentById(input.department_id);
+      if (!department) {
+        throw new HrNotFoundError('Department', input.department_id, HR_DOMAIN_RULES.DEPARTMENT_REQUIRED, [
+          {
+            field: 'department_id',
+            message: 'The referenced department does not exist',
+            code: HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
+          },
+        ]);
+      }
+
+      const duplicate = await tx.getPayrollTotalByDepartmentMonth(input.department_id, input.month);
+      if (duplicate) {
+        throw new HrConflictError(
+          `A payroll aggregate already exists for department "${input.department_id}" and month "${input.month}".`,
+          [
+            {
+              field: 'month',
+              message: 'One payroll aggregate per department and month already exists',
+              code: HR_DOMAIN_RULES.PAYROLL_TOTAL_DUPLICATE,
+            },
+          ],
+          HR_DOMAIN_RULES.PAYROLL_TOTAL_DUPLICATE
+        );
+      }
+
+      const total = await tx.createPayrollTotal({
+        department_id: input.department_id,
+        month: input.month,
+        total_amount: input.total_amount,
+        currency_code: input.currency_code ?? HR_DEFAULT_CURRENCY,
+        headcount: input.headcount ?? 0,
+      });
+
+      const receipt = await this.writeReceipt(
+        tx,
+        provenance,
+        HR_IMPORT_ENTITIES.PAYROLL_TOTAL,
+        total.id
+      );
+
+      return {
+        entity: total,
+        created: true,
+        ...(receipt !== null && { receipt }),
+      };
+    });
+  }
+
+  // ── Idempotency helpers ──────────────────────────────────────────────────
+
+  /**
+   * Writes the import receipt inside the caller's transaction.
+   *
+   * The receipt and the target mutation therefore commit together — a failure
+   * of either rolls both back (KIT-08).
+   */
+  private async writeReceipt(
+    tx: HrRepository,
+    provenance: HrImportProvenance | null,
+    entity: string,
+    targetId: string
+  ): Promise<HrImportReceipt | null> {
+    if (provenance === null) {
+      return null;
+    }
+    return tx.createImportReceipt({
+      batch_id: provenance.batch_id,
+      source_row: provenance.source_row,
+      entity,
+      schema_version: HR_TARGET_SCHEMA_VERSION,
+      idempotency_key: provenance.idempotency_key,
+      target_id: targetId,
+      kind: 'created',
+    });
+  }
+
+  /**
+   * Resolves a repeated import.
+   *
+   * Returns the original result when the same idempotency key is replayed
+   * with the same payload, `null` when the key is new, and throws
+   * `409` when the key was already used for a different payload.
+   */
+  private async replay<T>(
+    tx: HrRepository,
+    provenance: HrImportProvenance,
+    loadTarget: (targetId: string) => Promise<T | null>,
+    fingerprint: (entity: T) => string,
+    requestedFingerprint: string
+  ): Promise<HrMutationResult<T> | null> {
+    const receipt = await tx.getImportReceiptByIdempotencyKey(provenance.idempotency_key);
+    if (!receipt) {
+      return null;
+    }
+
+    const target = await loadTarget(receipt.target_id);
+    if (!target) {
+      throw new HrIdempotencyConflictError(
+        'The idempotency key was already used but the target record no longer exists.',
+        [
+          {
+            field: 'idempotency_key',
+            message: 'The idempotency key refers to a record that no longer exists',
+            code: HR_DOMAIN_RULES.IDEMPOTENCY_CONFLICT,
+          },
+        ]
+      );
+    }
+
+    if (fingerprint(target) !== requestedFingerprint) {
+      throw new HrIdempotencyConflictError(
+        'The idempotency key was already used with a different payload.',
+        [
+          {
+            field: 'idempotency_key',
+            message: 'The idempotency key was used with a different payload',
+            code: HR_DOMAIN_RULES.IDEMPOTENCY_CONFLICT,
+          },
+        ]
+      );
+    }
+
+    return { entity: target, created: false, receipt };
+  }
+
+  private async replayEmployee(
+    tx: HrRepository,
+    provenance: HrImportProvenance,
+    input: CreateHrEmployeeRequest
+  ): Promise<HrMutationResult<HrEmployeeView> | null> {
+    const result = await this.replay<HrEmployee>(
+      tx,
+      provenance,
+      (targetId) => tx.getEmployeeById(targetId),
+      (employee) => this.employeeFingerprint(employee),
+      this.employeeFingerprintFromRequest(input)
+    );
+
+    if (!result) {
+      return null;
+    }
+
+    return {
+      entity: toHrEmployeeView(result.entity),
+      created: false,
+      ...(result.receipt !== undefined && { receipt: result.receipt }),
+    };
+  }
+
+  private async replayDepartment(
+    tx: HrRepository,
+    provenance: HrImportProvenance,
+    input: CreateHrDepartmentRequest
+  ): Promise<HrMutationResult<HrDepartment> | null> {
+    return this.replay<HrDepartment>(
+      tx,
+      provenance,
+      (targetId) => tx.getDepartmentById(targetId),
+      (department) =>
+        [department.name, department.code, department.parent_id ?? ''].join('|'),
+      [input.name, input.code, input.parent_id ?? ''].join('|')
+    );
+  }
+
+  private async replayLeave(
+    tx: HrRepository,
+    provenance: HrImportProvenance,
+    input: CreateHrLeaveRequest
+  ): Promise<HrMutationResult<HrLeave> | null> {
+    return this.replay<HrLeave>(
+      tx,
+      provenance,
+      (targetId) => tx.getLeaveById(targetId),
+      (record) =>
+        [
+          record.employee_id,
+          record.date_from,
+          record.date_to,
+          record.type,
+          record.status,
+        ].join('|'),
+      [
+        input.employee_id,
+        input.date_from,
+        input.date_to,
+        input.type,
+        input.status ?? 'pending',
+      ].join('|')
+    );
+  }
+
+  private async replayPayrollTotal(
+    tx: HrRepository,
+    provenance: HrImportProvenance,
+    input: CreateHrPayrollTotalRequest
+  ): Promise<HrMutationResult<HrPayrollTotal> | null> {
+    return this.replay<HrPayrollTotal>(
+      tx,
+      provenance,
+      (targetId) => tx.getPayrollTotalById(targetId),
+      (total) =>
+        [
+          total.department_id,
+          total.month,
+          normalizeHrAmount(total.total_amount),
+          total.currency_code,
+          String(total.headcount),
+        ].join('|'),
+      [
+        input.department_id,
+        input.month,
+        normalizeHrAmount(input.total_amount),
+        input.currency_code ?? HR_DEFAULT_CURRENCY,
+        String(input.headcount ?? 0),
+      ].join('|')
+    );
+  }
+
+  /** Canonical fingerprint of an employee payload, used to detect replays. */
+  private employeeFingerprint(employee: HrEmployee): string {
+    return [
+      employee.employee_no,
+      employee.first_name,
+      employee.last_name,
+      employee.birth_date,
+      employee.join_date,
+      employee.department_id,
+      employee.job_title,
+      normalizeHrAmount(employee.salary),
+      employee.currency_code,
+    ].join('|');
+  }
+
+  /** The same fingerprint, computed from an incoming create request. */
+  private employeeFingerprintFromRequest(input: CreateHrEmployeeRequest): string {
+    return [
+      input.employee_no,
+      input.first_name,
+      input.last_name,
+      input.birth_date,
+      input.join_date,
+      input.department_id,
+      input.job_title,
+      normalizeHrAmount(input.salary),
+      input.currency_code ?? HR_DEFAULT_CURRENCY,
+    ].join('|');
+  }
+}
