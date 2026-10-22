@@ -31,11 +31,16 @@ export function buildAccessToken(claims: Record<string, unknown>): string {
 
 /** A token that is valid for the next `ttlSeconds`. */
 export function validAccessToken(ttlSeconds = 900): string {
+  return accessTokenWithRoles(['admin'], ttlSeconds);
+}
+
+/** A valid token that carries the given roles. */
+export function accessTokenWithRoles(roles: readonly string[], ttlSeconds = 900): string {
   return buildAccessToken({
     iss: 'clearshift-erp-local',
     aud: 'clearshift-erp',
     sub: 'ffffffff-0001-0001-0001-000000000001',
-    roles: ['admin'],
+    roles: [...roles],
     exp: Math.floor(Date.now() / 1000) + ttlSeconds,
   });
 }

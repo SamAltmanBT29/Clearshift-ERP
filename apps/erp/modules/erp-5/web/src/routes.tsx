@@ -23,18 +23,18 @@ import React from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth.js';
 import { ModuleShell } from './components/ModuleShell.js';
-import { DepartmentsPage } from './pages/DepartmentsPage.js';
 import { DepartmentCreatePage } from './pages/DepartmentCreatePage.js';
 import { DepartmentDetailPage } from './pages/DepartmentDetailPage.js';
+import { DepartmentsListPage } from './pages/DepartmentsListPage.js';
 import { EmployeeCreatePage } from './pages/EmployeeCreatePage.js';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage.js';
-import { EmployeesPage } from './pages/EmployeesPage.js';
-import { IdentityUsersPage } from './pages/IdentityUsersPage.js';
+import { EmployeesListPage } from './pages/EmployeesListPage.js';
+import { IdentityUsersListPage } from './pages/IdentityUsersListPage.js';
 import { LeaveCreatePage } from './pages/LeaveCreatePage.js';
 import { LeaveDetailPage } from './pages/LeaveDetailPage.js';
-import { LeavePage } from './pages/LeavePage.js';
+import { LeaveListPage } from './pages/LeaveListPage.js';
 import { ModuleNotFoundPage } from './pages/ModuleNotFoundPage.js';
-import { PayrollTotalsPage } from './pages/PayrollTotalsPage.js';
+import { PayrollTotalsListPage } from './pages/PayrollTotalsListPage.js';
 import { ERP5_BASE_PATH } from './route-manifest.js';
 
 export const erp5Routes: RouteObject[] = [
@@ -55,7 +55,7 @@ export const erp5Routes: RouteObject[] = [
           {
             id: 'erp5-employees',
             path: 'employees',
-            element: <EmployeesPage />,
+            element: <EmployeesListPage />,
           },
           {
             id: 'erp5-employees-create',
@@ -70,7 +70,7 @@ export const erp5Routes: RouteObject[] = [
           {
             id: 'erp5-departments',
             path: 'departments',
-            element: <DepartmentsPage />,
+            element: <DepartmentsListPage />,
           },
           {
             id: 'erp5-departments-create',
@@ -85,7 +85,7 @@ export const erp5Routes: RouteObject[] = [
           {
             id: 'erp5-leave',
             path: 'leave',
-            element: <LeavePage />,
+            element: <LeaveListPage />,
           },
           {
             id: 'erp5-leave-create',
@@ -100,12 +100,12 @@ export const erp5Routes: RouteObject[] = [
           {
             id: 'erp5-payroll-totals',
             path: 'payroll-totals',
-            element: <PayrollTotalsPage />,
+            element: <PayrollTotalsListPage />,
           },
           {
             id: 'erp5-identity-users',
             path: 'identity-users',
-            element: <IdentityUsersPage />,
+            element: <IdentityUsersListPage />,
           },
           {
             id: 'erp5-not-found',

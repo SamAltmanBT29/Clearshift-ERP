@@ -239,3 +239,127 @@
     margin-top: 0;
   }
 }
+
+/* ── Collection screens ──────────────────────────────────────────────────── */
+
+.cs-erp5-list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-s-4);
+}
+
+.cs-erp5-filter-bar {
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-r-lg);
+  background-color: var(--cs-surface);
+  padding: var(--cs-s-4);
+}
+
+.cs-erp5-filter-bar-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--cs-s-4);
+}
+
+.cs-erp5-filter-bar-fields .cs-form-field {
+  margin-bottom: 0;
+  min-width: 200px;
+  flex: 1 1 200px;
+}
+
+.cs-erp5-filter-bar-actions {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 1px;
+}
+
+.cs-erp5-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cs-s-2);
+  padding: var(--cs-s-2) var(--cs-s-4);
+  border-radius: var(--cs-r-md);
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.cs-erp5-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+.cs-erp5-button-primary {
+  background-color: var(--cs-accent);
+  border-color: var(--cs-accent);
+  color: #FFFFFF;
+}
+
+.cs-erp5-button-primary:hover {
+  background-color: var(--cs-accent-hover);
+  border-color: var(--cs-accent-hover);
+}
+
+.cs-erp5-button-secondary {
+  background-color: var(--cs-bg);
+  border-color: var(--cs-border);
+  color: var(--cs-text);
+}
+
+.cs-erp5-button-secondary:hover {
+  border-color: var(--cs-accent);
+  color: var(--cs-accent);
+}
+
+.cs-erp5-button-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cs-erp5-row-link {
+  color: var(--cs-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cs-erp5-row-link:hover {
+  text-decoration: underline;
+}
+
+.cs-erp5-row-link:focus-visible {
+  outline: none;
+  border-radius: var(--cs-r-sm);
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+.cs-erp5-forbidden {
+  border: 1px solid var(--cs-warn);
+  border-radius: var(--cs-r-lg);
+  background-color: var(--cs-warn-bg);
+  padding: var(--cs-s-6);
+}
+
+.cs-erp5-forbidden-title {
+  margin: 0 0 var(--cs-s-2);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--cs-warn);
+}
+
+.cs-erp5-forbidden-text {
+  margin: 0;
+  max-width: 65ch;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--cs-text);
+}
+
+.cs-erp5-forbidden-hint {
+  margin: var(--cs-s-3) 0 0;
+  font-size: 0.8125rem;
+  color: var(--cs-text-muted);
+}

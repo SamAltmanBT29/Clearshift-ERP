@@ -619,3 +619,96 @@ module reads it and never writes it.
 |---|---|---|
 | `apps/erp/modules/erp-5/tests/api/list.test.ts` | API | paging, search, filters, the sort allow-list, the page-size cap, the empty result, the salary mask, the projection shape, `404` / `400` / `401` / `403` |
 | `apps/erp/modules/erp-5/tests/db/repository.integration.test.ts` | database | the Drizzle write path, the parameterised server-side search, the bounded deterministic pages, the transaction commit and rollback, the read-only projection, the read model (live PostgreSQL) |
+
+---
+
+## 15. Collection screens (ERP5-04)
+
+**Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) — `[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
+**Implementation**: `apps/erp/modules/erp-5/web/src/` — the API client, the shared list
+machinery and the five collection screens
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192
+
+### 15.1 The screens and the endpoint each one reads
+
+| Screen | Route | Endpoint | Rows |
+|---|---|---|---|
+| Employee list | `/erp5/employees` | `GET /api/v1/erp-hr/employees` | `HrEmployeeView` |
+| Department list | `/erp5/departments` | `GET /api/v1/erp-hr/departments` | `HrDepartment` |
+| Leave record list | `/erp5/leave` | `GET /api/v1/erp-hr/leave` | `HrLeave` |
+| Payroll total list | `/erp5/payroll-totals` | `GET /api/v1/erp-hr/payroll-totals` | `HrPayrollTotal` |
+| Identity user list | `/erp5/identity-users` | `GET /api/v1/erp-hr/identity-users` | `HrIdentityUser` |
+
+### 15.2 The columns each screen shows
+
+Every column is a field the contract already returns. The screen adds no field and
+invents no value.
+
+| Screen | Columns |
+|---|---|
+| Employee list | `employee_no`, `first_name`, `last_name`, `birth_date`, `join_date`, department, `job_title`, `salary_display` + `currency_code`, action |
+| Department list | `code`, `name`, parent department, action |
+| Leave record list | `employee_id`, `date_from`, `date_to`, `type`, `status`, action |
+| Payroll total list | `department_id`, `month`, `total_amount`, `currency_code`, `headcount` |
+| Identity user list | `username`, `roles`, `employee_ref`, `status` |
+
+**The salary column shows `salary_display`, never `salary`.** The raw column is absent
+from the public projection (BR-ERP5-02), so the browser cannot render it even if it
+wanted to. The frontend test asserts the masked values and nothing else.
+
+**The department and the employee references are resolved by identifier.** The API
+returns `department_id` and `employee_id` and never a name. The module reads the bounded
+department collection (at most `HR_PAGE_SIZE_MAX`, 100 rows) to resolve a department to
+its name; a department outside that page is shown as a short identifier, never as an
+invented name. The leave list resolves no employee at all — the employee collection is
+not bounded — so the leave screen links to the employee record and carries the
+identifier.
+
+### 15.3 The server does the filtering, the sorting and the paging
+
+The browser never narrows, orders or pages a collection. The screen sends the search
+term, the filters, the sort field and the page to the API and renders exactly the page
+the API answered.
+
+| Screen | Query parameters it sends |
+|---|---|
+| Employee list | `page`, `pageSize`, `search`, `department_id`, `sort` (`name` / `employee_no` / `join_date`) |
+| Department list | `page`, `pageSize`, `search`, `sort` (`name` / `code`) |
+| Leave record list | `page`, `pageSize`, `type`, `status` |
+| Payroll total list | `page`, `pageSize`, `month`, `department_id` |
+| Identity user list | `page`, `pageSize`, `search` |
+
+A search or a filter change resets the page to the first one. The search term is
+published after a 300 ms pause so that a word is one request, not one request per
+keystroke.
+
+### 15.4 The four states of a collection screen
+
+| State | What the operator sees | Where it comes from |
+|---|---|---|
+| Loading | a skeleton of the table that is coming | `@cs/ui` `SkeletonTable` |
+| No data | an empty state, with a "Clear filters" action when a filter is active | `@cs/ui` `EmptyState` |
+| API failure | a readable message and a **Try again** action | `@cs/ui` `ErrorState` |
+| Permission denied | an **access-denied** view — never a retry button | `PermissionDeniedState` |
+
+The permission-denied state is deliberately not an error state: a refused request is
+not something a retry can fix, and offering one would invite the operator to hammer an
+endpoint that has already refused them. The message is the one the API returned; no
+stack trace, no SQL and no raw row is ever shown.
+
+### 15.5 The permission-aware action
+
+The screen offers the create action only to a session that may write. The question is
+asked of the **shared central matrix** (PLT-06, `packages/core/src/auth/permissions.ts`),
+never of a local copy of the role list. The server remains the authority — the matrix
+only decides whether an action is offered at all.
+
+### 15.6 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/web/tests/employees-list.test.tsx` | UI | the initial load, the search, the filters, the sort, the page reset, the page navigation, the empty result, the API failure and its recovery, the permission-denied state, the permission-aware action, the keyboard and landmark affordances |
+| `apps/erp/modules/erp-5/web/tests/list-screens.test.tsx` | UI | the four remaining screens, their filters, the parent resolution, the aggregate formatting, the read-only projection, the shared states |
+| `apps/erp/modules/erp-5/web/tests/hr-api.test.ts` | unit | the query construction, the session header, the error envelope, the transport failure, the absence of a leak |
+| `apps/erp/modules/erp-5/web/tests/permissions.test.ts` | unit | the role narrowing and the create permission |

@@ -82,6 +82,12 @@ The module owns only the `/erp5` subtree. The `/login` route is owned by the
 platform (Master Architecture Spec §3.1) and the host application registers
 it.
 
+> **Resolution note.** The module imports the shared central role matrix from
+> `@cs/core/auth/permissions.js` — the browser-safe module of `@cs/core`, whose
+> package root pulls in Drizzle and Node built-ins. The root `tsconfig.json`
+> already maps `@cs/core/*`; a host application's bundler needs the same
+> mapping, or `@cs/core` needs an `exports` sub-path for it.
+
 ---
 
 ## 3. The shell
@@ -131,24 +137,75 @@ forbidden view lands with **ERP5-19**.
 
 ---
 
-## 5. Screen ownership
+## 5. The collection screens
 
-This issue registers the routes. The screens themselves are delivered by the
-remaining Role 3 issues:
+**Issue:** [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) —
+`[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
 
-| Issue | Delivers |
+| Screen | Route | Endpoint |
+|---|---|---|
+| Employee list | `/erp5/employees` | `GET /api/v1/erp-hr/employees` |
+| Department list | `/erp5/departments` | `GET /api/v1/erp-hr/departments` |
+| Leave record list | `/erp5/leave` | `GET /api/v1/erp-hr/leave` |
+| Payroll total list | `/erp5/payroll-totals` | `GET /api/v1/erp-hr/payroll-totals` |
+| Identity user list | `/erp5/identity-users` | `GET /api/v1/erp-hr/identity-users` |
+
+### The browser never filters, sorts or pages
+
+The search term, the filters, the sort field and the page are sent to the
+**server**, and the screen renders exactly the page the API answered. A
+search or a filter change resets the page to the first one; the search term
+is published after a 300 ms pause, so a word is one request rather than one
+request per keystroke.
+
+### The four states
+
+| State | What the operator sees |
 |---|---|
-| ERP5-17 | The collection tables |
-| ERP5-18 | Search, filters and sorting |
-| ERP5-19 | Loading, empty, error and access-denied states |
-| ERP5-20 | The create forms |
-| ERP5-21 | The detail views |
-| ERP5-22 | The module metadata for the shared Migration Kit wizard |
-| ERP5-23 | The module context in the shared reject review screen |
+| Loading | a skeleton of the table that is coming (`@cs/ui` `SkeletonTable`) |
+| No data | an empty state, with a "Clear filters" action when a filter is active |
+| API failure | a readable message and a **Try again** action (`@cs/ui` `ErrorState`) |
+| Permission denied | an **access-denied** view — never a retry button |
+
+The permission-denied state is deliberately not an error state: a refused
+request is not something a retry can fix.
+
+### The permission-aware action
+
+The create action is offered only to a session that may write. The question
+is asked of the **shared central matrix** (PLT-06,
+`packages/core/src/auth/permissions.ts`) — never of a local copy of the role
+list. The server remains the authority; the matrix only decides whether an
+action is offered at all.
+
+### The references are resolved by identifier
+
+The API returns `department_id` and `employee_id`, never a name. The module
+reads the bounded department collection (at most 100 rows — the API's own
+maximum) to resolve a department to its name; a department outside that page
+is shown as a short identifier, never as an invented name. The leave screen
+resolves no employee at all — the employee collection is not bounded — so it
+links to the employee record and carries the identifier.
 
 ---
 
-## 6. Tests
+## 6. Screen ownership
+
+| Issue | Delivers |
+|---|---|
+| ERP5-16 | The route table, the navigation, the shell, the guard — **delivered** |
+| ERP5-04 | The collection screens, the API client, the four states — **delivered** |
+| ERP5-17 | The collection tables — **delivered** as part of ERP5-04 |
+| ERP5-18 | The faceted filter sidebar, the active filter pills, the URL query state — *not yet* |
+| ERP5-19 | The shared loading, empty, error and 403 states — **delivered** as part of ERP5-04 |
+| ERP5-20 | The create forms — *not yet* |
+| ERP5-21 | The detail views — *not yet* |
+| ERP5-22 | The module metadata for the shared Migration Kit wizard — *not yet* |
+| ERP5-23 | The module context in the shared reject review screen — *not yet* |
+
+---
+
+## 7. Tests
 
 ```bash
 npx vitest run apps/erp/modules/erp-5/web
@@ -158,9 +215,14 @@ npx vitest run apps/erp/modules/erp-5/web
 |---|---|
 | `route-manifest.test.ts` | The route table, matching, the navigation state, the breadcrumbs, the browser title |
 | `session.test.ts` | Token storage, claim decoding, session resolution and expiry |
+| `permissions.test.ts` | The role narrowing and the create permission of the shared matrix |
+| `hr-api.test.ts` | The query construction, the session header, the error envelope, the transport failure, the absence of a leak |
+| `format.test.ts` | The amount, identifier and absent-value formatting |
 | `public-facade.test.ts` | The exported surface a host application depends on |
 | `routes.test.tsx` | Every route resolves inside the shell, in a real DOM |
 | `module-shell.test.tsx` | Landmarks, keyboard navigation, the active state, the title, the guard |
+| `employees-list.test.tsx` | The initial load, the search, the filters, the sort, the page reset, the page navigation, the empty result, the API failure and its recovery, the permission-denied state, the permission-aware action, the keyboard and landmark affordances |
+| `list-screens.test.tsx` | The four remaining screens, their filters, the parent resolution, the aggregate formatting, the read-only projection, the shared states |
 
 The two `.tsx` suites run in a jsdom environment. Vitest's jsdom environment
 combines jsdom's `AbortController` with Node's `Request`, which undici refuses

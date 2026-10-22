@@ -13,9 +13,12 @@ import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-rout
 import { installNavigationRequestShim } from './support/jsdom-environment.js';
 import { erp5Routes } from '../src/routes.js';
 import { ERP5_ROUTE_DESCRIPTORS } from '../src/route-manifest.js';
+import { installHrApiMock, type HrApiMock } from './support/api-mock.js';
 import { clearStoredAccessToken, storeAccessToken, validAccessToken } from './support/session.js';
 
 installNavigationRequestShim();
+
+let api: HrApiMock;
 
 interface FlatRoute {
   readonly id?: string | undefined;
@@ -44,11 +47,13 @@ describe('ERP-5 module route registration', () => {
   beforeEach(() => {
     clearStoredAccessToken();
     storeAccessToken(validAccessToken());
+    api = installHrApiMock({ pending: true });
   });
 
   afterEach(() => {
     cleanup();
     clearStoredAccessToken();
+    api.restore();
   });
 
   describe('1. The route table', () => {

@@ -110,6 +110,28 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Identity projection | the read-only Hub Identity projection; empty when the platform has not created it; no credential column; never written by the module |
 | Authorization | the shared `module.read` capability — Viewer, Editor, Analyst and Admin |
 
+## Collection Screens (ERP5-04)
+
+**Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) —
+`[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192
+**Canonical detail**:
+[`apps/erp/modules/erp-5/docs/data-dictionary.md`](../../apps/erp/modules/erp-5/docs/data-dictionary.md)
+§15
+
+| Aspect | Rule |
+|---|---|
+| Screens | the employee, department, leave, payroll-total and identity-user collections — each reads its own endpoint of the same API base |
+| Columns | every column is a field the contract already returns; the screen adds no field and invents no value |
+| Salary | the employee screen shows `salary_display` only — the raw `salary` is absent from the public projection, so the browser cannot render it |
+| References | the API returns `department_id` / `employee_id`, never a name. The department is resolved through the bounded department collection (at most 100 rows); a department outside that page is shown as a short identifier, never as an invented name |
+| Server-side | the search, the filters, the sort and the page are sent to the API; the browser never narrows, orders or pages a collection |
+| Page reset | a search or a filter change resets the page to the first one; the search term is published after a 300 ms pause |
+| States | loading (a skeleton), no data (an empty state), API failure (a readable message and a retry), permission denied (an access-denied view, never a retry) |
+| Permission-aware actions | the create action is offered only to a session that may write — the question is asked of the shared central matrix of PLT-06, never of a local copy of the role list |
+| Authorization | the server remains the authority; the client matrix only decides whether an action is offered at all |
+
 ## Open Decision Records (V1)
 
 | ID | Decision | Status |
@@ -136,4 +158,5 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Live PostgreSQL constraint proofs | `DATABASE_URL_TEST=postgresql://user:pass@localhost:5432/postgres npx vitest run apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` |
 | Mutation API (service + API level) | `npx vitest run apps/erp/modules/erp-5/tests` |
 | Relationships, state transitions and read model | `npx vitest run apps/erp/modules/erp-5/tests/domain apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` |
+| Collection screens (API client, list screens, states) | `npx vitest run apps/erp/modules/erp-5/web` |
 | Migration apply / re-apply | `npm run db:migrate` twice against an empty database |

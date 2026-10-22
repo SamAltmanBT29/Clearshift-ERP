@@ -16,6 +16,7 @@ import { installNavigationRequestShim } from './support/jsdom-environment.js';
 import { erp5Routes } from '../src/routes.js';
 import { ERP5_MAIN_REGION_ID } from '../src/components/ModuleShell.js';
 import { ModuleNav } from '../src/components/ModuleNav.js';
+import { installHrApiMock, type HrApiMock } from './support/api-mock.js';
 import {
   clearStoredAccessToken,
   expiredAccessToken,
@@ -24,6 +25,8 @@ import {
 } from './support/session.js';
 
 installNavigationRequestShim();
+
+let api: HrApiMock;
 
 /** The Hub login screen is owned by the platform, not by this module. */
 const hubLoginRoute: RouteObject = {
@@ -43,11 +46,13 @@ describe('ERP-5 module shell', () => {
   beforeEach(() => {
     clearStoredAccessToken();
     storeAccessToken(validAccessToken());
+    api = installHrApiMock({ pending: true });
   });
 
   afterEach(() => {
     cleanup();
     clearStoredAccessToken();
+    api.restore();
   });
 
   describe('1. Accessibility landmarks', () => {
