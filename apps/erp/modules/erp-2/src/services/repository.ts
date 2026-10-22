@@ -123,7 +123,7 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
   private seedFixtures(): void {
     const v1Id = '00000000-0000-0000-0000-000000000001';
-    const now = new Date().toISOString();
+    const now = '2026-03-01T00:00:00.000Z';
     this.vendors.set(v1Id, {
       id: v1Id,
       name: 'Acme Industrial Supplies',
@@ -147,10 +147,10 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
     if (query.search) {
       const s = query.search.toLowerCase();
-      items = items.filter((v) => v.name.toLowerCase().includes(s));
+      items = items.filter((v) => v.name.toLowerCase().includes(s) || v.tax_number.toLowerCase().includes(s));
     }
 
-    items.sort((a, b) => a.name.localeCompare(b.name));
+    items.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     const total = items.length;
 
     const page = query.page;
@@ -221,7 +221,7 @@ export class InMemoryErp2Repository implements Erp2Repository {
       items = items.filter((po) => po.status === query.status);
     }
 
-    items.sort((a, b) => b.order_date.localeCompare(a.order_date));
+    items.sort((a, b) => b.order_date.localeCompare(a.order_date) || a.id.localeCompare(b.id));
     const total = items.length;
 
     const page = query.page;
