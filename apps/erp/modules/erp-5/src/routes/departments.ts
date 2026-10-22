@@ -10,7 +10,6 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { Capabilities, requireCapability } from '@cs/rbac';
 import {
   CreateHrDepartmentRequestSchema,
   HrDepartmentListQuerySchema,
@@ -18,7 +17,11 @@ import {
   UpdateHrDepartmentRequestSchema,
 } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
-import { hrWriteGuard } from './guard.js';
+import {
+  departmentCreateGuard,
+  departmentReadGuard,
+  departmentUpdateGuard,
+} from './guard.js';
 import { parseWriteBody } from './parsing.js';
 import type { HrRouteOptions } from './types.js';
 
@@ -28,7 +31,7 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   // GET /departments - List departments
   fastify.get(
     '/departments',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: departmentReadGuard },
     async (request, reply) => {
       const query = HrDepartmentListQuerySchema.parse(request.query);
       const response = await hrService.listDepartments(query);
@@ -40,7 +43,7 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   // GET /departments/:id - Read a single department
   fastify.get(
     '/departments/:id',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: departmentReadGuard },
     async (request, reply) => {
       const params = HrIdParamSchema.parse(request.params);
       const department = await hrService.getDepartmentById(params.id);
@@ -50,7 +53,7 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   );
 
   // POST /departments - Create a department
-  fastify.post('/departments', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.post('/departments', { preHandler: departmentCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrDepartmentRequestSchema, request);
     const result = await hrService.createDepartment(body);
 
@@ -62,7 +65,7 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   });
 
   // PATCH /departments/:id - Edit a department
-  fastify.patch('/departments/:id', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.patch('/departments/:id', { preHandler: departmentUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrDepartmentRequestSchema.parse(request.body ?? {});
     const department = await hrService.updateDepartment(params.id, body);

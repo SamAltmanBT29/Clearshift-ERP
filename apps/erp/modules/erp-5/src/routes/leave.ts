@@ -13,7 +13,6 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { Capabilities, requireCapability } from '@cs/rbac';
 import {
   CreateHrLeaveRequestSchema,
   HrIdParamSchema,
@@ -21,7 +20,7 @@ import {
   UpdateHrLeaveRequestSchema,
 } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
-import { hrWriteGuard } from './guard.js';
+import { leaveCreateGuard, leaveReadGuard, leaveUpdateGuard } from './guard.js';
 import { parseWriteBody } from './parsing.js';
 import type { HrRouteOptions } from './types.js';
 
@@ -31,7 +30,7 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   // GET /leave - List leave records
   fastify.get(
     '/leave',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: leaveReadGuard },
     async (request, reply) => {
       const query = HrLeaveListQuerySchema.parse(request.query);
       const response = await hrService.listLeave(query);
@@ -43,7 +42,7 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   // GET /leave/:id - Read a single leave record
   fastify.get(
     '/leave/:id',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: leaveReadGuard },
     async (request, reply) => {
       const params = HrIdParamSchema.parse(request.params);
       const record = await hrService.getLeaveById(params.id);
@@ -53,7 +52,7 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   );
 
   // POST /leave - Create a leave record
-  fastify.post('/leave', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.post('/leave', { preHandler: leaveCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrLeaveRequestSchema, request);
     const result = await hrService.createLeave(body);
 
@@ -65,7 +64,7 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   });
 
   // PATCH /leave/{id} - Edit a leave record / apply the state transition
-  fastify.patch('/leave/:id', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.patch('/leave/:id', { preHandler: leaveUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrLeaveRequestSchema.parse(request.body ?? {});
     const record = await hrService.updateLeave(params.id, body);

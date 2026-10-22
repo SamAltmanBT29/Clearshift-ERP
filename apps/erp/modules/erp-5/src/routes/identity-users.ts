@@ -16,9 +16,9 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { Capabilities, requireCapability } from '@cs/rbac';
 import { HrIdentityUserListQuerySchema } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
+import { identityUsersReadGuard } from './guard.js';
 import type { HrRouteOptions } from './types.js';
 
 export const identityUsersRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
@@ -27,7 +27,7 @@ export const identityUsersRoutes: FastifyPluginAsync<HrRouteOptions> = async (fa
   // GET /identity-users - List the read-only Hub Identity projection
   fastify.get(
     '/identity-users',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: identityUsersReadGuard },
     async (request, reply) => {
       const query = HrIdentityUserListQuerySchema.parse(request.query);
       const response = await hrService.listIdentityUsers(query);

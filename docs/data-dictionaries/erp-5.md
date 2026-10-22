@@ -16,6 +16,7 @@ For the canonical, detailed version see:
 | **Mutation API Issue** | #48 — `[ERP5-03] Mutation API and domain validation` |
 | **Relationship Issue** | #51 — `[ERP5-06] Relationships, state transitions and read-model consistency` |
 | **Read API Issue** | #47 — `[ERP5-02] List/read API with bounded paging and OpenAPI contract` |
+| **Authorization Issue** | #191 — `[ERP5-15] Module authorization policy integration` |
 | **PostgreSQL Schema** | `erp5` |
 | **API Base** | `/api/v1/erp-hr` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-5.yaml` |
@@ -24,7 +25,7 @@ For the canonical, detailed version see:
 | **Migration** | `packages/database/migrations/erp5_v1.sql` |
 | **Tables** | `erp5.departments`, `erp5.employees`, `erp5.leave`, `erp5.payroll_totals`, `erp5.import_receipts` |
 | **View** | `erp5.identity_users` — read-only Hub Identity projection (owner: Platform / Hub Identity) |
-| **Version** | V1.3 |
+| **Version** | V1.4 |
 | **SDS Reference** | ClearShift ERP v2.0 §4.6 (FR-ERP5-01..06, BR-ERP5-01..02), §4.7 (ERP-5 tables) |
 
 ## Table Index
@@ -110,6 +111,26 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Identity projection | the read-only Hub Identity projection; empty when the platform has not created it; no credential column; never written by the module |
 | Authorization | the shared `module.read` capability — Viewer, Editor, Analyst and Admin |
 
+## Authorization Policy (ERP5-15)
+
+The module owns **no** role list: every route is bound to a declared policy whose role sets mirror the central matrix of PLT-06 (**default deny**).
+
+| Policy | Roles | Central policy |
+|---|---|---|
+| `hr.employees.read` · `hr.departments.read` · `hr.leave.read` · `hr.payroll.read` · `hr.identity_users.read` | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.employees.create` / `.update` · `hr.departments.create` / `.update` · `hr.leave.create` / `.update` | Editor, Admin | `hr.mutate` |
+| `hr.payroll.load` | **Migration Runner**, Admin | `hr.payroll_bulk` |
+
+| Aspect | Rule |
+|---|---|
+| Authentication | a real access token is verified with the shared Hub verifier (PLT-05) — signature, issuer, audience, expiry; a disabled account is refused. The role set always comes from the verified claims. |
+| Unauthenticated | `401 UNAUTHORIZED` |
+| Insufficient role | `403 FORBIDDEN` — refused **before** the record is loaded, so a forbidden write reveals nothing |
+| Object level | the policy is bound to an entity kind and the identifier is resolved in the table that belongs to the route: a cross-module identifier is `404` and nothing is mutated (DR-14) |
+| Cross-module | the Migration Runner may load a payroll aggregate and nothing else; it never writes into the `erp5` tables directly (Decision C7) |
+| Fields | the raw `salary` never leaves the module; a credential in a payload is `400 HR_CREDENTIALS_FORBIDDEN`; the identity projection carries no credential field and is read-only |
+| Full note | `apps/erp/modules/erp-5/docs/security.md` |
+
 ## Open Decision Records (V1)
 
 | ID | Decision | Status |
@@ -127,6 +148,8 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | DR-11 | The department/month payroll aggregate is authoritative as loaded and is never recomputed from the employee rows; only the display values are derived | Open — escalated |
 | DR-12 | The cross-module resolver denies every existence check when it has no data source (default deny) instead of confirming every id | Accepted for V1 — maintainer confirmation requested |
 | DR-13 | The ERP-5 list response keeps its published `{data, meta}` shape; harmonising it with the ERP-4 and PLT-04 envelopes is a platform-wide change | Open — escalated to PLT-04 / PLT-14 |
+| DR-14 | The object-level guard enforces **module ownership**, not tenancy — the `erp5` schema has no tenant or owner column, so a multi-tenant dimension is a schema item, not an authorization one | Open — escalated |
+| DR-15 | The Kit's write identity for the master records (closes DR-9): the payroll load follows `hr.payroll_bulk`; the master-record loads keep `hr.mutate` — a Kit service identity or an `hr.employee_bulk` policy is a platform decision | Open — escalated to PLT-06 |
 
 ## Verification
 

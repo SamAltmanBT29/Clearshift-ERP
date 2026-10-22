@@ -12,14 +12,13 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { Capabilities, requireCapability } from '@cs/rbac';
 import {
   CreateHrPayrollTotalRequestSchema,
   HrIdParamSchema,
   HrPayrollTotalListQuerySchema,
 } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
-import { hrPayrollWriteGuard } from './guard.js';
+import { payrollLoadGuard, payrollReadGuard } from './guard.js';
 import { parseWriteBody } from './parsing.js';
 import type { HrRouteOptions } from './types.js';
 
@@ -29,7 +28,7 @@ export const payrollTotalsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fa
   // GET /payroll-totals - List department/month aggregates
   fastify.get(
     '/payroll-totals',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: payrollReadGuard },
     async (request, reply) => {
       const query = HrPayrollTotalListQuerySchema.parse(request.query);
       const response = await hrService.listPayrollTotals(query);
@@ -41,7 +40,7 @@ export const payrollTotalsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fa
   // GET /payroll-totals/:id - Read a single aggregate
   fastify.get(
     '/payroll-totals/:id',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: payrollReadGuard },
     async (request, reply) => {
       const params = HrIdParamSchema.parse(request.params);
       const total = await hrService.getPayrollTotalById(params.id);
@@ -51,7 +50,7 @@ export const payrollTotalsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fa
   );
 
   // POST /payroll-totals - Load one department/month aggregate
-  fastify.post('/payroll-totals', { preHandler: hrPayrollWriteGuard }, async (request, reply) => {
+  fastify.post('/payroll-totals', { preHandler: payrollLoadGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrPayrollTotalRequestSchema, request);
     const result = await hrService.createPayrollTotal(body);
 
