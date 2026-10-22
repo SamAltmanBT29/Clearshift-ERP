@@ -9,7 +9,7 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #22: ERP2-07 (Migration Kit Adapter and Durable Import Receipts) |
+| **Issues** | #22: ERP2-07 (Migration Kit Adapter and Durable Import Receipts)<br>#18: ERP2-03 (Mutation API and Domain Validation) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -141,3 +141,112 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
    - Identical 3x replays produce 1 business row and 1 receipt (HTTP 200/201).
    - Key reuse with mismatched payload returns HTTP 409 Conflict with zero database mutation.
    - Unexpected infrastructure failure (HTTP 503) rolls back the transaction and is not recorded as a rejected business record.
+
+---
+
+## 7. Synthetic Demo & Mutation Runbook
+
+The following synthetic scenarios demonstrate the mutation APIs and business invariants of ERP-2:
+
+### Step 1: Create a Vendor with Server-Side Bank Masking
+```bash
+curl -X POST http://localhost:3000/api/v1/erp-vendors/vendors \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer role:editor" \
+  -d '{
+    "name": "Apex Industrial Supplies",
+    "tax_number": "TX-APEX-001",
+    "email": "procurement@apex-supplies.com",
+    "phone": "+1-555-0188",
+    "address_line": "500 Logistics Parkway",
+    "city": "Chicago",
+    "country": "USA",
+    "bank_details": "98765432101234",
+    "currency": "USD"
+  }'
+```
+**Response (201 Created)**:
+```json
+{
+  "id": "e4a7c88b-1111-42e9-9a88-bbbbbbbbbbbb",
+  "name": "Apex Industrial Supplies",
+  "tax_number": "TX-APEX-001",
+  "email": "procurement@apex-supplies.com",
+  "bank_masked": "XXXX-XXXX-1234",
+  "currency": "USD",
+  "created_at": "2026-10-23T01:00:00.000Z",
+  "updated_at": "2026-10-23T01:00:00.000Z"
+}
+```
+
+### Step 2: Create a Purchase Order with Lines & Server-Side Totals
+```bash
+curl -X POST http://localhost:3000/api/v1/erp-vendors/purchase-orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer role:editor" \
+  -d '{
+    "vendor_id": "00000000-0000-0000-0000-000000000001",
+    "order_date": "2026-10-25",
+    "currency": "USD",
+    "lines": [
+      {
+        "product_id": "11111111-1111-1111-1111-111111111111",
+        "quantity": "10.00",
+        "price": "15.50"
+      },
+      {
+        "product_id": "22222222-2222-2222-2222-222222222222",
+        "quantity": "3.00",
+        "price": "20.25"
+      }
+    ],
+    "total": "9999.99"
+  }'
+```
+**Response (201 Created)**: (Note: client-submitted `total: 9999.99` is ignored; server calculates `155.00 + 60.75 = 215.75`):
+```json
+{
+  "id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
+  "po_number": "PO-1761180000-A1B2",
+  "vendor_id": "00000000-0000-0000-0000-000000000001",
+  "order_date": "2026-10-25",
+  "status": "Draft",
+  "currency": "USD",
+  "total": "215.75",
+  "lines": [
+    {
+      "id": "line-001",
+      "po_id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
+      "product_id": "11111111-1111-1111-1111-111111111111",
+      "quantity": "10.00",
+      "price": "15.50",
+      "line_total": "155.00"
+    },
+    {
+      "id": "line-002",
+      "po_id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
+      "product_id": "22222222-2222-2222-2222-222222222222",
+      "quantity": "3.00",
+      "price": "20.25",
+      "line_total": "60.75"
+    }
+  ]
+}
+```
+
+### Step 3: Progress Status (Draft -> Sent)
+```bash
+curl -X PATCH http://localhost:3000/api/v1/erp-vendors/purchase-orders/c1f7a2d4-3333-4bb9-8cc4-dddddddddddd \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer role:editor" \
+  -d '{ "status": "Sent" }'
+```
+**Response (200 OK)**:
+```json
+{
+  "id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
+  "status": "Sent",
+  "total": "215.75"
+}
+```
+
