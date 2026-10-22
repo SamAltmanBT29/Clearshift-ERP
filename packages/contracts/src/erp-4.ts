@@ -106,7 +106,17 @@ export const IdParamSchema = z.object({
 });
 export type IdParam = z.infer<typeof IdParamSchema>;
 
-// Generic pagination query is now centralized in common.ts (PLT-04)
+/** Generic pagination query parameters with hard cap of 100. */
+export const PaginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1, 'page must be greater than or equal to 1').default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .min(1, 'pageSize must be greater than or equal to 1')
+    .max(100, 'pageSize cannot exceed 100')
+    .default(20),
+});
+export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
 
 /** GET /api/v1/erp-finance/accounts — query params. */
 export const AccountListQuerySchema = z.object({

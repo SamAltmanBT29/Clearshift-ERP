@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  PaginationQuerySchema,
+  StandardPaginationQuerySchema as PaginationQuerySchema,
   createPaginatedResponseSchema,
   ErrorEnvelopeSchema,
 } from './common.js';

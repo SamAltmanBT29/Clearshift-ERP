@@ -159,16 +159,6 @@ export const StandardPaginationQuerySchema = BasePaginationQuerySchema.extend({
 export type StandardPaginationQuery = z.infer<typeof StandardPaginationQuerySchema>;
 
 /**
- * Backwards-compatible alias for PaginationQuerySchema.
- */
-export const PaginationQuerySchema = StandardPaginationQuerySchema.extend({
-  search: z.string().trim().optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('asc').optional(),
-});
-export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
-
-/**
  * Cursor Pagination Query Schema for large audit logs and streams
  */
 export const CursorPaginationQuerySchema = z.object({
