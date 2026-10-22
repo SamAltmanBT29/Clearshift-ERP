@@ -192,6 +192,37 @@ paths:
         - BearerAuth: []
 
   /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [Employees]
+      summary: Read an employee
+      description: |
+        Returns one employee as the **masked** projection — the raw `salary`
+        column never leaves the module (BR-ERP5-02).
+
+        Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeView"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
     patch:
       operationId: updateEmployee
       tags: [Employees]
@@ -278,6 +309,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -337,6 +370,34 @@ paths:
         - BearerAuth: []
 
   /departments/{id}:
+    get:
+      operationId: getDepartment
+      tags: [Departments]
+      summary: Read a department
+      description: |
+        Returns one department. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
     patch:
       operationId: updateDepartment
       tags: [Departments]
@@ -415,6 +476,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -477,6 +540,89 @@ paths:
       security:
         - BearerAuth: []
 
+  /leave/{id}:
+    get:
+      operationId: getLeave
+      tags: [Leave]
+      summary: Read a leave record
+      description: |
+        Returns one leave record. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leave"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    patch:
+      operationId: updateLeave
+      tags: [Leave]
+      summary: Edit a leave record and apply the V1 state transition
+      description: |
+        Updates a leave record.
+
+        **State transition.** `status` follows the V1 leave state matrix:
+        `pending → approved | rejected` is the only transition, and `approved`
+        and `rejected` are terminal — a decision is not reversed and a leave
+        is never un-decided. Setting the same status again is a no-op. A
+        forbidden transition is answered with
+        `422 HR_INVALID_LEAVE_STATUS_TRANSITION` and the allowed set in the
+        message. The full request → approve/reject workflow with a log
+        (FR-ERP5-10) is a V2 capability and is not exposed here.
+
+        **Immutable subject.** The employee the leave belongs to is never
+        re-parented — a leave is a fact about one employee.
+
+        `date_from`, `date_to` and `type` stay editable and are re-validated
+        (date range and enumeration).
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaveRequest"
+      responses:
+        "200":
+          description: Leave record updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
   # ── Identity (read-only projection) ───────────────────────────────────────
   /identity-users:
     get:
@@ -488,9 +634,20 @@ paths:
         does not store credentials and does not grant application roles; the
         projection exposes identity attributes only — no password, hash, token
         or refresh-token field is ever returned.
+
+        The list is **empty** when the platform has not created the projection
+        yet (it exists only together with `platform.hub_users`).
+
+        Requires the shared `module.read` capability.
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Server-side case-insensitive search across the username
       responses:
         "200":
           description: Successful response
@@ -502,6 +659,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -516,7 +675,11 @@ paths:
       description: |
         Returns one aggregate per department and month. The payload contains
         department totals only — never employee-level rows (FR-ERP5-06).
+
+        Requires the shared `module.read` capability.
       parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
         - name: month
           in: query
           schema:
@@ -540,6 +703,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -597,6 +762,36 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /payroll-totals/{id}:
+    get:
+      operationId: getPayrollTotal
+      tags: [Payroll]
+      summary: Read a department/month payroll aggregate
+      description: |
+        Returns one department/month aggregate. Requires the shared
+        `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotal"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -1162,6 +1357,51 @@ components:
         idempotency_key:
           $ref: "#/components/schemas/IdempotencyKeyValue"
 
+    UpdateLeaveRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: |
+        The state transition and the editable content of a leave record. The
+        employee the leave belongs to is immutable.
+      properties:
+        status:
+          $ref: "#/components/schemas/LeaveStatus"
+          description: |
+            The V1 leave state matrix — `pending → approved | rejected` is the
+            only transition; `approved` and `rejected` are terminal. The same
+            status again is a no-op.
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+          description: Must not precede date_from
+        type:
+          $ref: "#/components/schemas/LeaveType"
+
+    RelationshipWarning:
+      type: object
+      description: |
+        An **absent optional relationship**. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["DEPARTMENT_PARENT"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["parent_id"]
+        code:
+          type: string
+          enum: [HR_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
+
     IdentityUser:
       type: object
       description: |
@@ -1264,6 +1504,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     EmployeeMutationResponse:
       description: |
@@ -1276,6 +1521,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     LeaveMutationResponse:
       description: |
@@ -1287,6 +1537,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     PayrollTotalMutationResponse:
       description: |
@@ -1298,6 +1553,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     EmployeeListResponse:
       type: object
