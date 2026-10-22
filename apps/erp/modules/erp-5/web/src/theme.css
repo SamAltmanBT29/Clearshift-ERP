@@ -1,0 +1,241 @@
+/**
+ * ERP-5 HR & Employees — Module Shell Theme
+ *
+ * Layout rules for the module shell only. Every colour, radius and spacing
+ * value comes from the shared design tokens of `@cs/ui` (PLT-08) — this file
+ * adds no token of its own, so the module can never drift from the platform
+ * palette. The token sheet is imported, not copied.
+ */
+
+@import '../../../../../../packages/ui/src/tokens/tokens.css';
+
+.cs-erp5-shell {
+  background-color: var(--cs-bg);
+  color: var(--cs-text);
+  font-family: var(--cs-font-sans);
+  min-height: 100%;
+  padding: var(--cs-s-6);
+}
+
+.cs-erp5-skip-link {
+  position: absolute;
+  left: var(--cs-s-4);
+  top: var(--cs-s-4);
+  z-index: 10;
+  transform: translateY(-200%);
+  padding: var(--cs-s-2) var(--cs-s-4);
+  border-radius: var(--cs-r-md);
+  border: 1px solid var(--cs-accent);
+  background-color: var(--cs-bg);
+  color: var(--cs-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 120ms ease-in-out;
+}
+
+.cs-erp5-skip-link:focus {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: var(--cs-focus-ring, 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent));
+}
+
+.cs-erp5-banner {
+  border-bottom: 1px solid var(--cs-border);
+  padding-bottom: var(--cs-s-4);
+  margin-bottom: var(--cs-s-6);
+}
+
+.cs-erp5-eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-module-title {
+  margin: var(--cs-s-1) 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cs-text);
+}
+
+.cs-erp5-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--cs-s-8);
+  align-items: start;
+}
+
+.cs-erp5-nav {
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-r-lg);
+  background-color: var(--cs-surface);
+  padding: var(--cs-s-4);
+}
+
+.cs-erp5-nav-group + .cs-erp5-nav-group {
+  margin-top: var(--cs-s-5);
+}
+
+.cs-erp5-nav-group-title {
+  margin: 0 0 var(--cs-s-2);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-s-1);
+}
+
+.cs-erp5-nav-link {
+  display: block;
+  padding: var(--cs-s-2) var(--cs-s-3);
+  border-radius: var(--cs-r-md);
+  border: 1px solid transparent;
+  color: var(--cs-text);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.cs-erp5-nav-link:hover {
+  background-color: var(--cs-bg);
+  color: var(--cs-accent);
+}
+
+.cs-erp5-nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+.cs-erp5-nav-link.is-active {
+  background-color: var(--cs-bg);
+  border-color: var(--cs-accent);
+  color: var(--cs-accent);
+  font-weight: 600;
+}
+
+.cs-erp5-content {
+  min-width: 0;
+}
+
+.cs-erp5-breadcrumb {
+  margin-bottom: var(--cs-s-4);
+}
+
+.cs-erp5-main {
+  outline: none;
+}
+
+.cs-erp5-placeholder {
+  border: 1px dashed var(--cs-border);
+  border-radius: var(--cs-r-lg);
+  background-color: var(--cs-surface);
+  padding: var(--cs-s-6);
+}
+
+.cs-erp5-placeholder-text {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-link {
+  color: var(--cs-accent);
+  font-weight: 600;
+}
+
+.cs-erp5-link:focus-visible {
+  outline: none;
+  border-radius: var(--cs-r-sm);
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+/* The shared page header renders its own heading and breadcrumb spacing. */
+.cs-page-title {
+  margin-bottom: var(--cs-s-6);
+}
+
+.cs-page-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cs-text);
+}
+
+.cs-page-title p {
+  margin: var(--cs-s-1) 0 0;
+  font-size: 0.875rem;
+  color: var(--cs-text-muted);
+}
+
+.cs-breadcrumb ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cs-s-2);
+  font-size: 0.8125rem;
+  color: var(--cs-text-muted);
+}
+
+.cs-breadcrumb a {
+  color: var(--cs-accent);
+  text-decoration: none;
+}
+
+.cs-breadcrumb a:focus-visible {
+  outline: none;
+  border-radius: var(--cs-r-sm);
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+.cs-alert {
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-r-md);
+  background-color: var(--cs-surface);
+  padding: var(--cs-s-4);
+  font-size: 0.875rem;
+}
+
+.cs-alert p {
+  margin: 0 0 var(--cs-s-2);
+}
+
+.cs-alert p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1023px) {
+  .cs-erp5-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cs-s-6);
+  }
+
+  .cs-erp5-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cs-s-6);
+  }
+
+  .cs-erp5-nav-group + .cs-erp5-nav-group {
+    margin-top: 0;
+  }
+}

@@ -24,14 +24,19 @@
     "security:scan": "node --experimental-strip-types infra/security/scan-secrets.ts"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.0.0",
     "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-v8": "^2.1.9",
     "cross-env": "^7.0.3",
     "eslint": "^9.0.0",
+    "jsdom": "^29.1.1",
     "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9",
     "zod": "^4.6.7"
