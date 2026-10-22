@@ -1,67 +1,26 @@
 openapi: 3.1.0
 info:
-  title: ClearShift Shared API Contracts
+  title: ClearShift Shared API Contract & Error Envelope
   version: 1.0.0
-  description: Canonical error envelope, bounded pagination, and event envelope schemas across ClearShift modules.
-components:
-  parameters:
-    Page:
-      name: page
-      in: query
-      required: false
-      description: 1-indexed page number
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-    PageSize:
-      name: pageSize
-      in: query
-      required: false
-      description: Number of items per page (maximum 100)
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 25
-    Search:
-      name: search
-      in: query
-      required: false
-      description: Search text query
-      schema:
-        type: string
-    SortBy:
-      name: sortBy
-      in: query
-      required: false
-      description: Field name to sort by
-      schema:
-        type: string
-    SortOrder:
-      name: sortOrder
-      in: query
-      required: false
-      description: Sort direction
-      schema:
-        type: string
-        enum: [asc, desc]
-        default: asc
-    Cursor:
-      name: cursor
-      in: query
-      required: false
-      description: Cursor for keyset/log pagination
-      schema:
-        type: string
-    CorrelationIdHeader:
-      name: x-correlation-id
-      in: header
-      required: false
-      description: Request correlation identifier
-      schema:
-        type: string
+  description: Canonical OpenAPI components for shared errors, bounded pagination, event envelopes, and health checks (PLT-04).
 
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns service status, module identity, and dependency readiness.
+      operationId: getCommonHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
   schemas:
     ErrorDetail:
       type: object
@@ -70,13 +29,16 @@ components:
       properties:
         field:
           type: string
-          description: Field or parameter that failed validation
+          description: Specific payload field path causing the error
+          example: pageSize
         message:
           type: string
-          description: Human-readable error description
+          description: Human-readable error detail
+          example: pageSize cannot exceed 100
         code:
           type: string
-          description: Machine-readable specific error code
+          description: Machine-readable detail code
+          example: VALUE_OUT_OF_RANGE
 
     ErrorEnvelope:
       type: object
@@ -86,32 +48,68 @@ components:
       properties:
         code:
           type: string
-          description: Stable high-level error code (e.g., BAD_REQUEST, NOT_FOUND)
+          description: Stable machine-readable error code
+          example: BAD_REQUEST
         message:
           type: string
-          description: Safe human-readable summary of the error
+          description: Safe human-readable summary of the failure
+          example: Invalid query parameter values
         details:
-          description: Optional list of field-level errors or diagnostic details
+          description: Structured field-level validation errors or context dictionary
           oneOf:
             - type: array
               items:
                 $ref: '#/components/schemas/ErrorDetail'
             - type: object
+              additionalProperties: true
         correlation_id:
           type: string
-          description: Correlation ID for tracing across services
-        correlationId:
-          type: string
-          description: CamelCase alias for correlation_id
+          description: Unique request/event correlation identifier
+          example: 123e4567-e89b-12d3-a456-426614174000
 
-    PaginationMeta:
+    BasePaginationQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+          description: 1-based page number
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: Number of items per page (strictly capped at 100)
+
+    CursorPaginationQuery:
+      type: object
+      properties:
+        cursor:
+          type: string
+          description: Opaque cursor for stream or log continuation
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+          description: Number of items per page (strictly capped at 100)
+        direction:
+          type: string
+          enum: [forward, backward]
+          default: forward
+
+    PaginatedResponse:
       type: object
       required:
+        - items
         - page
         - pageSize
         - total
-        - totalPages
       properties:
+        items:
+          type: array
+          items: {}
         page:
           type: integer
           minimum: 1
@@ -125,101 +123,198 @@ components:
         totalPages:
           type: integer
           minimum: 0
-        hasNextPage:
+
+    CursorPaginatedResponse:
+      type: object
+      required:
+        - items
+        - hasMore
+      properties:
+        items:
+          type: array
+          items: {}
+        nextCursor:
+          type: string
+          nullable: true
+        prevCursor:
+          type: string
+          nullable: true
+        hasMore:
           type: boolean
-        hasPrevPage:
-          type: boolean
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - module
+        - version
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+          example: ok
+        module:
+          type: string
+          example: platform-kernel
+        version:
+          type: string
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+        dependencies:
+          type: object
+          additionalProperties:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [ok, degraded, down]
+              latencyMs:
+                type: number
+              message:
+                type: string
 
     EventEnvelope:
       type: object
       required:
-        - id
-        - eventType
-        - aggregateType
-        - aggregateId
-        - timestamp
-        - version
+        - event_id
+        - event_type
+        - schema_version
+        - occurred_at
+        - correlation_id
         - producer
+        - entity_type
+        - entity_id
         - payload
       properties:
-        id:
+        event_id:
           type: string
           format: uuid
-        eventType:
+          description: Unique UUID for deduplication and idempotent processing
+          example: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+        event_type:
           type: string
-        aggregateType:
+          description: Domain event name
+          example: erp.journal_entry.posted
+        schema_version:
           type: string
-        aggregateId:
-          type: string
-        timestamp:
+          example: 1.0.0
+        occurred_at:
           type: string
           format: date-time
-        version:
-          type: integer
-          minimum: 1
-          default: 1
-        correlationId:
+          example: '2026-10-22T10:00:00.000Z'
+        correlation_id:
           type: string
-        causationId:
-          type: string
+          example: req-cor-12345
         producer:
           type: string
-          default: clearshift
+          example: erp-4
+        entity_type:
+          type: string
+          example: journal_entry
+        entity_id:
+          type: string
+          example: 00000000-0000-4000-8000-000000000001
         payload:
           type: object
+          description: Event body
+        metadata:
+          type: object
+          additionalProperties: true
 
   responses:
     BadRequest:
-      description: 400 Invalid request payload or parameter
+      description: Invalid request payload, malformed query, or schema violation (400)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
-    Unauthenticated:
-      description: 401 Missing, expired, or invalid authorization token
+          example:
+            code: BAD_REQUEST
+            message: Validation failed
+            details:
+              - field: pageSize
+                message: pageSize cannot exceed 100
+
+    Unauthorized:
+      description: Authentication required or JWT token missing/invalid/expired (401)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: UNAUTHORIZED
+            message: Missing or invalid authentication token
+
     Forbidden:
-      description: 403 Insufficient permissions for requested action or resource
+      description: Caller lacks required RBAC role or capability (403)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: FORBIDDEN
+            message: Insufficient permissions for requested resource
+
     NotFound:
-      description: 404 Requested resource or record does not exist
+      description: Referenced domain resource does not exist (404)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: NOT_FOUND
+            message: Resource not found
+
     Conflict:
-      description: 409 Request conflicts with existing record or state invariant
+      description: Deterministic state conflict, duplicate natural key, or version mismatch (409)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: CONFLICT
+            message: Exact natural key collision detected
+
     PayloadTooLarge:
-      description: 413 Uploaded payload or file exceeds size limit
+      description: Payload or uploaded file exceeds size limit (413)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: PAYLOAD_TOO_LARGE
+            message: Uploaded file exceeds 50 MB limit
+
     UnprocessableEntity:
-      description: 422 Business rule invariant or domain transition violation
+      description: Domain business invariant violation (422)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: UNPROCESSABLE_ENTITY
+            message: Domain invariant violation
+
     TooManyRequests:
-      description: 429 Rate limit exceeded
+      description: Rate limit exceeded (429)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: TOO_MANY_REQUESTS
+            message: Rate limit exceeded. Try again later.
+
     InternalServerError:
-      description: 500 Unexpected internal server failure
+      description: Unexpected internal server error (500)
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: INTERNAL_SERVER_ERROR
+            message: An unexpected server error occurred
