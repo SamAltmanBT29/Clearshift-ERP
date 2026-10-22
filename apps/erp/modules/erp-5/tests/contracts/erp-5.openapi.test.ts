@@ -129,6 +129,24 @@ function operationBlock(spec: string, operationId: string): string {
   return block.join('\n');
 }
 
+/** Returns the text of every operation block of one path. */
+function operationBlockByPath(spec: string, path: string): string {
+  const lines = spec.split('\n');
+  const start = lines.findIndex((line) => line.trim() === `${path}:`);
+  if (start === -1) {
+    return '';
+  }
+
+  const block: string[] = [];
+  for (const line of lines.slice(start)) {
+    if (block.length > 0 && /^ {2}\S/.test(line)) {
+      break;
+    }
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
 /** Extracts the response status codes documented for one operation. */
 function documentedResponses(spec: string, operationId: string): Set<string> {
   const responses = new Set<string>();
@@ -298,6 +316,19 @@ describe('ERP-5 OpenAPI contract', () => {
   it('documents the relationship warning', () => {
     expect(SPEC).toContain('RelationshipWarning:');
     expect(SPEC).toContain('HR_OPTIONAL_REFERENCE_ABSENT');
+  });
+
+  it('documents the authorization contract of every operation', () => {
+    // Every operation must declare the authentication and the authorization
+    // outcome — an operation that does not is a contract gap (ERP5-15).
+    const lines = SPEC.split('\n');
+    for (const path of Object.keys(documentedEndpoints(SPEC))) {
+      const block = operationBlockByPath(SPEC, path);
+      expect(block, `${path} is not documented`).not.toBe('');
+      expect(block, `${path} does not document 401`).toContain('"401":');
+      expect(block, `${path} does not document 403`).toContain('"403":');
+    }
+    expect(lines.length).toBeGreaterThan(0);
   });
 
   it('documents the import receipt of a write', () => {
