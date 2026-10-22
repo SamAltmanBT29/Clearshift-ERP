@@ -39,6 +39,7 @@ export default defineConfig({
       '@cs/kit': resolve(__dirname, './packages/kit/src/index.ts'),
       '@cs/identity': resolve(__dirname, './packages/identity/src/index.ts'),
       '@cs/rbac': resolve(__dirname, './packages/rbac/src/index.ts'),
+      '@cs/ui': resolve(__dirname, './packages/ui/src/index.ts'),
     },
   },
 });

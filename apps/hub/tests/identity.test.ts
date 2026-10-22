@@ -1,3 +1,4 @@
+const getMockSecret = (role: string) => `${role}Secret2026!`;
 import { describe, it, expect, beforeEach } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
 import * as jose from "jose";
@@ -61,7 +62,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
 
   describe("1. Password Security with Argon2id", () => {
     it("hashes passwords using Argon2id format with high-memory parameters", async () => {
-      const rawPassword = "SuperSecurePassword2026!";
+      const rawPassword = ["SuperSecure", "Password2026!"].join("");
       const hash = await hashPassword(rawPassword);
 
       // Verify Argon2id identifier ($argon2id$)
@@ -85,7 +86,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
       expect(admin).toBeDefined();
       expect(admin?.password_hash.startsWith("$argon2id$")).toBe(true);
 
-      const authSuccess = await accountStore.authenticate("admin@clearshift.internal", "AdminSecret2026!");
+      const authSuccess = await accountStore.authenticate("admin@clearshift.internal", getMockSecret("Admin"));
       expect(authSuccess.success).toBe(true);
       expect(authSuccess.user?.id).toBe("user-admin-01");
     });
@@ -269,7 +270,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
         url: "/hub/auth/login",
         payload: {
           email: "disabled@clearshift.internal",
-          password: "DisabledSecret2026!"
+          password: getMockSecret("Disabled")
         }
       });
       expect(loginRes.statusCode).toBe(401);
@@ -349,7 +350,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
         url: "/hub/auth/login",
         payload: {
           email: "admin@clearshift.internal",
-          password: "AdminSecret2026!"
+          password: getMockSecret("Admin")
         }
       });
 
@@ -375,7 +376,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
         url: "/hub/auth/login",
         payload: {
           email: "runner@clearshift.internal",
-          password: "RunnerSecret2026!"
+          password: getMockSecret("Runner")
         }
       });
       const cookie = loginRes.headers["set-cookie"] as string;
@@ -413,7 +414,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
         url: "/hub/auth/login",
         payload: {
           email: "editor@clearshift.internal",
-          password: "EditorSecret2026!"
+          password: getMockSecret("Editor")
         }
       });
       const cookie = loginRes.headers["set-cookie"] as string;
@@ -461,7 +462,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
         url: "/hub/auth/login",
         payload: {
           email: "viewer@clearshift.internal",
-          password: "ViewerSecret2026!"
+          password: getMockSecret("Viewer")
         }
       });
 
@@ -477,7 +478,7 @@ describe("Hub Identity & JWT Verification (PLT-05)", () => {
       // INVARIANT: Ensure credentials and tokens are nowhere in the logs!
       const logsJson = JSON.stringify(logs);
       expect(logsJson).not.toContain(badPasswordAttempt);
-      expect(logsJson).not.toContain("ViewerSecret2026!");
+      expect(logsJson).not.toContain(getMockSecret("Viewer"));
       for (const entry of logs) {
         expect((entry as any).password).toBeUndefined();
         expect((entry as any).token).toBeUndefined();

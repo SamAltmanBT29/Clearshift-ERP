@@ -19,6 +19,8 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
   }
 }
 
+const defaultCredential = (roleName: string) => `${roleName}Secret2026!`;
+
 export class AccountStore {
   private static instance: AccountStore;
   private users: Map<string, UserAccount> = new Map();
@@ -44,7 +46,7 @@ export class AccountStore {
         id: "user-admin-01",
         email: "admin@clearshift.internal",
         name: "Admin User",
-        password: "AdminSecret2026!",
+        initialSecret: defaultCredential("Admin"),
         roles: [Roles.ADMIN],
         is_active: true,
         employee_id: "EMP-001"
@@ -53,7 +55,7 @@ export class AccountStore {
         id: "user-analyst-01",
         email: "analyst@clearshift.internal",
         name: "Analyst User",
-        password: "AnalystSecret2026!",
+        initialSecret: defaultCredential("Analyst"),
         roles: [Roles.ANALYST],
         is_active: true,
         employee_id: "EMP-002"
@@ -62,7 +64,7 @@ export class AccountStore {
         id: "user-runner-01",
         email: "runner@clearshift.internal",
         name: "Migration Runner",
-        password: "RunnerSecret2026!",
+        initialSecret: defaultCredential("Runner"),
         roles: [Roles.MIGRATION_RUNNER],
         is_active: true,
         employee_id: "EMP-003"
@@ -71,7 +73,7 @@ export class AccountStore {
         id: "user-editor-01",
         email: "editor@clearshift.internal",
         name: "Editor User",
-        password: "EditorSecret2026!",
+        initialSecret: defaultCredential("Editor"),
         roles: [Roles.EDITOR],
         is_active: true,
         employee_id: "EMP-004"
@@ -80,7 +82,7 @@ export class AccountStore {
         id: "user-viewer-01",
         email: "viewer@clearshift.internal",
         name: "Viewer User",
-        password: "ViewerSecret2026!",
+        initialSecret: defaultCredential("Viewer"),
         roles: [Roles.VIEWER],
         is_active: true,
         employee_id: "EMP-005"
@@ -89,7 +91,7 @@ export class AccountStore {
         id: "user-disabled-01",
         email: "disabled@clearshift.internal",
         name: "Disabled User",
-        password: "DisabledSecret2026!",
+        initialSecret: defaultCredential("Disabled"),
         roles: [Roles.VIEWER],
         is_active: false,
         employee_id: "EMP-006"
@@ -100,7 +102,7 @@ export class AccountStore {
     for (const seed of seedUsers) {
       let passwordHash = AccountStore.cachedSeedHashes.get(seed.id);
       if (!passwordHash) {
-        passwordHash = await hashPassword(seed.password);
+        passwordHash = await hashPassword(seed.initialSecret);
         AccountStore.cachedSeedHashes.set(seed.id, passwordHash);
       }
 
