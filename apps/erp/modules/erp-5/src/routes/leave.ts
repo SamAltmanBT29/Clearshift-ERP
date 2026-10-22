@@ -1,20 +1,25 @@
 /**
  * ERP-5 HR & Employees — Leave Routes
  *
+ * GET   /leave      - List leave records with bounded paging and filters
+ * GET   /leave/{id} - Read a single leave record
  * POST  /leave      - Create a leave record
  * PATCH /leave/{id} - Edit a leave record and apply the V1 state transition
  *
  * V1 records the leave status only. The request → approve/reject **workflow
  * with a log** is FR-ERP5-10 and stays in V2 (decision record DR-10).
  *
- * The list/read endpoints belong to **ERP5-02** (issue #47) and are
- * deliberately not implemented here.
- *
  * @module erp5/routes/leave
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { CreateHrLeaveRequestSchema, HrIdParamSchema, UpdateHrLeaveRequestSchema } from '@clearshift/contracts';
+import { Capabilities, requireCapability } from '@cs/rbac';
+import {
+  CreateHrLeaveRequestSchema,
+  HrIdParamSchema,
+  HrLeaveListQuerySchema,
+  UpdateHrLeaveRequestSchema,
+} from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
 import { hrWriteGuard } from './guard.js';
 import { parseWriteBody } from './parsing.js';
@@ -22,6 +27,30 @@ import type { HrRouteOptions } from './types.js';
 
 export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
   const { hrService } = opts;
+
+  // GET /leave - List leave records
+  fastify.get(
+    '/leave',
+    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    async (request, reply) => {
+      const query = HrLeaveListQuerySchema.parse(request.query);
+      const response = await hrService.listLeave(query);
+
+      return reply.status(200).send(response);
+    }
+  );
+
+  // GET /leave/:id - Read a single leave record
+  fastify.get(
+    '/leave/:id',
+    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    async (request, reply) => {
+      const params = HrIdParamSchema.parse(request.params);
+      const record = await hrService.getLeaveById(params.id);
+
+      return reply.status(200).send(record);
+    }
+  );
 
   // POST /leave - Create a leave record
   fastify.post('/leave', { preHandler: hrWriteGuard }, async (request, reply) => {

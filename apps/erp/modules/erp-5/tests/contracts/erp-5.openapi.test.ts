@@ -47,6 +47,19 @@ const WRITE_ENDPOINTS = [
   'POST /payroll-totals',
 ] as const;
 
+/** The read endpoints of ERP5-02. */
+const READ_ENDPOINTS = [
+  'GET /employees',
+  'GET /employees/{id}',
+  'GET /departments',
+  'GET /departments/{id}',
+  'GET /leave',
+  'GET /leave/{id}',
+  'GET /identity-users',
+  'GET /payroll-totals',
+  'GET /payroll-totals/{id}',
+] as const;
+
 /** Extracts the `METHOD /path` pairs from the `paths:` block of the document. */
 function documentedEndpoints(spec: string): Set<string> {
   const endpoints = new Set<string>();
@@ -89,6 +102,31 @@ function componentBlock(spec: string, name: string): string {
   const rest = spec.slice(start);
   const next = rest.slice(1).search(/^ {4}\S/m);
   return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+/** Returns the text of the operation block that declares `operationId`. */
+function operationBlock(spec: string, operationId: string): string {
+  const lines = spec.split('\n');
+  const anchor = lines.findIndex((line) => line.includes(`operationId: ${operationId}`));
+  if (anchor === -1) {
+    return '';
+  }
+
+  // Walk back to the operation key (`    get:` / `    post:` / …).
+  let start = anchor;
+  while (start > 0 && !/^ {4}\w+:/.test(lines[start] ?? '')) {
+    start -= 1;
+  }
+
+  // The operation ends at the next key on the same level.
+  const block: string[] = [];
+  for (const line of lines.slice(start)) {
+    if (block.length > 0 && /^ {4}\S/.test(line)) {
+      break;
+    }
+    block.push(line);
+  }
+  return block.join('\n');
 }
 
 /** Extracts the response status codes documented for one operation. */
@@ -175,6 +213,36 @@ describe('ERP-5 OpenAPI contract', () => {
     for (const route of writeRoutes) {
       const withPrefix = route.replace('/api/v1/erp-hr', '');
       expect(documented.has(withPrefix), `${route} is not documented`).toBe(true);
+    }
+  });
+
+  it('documents every read endpoint the module registers', () => {
+    const documented = documentedEndpoints(SPEC);
+
+    for (const endpoint of READ_ENDPOINTS) {
+      expect(documented.has(endpoint), `${endpoint} is not documented`).toBe(true);
+    }
+
+    const readRoutes = (registeredRoutes ?? []).filter((route) => /^GET /.test(route));
+    expect(readRoutes.length).toBeGreaterThan(0);
+    for (const route of readRoutes) {
+      const withPrefix = route.replace('/api/v1/erp-hr', '');
+      expect(documented.has(withPrefix), `${route} is not documented`).toBe(true);
+    }
+  });
+
+  it('documents the bounded paging of every collection', () => {
+    for (const collection of [
+      'listEmployees',
+      'listDepartments',
+      'listLeave',
+      'listIdentityUsers',
+      'listPayrollTotals',
+    ]) {
+      const block = operationBlock(SPEC, collection);
+      expect(block, `${collection} is not documented`).not.toBe('');
+      expect(block).toContain('#/components/parameters/Page');
+      expect(block).toContain('#/components/parameters/PageSize');
     }
   });
 

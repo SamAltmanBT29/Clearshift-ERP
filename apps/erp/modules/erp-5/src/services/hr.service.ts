@@ -24,17 +24,25 @@ import {
   HR_DEFAULT_CURRENCY,
   HR_DOMAIN_RULES,
   HR_IMPORT_ONLY_FIELDS,
+  HR_PAGE_SIZE_DEFAULT,
   maskHrSalary,
   type CreateHrDepartmentRequest,
   type CreateHrEmployeeRequest,
   type CreateHrLeaveRequest,
   type CreateHrPayrollTotalRequest,
   type HrDepartment,
+  type HrDepartmentListQuery,
   type HrEmployee,
+  type HrEmployeeListQuery,
   type HrEmployeeView,
+  type HrIdentityUser,
+  type HrIdentityUserListQuery,
   type HrImportReceipt,
   type HrLeave,
+  type HrLeaveListQuery,
+  type HrListMeta,
   type HrPayrollTotal,
+  type HrPayrollTotalListQuery,
   type HrRelationshipWarning,
   type LeaveStatus,
   type UpdateHrDepartmentRequest,
@@ -862,6 +870,131 @@ export class HrService {
         ...(receipt !== null && { receipt }),
       };
     });
+  }
+
+  // ── Query layer (ERP5-02) ────────────────────────────────────────────────
+
+  /**
+   * The bounded page metadata of a collection.
+   *
+   * `totalPages` is `0` for an empty collection — the honest answer, and
+   * within the published `HrListMeta` contract.
+   */
+  private static toListMeta(page: number, pageSize: number, total: number): HrListMeta {
+    return {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  /**
+   * Lists the employees.
+   *
+   * The result is the **masked** projection — the raw `salary` column never
+   * leaves the module (BR-ERP5-02).
+   */
+  async listEmployees(
+    query: HrEmployeeListQuery
+  ): Promise<{ data: HrEmployeeView[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listEmployees({ ...query, page, pageSize });
+
+    return {
+      data: result.items.map(toHrEmployeeView),
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listDepartments(
+    query: HrDepartmentListQuery
+  ): Promise<{ data: HrDepartment[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listDepartments({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listLeave(query: HrLeaveListQuery): Promise<{ data: HrLeave[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listLeave({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listPayrollTotals(
+    query: HrPayrollTotalListQuery
+  ): Promise<{ data: HrPayrollTotal[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listPayrollTotals({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  /**
+   * Lists the read-only Hub Identity projection.
+   *
+   * The projection is owned by the platform and exposes identity attributes
+   * only — no credential, hash, token or refresh-token field. It is empty
+   * when the platform has not created it yet.
+   */
+  async listIdentityUsers(
+    query: HrIdentityUserListQuery
+  ): Promise<{ data: HrIdentityUser[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listIdentityUsers({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async getEmployeeById(id: string): Promise<HrEmployeeView> {
+    const employee = await this.repository.getEmployeeById(id);
+    if (!employee) {
+      throw new HrNotFoundError('Employee', id);
+    }
+    return toHrEmployeeView(employee);
+  }
+
+  async getDepartmentById(id: string): Promise<HrDepartment> {
+    const department = await this.repository.getDepartmentById(id);
+    if (!department) {
+      throw new HrNotFoundError('Department', id);
+    }
+    return department;
+  }
+
+  async getLeaveById(id: string): Promise<HrLeave> {
+    const record = await this.repository.getLeaveById(id);
+    if (!record) {
+      throw new HrNotFoundError('Leave record', id);
+    }
+    return record;
+  }
+
+  async getPayrollTotalById(id: string): Promise<HrPayrollTotal> {
+    const total = await this.repository.getPayrollTotalById(id);
+    if (!total) {
+      throw new HrNotFoundError('Payroll aggregate', id);
+    }
+    return total;
   }
 
   // ── Idempotency helpers ──────────────────────────────────────────────────

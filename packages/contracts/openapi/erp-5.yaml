@@ -192,6 +192,37 @@ paths:
         - BearerAuth: []
 
   /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [Employees]
+      summary: Read an employee
+      description: |
+        Returns one employee as the **masked** projection — the raw `salary`
+        column never leaves the module (BR-ERP5-02).
+
+        Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeView"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
     patch:
       operationId: updateEmployee
       tags: [Employees]
@@ -278,6 +309,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -337,6 +370,34 @@ paths:
         - BearerAuth: []
 
   /departments/{id}:
+    get:
+      operationId: getDepartment
+      tags: [Departments]
+      summary: Read a department
+      description: |
+        Returns one department. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
     patch:
       operationId: updateDepartment
       tags: [Departments]
@@ -415,6 +476,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -478,6 +541,34 @@ paths:
         - BearerAuth: []
 
   /leave/{id}:
+    get:
+      operationId: getLeave
+      tags: [Leave]
+      summary: Read a leave record
+      description: |
+        Returns one leave record. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leave"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
     patch:
       operationId: updateLeave
       tags: [Leave]
@@ -543,9 +634,20 @@ paths:
         does not store credentials and does not grant application roles; the
         projection exposes identity attributes only — no password, hash, token
         or refresh-token field is ever returned.
+
+        The list is **empty** when the platform has not created the projection
+        yet (it exists only together with `platform.hub_users`).
+
+        Requires the shared `module.read` capability.
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Server-side case-insensitive search across the username
       responses:
         "200":
           description: Successful response
@@ -557,6 +659,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -571,7 +675,11 @@ paths:
       description: |
         Returns one aggregate per department and month. The payload contains
         department totals only — never employee-level rows (FR-ERP5-06).
+
+        Requires the shared `module.read` capability.
       parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
         - name: month
           in: query
           schema:
@@ -595,6 +703,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -652,6 +762,36 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /payroll-totals/{id}:
+    get:
+      operationId: getPayrollTotal
+      tags: [Payroll]
+      summary: Read a department/month payroll aggregate
+      description: |
+        Returns one department/month aggregate. Requires the shared
+        `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotal"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
