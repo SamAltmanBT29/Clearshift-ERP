@@ -32,6 +32,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@clearshift/database': resolve(__dirname, './packages/database/src/index.ts'),
+      '@clearshift/contracts/common': resolve(__dirname, './packages/contracts/src/common.ts'),
+      '@clearshift/contracts/events': resolve(__dirname, './packages/contracts/src/events.ts'),
       '@clearshift/contracts': resolve(__dirname, './packages/contracts/src/index.ts'),
     },
   },

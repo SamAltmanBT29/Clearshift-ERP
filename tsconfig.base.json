@@ -20,6 +20,9 @@
     "composite": true,
     "baseUrl": ".",
     "paths": {
+      "@clearshift/database": ["packages/database/src/index.ts"],
+      "@clearshift/contracts": ["packages/contracts/src/index.ts"],
+      "@clearshift/contracts/*": ["packages/contracts/src/*"],
       "@cs/kernel": ["packages/kernel/src/index.ts"],
       "@cs/kernel/*": ["packages/kernel/src/*"],
       "@cs/core": ["packages/core/src/index.ts"],
