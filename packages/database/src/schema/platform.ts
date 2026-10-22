@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
+import { pgSchema, uuid, text, timestamp, jsonb, primaryKey, integer } from "drizzle-orm/pg-core";
 
 export const platformSchema = pgSchema("platform");
 
@@ -49,14 +49,28 @@ export const outbox = platformSchema.table("outbox", {
   id: uuid("id").primaryKey().defaultRandom(),
   eventId: uuid("event_id").notNull().unique(),
   eventType: text("event_type").notNull(),
+  schemaVersion: text("schema_version").notNull().default("1.0.0"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  producer: text("producer").notNull(),
+  correlationId: text("correlation_id").notNull(),
+  batchId: text("batch_id"),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
   payload: jsonb("payload").notNull(),
+  metadata: jsonb("metadata"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  lockedBy: text("locked_by"),
+  retryCount: integer("retry_count").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const consumedEvents = platformSchema.table("consumed_events", {
   consumer: text("consumer").notNull(),
-  eventId: uuid("event_id").notNull()
+  eventId: uuid("event_id").notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
   primaryKey({ columns: [table.consumer, table.eventId] })
 ]);

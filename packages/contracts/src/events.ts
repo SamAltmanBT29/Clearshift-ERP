@@ -13,6 +13,7 @@ export const EventEnvelopeSchema = z.object({
   producer: z.string().min(1, { message: 'producer module identifier is required' }),
   entity_type: z.string().min(1, { message: 'entity_type is required' }),
   entity_id: z.string().min(1, { message: 'entity_id is required' }),
+  batch_id: z.string().optional(),
   payload: z.unknown(),
   metadata: z.record(z.unknown()).optional(),
 });
@@ -40,6 +41,7 @@ export function createEventEnvelope<T>(params: {
   producer: string;
   entity_type: string;
   entity_id: string;
+  batch_id?: string;
   payload: T;
   metadata?: Record<string, unknown>;
 }): EventEnvelope {
@@ -52,6 +54,7 @@ export function createEventEnvelope<T>(params: {
     producer: params.producer,
     entity_type: params.entity_type,
     entity_id: params.entity_id,
+    ...(params.batch_id ? { batch_id: params.batch_id } : {}),
     payload: params.payload,
     ...(params.metadata ? { metadata: params.metadata } : {}),
   };

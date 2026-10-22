@@ -17,6 +17,7 @@ export default defineConfig({
         'apps/erp/modules/erp-4/domain/**',
         'apps/erp/modules/erp-4/src/**',
         'apps/erp/modules/erp-5/db/**',
+        'apps/erp/modules/erp-5/src/**',
         'packages/contracts/src/**',
         'packages/database/src/**',
       ],
@@ -33,6 +34,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@clearshift/database': resolve(__dirname, './packages/database/src/index.ts'),
+      '@cs/db': resolve(__dirname, './packages/database/src/index.ts'),
       '@clearshift/contracts': resolve(__dirname, './packages/contracts/src/index.ts'),
       '@cs/kernel': resolve(__dirname, './packages/kernel/src/index.ts'),
       '@cs/core': resolve(__dirname, './packages/core/src/index.ts'),
@@ -40,6 +42,7 @@ export default defineConfig({
       '@cs/identity': resolve(__dirname, './packages/identity/src/index.ts'),
       '@cs/rbac': resolve(__dirname, './packages/rbac/src/index.ts'),
       '@cs/ui': resolve(__dirname, './packages/ui/src/index.ts'),
+      '@cs/db': resolve(__dirname, './packages/database/src/index.ts'),
     },
   },
 });
