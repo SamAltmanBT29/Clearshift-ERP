@@ -4,4 +4,6 @@
  * Re-exports all module contracts for use by API handlers and frontend.
  */
 
+export * from './common.js';
+export * from './events.js';
 export * from './erp-4.js';

@@ -7,6 +7,9 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./common": "./src/common.ts",
+    "./events": "./src/events.ts",
+    "./erp-4": "./src/erp-4.ts",
     "./openapi": "./openapi"
   },
   "dependencies": {
