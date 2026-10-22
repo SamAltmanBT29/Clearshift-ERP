@@ -330,5 +330,25 @@ When an optional relationship is absent, the system emits an approved warning ob
 - **Double-Entry Balance Invariant (`BR-ERP4-01`)**: `SUM(debit) == SUM(credit)` enforced within explicit currency at 4 decimal places (`NUMERIC(20,4)`).
 - **Trial Balance Aggregation**: Computed strictly from posted and reversed ledger movements plus one-time opening balances. Unlike currencies are segregated; `totals.is_balanced` asserts global double-entry equality.
 
+---
 
+## 11. OpenAPI 3.1, Event and Mock Contract Package (Issue #170)
 
+### 11.1 Authoritative Contract Files
+- **OpenAPI 3.1 Document**: `packages/contracts/openapi/erp-4.yaml` (covers all 18 V1 endpoints)
+- **Zod Runtime Schemas**: `@clearshift/contracts` (`packages/contracts/src/erp-4.ts`)
+- **Domain Event Schemas**: `@clearshift/contracts/erp-4-events` (PLT-04/PLT-09 transactional envelopes)
+- **Deterministic Mock Server**: `@clearshift/contracts/erp-4-mock` (`npm run mock:erp-4`, port 4014)
+
+### 11.2 Domain Events Specification
+- `erp.account.created`: Emitted when new account is established
+- `erp.account.updated`: Emitted when account attributes are modified
+- `erp.journal_entry.created`: Emitted when balanced draft entry is created
+- `erp.journal_entry.posted`: Emitted when draft entry is posted to the GL
+- `erp.journal_entry.reversed`: Emitted when compensating reversal is posted
+- `erp.journal_entry.voided`: Emitted when draft entry is voided
+- `erp.period.status_changed`: Emitted on period lifecycle status transition
+- `erp.opening_balance.created`: Emitted when opening balance is recorded
+
+### 11.3 Versioned Change Control Log
+- **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
