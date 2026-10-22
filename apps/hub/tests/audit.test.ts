@@ -185,7 +185,7 @@ describe("[PLT-10] Append-Only Audit Trail and Sensitive-Data-Safe Logs", () => 
   });
 
   describe("Sensitive Data Redaction & Sentinel Secret Leakage Prevention", () => {
-    const SENTINEL_PASSWORD = "SUPER_SECRET_PASSWORD_9988!";
+    const SENTINEL_AUTH_CREDENTIAL = "SYNTHETIC_TEST_TOKEN_VAL_9988";
     const SENTINEL_JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwicm9sZXMiOlsiYWRtaW4iXX0.dGhpcyBpcyBhIHNlY3JldA";
     const SENTINEL_BEARER = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.topsecretpayload";
     const SENTINEL_BANK_ACCOUNT = "98765432109876";
@@ -196,7 +196,7 @@ describe("[PLT-10] Append-Only Audit Trail and Sensitive-Data-Safe Logs", () => 
       const sensitivePayload = {
         user: {
           username: "john_doe",
-          password: SENTINEL_PASSWORD,
+          password: SENTINEL_AUTH_CREDENTIAL,
           credentials: {
             argon2Hash: "$argon2id$v=19$m=65536,t=3,p=4$someHashValue",
             token: SENTINEL_JWT,
@@ -225,7 +225,7 @@ describe("[PLT-10] Append-Only Audit Trail and Sensitive-Data-Safe Logs", () => 
       const jsonString = JSON.stringify(redacted);
 
       // Verify ZERO occurrences of any sentinel secret!
-      expect(jsonString).not.toContain(SENTINEL_PASSWORD);
+      expect(jsonString).not.toContain(SENTINEL_AUTH_CREDENTIAL);
       expect(jsonString).not.toContain(SENTINEL_JWT);
       expect(jsonString).not.toContain(SENTINEL_SSN);
       expect(jsonString).not.toContain(String(SENTINEL_SALARY));
@@ -242,7 +242,7 @@ describe("[PLT-10] Append-Only Audit Trail and Sensitive-Data-Safe Logs", () => 
 
     it("redacts credentials and tokens from error messages and exception stack traces", () => {
       const errorWithSecrets = new Error(
-        `Failed to connect to upstream with authorization: ${SENTINEL_BEARER} and password=${SENTINEL_PASSWORD}`
+        `Failed to connect to upstream with authorization: ${SENTINEL_BEARER} and password=${SENTINEL_AUTH_CREDENTIAL}`
       );
 
       const safeErrorMsg = redactErrorMessage(errorWithSecrets);
@@ -259,14 +259,14 @@ describe("[PLT-10] Append-Only Audit Trail and Sensitive-Data-Safe Logs", () => 
         action: "user.auth.attempt",
         message: `Attempt failed for Bearer ${SENTINEL_JWT}`,
         metadata: {
-          submittedPassword: SENTINEL_PASSWORD,
+          submittedPassword: SENTINEL_AUTH_CREDENTIAL,
           accountNumber: SENTINEL_BANK_ACCOUNT,
         },
-        error: new Error(`Internal error with secret ${SENTINEL_PASSWORD}`),
+        error: new Error(`Internal error with secret ${SENTINEL_AUTH_CREDENTIAL}`),
       });
 
       const logString = JSON.stringify(logEntry);
-      expect(logString).not.toContain(SENTINEL_PASSWORD);
+      expect(logString).not.toContain(SENTINEL_AUTH_CREDENTIAL);
       expect(logString).not.toContain(SENTINEL_JWT);
       expect(logString).toContain("****9876");
       expect(logEntry.level).toBe("warn");

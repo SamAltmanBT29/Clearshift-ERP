@@ -1,6 +1,6 @@
 import { AuditEntryInput, AuditRecord, AuditQueryFilter } from "./types.js";
 import { redactSensitiveData, redactErrorMessage } from "../logging/redact.js";
-import { auditLogs } from "@clearshift/database";
+import { auditLogs } from "@cs/db";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, and, gte, lte } from "drizzle-orm";
 
