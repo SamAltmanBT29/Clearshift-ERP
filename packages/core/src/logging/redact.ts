@@ -1,5 +1,5 @@
 /**
- * Sensitive Data Redaction Utilities (PLT-10)
+ * Sensitive Data Redaction Utilities (PLT-10 / PLT-11)
  * Guarantees that passwords, JWTs, secrets, full bank details, full salary,
  * government IDs, and complete raw rows never leak to logs, errors, or audit trails.
  */
@@ -104,6 +104,8 @@ export function redactSensitiveData<T>(obj: T, visited: WeakSet<object> = new We
     sanitized = sanitized.replace(SSN_REGEX, "[REDACTED_SSN]");
     // Redact Card patterns
     sanitized = sanitized.replace(CREDIT_CARD_REGEX, "[REDACTED_CARD]");
+    // Redact inline secrets
+    sanitized = sanitized.replace(INLINE_SECRET_REGEX, "$1=[REDACTED_SECRET]");
     return sanitized as unknown as T;
   }
 
