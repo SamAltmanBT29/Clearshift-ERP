@@ -5,9 +5,10 @@
 **Module**: ERP-5 HR & Employees (Group 10)
 **Issue**: [#46](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/46) — `[ERP5-01] Schema, Drizzle models and guarded migrations`
 **Mutation API Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
+**Relationship Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
 **PostgreSQL Schema**: `erp5`
 **API Base**: `/api/v1/erp-hr`
-**Version**: V1.1
+**Version**: V1.2
 
 ---
 
@@ -25,6 +26,7 @@
 10. [Decision records](#10-decision-records)
 11. [Migration & verification](#11-migration--verification)
 12. [Mutation API (ERP5-03)](#12-mutation-api-erp503)
+13. [Relationships, state transitions and read model (ERP5-06)](#13-relationships-state-transitions-and-read-model-erp506)
 
 ---
 
@@ -313,6 +315,26 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 - **Open item**: PLT-06 declares no policy for the **identity the Kit uses to load employee, department and leave rows**. The module grants those writes to any holder of the shared `module.write` capability, which today means Editor and Admin; a platform-issued Kit service identity (or a `hr.employee_bulk` policy) is needed to close the gap. This is escalated to **ERP5-15** (module authorization policy integration) and to the PLT-06 owner.
 - **Status**: open — escalated in PR #226.
 
+### DR-10 — The V1 leave state transition
+
+- **Conflict**: issue #51 (`ERP5-06`) requires "the allowed state transitions" and "state transition tests cover each allowed transition and each forbidden transition", but the leave **request → approve/reject workflow with a log** is `FR-ERP5-10`, which the SDS places in **Part V2** (§5.2) and which issue #51 lists under "Out of Scope: V2/V3-only capability".
+- **Decision**: V1 exposes the **state transition only** — `pending → approved | rejected`; `approved` and `rejected` are **terminal** (a decision is never reversed and a leave is never un-decided); setting the same status again is an idempotent no-op, not an error. It is exposed as `PATCH /api/v1/erp-hr/leave/{id}`. There is **no** request step, **no** approval log and **no** notification — those belong to FR-ERP5-10 in V2. A forbidden transition is answered with `422 HR_INVALID_LEAVE_STATUS_TRANSITION` and the allowed set in the message.
+- **Rationale**: the leave status is the only stateful field of the V1 ERP-5 data model (`erp5.leave.status`; the other three tables have no status column), and FR-ERP5-04 makes it a V1 field. The state matrix is therefore a V1 rule; the *workflow* is not.
+- **Status**: **open** — escalated in PR #231 (ERP5-06). If the maintainer prefers V1 immutability, the endpoint is deleted and the matrix collapses to a single state (the change is confined to one route, one service method and one contract schema).
+
+### DR-11 — The payroll aggregate is authoritative as loaded
+
+- **Conflict**: issue #51 requires that "derived display values and **report totals** are computed from authoritative persisted state". The only ERP-5 report is the department/month payroll aggregate, which would suggest recomputing it from the employee rows (`sum(erp5.employees.salary)`).
+- **Decision**: the module does **not** recompute the amount. The aggregate is the number of the customer's payroll system, loaded through the Migration Kit (FR-ERP5-06: "one number per department, **no personal data**"), and it is authoritative **as loaded**. The module validates it against its own invariants (the department exists, the month label is valid, the amount and headcount are non-negative, one aggregate per department and month) and reads the persisted row back. The **display** values — the department link, the month label, the status and the headcount — are always derived from the persisted rows, never from the request payload.
+- **Rationale**: recomputing the total from the employee rows would (a) replace the source system's number with a different one, (b) make the load order significant — the aggregate could not be loaded before the employees — and (c) put a per-employee sum behind an aggregate that must not carry personal data.
+- **Status**: **open** — escalated in PR #231 (ERP5-06).
+
+### DR-12 — The cross-module resolver denies what it cannot prove
+
+- **Defect found in the ERP5-03 output**: `Erp5ReferenceResolver.exists()` answered "yes" for **every** employee, department and leave id, and `get()` returned a fabricated summary (`EMP-001`, `dept-engineering`). A sibling module or the Kit that resolved a reference through the module facade would therefore have been told that a non-existent record exists, and could have built a dangling reference that only the foreign key would catch — as a `500`, not as a clean `404`.
+- **Decision**: the resolver validates against the `HrRepository` (`createErp5Resolver(repository)`) and **denies every existence check when it has no data source** (default deny, PLT-06's non-negotiable invariant). The facade keeps a repository-less instance for the module definition; the platform bootstrap constructs the repository-backed one once the Drizzle repository of ERP5-02 exists.
+- **Status**: accepted for V1 — flagged for maintainer confirmation in PR #231.
+
 
 ---
 
@@ -345,7 +367,8 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 | `PATCH` | `/api/v1/erp-hr/employees/{id}` | `erp5.employees` | unique `employee_no`, existing department, BR-ERP5-01 against the **stored** dates |
 | `POST` | `/api/v1/erp-hr/departments` | `erp5.departments` | unique `code`, existing parent |
 | `PATCH` | `/api/v1/erp-hr/departments/{id}` | `erp5.departments` | unique `code`, existing parent, no self-parent, acyclic hierarchy |
-| `POST` | `/api/v1/erp-hr/leave` | `erp5.leave` | valid date range, existing employee |
+| `POST` | `/api/v1/erp-hr/leave` | `erp5.leave` | valid date range, existing employee, approved type/status |
+| `PATCH` | `/api/v1/erp-hr/leave/{id}` | `erp5.leave` | the V1 state matrix (§13.3), re-validated date range and type, immutable subject |
 | `POST` | `/api/v1/erp-hr/payroll-totals` | `erp5.payroll_totals` | one aggregate per department/month, existing department, no employee rows |
 
 The list/read endpoints belong to **ERP5-02** (issue #47) and are not implemented here.
@@ -431,3 +454,93 @@ different payload is answered with `409 HR_IDEMPOTENCY_CONFLICT`.
 | `apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | contract | the Zod contract, the stable business-rule codes, the masked response schemas |
 | `apps/erp/modules/erp-5/tests/contracts/erp-5.openapi.test.ts` | contract | every `$ref` resolves, every write route is documented, unknown properties are forbidden |
 | `apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` | database | the PostgreSQL constraints that back the same invariants (live PostgreSQL) |
+
+---
+
+## 13. Relationships, state transitions and read model (ERP5-06)
+
+**Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
+**Domain layer**: `apps/erp/modules/erp-5/src/domain/relationships.ts` (pure — no I/O)
+
+### 13.1 Relationship map
+
+| From | To | Cardinality | Rule | Failure |
+|---|---|---|---|---|
+| `employees.department_id` | `departments.id` | exactly one, required | the department must exist | `404 HR_DEPARTMENT_REQUIRED` |
+| `leave.employee_id` | `employees.id` | exactly one, required | the employee must exist | `404 HR_EMPLOYEE_REQUIRED` |
+| `payroll_totals.department_id` | `departments.id` | exactly one, required | the department must exist | `404 HR_DEPARTMENT_REQUIRED` |
+| `departments.parent_id` | `departments.id` | zero or one, **optional** | the parent must exist; no self-parent; no cycle | `404` / `422 HR_DEPARTMENT_SELF_PARENT` / `422 HR_DEPARTMENT_CYCLE` |
+| `employees.(source_system, source_id)` | the source system | zero or one, **optional pair** | both or neither | `400 HR_SOURCE_IDENTITY_INCOMPLETE` / `400 HR_PROTECTED_FIELD` |
+| `identity_users.employee_ref` | `employees.id` | zero or one, **optional, read-only** | the Hub owns the link; ERP-5 never writes it | — |
+
+Every required relationship is validated **before** the mutation, inside the same transaction as the write. A rejected reference therefore leaves **no** partial mutation — the target row is not written and the import receipt is not written.
+
+### 13.2 Optional relationships — the approved warning
+
+An absent **optional** relationship is reported as a warning, never as an invented record:
+
+```json
+{
+  "relationship": "DEPARTMENT_PARENT",
+  "field": "parent_id",
+  "code": "HR_OPTIONAL_REFERENCE_ABSENT",
+  "message": "Optional relationship \"DEPARTMENT_PARENT\" on field \"parent_id\" is absent. No synthetic record was created."
+}
+```
+
+The warning travels in the `warnings` array of the mutation response. A root department therefore reports "this department has no parent" without the module fabricating a parent row.
+
+### 13.3 The leave state matrix
+
+`erp5.leave.status` is the only stateful field of the V1 ERP-5 data model.
+
+| From | To | Allowed | Reason |
+|---|---|---|---|
+| `pending` | `approved` | ✅ | the decision |
+| `pending` | `rejected` | ✅ | the decision |
+| `pending` | `pending` | ✅ (no-op) | idempotent, carries no state change |
+| `approved` | `rejected` | ❌ | a decision is never reversed |
+| `approved` | `pending` | ❌ | a leave is never un-decided |
+| `approved` | `approved` | ✅ (no-op) | idempotent |
+| `rejected` | `approved` | ❌ | a decision is never reversed |
+| `rejected` | `pending` | ❌ | a leave is never un-decided |
+| `rejected` | `rejected` | ✅ (no-op) | idempotent |
+
+A forbidden transition is answered with `422 HR_INVALID_LEAVE_STATUS_TRANSITION`; the message names the allowed set. The request → approve/reject **workflow with a log** (FR-ERP5-10) is a **V2** capability and is not exposed — see [DR-10](#dr-10--the-v1-leave-state-transition).
+
+The recorded subject of a leave — the employee it belongs to — is **immutable**: a leave is a fact about one employee and is never re-parented. `date_from`, `date_to` and `type` stay editable and are re-validated.
+
+### 13.4 Read model
+
+The response of a write is built from the **persisted row**, never from the request payload, and the row is asserted against the read model of its entity before it is returned:
+
+| Entity | Read-model assertion |
+|---|---|
+| employee | the mandatory links are present, `join_date >= birth_date`, the salary is a valid decimal |
+| department | the code is present, the row is not its own parent |
+| leave | the employee link is present, `date_to >= date_from`, the type and the status are approved values |
+| payroll total | the department link is present, the month label is valid, the amount and the headcount are non-negative |
+
+The read model is what makes the UI and the read API agree with the database immediately after a successful write — the status, the links and the derived totals a client sees are the ones the database holds.
+
+### 13.5 Cross-module boundary
+
+`Erp5ReferenceResolver` is the module's published surface for *other* modules and the Migration Kit (Decision C7: cross-module data is read through the owning module's API, never by writing into the `erp5` tables).
+
+| Call | Answer |
+|---|---|
+| `exists('employee', <existing id>)` | `true` |
+| `exists('employee', <unknown id>)` | `false` |
+| `exists('<unknown entity>', <any id>)` | `false` |
+| `get('employee', <unknown id>)` | `null` |
+| `exists(...)` with **no repository** | `false` — default deny (PLT-06) |
+
+The resolver never confirms a record it cannot prove exists — see [DR-12](#dr-12--the-cross-module-resolver-denies-what-it-cannot-prove).
+
+### 13.6 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/tests/domain/relationships.test.ts` | domain | the optional-reference warning, the enumerations, every allowed and forbidden transition, the read model, the source identity |
+| `apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts` | service | the relationship failures with no partial write, the state matrix, the warning, the read-back |
+| `apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` | API | the transitions over HTTP, the error envelope, the resolver, the no-partial-mutation proof |

@@ -43,6 +43,7 @@ const WRITE_ENDPOINTS = [
   'POST /departments',
   'PATCH /departments/{id}',
   'POST /leave',
+  'PATCH /leave/{id}',
   'POST /payroll-totals',
 ] as const;
 
@@ -184,6 +185,7 @@ describe('ERP-5 OpenAPI contract', () => {
       createDepartment: ['201', '200', '400', '401', '403', '404', '409', '500'],
       updateDepartment: ['200', '400', '401', '403', '404', '409', '422', '500'],
       createLeave: ['201', '200', '400', '401', '403', '404', '409', '422', '500'],
+      updateLeave: ['200', '400', '401', '403', '404', '422', '500'],
       createPayrollTotal: ['201', '200', '400', '401', '403', '404', '409', '422', '500'],
     };
 
@@ -202,6 +204,7 @@ describe('ERP-5 OpenAPI contract', () => {
       'CreateDepartmentRequest',
       'UpdateDepartmentRequest',
       'CreateLeaveRequest',
+      'UpdateLeaveRequest',
       'CreatePayrollTotalRequest',
     ]) {
       const block = componentBlock(SPEC, schema);
@@ -217,6 +220,16 @@ describe('ERP-5 OpenAPI contract', () => {
     expect(block).not.toBe('');
     expect(block).toContain('#/components/schemas/EmployeeView');
     expect(block).not.toMatch(/#\/components\/schemas\/Employee$/m);
+  });
+
+  it('documents the leave state matrix', () => {
+    expect(SPEC).toContain('UpdateLeaveRequest:');
+    expect(SPEC).toContain('HR_INVALID_LEAVE_STATUS_TRANSITION');
+  });
+
+  it('documents the relationship warning', () => {
+    expect(SPEC).toContain('RelationshipWarning:');
+    expect(SPEC).toContain('HR_OPTIONAL_REFERENCE_ABSENT');
   });
 
   it('documents the import receipt of a write', () => {

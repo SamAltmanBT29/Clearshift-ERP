@@ -31,6 +31,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
     return reply.status(result.created ? 201 : 200).send({
       ...result.entity,
       ...(result.receipt !== undefined && { import_receipt: result.receipt }),
+      ...(result.warnings !== undefined && { warnings: result.warnings }),
     });
   });
 

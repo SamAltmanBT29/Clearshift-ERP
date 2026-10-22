@@ -121,6 +121,20 @@ export const HR_DOMAIN_RULES = {
   CREDENTIALS_FORBIDDEN: 'HR_CREDENTIALS_FORBIDDEN',
   /** A payroll aggregate carries no employee-level rows. */
   PAYROLL_AGGREGATE_ONLY: 'HR_PAYROLL_AGGREGATE_ONLY',
+  /** The leave status transition is not allowed (ERP5-06 state matrix). */
+  INVALID_LEAVE_STATUS_TRANSITION: 'HR_INVALID_LEAVE_STATUS_TRANSITION',
+  /** The leave type is outside the approved enumeration. */
+  INVALID_LEAVE_TYPE: 'HR_INVALID_LEAVE_TYPE',
+  /** The leave status is outside the approved enumeration. */
+  INVALID_LEAVE_STATUS: 'HR_INVALID_LEAVE_STATUS',
+  /** Exactly one of `source_system` / `source_id` was supplied. */
+  SOURCE_IDENTITY_INCOMPLETE: 'HR_SOURCE_IDENTITY_INCOMPLETE',
+  /** A referenced record does not exist in the owning entity. */
+  INVALID_REFERENCE: 'HR_INVALID_REFERENCE',
+  /** A required relationship is missing. */
+  MISSING_REQUIRED_REFERENCE: 'HR_MISSING_REQUIRED_REFERENCE',
+  /** The persisted row does not satisfy the read model of its entity. */
+  READ_MODEL_INCONSISTENT: 'HR_READ_MODEL_INCONSISTENT',
 } as const;
 
 export type HrDomainRule = (typeof HR_DOMAIN_RULES)[keyof typeof HR_DOMAIN_RULES];
@@ -139,7 +153,60 @@ export const HR_UNPROCESSABLE_CODES: readonly string[] = [
   HR_DOMAIN_RULES.SALARY_NON_NEGATIVE,
   HR_DOMAIN_RULES.DEPARTMENT_SELF_PARENT,
   HR_DOMAIN_RULES.DEPARTMENT_CYCLE,
+  HR_DOMAIN_RULES.INVALID_LEAVE_STATUS_TRANSITION,
+  HR_DOMAIN_RULES.INVALID_LEAVE_TYPE,
+  HR_DOMAIN_RULES.INVALID_LEAVE_STATUS,
+  HR_DOMAIN_RULES.SOURCE_IDENTITY_INCOMPLETE,
+  HR_DOMAIN_RULES.READ_MODEL_INCONSISTENT,
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Relationship rules (ERP5-06)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * An **absent optional relationship** is reported as an approved warning.
+ *
+ * The module never invents a record to satisfy an optional link: the warning
+ * says so explicitly. The code is module-scoped so it can never collide with
+ * another module's warning code.
+ */
+export const HR_OPTIONAL_REFERENCE_ABSENT = 'HR_OPTIONAL_REFERENCE_ABSENT';
+
+export const HrRelationshipWarningSchema = z.object({
+  /** The relationship that is absent, e.g. `DEPARTMENT_PARENT`. */
+  relationship: z.string(),
+  /** The field the relationship hangs on, e.g. `parent_id`. */
+  field: z.string(),
+  code: z.literal(HR_OPTIONAL_REFERENCE_ABSENT),
+  message: z.string(),
+});
+export type HrRelationshipWarning = z.infer<typeof HrRelationshipWarningSchema>;
+
+/**
+ * The V1 leave state matrix (ERP5-06).
+ *
+ * A leave record is created in `pending` status by default and may be
+ * decided once. `approved` and `rejected` are terminal — a decision is not
+ * reversed, and a leave is never un-decided. The full request → approve /
+ * reject **workflow with a log** is FR-ERP5-10 and stays in V2 (see DR-10).
+ */
+export const HR_LEAVE_STATUS_TRANSITIONS: Readonly<
+  Record<LeaveStatus, readonly LeaveStatus[]>
+> = {
+  pending: ['approved', 'rejected'],
+  approved: [],
+  rejected: [],
+};
+
+/** Leave statuses from which no further transition is allowed. */
+export const HR_LEAVE_TERMINAL_STATUSES: readonly LeaveStatus[] = ['approved', 'rejected'];
+
+/** The leave statuses the module accepts. */
+export const HR_LEAVE_STATUSES: readonly LeaveStatus[] = ['pending', 'approved', 'rejected'];
+
+/** The leave types the module accepts (FR-ERP5-04). */
+export const HR_LEAVE_TYPES: readonly LeaveType[] = ['sick', 'holiday', 'other'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Salary masking (BR-ERP5-02)
@@ -489,6 +556,41 @@ export const CreateHrPayrollTotalRequestSchema = z
   .strict();
 export type CreateHrPayrollTotalRequest = z.infer<typeof CreateHrPayrollTotalRequestSchema>;
 
+/**
+ * PATCH /api/v1/erp-hr/leave/{id}
+ *
+ * `status` is the state transition and is checked against the V1 leave state
+ * matrix (`HR_LEAVE_STATUS_TRANSITIONS`). The recorded subject — the employee
+ * the leave belongs to — is **immutable**: a leave is a fact about one
+ * employee and is never re-parented.
+ *
+ * `date_from`, `date_to` and `type` stay editable and are re-validated
+ * (the date range and the enumeration) by the domain layer.
+ */
+export const UpdateHrLeaveRequestSchema = z
+  .object({
+    status: LeaveStatusEnum.optional(),
+    date_from: HrIsoDate.optional(),
+    date_to: HrIsoDate.optional(),
+    type: LeaveTypeEnum.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.date_from === undefined ||
+      value.date_to === undefined ||
+      value.date_to >= value.date_from,
+    {
+      message: 'date_to must not be before date_from',
+      path: ['date_to'],
+      params: { code: HR_DOMAIN_RULES.LEAVE_DATE_RANGE_VALID },
+    }
+  )
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+export type UpdateHrLeaveRequest = z.infer<typeof UpdateHrLeaveRequestSchema>;
+
 /** Path parameter of every ERP-5 resource endpoint. */
 export const HrIdParamSchema = z.object({ id: HrUuid });
 export type HrIdParam = z.infer<typeof HrIdParamSchema>;
@@ -521,24 +623,31 @@ export type HrImportReceipt = z.infer<typeof HrImportReceiptSchema>;
  * `import_receipt` is present only when the write carried the full import
  * provenance (`batch_id` + `source_row` + idempotency key). A repeated import
  * with the same idempotency key returns the original receipt.
+ *
+ * `warnings` reports **absent optional relationships**. The module never
+ * invents a record to satisfy an optional link.
  */
 export const HrEmployeeMutationResponseSchema = HrEmployeeViewSchema.extend({
   import_receipt: HrImportReceiptSchema.optional(),
+  warnings: z.array(HrRelationshipWarningSchema).optional(),
 });
 export type HrEmployeeMutationResponse = z.infer<typeof HrEmployeeMutationResponseSchema>;
 
 export const HrDepartmentMutationResponseSchema = HrDepartmentSchema.extend({
   import_receipt: HrImportReceiptSchema.optional(),
+  warnings: z.array(HrRelationshipWarningSchema).optional(),
 });
 export type HrDepartmentMutationResponse = z.infer<typeof HrDepartmentMutationResponseSchema>;
 
 export const HrLeaveMutationResponseSchema = HrLeaveSchema.extend({
   import_receipt: HrImportReceiptSchema.optional(),
+  warnings: z.array(HrRelationshipWarningSchema).optional(),
 });
 export type HrLeaveMutationResponse = z.infer<typeof HrLeaveMutationResponseSchema>;
 
 export const HrPayrollTotalMutationResponseSchema = HrPayrollTotalSchema.extend({
   import_receipt: HrImportReceiptSchema.optional(),
+  warnings: z.array(HrRelationshipWarningSchema).optional(),
 });
 export type HrPayrollTotalMutationResponse = z.infer<
   typeof HrPayrollTotalMutationResponseSchema

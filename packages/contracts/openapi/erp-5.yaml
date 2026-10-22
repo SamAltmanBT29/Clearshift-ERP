@@ -477,6 +477,61 @@ paths:
       security:
         - BearerAuth: []
 
+  /leave/{id}:
+    patch:
+      operationId: updateLeave
+      tags: [Leave]
+      summary: Edit a leave record and apply the V1 state transition
+      description: |
+        Updates a leave record.
+
+        **State transition.** `status` follows the V1 leave state matrix:
+        `pending → approved | rejected` is the only transition, and `approved`
+        and `rejected` are terminal — a decision is not reversed and a leave
+        is never un-decided. Setting the same status again is a no-op. A
+        forbidden transition is answered with
+        `422 HR_INVALID_LEAVE_STATUS_TRANSITION` and the allowed set in the
+        message. The full request → approve/reject workflow with a log
+        (FR-ERP5-10) is a V2 capability and is not exposed here.
+
+        **Immutable subject.** The employee the leave belongs to is never
+        re-parented — a leave is a fact about one employee.
+
+        `date_from`, `date_to` and `type` stay editable and are re-validated
+        (date range and enumeration).
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaveRequest"
+      responses:
+        "200":
+          description: Leave record updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
   # ── Identity (read-only projection) ───────────────────────────────────────
   /identity-users:
     get:
@@ -1162,6 +1217,51 @@ components:
         idempotency_key:
           $ref: "#/components/schemas/IdempotencyKeyValue"
 
+    UpdateLeaveRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: |
+        The state transition and the editable content of a leave record. The
+        employee the leave belongs to is immutable.
+      properties:
+        status:
+          $ref: "#/components/schemas/LeaveStatus"
+          description: |
+            The V1 leave state matrix — `pending → approved | rejected` is the
+            only transition; `approved` and `rejected` are terminal. The same
+            status again is a no-op.
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+          description: Must not precede date_from
+        type:
+          $ref: "#/components/schemas/LeaveType"
+
+    RelationshipWarning:
+      type: object
+      description: |
+        An **absent optional relationship**. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["DEPARTMENT_PARENT"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["parent_id"]
+        code:
+          type: string
+          enum: [HR_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
+
     IdentityUser:
       type: object
       description: |
@@ -1264,6 +1364,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     EmployeeMutationResponse:
       description: |
@@ -1276,6 +1381,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     LeaveMutationResponse:
       description: |
@@ -1287,6 +1397,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     PayrollTotalMutationResponse:
       description: |
@@ -1298,6 +1413,11 @@ components:
           properties:
             import_receipt:
               $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
 
     EmployeeListResponse:
       type: object
