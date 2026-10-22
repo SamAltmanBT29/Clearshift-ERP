@@ -1,65 +1,45 @@
 /**
  * ERP-5 HR & Employees — Shared Route Guards
  *
- * The module does not own an authorization matrix. It consumes the platform
- * primitives:
+ * Every route of the module is bound to a **declared** policy of
+ * `HR_ROUTE_POLICIES` (see `src/policies/permissions.ts`). The role sets
+ * come from the central matrix of PLT-06 — the module owns no role list of
+ * its own.
  *
- *   - `packages/rbac` (PLT-03) — the shared **capability** matrix. The
- *     `module.write` capability is granted to Editor and Admin, which is
- *     exactly the role set of the central matrix's `hr.mutate` policy
- *     (PLT-06).
- *   - `packages/core` (PLT-06) — the central **role / action / resource**
- *     matrix. `hr.payroll_bulk` (MIGRATION_RUNNER, ADMIN) is expressed there
- *     as `EXECUTE_BULK` / `UPDATE` on the `payroll` resource.
+ * The policy is bound to an **entity kind**, which is the object-level
+ * dimension: a route guarded by `hr.employees.update` can only ever reach an
+ * employee row, because the service resolves the identifier in the table that
+ * belongs to the route. An identifier of another module resolves to nothing
+ * and is answered with `404` — no row is mutated through it.
  *
  * The Migration Kit therefore loads a payroll aggregate as MIGRATION_RUNNER
- * and can never write into the `erp5` tables directly (Decision C7) — it
- * goes through this module's public API.
+ * and can never write into the `erp5` tables directly (Decision C7): it goes
+ * through this module's public API.
  *
  * @module erp5/routes/guard
  */
 
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { AppError } from '@cs/kernel';
-import { Capabilities, requireCapability } from '@cs/rbac';
-import { hasPermission } from '@cs/core';
-import { Actions, Resources } from '@clearshift/contracts';
+import { requireHrPolicy } from '../policies/guard.js';
+import { HrPolicies } from '../policies/permissions.js';
 
-/**
- * Employees, departments and leave — the HR master records.
- *
- * `module.write` is held by Editor and Admin, which is the role set of the
- * central matrix's `hr.mutate` policy.
- */
-export const hrWriteGuard = requireCapability(Capabilities.MODULE_WRITE);
+// ── Employees (FR-ERP5-01/02) ───────────────────────────────────────────────
+export const employeeReadGuard = requireHrPolicy(HrPolicies.EMPLOYEES_READ);
+export const employeeCreateGuard = requireHrPolicy(HrPolicies.EMPLOYEES_CREATE);
+export const employeeUpdateGuard = requireHrPolicy(HrPolicies.EMPLOYEES_UPDATE);
 
-/**
- * Payroll aggregates — the department/month bulk load.
- *
- * The central matrix (PLT-06) declares `hr.payroll_bulk` for MIGRATION_RUNNER
- * and Admin. The check is expressed with the shared matrix itself instead of
- * a local role list, so the module can never drift from the platform policy.
- */
-export const hrPayrollWriteGuard = async (
-  request: FastifyRequest,
-  _reply: FastifyReply
-): Promise<void> => {
-  const user = request.user;
-  if (!user) {
-    throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
-  }
+// ── Departments (FR-ERP5-03) ────────────────────────────────────────────────
+export const departmentReadGuard = requireHrPolicy(HrPolicies.DEPARTMENTS_READ);
+export const departmentCreateGuard = requireHrPolicy(HrPolicies.DEPARTMENTS_CREATE);
+export const departmentUpdateGuard = requireHrPolicy(HrPolicies.DEPARTMENTS_UPDATE);
 
-  const roles = user.roles ?? [];
-  const allowed =
-    hasPermission(roles, Actions.CREATE, Resources.PAYROLL) ||
-    hasPermission(roles, Actions.UPDATE, Resources.PAYROLL) ||
-    hasPermission(roles, Actions.EXECUTE_BULK, Resources.PAYROLL);
+// ── Leave (FR-ERP5-04) ──────────────────────────────────────────────────────
+export const leaveReadGuard = requireHrPolicy(HrPolicies.LEAVE_READ);
+export const leaveCreateGuard = requireHrPolicy(HrPolicies.LEAVE_CREATE);
+export const leaveUpdateGuard = requireHrPolicy(HrPolicies.LEAVE_UPDATE);
 
-  if (!allowed) {
-    throw new AppError(
-      'FORBIDDEN',
-      'Access denied. Loading a payroll aggregate requires the central matrix role set (MIGRATION_RUNNER, ADMIN).',
-      403
-    );
-  }
-};
+// ── Payroll aggregates (FR-ERP5-06) ─────────────────────────────────────────
+export const payrollReadGuard = requireHrPolicy(HrPolicies.PAYROLL_READ);
+export const payrollLoadGuard = requireHrPolicy(HrPolicies.PAYROLL_LOAD);
+
+// ── Hub Identity projection (FR-ERP5-05) — read only ────────────────────────
+export const identityUsersReadGuard = requireHrPolicy(HrPolicies.IDENTITY_USERS_READ);

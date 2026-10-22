@@ -12,6 +12,8 @@
     "./erp-1": "./src/erp-1.ts",
     "./erp-2": "./src/erp-2.ts",
     "./erp-4": "./src/erp-4.ts",
+    "./erp-4-mock": "./src/erp-4-mock.ts",
+    "./erp-4-events": "./src/erp-4-events.ts",
     "./erp-5": "./src/erp-5.ts",
     "./import-target": "./src/import-target.ts",
     "./roles": "./src/roles.ts",
