@@ -67,6 +67,32 @@ describe('ERP-5 module route registration', () => {
       }
     });
 
+    it('registers no screen that the manifest does not declare', () => {
+      // The manifest is the single source of truth, so the check runs in both
+      // directions: a screen that exists only in the route table would have no
+      // navigation entry, no breadcrumb and no browser title.
+      const registeredIds = flattenRoutes(erp5Routes)
+        .map((route) => route.id)
+        .filter((id): id is string => typeof id === 'string');
+
+      const declaredIds = ERP5_ROUTE_DESCRIPTORS.map((descriptor) => `erp5-${descriptor.id}`);
+      const structuralIds = ['erp5', 'erp5-shell', 'erp5-index', 'erp5-not-found'];
+
+      for (const id of registeredIds) {
+        expect([...declaredIds, ...structuralIds]).toContain(id);
+      }
+    });
+
+    it('registers the same path in the route table and in the manifest', () => {
+      const registeredPaths = flattenRoutes(erp5Routes)
+        .map((route) => route.path)
+        .filter((path): path is string => typeof path === 'string');
+
+      for (const descriptor of ERP5_ROUTE_DESCRIPTORS) {
+        expect(registeredPaths).toContain(descriptor.path);
+      }
+    });
+
     it('mounts the whole module under the ERP-5 base path', () => {
       const root = erp5Routes[0];
       expect(root?.path).toBe('/erp5');

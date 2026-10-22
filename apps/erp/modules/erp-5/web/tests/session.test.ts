@@ -35,8 +35,10 @@ describe('ERP-5 session adapter', () => {
   });
   afterEach(() => {
     // Restore the environment before touching the storage — the "no window"
-    // cases stub the global away.
+    // cases stub the global away, and the blocked-storage cases replace the
+    // storage getter with one that throws.
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     window.sessionStorage.clear();
   });
 
@@ -87,12 +89,26 @@ describe('ERP-5 session adapter', () => {
       expect(decodeJwtClaims('')).toBeNull();
     });
 
+    it('returns no claims for a token with an empty payload', () => {
+      expect(decodeJwtClaims('header..signature')).toBeNull();
+    });
+
     it('returns no claims for a payload that is not JSON', () => {
       expect(decodeJwtClaims('a.bm90LWpzb24.c')).toBeNull();
     });
 
     it('returns no claims for a payload that is not an object', () => {
       const token = `${buildAccessToken({ exp: 1 }).split('.')[0]}.${btoa('[1,2,3]')}.sig`;
+      expect(decodeJwtClaims(token)).toBeNull();
+    });
+
+    it('returns no claims for a payload that is null', () => {
+      const token = `${buildAccessToken({ exp: 1 }).split('.')[0]}.${btoa('null')}.sig`;
+      expect(decodeJwtClaims(token)).toBeNull();
+    });
+
+    it('returns no claims for a payload that is not base64', () => {
+      const token = `${buildAccessToken({ exp: 1 }).split('.')[0]}.%%%%.sig`;
       expect(decodeJwtClaims(token)).toBeNull();
     });
   });
@@ -170,6 +186,54 @@ describe('ERP-5 session adapter', () => {
 
     it('resolves no session when there is no window', () => {
       vi.stubGlobal('window', undefined);
+      expect(getSession()).toBeNull();
+    });
+  });
+
+  describe('6. A storage that refuses to answer', () => {
+    /**
+     * Replaces the session storage with one that throws on every operation —
+     * the behaviour of a browser in private mode or under a strict privacy
+     * setting. The module must treat that as "no session", never as a crash.
+     */
+    function stubBlockedStorage(): void {
+      const blocked = {
+        getItem: () => {
+          throw new Error('storage is blocked');
+        },
+        setItem: () => {
+          throw new Error('storage is blocked');
+        },
+        removeItem: () => {
+          throw new Error('storage is blocked');
+        },
+        clear: () => {
+          throw new Error('storage is blocked');
+        },
+        key: () => null,
+        length: 0,
+      };
+      vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(
+        blocked as unknown as Storage
+      );
+    }
+
+    it('reads no token when the storage throws', () => {
+      stubBlockedStorage();
+
+      expect(readAccessToken()).toBeNull();
+    });
+
+    it('writes and clears without throwing when the storage throws', () => {
+      stubBlockedStorage();
+
+      expect(() => writeAccessToken('token-value')).not.toThrow();
+      expect(() => clearAccessToken()).not.toThrow();
+    });
+
+    it('resolves no session when the storage throws', () => {
+      stubBlockedStorage();
+
       expect(getSession()).toBeNull();
     });
   });

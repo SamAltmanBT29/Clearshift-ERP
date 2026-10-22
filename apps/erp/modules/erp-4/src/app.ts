@@ -24,6 +24,7 @@ import { Erp4AuditService } from './services/audit.js';
 import { authPlugin, type AuthenticatedFinanceUser } from './plugins/auth.js';
 import { erp4FieldMaskingPlugin } from './policies/masking.js';
 import { erpFinanceRoutes } from './routes/index.js';
+import { authenticateFinanceRequest } from './interface/authz.js';
 
 export interface AppOptions {
   repository?: FinanceRepository | undefined;

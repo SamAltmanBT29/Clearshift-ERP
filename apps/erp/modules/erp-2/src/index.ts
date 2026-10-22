@@ -22,4 +22,6 @@ export const moduleDefinition = {
   routes: erpVendorsRoutes,
 };
 
+export const erp2Descriptor = moduleDefinition;
+
 export default moduleDefinition;

@@ -193,6 +193,25 @@ function isDynamicSegment(segment: string): boolean {
 }
 
 /**
+ * Decodes a URL path segment, tolerating a malformed percent escape.
+ *
+ * A browser can hand the module any pathname, including one with a stray or
+ * truncated escape such as `/erp5/employees/100%`. `decodeURIComponent` throws
+ * a `URIError` on those, which would take down the whole shell — the document
+ * title and the breadcrumb trail are derived from the same match. A malformed
+ * segment is therefore kept verbatim: it is only ever used as a display label
+ * and a route parameter, and the raw text is the honest representation of what
+ * the operator asked for.
+ */
+function safeDecodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+/**
  * Matches a pathname against the route table.
  *
  * A static segment always wins over a dynamic one, so `/erp5/employees/new`
@@ -227,7 +246,7 @@ export function matchErp5Route(
       const pattern = patternSegments[index] as string;
       const actual = routeSegments[index] as string;
       if (isDynamicSegment(pattern)) {
-        params[pattern.slice(1)] = decodeURIComponent(actual);
+        params[pattern.slice(1)] = safeDecodeSegment(actual);
       } else if (pattern === actual) {
         staticScore += 1;
       } else {

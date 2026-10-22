@@ -194,6 +194,9 @@ describe('ERP-5 remaining list screens', () => {
     it('offers no search box, because the endpoint has no search parameter', async () => {
       renderScreen(<LeaveListPage />);
 
+      // The collection is loaded first, so the assertion runs against a
+      // settled screen.
+      await screen.findByRole('table', { name: 'Leave records' });
       expect(screen.queryByLabelText('Search leave records')).toBeNull();
     });
 

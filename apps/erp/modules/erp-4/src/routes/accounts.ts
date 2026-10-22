@@ -17,6 +17,10 @@ import {
   IdParamSchema,
 } from '@clearshift/contracts';
 import type { FinanceService } from '../services/finance.service.js';
+import {
+  assertTenantAccess,
+  registerEntityTenant,
+} from './guard.js';
 import { requireFinancePolicy, FinancePolicies } from '../policies/index.js';
 
 export interface AccountsRouteOptions {
@@ -44,6 +48,7 @@ export const accountsRoutes: FastifyPluginAsync<AccountsRouteOptions> = async (f
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const account = await financeService.getAccountById(params.id);
+      assertTenantAccess(request.user, account, request.headers['x-tenant-id'] as string | undefined);
       return reply.status(200).send(account);
     }
   );
@@ -60,7 +65,13 @@ export const accountsRoutes: FastifyPluginAsync<AccountsRouteOptions> = async (f
         ...(idempotencyHeader && !(rawBody as any).idempotency_key && { idempotency_key: idempotencyHeader }),
       });
 
+      assertTenantAccess(request.user, body, request.headers['x-tenant-id'] as string | undefined);
+
       const result = await financeService.createAccount(body);
+      const tenantId = (rawBody as any).tenant_id ?? (request.headers['x-tenant-id'] as string | undefined);
+      if (result.account?.id && tenantId) {
+        registerEntityTenant(result.account.id, tenantId);
+      }
       return reply.status(result.created ? 201 : 200).send(result.account);
     }
   );
@@ -72,6 +83,10 @@ export const accountsRoutes: FastifyPluginAsync<AccountsRouteOptions> = async (f
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const body = UpdateAccountRequestSchema.parse(request.body);
+
+      const existing = await financeService.getAccountById(params.id);
+      assertTenantAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const updated = await financeService.updateAccount(params.id, body);
       return reply.status(200).send(updated);
     }

@@ -109,6 +109,11 @@ export const authPluginAsync: FastifyPluginAsync<AuthPluginOptions> = async (
           exp: claims.exp,
           jti: claims.jti,
           ...(claims.employee_id ? { employee_id: claims.employee_id } : {}),
+          ...(request.headers['x-tenant-id']
+            ? { tenant_id: request.headers['x-tenant-id'] as string }
+            : (claims as any).tenant_id
+            ? { tenant_id: (claims as any).tenant_id }
+            : {}),
         };
         return;
       } catch (err: any) {
@@ -123,17 +128,19 @@ export const authPluginAsync: FastifyPluginAsync<AuthPluginOptions> = async (
     let role: RoleType = Roles.ADMIN;
     let roles: RoleType[] = [Roles.ADMIN];
     let sub = 'ffffffff-0001-0001-0001-000000000001';
+    const headerTenantId = request.headers['x-tenant-id'] as string | undefined;
+    let specifiedTenantId = headerTenantId;
 
-    const roleMatch = token.match(/role:([a-z_]+)/);
+    const roleMatch = token.match(/role:([a-z_]+)(?::([a-zA-Z0-9_-]+))?(?::([a-zA-Z0-9_-]+))?/);
     if (roleMatch && roleMatch[1]) {
       const parsedRole = roleMatch[1] as RoleType;
-      if (ALL_ROLES.has(parsedRole)) {
-        role = parsedRole;
-        roles = [parsedRole];
-      } else {
-        // Unknown role grants no valid role
-        role = parsedRole;
-        roles = [parsedRole];
+      role = parsedRole;
+      roles = [parsedRole];
+      if (roleMatch[2]) {
+        sub = roleMatch[2];
+      }
+      if (roleMatch[3]) {
+        specifiedTenantId = roleMatch[3];
       }
     } else if (token === 'valid-jwt-token-synthetic') {
       role = Roles.ADMIN;
@@ -156,6 +163,7 @@ export const authPluginAsync: FastifyPluginAsync<AuthPluginOptions> = async (
       aud: 'clearshift',
       exp: Math.floor(Date.now() / 1000) + 3600,
       jti: 'syn-test-01',
+      ...(specifiedTenantId ? { tenant_id: specifiedTenantId } : {}),
     };
   };
 
