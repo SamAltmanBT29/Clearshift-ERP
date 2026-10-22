@@ -41,6 +41,9 @@ tags:
   - name: Opening Balances
     description: One-time opening balance loads
 
+security:
+  - BearerAuth: []
+
 # ────────────────────────────────────────────────────────────────────────────
 # Paths
 # ────────────────────────────────────────────────────────────────────────────
@@ -976,6 +979,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        Asymmetric EdDSA (Ed25519) JSON Web Token issued by ClearShift Hub (`clearshift-hub`).
+        Audience: `clearshift`.
+        Verifies active user state, expiration (`exp`), and RBAC roles (`viewer`, `editor`, `migration_runner`, `analyst`, `admin`).
 
   parameters:
     ResourceId:
