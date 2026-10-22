@@ -20,7 +20,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "validate:frontend": "node scripts/validate-frontend.js"
+    "validate:frontend": "node scripts/validate-frontend.js",
+    "security:scan": "node --experimental-strip-types infra/security/scan-secrets.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
