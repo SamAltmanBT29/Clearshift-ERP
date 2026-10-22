@@ -1,0 +1,1604 @@
+openapi: "3.1.0"
+
+info:
+  title: ClearShift ERP — HR & Employees API
+  description: |
+    **ERP-5 HR & Employees module** — public REST contract.
+
+    Base path: `/api/v1/erp-hr`
+
+    Implements:
+    - Employee list, search and create/edit (FR-ERP5-01, FR-ERP5-02)
+    - Departments with optional parent hierarchy (FR-ERP5-03)
+    - Leave records with date range, type and status (FR-ERP5-04)
+    - Read-only Hub Identity user projection (FR-ERP5-05, Master Architecture Spec C3)
+    - Department/month payroll aggregates (FR-ERP5-06)
+
+    Domain rules enforced by both the API and the database:
+    - `BR-ERP5-01` — join date can never be before the birth date.
+    - `BR-ERP5-02` — salary is never returned in full to viewers and never logged.
+
+    Monetary values are returned as **string-encoded decimals** to avoid
+    IEEE-754 floating-point rounding. All timestamps are ISO 8601 with timezone.
+  version: "1.0.0"
+  contact:
+    name: ClearShift Engineering — ERP Team
+  license:
+    name: Private
+
+servers:
+  - url: http://localhost:3000/api/v1/erp-hr
+    description: Local development server
+  - url: https://api.clearshift.internal/api/v1/erp-hr
+    description: Staging / production
+
+tags:
+  - name: Employees
+    description: Employee master records
+  - name: Departments
+    description: Department hierarchy
+  - name: Leave
+    description: Leave records
+  - name: Identity
+    description: Read-only Hub Identity projection
+  - name: Payroll
+    description: Department/month payroll aggregates
+
+# ────────────────────────────────────────────────────────────────────────────
+# Paths
+# ────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Employees ─────────────────────────────────────────────────────────────
+  /employees:
+    get:
+      operationId: listEmployees
+      tags: [Employees]
+      summary: List employees
+      description: |
+        Returns a bounded page of employees. Results are ordered by the
+        requested sort field with a deterministic `id` tie-breaker.
+        Salary is never returned in full — the `EmployeeView` projection
+        exposes `salary_display` only (BR-ERP5-02).
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Server-side case-insensitive search across first name, last name and employee number
+        - name: department_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Restrict the result set to one department
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, employee_no, join_date]
+            default: name
+          description: Allow-listed sort field
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createEmployee
+      tags: [Employees]
+      summary: Create an employee
+      description: |
+        Creates an employee. `employee_no` must be unique across the module
+        and `join_date` must not precede `birth_date` (BR-ERP5-01).
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (the role set of the central matrix's `hr.mutate` policy,
+        PLT-06). Viewer, Analyst and Migration Runner receive `403`.
+
+        The response carries the **masked** `EmployeeView` projection — the raw
+        `salary` column never leaves the module (BR-ERP5-02, DR-5).
+
+        Import/load write: supply `batch_id`, `source_row` and an
+        `Idempotency-Key` together. The three fields travel together because
+        an idempotency key without a batch and a source row cannot produce a
+        durable receipt. The receipt is written in the same transaction as the
+        employee row, and `source_system` / `source_id` may then be set by the
+        Migration Kit. A repeated request with the same idempotency key
+        returns the original receipt and the original row (HTTP 200) without
+        performing a second mutation.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmployeeRequest"
+            examples:
+              employee:
+                summary: Create an employee
+                value:
+                  employee_no: "EMP-0001"
+                  first_name: "Asha"
+                  last_name: "Iyer"
+                  birth_date: "1990-04-12"
+                  join_date: "2024-01-08"
+                  department_id: "11111111-1111-1111-1111-111111111111"
+                  job_title: "Software Engineer"
+                  salary: "125000.0000"
+                  currency_code: "INR"
+              employeeImport:
+                summary: Import an employee (Migration Kit)
+                value:
+                  employee_no: "EMP-0001"
+                  first_name: "Asha"
+                  last_name: "Iyer"
+                  birth_date: "1990-04-12"
+                  join_date: "2024-01-08"
+                  department_id: "11111111-1111-1111-1111-111111111111"
+                  job_title: "Software Engineer"
+                  salary: "125000.0000"
+                  source_system: "legacy_hr_csv"
+                  source_id: "row-0001"
+                  batch_id: "44444444-4444-4444-4444-444444444444"
+                  source_row: 1
+      responses:
+        "201":
+          description: Employee created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeMutationResponse"
+        "200":
+          description: |
+            Idempotent replay — the original employee and the original import
+            receipt are returned and no second mutation was performed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [Employees]
+      summary: Read an employee
+      description: |
+        Returns one employee as the **masked** projection — the raw `salary`
+        column never leaves the module (BR-ERP5-02).
+
+        Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeView"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    patch:
+      operationId: updateEmployee
+      tags: [Employees]
+      summary: Edit an employee
+      description: |
+        Updates the allow-listed mutable fields of an employee. The
+        `join_date`/`birth_date` pair is re-validated against the stored
+        values (BR-ERP5-01). `employee_no` remains unique across the module.
+
+        `id`, `created_at`, `updated_at`, `currency_code`, `source_system` and
+        `source_id` are system-maintained and are rejected with
+        `400 HR_PROTECTED_FIELD` — a browser may never set them.
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmployeeRequest"
+      responses:
+        "200":
+          description: Employee updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Departments ───────────────────────────────────────────────────────────
+  /departments:
+    get:
+      operationId: listDepartments
+      tags: [Departments]
+      summary: List departments
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Server-side case-insensitive search across name and code
+        - name: parent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Restrict the result set to the children of one department
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, code]
+            default: name
+          description: Allow-listed sort field
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createDepartment
+      tags: [Departments]
+      summary: Create a department
+      description: |
+        Creates a department. `code` must be unique across the module.
+        `parent_id` must reference an existing department; a department can
+        never be its own parent.
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+
+        Import/load write: supply `batch_id`, `source_row` and an
+        `Idempotency-Key` together. The receipt is written in the same
+        transaction as the department row.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepartmentRequest"
+      responses:
+        "201":
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentMutationResponse"
+        "200":
+          description: |
+            Idempotent replay — the original department and the original import
+            receipt are returned and no second mutation was performed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /departments/{id}:
+    get:
+      operationId: getDepartment
+      tags: [Departments]
+      summary: Read a department
+      description: |
+        Returns one department. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Department"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    patch:
+      operationId: updateDepartment
+      tags: [Departments]
+      summary: Edit a department
+      description: |
+        Updates the allow-listed mutable fields of a department. `code` stays
+        unique, `parent_id` must reference an existing department, and the
+        hierarchy must stay acyclic (a self-parent or a cycle is rejected with
+        `422 HR_DEPARTMENT_SELF_PARENT` / `422 HR_DEPARTMENT_CYCLE`).
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDepartmentRequest"
+      responses:
+        "200":
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DepartmentMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Leave ─────────────────────────────────────────────────────────────────
+  /leave:
+    get:
+      operationId: listLeave
+      tags: [Leave]
+      summary: List leave records
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: employee_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Restrict the result set to one employee
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeaveType"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeaveStatus"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createLeave
+      tags: [Leave]
+      summary: Create a leave record
+      description: |
+        Creates a leave record. `date_to` must not precede `date_from` and the
+        referenced employee must exist.
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+
+        V1 records the leave status only; the request → approve/reject
+        workflow (FR-ERP5-10) is a V2 capability.
+
+        Import/load write: supply `batch_id`, `source_row` and an
+        `Idempotency-Key` together. The receipt is written in the same
+        transaction as the leave row.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLeaveRequest"
+      responses:
+        "201":
+          description: Leave record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveMutationResponse"
+        "200":
+          description: |
+            Idempotent replay — the original leave record and the original
+            import receipt are returned and no second mutation was performed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /leave/{id}:
+    get:
+      operationId: getLeave
+      tags: [Leave]
+      summary: Read a leave record
+      description: |
+        Returns one leave record. Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Leave"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    patch:
+      operationId: updateLeave
+      tags: [Leave]
+      summary: Edit a leave record and apply the V1 state transition
+      description: |
+        Updates a leave record.
+
+        **State transition.** `status` follows the V1 leave state matrix:
+        `pending → approved | rejected` is the only transition, and `approved`
+        and `rejected` are terminal — a decision is not reversed and a leave
+        is never un-decided. Setting the same status again is a no-op. A
+        forbidden transition is answered with
+        `422 HR_INVALID_LEAVE_STATUS_TRANSITION` and the allowed set in the
+        message. The full request → approve/reject workflow with a log
+        (FR-ERP5-10) is a V2 capability and is not exposed here.
+
+        **Immutable subject.** The employee the leave belongs to is never
+        re-parented — a leave is a fact about one employee.
+
+        `date_from`, `date_to` and `type` stay editable and are re-validated
+        (date range and enumeration).
+
+        Requires the shared `module.write` capability — **Editor** and
+        **Admin** (PLT-06 `hr.mutate`).
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaveRequest"
+      responses:
+        "200":
+          description: Leave record updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaveMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Identity (read-only projection) ───────────────────────────────────────
+  /identity-users:
+    get:
+      operationId: listIdentityUsers
+      tags: [Identity]
+      summary: List Hub Identity users (read-only projection)
+      description: |
+        Returns the read-only Hub Identity projection. HR does not own users,
+        does not store credentials and does not grant application roles; the
+        projection exposes identity attributes only — no password, hash, token
+        or refresh-token field is ever returned.
+
+        The list is **empty** when the platform has not created the projection
+        yet (it exists only together with `platform.hub_users`).
+
+        Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+          description: Server-side case-insensitive search across the username
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityUserListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  # ── Payroll totals ────────────────────────────────────────────────────────
+  /payroll-totals:
+    get:
+      operationId: listPayrollTotals
+      tags: [Payroll]
+      summary: List department/month payroll aggregates
+      description: |
+        Returns one aggregate per department and month. The payload contains
+        department totals only — never employee-level rows (FR-ERP5-06).
+
+        Requires the shared `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: Payroll month in YYYY-MM form
+        - name: department_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Restrict the result set to one department
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotalListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+    post:
+      operationId: createPayrollTotal
+      tags: [Payroll]
+      summary: Load a department/month payroll aggregate
+      description: |
+        Loads one department/month aggregate. One aggregate exists per
+        department and month; a second load for the same pair is rejected with
+        409. The payload carries no employee-level data — an employee field is
+        rejected with `400 HR_PROTECTED_FIELD` (FR-ERP5-06).
+
+        Authorization follows the central matrix of PLT-06
+        (`hr.payroll_bulk`): the **Migration Runner** and **Admin** may load
+        an aggregate; Viewer, Editor and Analyst receive `403`.
+
+        Import/load write: supply `batch_id`, `source_row` and an
+        `Idempotency-Key` together. The receipt is written in the same
+        transaction as the aggregate row.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePayrollTotalRequest"
+      responses:
+        "201":
+          description: Aggregate created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotalMutationResponse"
+        "200":
+          description: |
+            Idempotent replay — the original aggregate and the original import
+            receipt are returned and no second mutation was performed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotalMutationResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /payroll-totals/{id}:
+    get:
+      operationId: getPayrollTotal
+      tags: [Payroll]
+      summary: Read a department/month payroll aggregate
+      description: |
+        Returns one department/month aggregate. Requires the shared
+        `module.read` capability.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollTotal"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+# ────────────────────────────────────────────────────────────────────────────
+# Components
+# ────────────────────────────────────────────────────────────────────────────
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID of the resource
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number (1-indexed)
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+      description: Page size (deterministic paging, hard cap of 100)
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+      description: |
+        Stable idempotency key for a safe retry — `batch id + source row +
+        target entity/schema version`. It must be supplied together with
+        `batch_id` and `source_row` in the request body: an idempotency key
+        without a batch and a source row cannot produce a durable import
+        receipt and is therefore rejected with
+        `400 HR_IMPORT_PROVENANCE_REQUIRED`.
+
+        The key may also be sent as the `idempotency_key` body field; the
+        header and the body field must be identical.
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: Unique or idempotency conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+
+    ApiError:
+      type: object
+      description: |
+        Standard error envelope. It mirrors the shared platform envelope
+        merged with PLT-04 (`packages/contracts/openapi/common.yaml` →
+        `#/components/schemas/ErrorEnvelope`, Zod contract
+        `@clearshift/contracts` → `ErrorEnvelopeSchema`) — it is not redefined
+        per module.
+
+        Status mapping:
+
+        | Status | Meaning | Example `code` |
+        |---|---|---|
+        | 400 | malformed request | `VALIDATION_ERROR`, `HR_PROTECTED_FIELD` |
+        | 401 | unauthenticated | `UNAUTHORIZED` |
+        | 403 | forbidden | `FORBIDDEN` |
+        | 404 | missing record | `NOT_FOUND`, `HR_DEPARTMENT_REQUIRED`, `HR_EMPLOYEE_REQUIRED` |
+        | 409 | duplicate / idempotency conflict | `HR_EMPLOYEE_NO_DUPLICATE`, `HR_DEPARTMENT_CODE_DUPLICATE`, `HR_PAYROLL_TOTAL_DUPLICATE`, `HR_IDEMPOTENCY_CONFLICT` |
+        | 422 | invalid business value | `HR_JOIN_DATE_AFTER_BIRTH_DATE`, `HR_LEAVE_DATE_RANGE_VALID`, `HR_SALARY_NON_NEGATIVE`, `HR_DEPARTMENT_SELF_PARENT`, `HR_DEPARTMENT_CYCLE` |
+        | 500 | unexpected failure | `INTERNAL_SERVER_ERROR` |
+
+        The envelope never carries a SQL statement, a stack trace, a secret or
+        a raw row. An unexpected failure returns only a correlation id.
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code
+          examples: ["HR_JOIN_DATE_AFTER_BIRTH_DATE"]
+        message:
+          type: string
+          description: Human-readable summary
+        details:
+          type: array
+          default: []
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+              code:
+                type: string
+        correlation_id:
+          type: string
+          description: Correlation id for log tracing
+
+    ImportReceipt:
+      type: object
+      description: |
+        Durable import receipt (`erp5.import_receipts`). It is written in the
+        same PostgreSQL transaction as the target mutation, so a receipt can
+        never exist without its row and a row can never exist without its
+        receipt.
+      required:
+        [id, batch_id, source_row, entity, schema_version, idempotency_key,
+         target_id, kind, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        entity:
+          type: string
+          maxLength: 64
+          description: Target entity of the load
+          examples: ["employee"]
+        schema_version:
+          type: integer
+          minimum: 1
+          default: 1
+        idempotency_key:
+          type: string
+          maxLength: 128
+        target_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [created, linked]
+          default: created
+        created_at:
+          type: string
+          format: date-time
+
+    ListMeta:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+
+    LeaveType:
+      type: string
+      enum: [sick, holiday, other]
+
+    LeaveStatus:
+      type: string
+      enum: [pending, approved, rejected]
+
+    Department:
+      type: object
+      required: [id, name, code, parent_id, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+        code:
+          type: string
+          maxLength: 32
+          description: Unique department code
+        parent_id:
+          type: [string, "null"]
+          format: uuid
+          description: Optional parent department
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      required: [name, code]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        parent_id:
+          type: [string, "null"]
+          format: uuid
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        source_row:
+          $ref: "#/components/schemas/SourceRow"
+        idempotency_key:
+          $ref: "#/components/schemas/IdempotencyKeyValue"
+
+    UpdateDepartmentRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        code:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        parent_id:
+          type: [string, "null"]
+          format: uuid
+
+    BatchId:
+      type: string
+      format: uuid
+      description: Migration batch identifier — stored on the import receipt.
+
+    SourceRow:
+      type: integer
+      minimum: 0
+      maximum: 1000000
+      description: Source row number inside the migration batch.
+
+    IdempotencyKeyValue:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: |
+        Stable idempotency key. It must travel together with `batch_id` and
+        `source_row`; a partial triple is rejected with
+        `400 HR_IMPORT_PROVENANCE_REQUIRED`.
+
+    Employee:
+      type: object
+      description: |
+        Privileged internal representation of an employee.
+
+        **Not returned by any V1 endpoint.** Every employee response uses the
+        masked `EmployeeView` projection, because BR-ERP5-02 forbids showing
+        the full salary to a viewer and V1 defines no role that may see it
+        (DR-5). The schema is kept so the internal shape stays documented.
+      required:
+        [id, employee_no, first_name, last_name, birth_date, join_date,
+         department_id, job_title, salary, currency_code, source_system,
+         source_id, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_no:
+          type: string
+          maxLength: 32
+          description: Unique declared employee identifier
+        first_name:
+          type: string
+          maxLength: 120
+        last_name:
+          type: string
+          maxLength: 120
+        birth_date:
+          type: string
+          format: date
+        join_date:
+          type: string
+          format: date
+        department_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+          maxLength: 120
+        salary:
+          type: string
+          pattern: '^\d+(\.\d{1,4})?$'
+          description: String-encoded decimal. Masked before serialization for viewers.
+        currency_code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    EmployeeView:
+      type: object
+      description: |
+        Employee projection for viewers — the raw `salary` column is absent and
+        replaced by a masked display value (BR-ERP5-02).
+      required:
+        [id, employee_no, first_name, last_name, birth_date, join_date,
+         department_id, job_title, salary_display, currency_code,
+         created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_no:
+          type: string
+          maxLength: 32
+        first_name:
+          type: string
+          maxLength: 120
+        last_name:
+          type: string
+          maxLength: 120
+        birth_date:
+          type: string
+          format: date
+        join_date:
+          type: string
+          format: date
+        department_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+          maxLength: 120
+        salary_display:
+          type: string
+          description: Masked salary — "XX,XXX" or "salary hidden"
+          examples: ["XX,XXX"]
+        currency_code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateEmployeeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [employee_no, first_name, last_name, birth_date, join_date,
+         department_id, job_title, salary]
+      properties:
+        employee_no:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        birth_date:
+          type: string
+          format: date
+        join_date:
+          type: string
+          format: date
+          description: Must not precede birth_date (BR-ERP5-01)
+        department_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        salary:
+          type: string
+          pattern: '^\d+(\.\d{1,4})?$'
+        currency_code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: |
+            ISO 4217 currency of the salary. Optional on create (defaults to
+            `INR`) and immutable afterwards — a patch that carries
+            `currency_code` is rejected with `400 HR_PROTECTED_FIELD`.
+        source_system:
+          type: string
+          maxLength: 64
+          description: |
+            System-maintained. Only an import write (a request carrying
+            `batch_id`, `source_row` and an idempotency key) may set it; a
+            browser write is rejected with `400 HR_PROTECTED_FIELD`.
+        source_id:
+          type: string
+          maxLength: 128
+          description: |
+            System-maintained. Only an import write (a request carrying
+            `batch_id`, `source_row` and an idempotency key) may set it; a
+            browser write is rejected with `400 HR_PROTECTED_FIELD`.
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        source_row:
+          $ref: "#/components/schemas/SourceRow"
+        idempotency_key:
+          $ref: "#/components/schemas/IdempotencyKeyValue"
+
+    UpdateEmployeeRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        employee_no:
+          type: string
+          minLength: 1
+          maxLength: 32
+          pattern: "^[A-Za-z0-9_-]+$"
+        first_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        last_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        birth_date:
+          type: string
+          format: date
+        join_date:
+          type: string
+          format: date
+        department_id:
+          type: string
+          format: uuid
+        job_title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        salary:
+          type: string
+          pattern: '^\d+(\.\d{1,4})?$'
+
+    Leave:
+      type: object
+      required: [id, employee_id, date_from, date_to, type, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+          description: Must not precede date_from
+        type:
+          $ref: "#/components/schemas/LeaveType"
+        status:
+          $ref: "#/components/schemas/LeaveStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateLeaveRequest:
+      type: object
+      additionalProperties: false
+      required: [employee_id, date_from, date_to, type]
+      properties:
+        employee_id:
+          type: string
+          format: uuid
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+          description: Must not precede date_from
+        type:
+          $ref: "#/components/schemas/LeaveType"
+        status:
+          $ref: "#/components/schemas/LeaveStatus"
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        source_row:
+          $ref: "#/components/schemas/SourceRow"
+        idempotency_key:
+          $ref: "#/components/schemas/IdempotencyKeyValue"
+
+    UpdateLeaveRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: |
+        The state transition and the editable content of a leave record. The
+        employee the leave belongs to is immutable.
+      properties:
+        status:
+          $ref: "#/components/schemas/LeaveStatus"
+          description: |
+            The V1 leave state matrix — `pending → approved | rejected` is the
+            only transition; `approved` and `rejected` are terminal. The same
+            status again is a no-op.
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+          description: Must not precede date_from
+        type:
+          $ref: "#/components/schemas/LeaveType"
+
+    RelationshipWarning:
+      type: object
+      description: |
+        An **absent optional relationship**. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["DEPARTMENT_PARENT"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["parent_id"]
+        code:
+          type: string
+          enum: [HR_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
+
+    IdentityUser:
+      type: object
+      description: |
+        Read-only Hub Identity projection. Contains no password, hash, token or
+        refresh-token field.
+      required: [id, username, roles, employee_ref, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        employee_ref:
+          type: [string, "null"]
+          format: uuid
+        status:
+          type: string
+
+    PayrollTotal:
+      type: object
+      description: One aggregate per department and month — never employee rows.
+      required:
+        [id, department_id, month, total_amount, currency_code, headcount,
+         created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        department_id:
+          type: string
+          format: uuid
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        total_amount:
+          type: string
+          pattern: '^\d+(\.\d{1,4})?$'
+        currency_code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        headcount:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePayrollTotalRequest:
+      type: object
+      additionalProperties: false
+      required: [department_id, month, total_amount]
+      properties:
+        department_id:
+          type: string
+          format: uuid
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        total_amount:
+          type: string
+          pattern: '^\d+(\.\d{1,4})?$'
+        currency_code:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        headcount:
+          type: integer
+          minimum: 0
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        source_row:
+          $ref: "#/components/schemas/SourceRow"
+        idempotency_key:
+          $ref: "#/components/schemas/IdempotencyKeyValue"
+
+    DepartmentListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Department"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
+
+    DepartmentMutationResponse:
+      description: |
+        Response of a department create/edit. `import_receipt` is present only
+        when the write carried the full import provenance.
+      allOf:
+        - $ref: "#/components/schemas/Department"
+        - type: object
+          properties:
+            import_receipt:
+              $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
+
+    EmployeeMutationResponse:
+      description: |
+        Response of an employee create/edit — always the masked projection
+        (BR-ERP5-02). `import_receipt` is present only when the write carried
+        the full import provenance.
+      allOf:
+        - $ref: "#/components/schemas/EmployeeView"
+        - type: object
+          properties:
+            import_receipt:
+              $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
+
+    LeaveMutationResponse:
+      description: |
+        Response of a leave create. `import_receipt` is present only when the
+        write carried the full import provenance.
+      allOf:
+        - $ref: "#/components/schemas/Leave"
+        - type: object
+          properties:
+            import_receipt:
+              $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
+
+    PayrollTotalMutationResponse:
+      description: |
+        Response of a payroll aggregate load. `import_receipt` is present only
+        when the write carried the full import provenance.
+      allOf:
+        - $ref: "#/components/schemas/PayrollTotal"
+        - type: object
+          properties:
+            import_receipt:
+              $ref: "#/components/schemas/ImportReceipt"
+            warnings:
+              type: array
+              description: Absent optional relationships — no synthetic record was created.
+              items:
+                $ref: "#/components/schemas/RelationshipWarning"
+
+    EmployeeListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmployeeView"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
+
+    LeaveListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Leave"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
+
+    IdentityUserListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdentityUser"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
+
+    PayrollTotalListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PayrollTotal"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
