@@ -81,6 +81,11 @@ The ERP-4 frontend implements the Minimal White Theme design system using CSS va
 | **AccountCreateModal** | `apps/erp/modules/erp-4/web/src/components/forms/AccountCreateModal.tsx` | Accessible modal dialog for creating posting GL accounts on the fly without losing in-flight journal draft data. |
 | **TrialBalanceTable** | `apps/erp/modules/erp-4/web/src/components/TrialBalanceTable.tsx` | Grouped debit/credit totals by account and period-end balance banner (`totalDebit === totalCredit`). |
 
+## Module Authorization & Security (Issue #171 / ERP4-15)
 
-
-
+- **Authentication**: Validates incoming Hub EdDSA JWTs via `@cs/identity` (`verifyAccessToken`). Unauthenticated requests reject with 401 `UNAUTHORIZED`.
+- **Capability Matrix**: Enforces Default Deny. Roles (`viewer`, `editor`, `migration_runner`, `analyst`, `admin`) map to granular endpoint policies (`requireFinanceRead`, `requireFinanceWrite`, `requireJournalCreate`, `requireJournalPost`, `requireOpeningBalancesLoad`, `requirePeriodUpdate`).
+- **Object-Level Guards**:
+  - Multi-tenant isolation (`assertTenantAccess`) returns 403 `OBJECT_ACCESS_DENIED`.
+  - Cross-user draft mutation protection (`assertObjectMutationAccess`) returns 403 `CROSS_USER_MUTATION_FORBIDDEN` when non-admin editors modify drafts created by others.
+- **Error Envelopes**: Standard ClearShift envelope `{ statusCode, error, code, message, details, correlation_id }` with correlation IDs preserved in headers and body.

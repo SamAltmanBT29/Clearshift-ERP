@@ -13,12 +13,14 @@
 import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
+import { AppError } from '@cs/kernel';
 import { FinanceService, ServiceError } from './services/finance.service.js';
 import { DomainError } from '../domain/engine.js';
 import type { FinanceRepository } from './services/repository.js';
 import { InMemoryFinanceRepository } from './services/repository.js';
 import type { ReferenceResolver } from '@cs/kernel';
 import { erpFinanceRoutes } from './routes/index.js';
+import { authenticateFinanceRequest } from './interface/authz.js';
 
 export interface AppOptions {
   repository?: FinanceRepository | undefined;
@@ -50,6 +52,17 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       (request.headers['x-request-id'] as string | undefined) ??
       randomUUID();
     reply.header('x-correlation-id', correlationId);
+
+    if (error instanceof AppError) {
+      return reply.status(error.statusCode).send({
+        statusCode: error.statusCode,
+        error: error.statusCode === 401 ? 'Unauthorized' : error.statusCode === 403 ? 'Forbidden' : error.code,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        correlation_id: correlationId,
+      });
+    }
 
     if (error instanceof ServiceError) {
       return reply.status(error.statusCode).send({
@@ -118,62 +131,8 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   });
 
   // ── Authentication & Authorization Hook ────────────────────────────────────
-  app.addHook('onRequest', async (request, reply) => {
-    const authHeader = request.headers.authorization;
-
-    if (authRequired && !authHeader) {
-      return reply.status(401).send({
-        statusCode: 401,
-        error: 'Unauthorized',
-        message: 'Missing Authorization header. Bearer token required.',
-        details: [],
-      });
-    }
-
-    if (authHeader) {
-      if (!authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          message: 'Invalid Authorization header format. Expected "Bearer <token>".',
-          details: [],
-        });
-      }
-
-      const token = authHeader.slice(7).trim();
-      if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          message: 'Invalid or expired bearer token.',
-          details: [],
-        });
-      }
-
-      let role = 'finance_admin';
-      const id = 'ffffffff-0001-0001-0001-000000000001';
-
-      const match = token.match(/role:([a-z_]+)/);
-      if (match && match[1]) {
-        role = match[1];
-      }
-
-      (request as any).user = {
-        id,
-        role,
-        sub: id,
-        roles: [role],
-      };
-      return;
-    }
-
-    // Default system context when auth is not strictly required
-    (request as any).user = {
-      id: 'ffffffff-0001-0001-0001-000000000001',
-      role: 'finance_admin',
-      sub: 'ffffffff-0001-0001-0001-000000000001',
-      roles: ['finance_admin'],
-    };
+  app.addHook('onRequest', async (request) => {
+    await authenticateFinanceRequest(request, authRequired);
   });
 
   // ── Register Module Routes ─────────────────────────────────────────────────

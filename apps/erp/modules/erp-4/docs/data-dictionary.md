@@ -330,5 +330,74 @@ When an optional relationship is absent, the system emits an approved warning ob
 - **Double-Entry Balance Invariant (`BR-ERP4-01`)**: `SUM(debit) == SUM(credit)` enforced within explicit currency at 4 decimal places (`NUMERIC(20,4)`).
 - **Trial Balance Aggregation**: Computed strictly from posted and reversed ledger movements plus one-time opening balances. Unlike currencies are segregated; `totals.is_balanced` asserts global double-entry equality.
 
+---
 
+## 11. Module Authorization Policy & Object-Level Guards (ERP4-15 / #171)
 
+ERP-4 Finance and Accounting enforces server-side role-based access control (RBAC), cryptographic JWT authentication, and object-level authorization across all `/api/v1/erp-finance/*` endpoints.
+
+### 11.1 Authentication & Token Verification (PLT-05)
+
+- Every incoming HTTP request must include an `Authorization: Bearer <token>` header containing a Hub-issued JSON Web Token (JWT).
+- Cryptographic verification uses EdDSA (Ed25519) public keys signed by ClearShift Hub (`cs-hub-key-v1`), validating signature integrity, issuer (`clearshift-hub`), audience (`clearshift`), and token expiration (`exp`).
+- Requests with missing, expired, tampered, or disabled-user tokens are rejected immediately with HTTP 401 `UNAUTHORIZED`.
+
+### 11.2 Role Capability Matrix & Default Deny
+
+Access follows the **Default Deny** security invariant. Roles map to granular capabilities as defined in `@cs/identity` and `@cs/rbac`:
+
+| Role | Read Operations (`accounts`, `journal`, `reports`) | Account Mutations (`accounts POST/PATCH`) | Journal Draft / Post / Reverse | Opening Balances Bulk Load | Accounting Periods Lifecycle (`open`, `soft_closed`, `locked`) |
+|---|---|---|---|---|---|
+| **Viewer** (`viewer`) | Allowed | Denied (403) | Denied (403) | Denied (403) | Denied (403) |
+| **Editor** (`editor`) | Allowed | Allowed | Allowed | Denied (403) | Denied (403) |
+| **Migration Runner** (`migration_runner`) | Allowed | Denied (403) | Create Draft Only (403 on Post) | Allowed | Denied (403) |
+| **Analyst** (`analyst`) | Allowed | Denied (403) | Denied (403) | Denied (403) | Denied (403) |
+| **Admin** (`admin`) | Allowed | Allowed | Allowed | Allowed | Allowed |
+
+### 11.3 Policy Mapping by Endpoint
+
+| Endpoint | Method | Required Policy | Allowed Roles |
+|---|---|---|---|
+| `/api/v1/erp-finance/accounts` | `GET` | `finance.accounts.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/accounts/:id` | `GET` | `finance.accounts.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/accounts` | `POST` | `finance.accounts.create` | Editor, Admin |
+| `/api/v1/erp-finance/accounts/:id` | `PATCH` | `finance.accounts.update` | Editor, Admin |
+| `/api/v1/erp-finance/journal-entries` | `GET` | `finance.journal.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/journal-entries/:id` | `GET` | `finance.journal.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/journal-entries` | `POST` | `finance.journal.create` | Editor, Migration Runner, Admin |
+| `/api/v1/erp-finance/journal-entries/:id` | `PATCH` | `finance.journal.update` | Editor, Admin |
+| `/api/v1/erp-finance/journal-entries/:id/post` | `POST` | `finance.journal.post` | Editor, Admin |
+| `/api/v1/erp-finance/journal-entries/:id/reverse` | `POST` | `finance.journal.reverse` | Editor, Admin |
+| `/api/v1/erp-finance/journal-entries/:id/void` | `POST` | `finance.journal.void` | Editor, Admin |
+| `/api/v1/erp-finance/trial-balance` | `GET` | `finance.trial_balance.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/opening-balances` | `GET` | `finance.opening_balances.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/opening-balances/:id` | `GET` | `finance.opening_balances.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/opening-balances` | `POST` | `finance.opening_balances.load` | Migration Runner, Admin |
+| `/api/v1/erp-finance/periods` | `GET` | `finance.periods.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/periods/:id` | `GET` | `finance.periods.read` | Viewer, Editor, Migration Runner, Analyst, Admin |
+| `/api/v1/erp-finance/periods/:id` | `PATCH` | `finance.periods.update` | Admin |
+
+### 11.4 Object-Level Authorization Guards
+
+1. **Multi-Tenant Boundary Isolation (`assertTenantAccess`)**:
+   - Compares caller tenant context with target resource tenant bindings.
+   - Any cross-tenant read or mutation attempt immediately throws HTTP 403 `OBJECT_ACCESS_DENIED`.
+2. **Cross-User Draft Mutation Protection (`assertObjectMutationAccess`)**:
+   - Unposted draft journal entries track their creator (`created_by` / `created_by_user_id`).
+   - Non-admin callers attempting to edit or void an in-flight draft created by another user are rejected with HTTP 403 `CROSS_USER_MUTATION_FORBIDDEN`.
+   - Administrators possess organizational management override privileges across draft records within their tenant.
+
+### 11.5 Standard Error Envelope Compliance (PLT-06)
+
+All security and authorization rejections return the standardized ClearShift error envelope with `correlation_id`:
+
+```json
+{
+  "statusCode": 403,
+  "error": "Forbidden",
+  "code": "INSUFFICIENT_PERMISSIONS",
+  "message": "Access denied. Action requires write permissions.",
+  "details": [],
+  "correlation_id": "req-171-corr-id"
+}
+```
