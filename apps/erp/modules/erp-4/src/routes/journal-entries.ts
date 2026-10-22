@@ -21,6 +21,11 @@ import {
   IdParamSchema,
 } from '@clearshift/contracts';
 import type { FinanceService } from '../services/finance.service.js';
+import {
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+} from './guard.js';
 import { requireFinancePolicy, FinancePolicies } from '../policies/index.js';
 
 export interface JournalEntriesRouteOptions {
@@ -59,6 +64,7 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const entry = await financeService.getJournalEntryById(params.id);
+      assertTenantAccess(request.user, entry, request.headers['x-tenant-id'] as string | undefined);
       return reply.status(200).send(entry);
     }
   );
@@ -74,8 +80,15 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
         ...rawBody,
         ...(idempotencyHeader && !(rawBody as any).idempotency_key && { idempotency_key: idempotencyHeader }),
       });
+
+      assertTenantAccess(request.user, body, request.headers['x-tenant-id'] as string | undefined);
+
       const user = getUserContext(request);
       const { entry, created } = await financeService.createJournalEntry(body, user.id);
+      const tenantId = (rawBody as any).tenant_id ?? (request.headers['x-tenant-id'] as string | undefined);
+      if (entry?.id && tenantId) {
+        registerEntityTenant(entry.id, tenantId);
+      }
       return reply.status(created ? 201 : 200).send(entry);
     }
   );
@@ -87,6 +100,10 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const body = UpdateJournalEntryRequestSchema.parse(request.body);
+
+      const existing = await financeService.getJournalEntryById(params.id);
+      assertObjectMutationAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const user = getUserContext(request);
       const updated = await financeService.updateJournalEntry(params.id, body, user.id);
       return reply.status(200).send(updated);
@@ -99,6 +116,10 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     { preHandler: [requireFinancePolicy(FinancePolicies.JOURNAL_POST)] },
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
+
+      const existing = await financeService.getJournalEntryById(params.id);
+      assertTenantAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const user = getUserContext(request);
       const posted = await financeService.postJournalEntry(params.id, user);
       return reply.status(200).send(posted);
@@ -112,6 +133,10 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
       const body = ReverseJournalEntryRequestSchema.parse(request.body ?? {});
+
+      const existing = await financeService.getJournalEntryById(params.id);
+      assertTenantAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const user = getUserContext(request);
       const result = await financeService.reverseJournalEntry(params.id, body, user);
       return reply.status(200).send(result);
@@ -124,6 +149,10 @@ export const journalEntriesRoutes: FastifyPluginAsync<JournalEntriesRouteOptions
     { preHandler: [requireFinancePolicy(FinancePolicies.JOURNAL_VOID)] },
     async (request, reply) => {
       const params = IdParamSchema.parse(request.params);
+
+      const existing = await financeService.getJournalEntryById(params.id);
+      assertObjectMutationAccess(request.user, existing, request.headers['x-tenant-id'] as string | undefined);
+
       const user = getUserContext(request);
       const voided = await financeService.voidJournalEntry(params.id, user);
       return reply.status(200).send(voided);

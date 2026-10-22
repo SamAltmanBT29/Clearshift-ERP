@@ -23,3 +23,15 @@ export * from './services/audit.js';
 export * from './policies/index.js';
 export * from './plugins/auth.js';
 export * from './routes/index.js';
+export {
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+  entityTenantRegistry,
+  authenticateFinanceRequest,
+  DISABLED_USER_IDS,
+  type FinanceUserContext,
+  type TenantScopedEntity,
+  type UserScopedEntity,
+} from './interface/authz.js';
+
