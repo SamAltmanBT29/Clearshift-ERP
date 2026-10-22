@@ -31,6 +31,8 @@
 13. [Relationships, state transitions and read model (ERP5-06)](#13-relationships-state-transitions-and-read-model-erp506)
 14. [Query layer — list and read API (ERP5-02)](#14-query-layer--list-and-read-api-erp502)
 15. [Authorization policy (ERP5-15)](#15-authorization-policy-erp515)
+16. [Collection screens (ERP5-04)](#16-collection-screens-erp504)
+17. [Create, edit and detail screens (ERP5-05)](#17-create-edit-and-detail-screens-erp505)
 
 ---
 
@@ -700,3 +702,196 @@ ERP-5 has **no tenant and no per-user ownership dimension** in V1 — see
 | `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | the declared matrix, the route × role matrix (16 routes × 5 roles), the JWT verification (real, forged, tampered, expired, disabled) and the object-level guard |
 | `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | the write authorization per endpoint |
 | `apps/erp/modules/erp-5/tests/api/list.test.ts` | the read authorization per collection |
+
+---
+
+## 16. Collection screens (ERP5-04)
+
+**Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) — `[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
+**Implementation**: `apps/erp/modules/erp-5/web/src/` — the API client, the shared list
+machinery and the five collection screens
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192
+
+### 16.1 The screens and the endpoint each one reads
+
+| Screen | Route | Endpoint | Rows |
+|---|---|---|---|
+| Employee list | `/erp5/employees` | `GET /api/v1/erp-hr/employees` | `HrEmployeeView` |
+| Department list | `/erp5/departments` | `GET /api/v1/erp-hr/departments` | `HrDepartment` |
+| Leave record list | `/erp5/leave` | `GET /api/v1/erp-hr/leave` | `HrLeave` |
+| Payroll total list | `/erp5/payroll-totals` | `GET /api/v1/erp-hr/payroll-totals` | `HrPayrollTotal` |
+| Identity user list | `/erp5/identity-users` | `GET /api/v1/erp-hr/identity-users` | `HrIdentityUser` |
+
+### 16.2 The columns each screen shows
+
+Every column is a field the contract already returns. The screen adds no field and
+invents no value.
+
+| Screen | Columns |
+|---|---|
+| Employee list | `employee_no`, `first_name`, `last_name`, `birth_date`, `join_date`, department, `job_title`, `salary_display` + `currency_code`, action |
+| Department list | `code`, `name`, parent department, action |
+| Leave record list | `employee_id`, `date_from`, `date_to`, `type`, `status`, action |
+| Payroll total list | `department_id`, `month`, `total_amount`, `currency_code`, `headcount` |
+| Identity user list | `username`, `roles`, `employee_ref`, `status` |
+
+**The salary column shows `salary_display`, never `salary`.** The raw column is absent
+from the public projection (BR-ERP5-02), so the browser cannot render it even if it
+wanted to. The frontend test asserts the masked values and nothing else.
+
+**The department and the employee references are resolved by identifier.** The API
+returns `department_id` and `employee_id` and never a name. The module reads the bounded
+department collection (at most `HR_PAGE_SIZE_MAX`, 100 rows) to resolve a department to
+its name; a department outside that page is shown as a short identifier, never as an
+invented name. The leave list resolves no employee at all — the employee collection is
+not bounded — so the leave screen links to the employee record and carries the
+identifier.
+
+### 16.3 The server does the filtering, the sorting and the paging
+
+The browser never narrows, orders or pages a collection. The screen sends the search
+term, the filters, the sort field and the page to the API and renders exactly the page
+the API answered.
+
+| Screen | Query parameters it sends |
+|---|---|
+| Employee list | `page`, `pageSize`, `search`, `department_id`, `sort` (`name` / `employee_no` / `join_date`) |
+| Department list | `page`, `pageSize`, `search`, `sort` (`name` / `code`) |
+| Leave record list | `page`, `pageSize`, `type`, `status` |
+| Payroll total list | `page`, `pageSize`, `month`, `department_id` |
+| Identity user list | `page`, `pageSize`, `search` |
+
+A search or a filter change resets the page to the first one. The search term is
+published after a 300 ms pause so that a word is one request, not one request per
+keystroke.
+
+### 16.4 The four states of a collection screen
+
+| State | What the operator sees | Where it comes from |
+|---|---|---|
+| Loading | a skeleton of the table that is coming | `@cs/ui` `SkeletonTable` |
+| No data | an empty state, with a "Clear filters" action when a filter is active | `@cs/ui` `EmptyState` |
+| API failure | a readable message and a **Try again** action | `@cs/ui` `ErrorState` |
+| Permission denied | an **access-denied** view — never a retry button | `PermissionDeniedState` |
+
+The permission-denied state is deliberately not an error state: a refused request is
+not something a retry can fix, and offering one would invite the operator to hammer an
+endpoint that has already refused them. The message is the one the API returned; no
+stack trace, no SQL and no raw row is ever shown.
+
+### 16.5 The permission-aware action
+
+The screen offers the create action only to a session that may write. The question is
+asked of the **shared central matrix** (PLT-06, `packages/core/src/auth/permissions.ts`),
+never of a local copy of the role list. The server remains the authority — the matrix
+only decides whether an action is offered at all.
+
+### 16.6 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/web/tests/employees-list.test.tsx` | UI | the initial load, the search, the filters, the sort, the page reset, the page navigation, the empty result, the API failure and its recovery, the permission-denied state, the permission-aware action, the keyboard and landmark affordances |
+| `apps/erp/modules/erp-5/web/tests/list-screens.test.tsx` | UI | the four remaining screens, their filters, the parent resolution, the aggregate formatting, the read-only projection, the shared states |
+| `apps/erp/modules/erp-5/web/tests/hr-api.test.ts` | unit | the query construction, the session header, the error envelope, the transport failure, the absence of a leak |
+| `apps/erp/modules/erp-5/web/tests/permissions.test.ts` | unit | the role narrowing and the create permission |
+
+---
+
+## 17. Create, edit and detail screens (ERP5-05)
+
+**Issue**: [#50](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/50) — `[ERP5-05] ERP-5 HR and Employees: Create/edit/detail workflow and client-side validation`
+**Implementation**: `apps/erp/modules/erp-5/web/src/components/forms/` and `web/src/pages/`
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192 · **Collection screens**: [ERP5-04](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) —
+issue #49
+
+### 17.1 The screens and the endpoint each one writes
+
+| Screen | Route | Endpoint |
+|---|---|---|
+| Employee create | `/erp5/employees/new` | `POST /api/v1/erp-hr/employees` |
+| Employee edit | `/erp5/employees/{id}/edit` | `PATCH /api/v1/erp-hr/employees/{id}` |
+| Employee detail | `/erp5/employees/{id}` | `GET /api/v1/erp-hr/employees/{id}` |
+| Department create | `/erp5/departments/new` | `POST /api/v1/erp-hr/departments` |
+| Department edit | `/erp5/departments/{id}/edit` | `PATCH /api/v1/erp-hr/departments/{id}` |
+| Department detail | `/erp5/departments/{id}` | `GET /api/v1/erp-hr/departments/{id}` |
+| Leave create | `/erp5/leave/new` | `POST /api/v1/erp-hr/leave` |
+| Leave edit | `/erp5/leave/{id}/edit` | `PATCH /api/v1/erp-hr/leave/{id}` |
+| Leave detail | `/erp5/leave/{id}` | `GET /api/v1/erp-hr/leave/{id}` |
+
+Every screen links back to the list it belongs to, and every detail screen
+links to its edit screen.
+
+**The payroll aggregate has no form.** The V1 API offers `POST
+/api/v1/erp-hr/payroll-totals` but **no `PATCH`**, so a form could only ever
+*add* an aggregate and never correct one, and the unique
+`(department_id, month)` constraint would turn a correction into a conflict.
+The aggregate is loaded by the Migration Kit (ERP5-07 / ERP5-11), which owns
+the bulk path; the read-only payroll list of §16 is the module's V1 screen
+for it.
+
+### 17.2 The validation is the contract's
+
+Each form is handed the **same Zod schema the API validates the payload
+with** — `CreateHrEmployeeRequestSchema`, `UpdateHrLeaveRequestSchema` and so
+on, out of `@clearshift/contracts`. The module never re-states a rule:
+
+| Rule | Where it is asserted |
+|---|---|
+| the employee number is unique and well-formed | the contract's `HrEmployeeNo`; the API refuses a duplicate with `409` |
+| the join date never precedes the birth date (BR-ERP5-01) | the contract's refinement on `CreateHrEmployeeRequestSchema` / `UpdateHrEmployeeRequestSchema` — the browser shows the contract's own message, `join_date must not be before birth_date` |
+| the leave end date never precedes the start date | the contract's refinement — `date_to must not be before date_from` |
+| the leave type and status are enumerations | `LeaveTypeEnum` / `LeaveStatusEnum` |
+| a department code is well-formed | the contract's `HrDepartmentCode` |
+| the salary is a non-negative decimal with at most four decimals | the contract's `HrMoneyAmount` |
+
+The client validation exists so the operator gets a **field-level** answer
+without a round trip. The server re-validates every payload and is the sole
+authority — a form that passes the browser can still be refused with `422`
+and a field detail, and the screen then shows that message on that field
+**without losing the other values**.
+
+### 17.3 The fields the browser may not write
+
+The contract's request schemas are **strict**, so a payload that carries a
+field outside the allow-list is refused with `400 HR_PROTECTED_FIELD`. The
+screens never send such a field, because they have no control for it:
+
+| Field | Why it is not writable | Where it is shown |
+|---|---|---|
+| `id`, `created_at`, `updated_at` | system-maintained | a read-only value on the detail and edit screens |
+| `salary_display` | the masked salary (BR-ERP5-02) — the raw column never leaves the module | a read-only value beside the salary field |
+| `currency_code` | set on create, immutable afterwards | a read-only value on the edit screen, an input on the create screen |
+| `employee_id` of a leave record | a leave is a fact about one employee and is never re-parented | a read-only value on the edit screen |
+| the leave `status` of a **new** record | the server creates a leave as `pending` | a read-only value on the create screen |
+
+An edit sends **only the fields the operator changed**, so a field the API
+never accepted cannot ride along with a legitimate change.
+
+### 17.4 The leave state matrix and the irreversible action
+
+The status of a leave record is a **transition**, not a free field. The form
+offers exactly the transitions `HR_LEAVE_STATUS_TRANSITIONS` allows:
+
+| Current status | Offered | Note |
+|---|---|---|
+| `pending` | `approved`, `rejected` | both are terminal |
+| `approved` | none | the record is decided |
+| `rejected` | none | the record is decided |
+
+A decision is **irreversible** — the V1 matrix has no way back, and a leave is
+never un-decided. The screen therefore confirms the decision once, in plain
+words, before the record is written; cancelling the confirmation leaves the
+record untouched and sends nothing.
+
+### 17.5 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/web/tests/employee-form.test.tsx` | UI | the create payload, the contract's field-level messages, the API failure that keeps the other values, the patch of only the changed fields, the protected fields, the masked salary, the detail view, the not-found view |
+| `apps/erp/modules/erp-5/web/tests/department-form.test.tsx` | UI | the create payload, the malformed code, the patch of only the changed fields, the parent cleared with an explicit `null`, the department that is not offered as its own parent |
+| `apps/erp/modules/erp-5/web/tests/leave-form.test.tsx` | UI | the create payload without a status, the invalid period, the immutable employee, the transitions of the state matrix, the confirmation of an irreversible decision, the cancelled confirmation, the decided record |
+| `apps/erp/modules/erp-5/web/tests/hr-form.test.ts` | unit | the empty value that is dropped, the changed fields, the contract failure that sends nothing, the failure that stays on the form |
+| `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | API | the server's own refusal of a protected field and of a duplicate (unchanged) |
+| `apps/erp/modules/erp-5/tests/domain/rules.test.ts` | domain | BR-ERP5-01 and the leave date range (unchanged) |

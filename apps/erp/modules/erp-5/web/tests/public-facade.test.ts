@@ -38,7 +38,6 @@ describe('ERP-5 web public facade', () => {
   });
 
   it('exports the page components', () => {
-    expect(erp5Web.ModulePlaceholderPage).toBeDefined();
     expect(erp5Web.ModuleNotFoundPage).toBeDefined();
   });
 });
