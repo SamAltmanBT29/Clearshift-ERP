@@ -13,7 +13,6 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { Capabilities, requireCapability } from '@cs/rbac';
 import {
   CreateHrEmployeeRequestSchema,
   HrEmployeeListQuerySchema,
@@ -21,7 +20,11 @@ import {
   UpdateHrEmployeeRequestSchema,
 } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
-import { hrWriteGuard } from './guard.js';
+import {
+  employeeCreateGuard,
+  employeeReadGuard,
+  employeeUpdateGuard,
+} from './guard.js';
 import { parseWriteBody } from './parsing.js';
 import type { HrRouteOptions } from './types.js';
 
@@ -31,7 +34,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   // GET /employees - List employees with bounded paging and search
   fastify.get(
     '/employees',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: employeeReadGuard },
     async (request, reply) => {
       const query = HrEmployeeListQuerySchema.parse(request.query);
       const response = await hrService.listEmployees(query);
@@ -43,7 +46,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   // GET /employees/:id - Read a single employee (masked projection)
   fastify.get(
     '/employees/:id',
-    { preHandler: requireCapability(Capabilities.MODULE_READ) },
+    { preHandler: employeeReadGuard },
     async (request, reply) => {
       const params = HrIdParamSchema.parse(request.params);
       const employee = await hrService.getEmployeeById(params.id);
@@ -53,7 +56,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   );
 
   // POST /employees - Create an employee
-  fastify.post('/employees', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.post('/employees', { preHandler: employeeCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrEmployeeRequestSchema, request);
     const result = await hrService.createEmployee(body);
 
@@ -65,7 +68,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   });
 
   // PATCH /employees/:id - Edit an employee
-  fastify.patch('/employees/:id', { preHandler: hrWriteGuard }, async (request, reply) => {
+  fastify.patch('/employees/:id', { preHandler: employeeUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrEmployeeRequestSchema.parse(request.body ?? {});
     const employee = await hrService.updateEmployee(params.id, body);
