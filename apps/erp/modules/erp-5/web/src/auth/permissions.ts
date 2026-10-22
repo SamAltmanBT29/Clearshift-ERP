@@ -37,13 +37,14 @@ export function toRoleTypes(roles: readonly string[]): RoleType[] {
  * May the session create an HR master record (employee, department, leave)?
  *
  * **Why `Resources.EMPLOYEES` stands in for the whole HR master data.**
- * The central matrix declares a resource for employees but none for
- * departments or leave records, while the module's write guard is the shared
- * `module.write` capability — granted to exactly the roles the matrix grants
- * `CREATE` on `EMPLOYEES` (Editor and Admin). Asking the matrix for
- * `CREATE` on `EMPLOYEES` therefore answers the department and leave
- * questions correctly today, and it keeps answering them correctly when the
- * platform adds the missing resources.
+ * The module's declared policy (ERP5-15,
+ * `apps/erp/modules/erp-5/src/policies/permissions.ts`) binds
+ * `hr.employees.create`, `hr.departments.create` and `hr.leave.create` to
+ * the **same** central policy — `hr.mutate` — whose role set is Editor and
+ * Admin. That is exactly the role set the central matrix grants `CREATE` on
+ * `EMPLOYEES`, so asking the matrix that question answers the employee, the
+ * department and the leave question correctly, and it keeps answering them
+ * correctly when the central matrix grows a resource per entity.
  *
  * Follow-up for Platform: declare `DEPARTMENTS` and `LEAVE` resources in the
  * central matrix so the question can be asked per resource.

@@ -7,9 +7,10 @@
 **Mutation API Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
 **Relationship Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
 **Read API Issue**: [#47](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/47) — `[ERP5-02] List/read API with bounded paging and OpenAPI contract`
+**Authorization Issue**: [#191](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/191) — `[ERP5-15] Module authorization policy integration`
 **PostgreSQL Schema**: `erp5`
 **API Base**: `/api/v1/erp-hr`
-**Version**: V1.3
+**Version**: V1.4
 
 ---
 
@@ -29,6 +30,7 @@
 12. [Mutation API (ERP5-03)](#12-mutation-api-erp503)
 13. [Relationships, state transitions and read model (ERP5-06)](#13-relationships-state-transitions-and-read-model-erp506)
 14. [Query layer — list and read API (ERP5-02)](#14-query-layer--list-and-read-api-erp502)
+15. [Authorization policy (ERP5-15)](#15-authorization-policy-erp515)
 
 ---
 
@@ -344,6 +346,20 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 - **Rationale**: harmonising the three shapes is a **platform-wide** change — it touches ERP-4 and every module contract, and it is owned by PLT-04 / PLT-14, not by a module issue. Doing it inside ERP5-02 would make ERP-5 the first module to migrate and leave the others behind, which is a programme decision rather than a module one.
 - **Status**: open — escalated in PR #232 (ERP5-02). The pagination **rules** (1-based `page`, `pageSize` 1..100, default 25, the allow-listed sort fields, the deterministic `id` tie-breaker) are identical in all three shapes — only the envelope differs.
 
+### DR-14 — The object-level guard enforces module ownership, not tenancy
+
+- **Conflict**: issue #191 requires "object-level authorization guards prevent unauthorized **multi-tenant** or cross-user record mutations". The `erp5` schema has **no** organisation, tenant or owner column — `erp5.employees`, `erp5.departments`, `erp5.leave` and `erp5.payroll_totals` carry no such attribute, and every record belongs to the single organisation the module serves.
+- **Decision**: the object-level guard enforces **module ownership**: the policy is bound to an entity kind, the identifier of a request is always resolved inside the table that belongs to the route, and an identifier that belongs to another module resolves to nothing and is refused with `404`. A forbidden request is refused with `403` before the record is loaded, so a caller that may not write cannot learn whether a record exists. The guard does **not** pretend to implement a tenancy dimension that the schema does not have.
+- **Rationale**: inventing a tenant scope in the API without a tenant column would be a policy the database cannot enforce — the check would live only in the request path and could not be proven. The limitation is stated instead of being approximated.
+- **Status**: open — escalated in PR #239 (ERP5-15). A multi-tenant dimension is a **schema** item (an organisation column on every module table, plus a foreign key to the owning organisation) and belongs to a migration issue, not to an authorization issue.
+
+### DR-15 — The Kit's write identity for the master records (closes DR-9)
+
+- **Conflict**: DR-9 (raised in PR #226 and repeated in PR #231) recorded that the central matrix of PLT-06 declares no policy for the **identity the Migration Kit uses to load employee, department and leave rows**. The Kit loads a payroll aggregate as MIGRATION_RUNNER (`hr.payroll_bulk`), but the master records are `hr.mutate` — Editor and Admin.
+- **Decision**: the module declares the policy it can prove and grants no more: the master-record loads require `hr.mutate` (Editor, Admin) and the payroll load requires `hr.payroll_bulk` (Migration Runner, Admin). The module does **not** invent a Kit-only role, and it does **not** widen `hr.mutate` to the Migration Runner — that would grant the Kit write access to the whole HR master data, which no approved policy asks for.
+- **Rationale**: the gap is a **platform** policy gap, not a module one: the platform must either issue a service identity that holds `module.write` for the Kit, or add an `hr.employee_bulk` policy to the central matrix. Until then the module stays on the declared policy, and the load of a payroll aggregate — the Kit's own job — works.
+- **Status**: open — escalated to the PLT-06 owner and **ERP5-15** in PR #239 (ERP5-15). The payroll half of the gap is closed by this issue; the master-record half needs a platform decision.
+
 
 ---
 
@@ -622,7 +638,72 @@ module reads it and never writes it.
 
 ---
 
-## 15. Collection screens (ERP5-04)
+## 15. Authorization policy (ERP5-15)
+
+**Issue**: [#191](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/191) — `[ERP5-15] Module authorization policy integration`
+**Declaration**: `apps/erp/modules/erp-5/src/policies/permissions.ts` · **Guard**: `src/policies/guard.ts`
+**Security note**: [`apps/erp/modules/erp-5/docs/security.md`](./security.md)
+
+### 15.1 The declared matrix
+
+The module owns **no** role list. Every route is bound to one entry of
+`HR_ROUTE_POLICIES`, and the role sets mirror the central matrix of PLT-06:
+
+| Policy | Entity | Roles | Central policy |
+|---|---|---|---|
+| `hr.employees.read` | employee | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.employees.create` | employee | Editor, Admin | `hr.mutate` |
+| `hr.employees.update` | employee | Editor, Admin | `hr.mutate` |
+| `hr.departments.read` | department | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.departments.create` | department | Editor, Admin | `hr.mutate` |
+| `hr.departments.update` | department | Editor, Admin | `hr.mutate` |
+| `hr.leave.read` | leave | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.leave.create` | leave | Editor, Admin | `hr.mutate` |
+| `hr.leave.update` | leave | Editor, Admin | `hr.mutate` |
+| `hr.payroll.read` | payroll_total | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.payroll.load` | payroll_total | **Migration Runner**, Admin | `hr.payroll_bulk` |
+| `hr.identity_users.read` | identity_user | Viewer, Editor, Analyst, Admin | `hr.read` |
+
+**Invariant: DEFAULT DENY.** A route without a declared policy, an unknown policy or an
+unlisted role is refused with `403`.
+
+The Migration Runner has **no read** access to the HR master data — it may load a payroll
+aggregate (its declared job) and nothing else, and it can never write into the `erp5`
+tables directly (Decision C7).
+
+### 15.2 Authentication
+
+A real access token is verified with the shared Hub verifier of PLT-05 — the EdDSA
+signature, the issuer, the audience and the expiry are all checked, and a disabled account
+is refused. The module never derives a role from an unverified token: the role set always
+comes from the verified claims. When the platform mounts the module, its own
+authentication has already populated `request.user` and the module leaves it untouched.
+
+### 15.3 The object-level guard
+
+The policy is bound to an **entity kind** and the identifier of a request is always
+resolved inside the table that belongs to the route:
+
+| Attempt | Result |
+|---|---|
+| A leave id read as an employee | `404` — it is not an employee |
+| A Hub Identity user id patched as an employee | `404` — it is not an ERP-5 record, and nothing is mutated |
+| A forbidden write of a record that does not exist | `403` — the role is refused before the record is loaded, so nothing is revealed |
+
+ERP-5 has **no tenant and no per-user ownership dimension** in V1 — see
+[DR-14](#dr-14--the-object-level-guard-enforces-module-ownership-not-tenancy).
+
+### 15.4 Test evidence
+
+| Suite | Coverage |
+|---|---|
+| `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | the declared matrix, the route × role matrix (16 routes × 5 roles), the JWT verification (real, forged, tampered, expired, disabled) and the object-level guard |
+| `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | the write authorization per endpoint |
+| `apps/erp/modules/erp-5/tests/api/list.test.ts` | the read authorization per collection |
+
+---
+
+## 16. Collection screens (ERP5-04)
 
 **Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) — `[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
 **Implementation**: `apps/erp/modules/erp-5/web/src/` — the API client, the shared list
@@ -630,7 +711,7 @@ machinery and the five collection screens
 **Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
 issue #192
 
-### 15.1 The screens and the endpoint each one reads
+### 16.1 The screens and the endpoint each one reads
 
 | Screen | Route | Endpoint | Rows |
 |---|---|---|---|
@@ -640,7 +721,7 @@ issue #192
 | Payroll total list | `/erp5/payroll-totals` | `GET /api/v1/erp-hr/payroll-totals` | `HrPayrollTotal` |
 | Identity user list | `/erp5/identity-users` | `GET /api/v1/erp-hr/identity-users` | `HrIdentityUser` |
 
-### 15.2 The columns each screen shows
+### 16.2 The columns each screen shows
 
 Every column is a field the contract already returns. The screen adds no field and
 invents no value.
@@ -665,7 +746,7 @@ invented name. The leave list resolves no employee at all — the employee colle
 not bounded — so the leave screen links to the employee record and carries the
 identifier.
 
-### 15.3 The server does the filtering, the sorting and the paging
+### 16.3 The server does the filtering, the sorting and the paging
 
 The browser never narrows, orders or pages a collection. The screen sends the search
 term, the filters, the sort field and the page to the API and renders exactly the page
@@ -683,7 +764,7 @@ A search or a filter change resets the page to the first one. The search term is
 published after a 300 ms pause so that a word is one request, not one request per
 keystroke.
 
-### 15.4 The four states of a collection screen
+### 16.4 The four states of a collection screen
 
 | State | What the operator sees | Where it comes from |
 |---|---|---|
@@ -697,14 +778,14 @@ not something a retry can fix, and offering one would invite the operator to ham
 endpoint that has already refused them. The message is the one the API returned; no
 stack trace, no SQL and no raw row is ever shown.
 
-### 15.5 The permission-aware action
+### 16.5 The permission-aware action
 
 The screen offers the create action only to a session that may write. The question is
 asked of the **shared central matrix** (PLT-06, `packages/core/src/auth/permissions.ts`),
 never of a local copy of the role list. The server remains the authority — the matrix
 only decides whether an action is offered at all.
 
-### 15.6 Test evidence
+### 16.6 Test evidence
 
 | Suite | Level | Coverage |
 |---|---|---|
