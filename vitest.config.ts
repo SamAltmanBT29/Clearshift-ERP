@@ -34,6 +34,9 @@ export default defineConfig({
     alias: {
       '@clearshift/database': resolve(__dirname, './packages/database/src/index.ts'),
       '@clearshift/contracts': resolve(__dirname, './packages/contracts/src/index.ts'),
+      '@cs/core': resolve(__dirname, './packages/core/src/index.ts'),
+      '@cs/kernel': resolve(__dirname, './packages/kernel/src/index.ts'),
+      '@cs/db': resolve(__dirname, './packages/database/src/index.ts'),
     },
   },
 });
