@@ -11,8 +11,14 @@
 --   Tables:  erp1.categories, erp1.warehouses, erp1.products,
 --            erp1.stock_levels, erp1.import_receipts
 --   Constraints: SKU uniqueness, non-negative price, non-negative tax,
---                non-negative stock quantity (BR-ERP1-02)
+--                explicit currency format, non-negative stock quantity
+--                (BR-ERP1-02), one warehouse (FR-ERP1-05), and the
+--                KIT-08 import receipt idempotency key.
 --   Seeds:   Default warehouse (WH-01), default category (GEN)
+--
+-- The table names follow the module schema convention used by ERP-4/ERP-5:
+-- the SDS logical names `erp1_categories`, `erp1_products`, etc. are the
+-- schema-qualified tables `erp1.categories`, `erp1.products`, etc.
 -- ============================================================================
 
 BEGIN;
@@ -26,13 +32,18 @@ CREATE TABLE IF NOT EXISTS public.schema_migrations (
     applied_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
--- Guard: skip if this migration was already applied
+-- Guard: skip if this migration was already applied.
+-- RAISE EXCEPTION aborts the transaction so no DDL is re-applied when the
+-- SQL file is executed directly (e.g. via psql).  The JS migration runner
+-- holds an advisory lock, checks schema_migrations BEFORE executing the file,
+-- and verifies the ledger after execution.
 DO $$
 BEGIN
     IF EXISTS (
         SELECT 1 FROM public.schema_migrations WHERE migration = 'erp1_v1'
     ) THEN
-        RAISE NOTICE 'Migration erp1_v1 already applied — skipping.';
+        RAISE EXCEPTION 'Migration erp1_v1 already applied — skipping.'
+            USING ERRCODE = 'GX001';
     END IF;
 END $$;
 
@@ -94,6 +105,11 @@ CREATE TABLE IF NOT EXISTS erp1.warehouses (
 CREATE UNIQUE INDEX IF NOT EXISTS erp1_warehouses_code_idx
     ON erp1.warehouses (code);
 
+-- Exactly one warehouse may exist in V1. The constant-expression unique index
+-- is enforced by PostgreSQL, regardless of application-layer validation.
+CREATE UNIQUE INDEX IF NOT EXISTS erp1_warehouses_single_idx
+    ON erp1.warehouses ((true));
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 5. Products (FR-ERP1-01, FR-ERP1-02, BR-ERP1-01)
 -- ────────────────────────────────────────────────────────────────────────────
@@ -104,15 +120,16 @@ CREATE TABLE IF NOT EXISTS erp1.products (
     normalized_sku  VARCHAR(128)         NOT NULL,
     category_id     UUID                 REFERENCES erp1.categories (id) ON DELETE SET NULL,
     unit_of_measure erp1.unit_of_measure NOT NULL,
-    price           NUMERIC(12, 2)       NOT NULL,
-    currency        VARCHAR(3)           NOT NULL DEFAULT 'USD',
+    price           NUMERIC(19, 4)       NOT NULL,
+    currency        VARCHAR(3)           NOT NULL,
     tax_rate        NUMERIC(5, 2)        NOT NULL DEFAULT 0.00,
     source_system   VARCHAR(64),
     source_id       VARCHAR(128),
     created_at      TIMESTAMPTZ          NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ          NOT NULL DEFAULT now(),
     CONSTRAINT check_erp1_products_price_non_negative CHECK (price >= 0),
-    CONSTRAINT check_erp1_products_tax_rate_non_negative CHECK (tax_rate >= 0)
+    CONSTRAINT check_erp1_products_tax_rate_non_negative CHECK (tax_rate >= 0),
+    CONSTRAINT check_erp1_products_currency_format CHECK (currency ~ '^[A-Z]{3}$')
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS erp1_products_sku_idx
@@ -137,7 +154,7 @@ CREATE TABLE IF NOT EXISTS erp1.stock_levels (
     id            UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id    UUID           NOT NULL REFERENCES erp1.products (id) ON DELETE CASCADE,
     warehouse_id  UUID           NOT NULL REFERENCES erp1.warehouses (id) ON DELETE CASCADE,
-    quantity      NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    quantity      NUMERIC(19, 4) NOT NULL DEFAULT 0.0000,
     updated_at    TIMESTAMPTZ    NOT NULL DEFAULT now(),
     CONSTRAINT check_erp1_stock_quantity_non_negative CHECK (quantity >= 0)
 );
@@ -147,25 +164,63 @@ CREATE UNIQUE INDEX IF NOT EXISTS erp1_stock_levels_product_warehouse_idx
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 7. Import Receipts (Decision C4 & KIT-08)
+--    Idempotency key = sha256(batch_id, source_row, entity, schema_version).
+--    Written in the same transaction as the target product/stock mutation.
 -- ────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS erp1.import_receipts (
     id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id          UUID         NOT NULL,
-    source_row_index  INTEGER      NOT NULL,
+    source_row        INTEGER      NOT NULL,
+    entity            VARCHAR(64)  NOT NULL,
+    schema_version    INTEGER      NOT NULL DEFAULT 1,
+    idempotency_key   VARCHAR(128) NOT NULL,
     target_id         UUID         NOT NULL,
-    target_entity     VARCHAR(64)  NOT NULL DEFAULT 'product',
-    idempotency_key   VARCHAR(255) NOT NULL,
-    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+    kind              VARCHAR(16)  NOT NULL DEFAULT 'created',
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT check_erp1_import_receipts_source_row_positive CHECK (source_row >= 1),
+    CONSTRAINT check_erp1_import_receipts_schema_version_positive CHECK (schema_version >= 1),
+    CONSTRAINT check_erp1_import_receipts_kind_allowed CHECK (kind IN ('created', 'linked'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS erp1_import_receipts_idempotency_idx
+CREATE UNIQUE INDEX IF NOT EXISTS erp1_import_receipts_idempotency_key_unique
     ON erp1.import_receipts (idempotency_key);
 
-CREATE INDEX IF NOT EXISTS erp1_import_receipts_batch_idx
-    ON erp1.import_receipts (batch_id);
+CREATE INDEX IF NOT EXISTS erp1_import_receipts_batch_row_idx
+    ON erp1.import_receipts (batch_id, source_row);
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 8. Seed Initial V1 Data (Default warehouse & Category)
+-- 8. updated_at triggers
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION erp1.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS categories_set_updated_at ON erp1.categories;
+CREATE TRIGGER categories_set_updated_at
+    BEFORE UPDATE ON erp1.categories
+    FOR EACH ROW EXECUTE FUNCTION erp1.set_updated_at();
+
+DROP TRIGGER IF EXISTS warehouses_set_updated_at ON erp1.warehouses;
+CREATE TRIGGER warehouses_set_updated_at
+    BEFORE UPDATE ON erp1.warehouses
+    FOR EACH ROW EXECUTE FUNCTION erp1.set_updated_at();
+
+DROP TRIGGER IF EXISTS products_set_updated_at ON erp1.products;
+CREATE TRIGGER products_set_updated_at
+    BEFORE UPDATE ON erp1.products
+    FOR EACH ROW EXECUTE FUNCTION erp1.set_updated_at();
+
+DROP TRIGGER IF EXISTS stock_levels_set_updated_at ON erp1.stock_levels;
+CREATE TRIGGER stock_levels_set_updated_at
+    BEFORE UPDATE ON erp1.stock_levels
+    FOR EACH ROW EXECUTE FUNCTION erp1.set_updated_at();
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 9. Seed Initial V1 Data (Default warehouse & Category)
 -- ────────────────────────────────────────────────────────────────────────────
 INSERT INTO erp1.categories (id, name, code)
 VALUES ('00000000-0000-4000-8000-000000000001', 'General', 'GEN')
@@ -176,7 +231,7 @@ VALUES ('00000000-0000-4000-8000-000000000002', 'Main Warehouse', 'WH-01', true)
 ON CONFLICT (code) DO NOTHING;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 9. Record Migration
+-- 10. Record Migration
 -- ────────────────────────────────────────────────────────────────────────────
 INSERT INTO public.schema_migrations (migration)
 VALUES ('erp1_v1')
