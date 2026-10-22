@@ -21,6 +21,42 @@ export const UnitOfMeasureSchema = z.enum([
 export type UnitOfMeasure = z.infer<typeof UnitOfMeasureSchema>;
 
 /**
+ * ISO 4217 currency code. ERP-1 has no approved implicit currency default in
+ * the SDS, so callers must supply the currency explicitly.
+ */
+export const CurrencySchema = z
+  .string()
+  .trim()
+  .regex(/^[A-Z]{3}$/, 'Currency must be an uppercase ISO 4217 code');
+
+const PricePattern = /^\d+(\.\d{1,4})?$/;
+const QuantityPattern = /^\d+(\.\d{1,4})?$/;
+const TaxRatePattern = /^\d+(\.\d{1,2})?$/;
+
+function normalizeDecimalInput(
+  value: string | number,
+  scale: number,
+  message: string,
+  ctx: z.RefinementCtx
+): string {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      return z.NEVER;
+    }
+    return value.toFixed(scale);
+  }
+
+  const text = value.trim();
+  const pattern = new RegExp(`^\\d+(\\.\\d{1,${scale}})?$`);
+  if (!pattern.test(text)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    return z.NEVER;
+  }
+  return Number(text).toFixed(scale);
+}
+
+/**
  * Normalizes SKU strings for exact deterministic matching (uppercase, trimmed).
  */
 export function normalizeSku(sku: string): string {
@@ -66,6 +102,8 @@ export type Warehouse = z.infer<typeof WarehouseSchema>;
 
 /**
  * Product Schema (FR-ERP1-01, FR-ERP1-02, BR-ERP1-01).
+ *
+ * Money and quantities use the SDS numeric(19,4) precision.
  */
 export const ProductSchema = z.object({
   id: z.string().uuid(),
@@ -74,9 +112,14 @@ export const ProductSchema = z.object({
   normalizedSku: z.string().min(1),
   categoryId: z.string().uuid().nullable().optional(),
   unitOfMeasure: UnitOfMeasureSchema,
-  price: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Price must be a valid non-negative decimal string (e.g. 19.99)'),
-  currency: z.string().length(3).default('USD'),
-  taxRate: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Tax rate must be a valid non-negative decimal percentage').default('0.00'),
+  price: z
+    .string()
+    .regex(PricePattern, 'Price must be a valid non-negative decimal string with up to 4 decimal places'),
+  currency: CurrencySchema,
+  taxRate: z
+    .string()
+    .regex(TaxRatePattern, 'Tax rate must be a valid non-negative decimal percentage')
+    .default('0.00'),
   sourceSystem: z.string().nullable().optional(),
   sourceId: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
@@ -89,23 +132,26 @@ export const CreateProductInputSchema = z.object({
   sku: z.string().trim().min(1, 'SKU is required'),
   categoryId: z.string().uuid().nullable().optional(),
   unitOfMeasure: UnitOfMeasureSchema,
-  price: z.union([z.string(), z.number()]).transform((val) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error('Price must be greater than or equal to 0');
-    }
-    return num.toFixed(2);
-  }),
-  currency: z.string().length(3).default('USD').optional(),
-  taxRate: z.union([z.string(), z.number()]).transform((val) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error('Tax rate must be non-negative');
-    }
-    return num.toFixed(2);
-  }).default('0.00').optional(),
-  sourceSystem: z.string().trim().optional(),
-  sourceId: z.string().trim().optional(),
+  price: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) =>
+      normalizeDecimalInput(
+        val,
+        4,
+        'Price must be greater than or equal to 0',
+        ctx
+      )
+    ),
+  currency: CurrencySchema,
+  taxRate: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) =>
+      normalizeDecimalInput(val, 2, 'Tax rate must be non-negative', ctx)
+    )
+    .default('0.00')
+    .optional(),
+  sourceSystem: z.string().trim().min(1).max(64).optional(),
+  sourceId: z.string().trim().min(1).max(128).optional(),
 });
 export type CreateProductInput = z.infer<typeof CreateProductInputSchema>;
 
@@ -113,21 +159,24 @@ export const UpdateProductInputSchema = z.object({
   name: z.string().trim().min(1).optional(),
   categoryId: z.string().uuid().nullable().optional(),
   unitOfMeasure: UnitOfMeasureSchema.optional(),
-  price: z.union([z.string(), z.number()]).transform((val) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error('Price must be greater than or equal to 0');
-    }
-    return num.toFixed(2);
-  }).optional(),
-  currency: z.string().length(3).optional(),
-  taxRate: z.union([z.string(), z.number()]).transform((val) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error('Tax rate must be non-negative');
-    }
-    return num.toFixed(2);
-  }).optional(),
+  price: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) =>
+      normalizeDecimalInput(
+        val,
+        4,
+        'Price must be greater than or equal to 0',
+        ctx
+      )
+    )
+    .optional(),
+  currency: CurrencySchema.optional(),
+  taxRate: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) =>
+      normalizeDecimalInput(val, 2, 'Tax rate must be non-negative', ctx)
+    )
+    .optional(),
 });
 export type UpdateProductInput = z.infer<typeof UpdateProductInputSchema>;
 
@@ -138,7 +187,9 @@ export const StockLevelSchema = z.object({
   id: z.string().uuid(),
   productId: z.string().uuid(),
   warehouseId: z.string().uuid(),
-  quantity: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Quantity must be non-negative'),
+  quantity: z
+    .string()
+    .regex(QuantityPattern, 'Quantity must be a non-negative decimal with up to 4 decimal places'),
   updatedAt: z.string().datetime(),
 });
 export type StockLevel = z.infer<typeof StockLevelSchema>;
@@ -146,23 +197,39 @@ export type StockLevel = z.infer<typeof StockLevelSchema>;
 export const SetOpeningStockInputSchema = z.object({
   productId: z.string().uuid(),
   warehouseId: z.string().uuid().optional(),
-  quantity: z.union([z.string(), z.number()]).transform((val) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error('Stock quantity cannot become negative (BR-ERP1-02)');
-    }
-    return num.toFixed(2);
-  }),
+  quantity: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) =>
+      normalizeDecimalInput(
+        val,
+        4,
+        'Stock quantity cannot become negative (BR-ERP1-02)',
+        ctx
+      )
+    ),
 });
 export type SetOpeningStockInput = z.infer<typeof SetOpeningStockInputSchema>;
 
 /**
  * Query & List Envelopes.
  */
-export const ProductListQuerySchema = PaginationQuerySchema.extend({
+const Erp1PaginationQuerySchema = PaginationQuerySchema.extend({
+  pageSize: z.coerce
+    .number()
+    .int({ message: 'pageSize must be an integer' })
+    .min(1, { message: 'pageSize must be >= 1' })
+    .max(100, { message: 'pageSize cannot exceed 100' })
+    .default(25),
+});
+
+export const ProductListQuerySchema = Erp1PaginationQuerySchema.extend({
+  search: z.string().trim().optional(),
   categoryId: z.string().uuid().optional(),
 });
 export type ProductListQuery = z.infer<typeof ProductListQuerySchema>;
+
+export const CategoryListQuerySchema = Erp1PaginationQuerySchema;
+export type CategoryListQuery = z.infer<typeof CategoryListQuerySchema>;
 
 export const PaginatedProductsResponseSchema = createPaginatedResponseSchema(ProductSchema);
 export type PaginatedProductsResponse = z.infer<typeof PaginatedProductsResponseSchema>;
