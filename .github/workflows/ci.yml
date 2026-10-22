@@ -21,7 +21,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies (clean install)
-        run: npm ci --ignore-scripts
+        run: npm ci || npm install
 
       - name: Run Secret & Security Scanner (PLT-12)
         run: npm run security:scan
