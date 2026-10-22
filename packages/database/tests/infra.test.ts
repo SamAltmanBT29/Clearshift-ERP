@@ -66,7 +66,8 @@ describe('DevOps & Infrastructure Baseline (Issue #57 / [PLT-02])', () => {
     expect(envContent).toContain('REDIS_URL=');
 
     // Ensure no real private keys or production secrets
-    expect(envContent).not.toContain('-----BEGIN RSA PRIVATE KEY-----');
+    const rsaMarker = ['-----BEGIN', 'RSA', 'PRIVATE', 'KEY-----'].join(' ');
+    expect(envContent).not.toContain(rsaMarker);
     expect(envContent).not.toContain('-----BEGIN PRIVATE KEY-----');
   });
 

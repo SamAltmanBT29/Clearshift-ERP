@@ -15,5 +15,5 @@ export interface HubTokenClaims {
   jti: string;
   exp: number;
   roles: RoleType[];
-  employee_id?: string;
+  employee_id?: string | undefined;
 }
