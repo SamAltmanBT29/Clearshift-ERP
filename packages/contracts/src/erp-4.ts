@@ -641,3 +641,4 @@ export interface PaginatedJournalEntriesResponse {
   limit: number;
   totalPages: number;
 }
+export * from './erp-4-events.js';

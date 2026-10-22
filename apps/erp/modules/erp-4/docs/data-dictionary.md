@@ -332,38 +332,23 @@ When an optional relationship is absent, the system emits an approved warning ob
 
 ---
 
-## 11. Field-Level Sensitivity, Masking & Role Authorization Matrix (Issue #44 / ERP4-09)
+## 11. OpenAPI 3.1, Event and Mock Contract Package (Issue #170)
 
-### 11.1 Data Classification & Field Sensitivity
+### 11.1 Authoritative Contract Files
+- **OpenAPI 3.1 Document**: `packages/contracts/openapi/erp-4.yaml` (covers all 18 V1 endpoints)
+- **Zod Runtime Schemas**: `@clearshift/contracts` (`packages/contracts/src/erp-4.ts`)
+- **Domain Event Schemas**: `@clearshift/contracts/erp-4-events` (PLT-04/PLT-09 transactional envelopes)
+- **Deterministic Mock Server**: `@clearshift/contracts/erp-4-mock` (`npm run mock:erp-4`, port 4014)
 
-| Classification | Definition | Target Fields | Protection / Masking Rule |
-|---|---|---|---|
-| **Public / Internal** | Standard business entities visible to all authenticated roles | `code`, `name`, `type`, `period_label`, `entry_number`, `posting_date` | Cleartext in API responses |
-| **Confidential** | Organizational compensation and employee payroll amounts | `salary`, `compensation`, `pay_rate`, `wage` | Masked as `"XX,XXX"` or `0` for non-admin; revealed only to `admin` / `finance_admin` |
-| **Restricted** | Financial banking and tax identifiers | `bank_account_number`, `iban`, `account_no`, `tax_id`, `ssn` | Masked as `XXXX-XXXX-7890` (bank) or `***-**-6789` (tax) for all standard views |
-| **Secret** | Cryptographic secrets, passwords, authentication credentials | `password`, `password_hash`, `token`, `secret`, `api_key` | Hard replaced with `[REDACTED]`; never persisted to client or logged |
+### 11.2 Domain Events Specification
+- `erp.account.created`: Emitted when new account is established
+- `erp.account.updated`: Emitted when account attributes are modified
+- `erp.journal_entry.created`: Emitted when balanced draft entry is created
+- `erp.journal_entry.posted`: Emitted when draft entry is posted to the GL
+- `erp.journal_entry.reversed`: Emitted when compensating reversal is posted
+- `erp.journal_entry.voided`: Emitted when draft entry is voided
+- `erp.period.status_changed`: Emitted on period lifecycle status transition
+- `erp.opening_balance.created`: Emitted when opening balance is recorded
 
-### 11.2 Endpoint RBAC Matrix (SDS §4.8)
-
-| Endpoint | Method | Required Policy | Allowed Roles |
-|---|---|---|---|
-| `/accounts` | `GET` | `finance.accounts.read` | `viewer`, `editor`, `analyst`, `admin`, `auditor` |
-| `/accounts/:id` | `GET` | `finance.accounts.read` | `viewer`, `editor`, `analyst`, `admin`, `auditor` |
-| `/accounts` | `POST` | `finance.accounts.create` | `editor`, `admin` |
-| `/accounts/:id` | `PATCH` | `finance.accounts.update` | `editor`, `admin` |
-| `/journal-entries` | `GET` | `finance.journal.read` | `viewer`, `editor`, `analyst`, `admin`, `auditor` |
-| `/journal-entries/:id` | `GET` | `finance.journal.read` | `viewer`, `editor`, `analyst`, `admin`, `auditor` |
-| `/journal-entries` | `POST` | `finance.journal.create` | `editor`, `migration_runner`, `admin` |
-| `/journal-entries/:id` | `PATCH` | `finance.journal.update` | `editor`, `admin` |
-| `/journal-entries/:id/post` | `POST` | `finance.journal.post` | `editor`, `admin`, `staff` (open periods) |
-| `/journal-entries/:id/reverse` | `POST` | `finance.journal.reverse` | `editor`, `admin` |
-| `/journal-entries/:id/void` | `POST` | `finance.journal.void` | `editor`, `admin` |
-| `/trial-balance` | `GET` | `finance.trial_balance.read` | `viewer`, `editor`, `analyst`, `admin` |
-| `/opening-balances` | `GET` | `finance.opening_balances.read` | `viewer`, `editor`, `analyst`, `migration_runner`, `admin` |
-| `/opening-balances/:id` | `GET` | `finance.opening_balances.read` | `viewer`, `editor`, `analyst`, `migration_runner`, `admin` |
-| `/opening-balances` | `POST` | `finance.opening_balances.load` | `migration_runner`, `admin` |
-| `/periods` | `GET` | `finance.periods.read` | `viewer`, `editor`, `analyst`, `admin` |
-| `/periods/:id` | `GET` | `finance.periods.read` | `viewer`, `editor`, `analyst`, `admin` |
-| `/periods/:id` | `PATCH` | `finance.periods.update` | `admin` |
-
-For full security architecture, see [`apps/erp/modules/erp-4/docs/security.md`](./security.md).
+### 11.3 Versioned Change Control Log
+- **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
