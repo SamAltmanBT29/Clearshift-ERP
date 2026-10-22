@@ -161,9 +161,18 @@ npx vitest run apps/erp/modules/erp-5/web
 | `public-facade.test.ts` | The exported surface a host application depends on |
 | `routes.test.tsx` | Every route resolves inside the shell, in a real DOM |
 | `module-shell.test.tsx` | Landmarks, keyboard navigation, the active state, the title, the guard |
+| `module-nav.test.tsx` | The navigation fallback to the router location, and an empty navigation group |
+| `environment.test.ts` | Every dependency the module added is resolvable from a clean install |
 
-The two `.tsx` suites run in a jsdom environment. Vitest's jsdom environment
+The three `.tsx` suites run in a jsdom environment. Vitest's jsdom environment
 combines jsdom's `AbortController` with Node's `Request`, which undici refuses
 to pair; `tests/support/jsdom-environment.ts` installs a minimal `Request` for
 the duration of those suites. The shim is self-disabling — it probes the
 environment first and does nothing when it is already consistent.
+
+### Malformed URLs
+
+A browser can hand the module any pathname. The route matcher decodes a
+dynamic segment defensively: a malformed percent escape such as
+`/erp5/employees/100%` is kept verbatim instead of throwing, so the shell
+still renders the screen with its title and breadcrumb trail.

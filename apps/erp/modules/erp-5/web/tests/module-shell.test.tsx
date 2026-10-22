@@ -194,6 +194,15 @@ describe('ERP-5 module shell', () => {
       expect(text).toContain('HR & Employees');
       expect(text).toContain('Leave records');
     });
+
+    it('renders the shell for a route identifier with a malformed percent escape', () => {
+      // A malformed escape must not throw out of the shell — the document
+      // title and the breadcrumb trail are both derived from the route match.
+      expect(() => renderModule('/erp5/employees/100%')).not.toThrow();
+
+      expect(screen.getByRole('main')).toBeDefined();
+      expect(document.title).toBe('Employee · ClearShift ERP');
+    });
   });
 
   describe('5. Authentication guard', () => {
