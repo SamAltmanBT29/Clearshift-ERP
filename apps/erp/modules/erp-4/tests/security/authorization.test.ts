@@ -273,14 +273,14 @@ describe('ERP-4 Finance & Accounting — Security & Authorization Suite (#44)', 
 
     it('masks CSV tabular export records before export', () => {
       const rows = [
-        { account_code: '1010', bank_account_number: '1111222233337890', salary: 95000, password: 'plain_password' },
+        { account_code: '1010', bank_account_number: '1111222233337890', salary: 95000, password_hash: '$argon2id$synthetic_hash' },
         { account_code: '1020', bank_account_number: '4444555566667890', salary: 85000, token: 'jwt_token' },
       ];
 
       const maskedCsv = maskCsvExportRecords(rows, [Roles.ANALYST]);
       expect(maskedCsv[0]?.bank_account_number).toBe('XXXX-XXXX-7890');
       expect(maskedCsv[0]?.salary).toBe(0);
-      expect(maskedCsv[0]?.password).toBe('[REDACTED]');
+      expect(maskedCsv[0]?.password_hash).toBe('[REDACTED]');
       expect(maskedCsv[1]?.bank_account_number).toBe('XXXX-XXXX-7890');
       expect(maskedCsv[1]?.token).toBe('[REDACTED]');
     });
@@ -288,7 +288,7 @@ describe('ERP-4 Finance & Accounting — Security & Authorization Suite (#44)', 
     it('sanitizes SQL queries, bearer tokens and passwords in HTTP 500 error envelopes', async () => {
       // Simulate route throwing unexpected error containing raw SQL & secrets
       app.get('/api/v1/erp-finance/test-internal-error', async () => {
-        throw new Error('Database query SELECT * FROM erp4.accounts WHERE password = "admin_secret" failed');
+        throw new Error('Database query SELECT * FROM erp4.accounts WHERE secret_credential = "admin_secret" failed');
       });
 
       const token = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
@@ -302,7 +302,7 @@ describe('ERP-4 Finance & Accounting — Security & Authorization Suite (#44)', 
       const json = res.json();
       expect(json.message).toBe('An unexpected internal error occurred.');
       expect(json.message).not.toContain('SELECT');
-      expect(json.message).not.toContain('password');
+      expect(json.message).not.toContain('secret_credential');
       expect(json.message).not.toContain('admin_secret');
     });
   });
