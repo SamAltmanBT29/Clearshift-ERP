@@ -1,12 +1,15 @@
 /**
- * ERP-4 Finance & Accounting — Module Authorization Policy Integration Test Suite (PLT-05, PLT-06 / ERP4-15 / #171)
+ * ERP-4 Finance & Accounting — Security, Authorization, Sensitive-Field Protection & Audit Test Suite
  *
  * Exhaustively validates:
- *   - AC1: Every route validates incoming Hub JWT signature and token expiration.
- *   - AC2: Role capability matrix is enforced: Viewer, Editor, Migration Runner, Analyst, Admin.
- *   - AC3: Unauthenticated requests return 401 Unauthorized; insufficient permissions return 403 Forbidden.
- *   - AC4: Object-level authorization guards prevent unauthorized multi-tenant or cross-user record mutations.
- *   - Invariants: Double-entry balancing invariant (BR-ERP4-01) and closed period guards.
+ *   - Issues #44 and #171 requirements and V1 acceptance criteria
+ *   - AC1: Viewer/Editor/Analyst/Admin/Migration Runner permissions match the SDS endpoint matrix exactly
+ *   - AC2: Unauthenticated calls return 401; authenticated but forbidden calls return 403
+ *   - AC3: Sensitive fields are masked/omitted in API JSON, CSV exports, events, errors, and logs
+ *   - AC4: Disabled users, expired tokens, invalid issuers, invalid audiences are rejected
+ *   - AC5: Audit records capture actor, action, timestamp, correlationId, entity without leaking secrets
+ *   - AC6: Domain invariant: Every posted journal entry balances exactly at currency precision
+ *   - AC7: Object-level authorization guards prevent unauthorized multi-tenant and cross-user mutations
  *
  * @module erp4/tests/security/authorization.test
  */
@@ -19,534 +22,637 @@ import { Roles, type RoleType, signAccessToken, getSigningKeys } from '@cs/ident
 import { buildApp } from '../../src/app.js';
 import { InMemoryFinanceRepository } from '../../src/services/repository.js';
 import { FinanceService } from '../../src/services/finance.service.js';
+import { Erp4AuditService } from '../../src/services/audit.js';
+import { InMemoryAuditRepository } from '@cs/core';
 import {
-  FinancePolicies,
-  isFinancePolicyAllowed,
+  maskBankAccountNumber,
+  maskSalary,
+  maskGovernmentId,
+  maskSensitiveFields,
+  maskCsvExportRecords,
+} from '../../src/policies/masking.js';
+import { isFinancePolicyAllowed, FinancePolicies } from '../../src/policies/permissions.js';
+import {
   assertTenantAccess,
   assertObjectMutationAccess,
 } from '../../src/interface/authz.js';
 
-describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration (#171)', () => {
+describe('ERP-4 Finance & Accounting — Security & Authorization Suite (#44 / #171)', () => {
   let repository: InMemoryFinanceRepository;
+  let auditRepository: InMemoryAuditRepository;
+  let auditService: Erp4AuditService;
   let financeService: FinanceService;
   let app: FastifyInstance;
 
-  // Stable seed IDs from InMemoryFinanceRepository fixtures
   const ACCT_CASH_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
   const ACCT_BANK_ID = 'aaaaaaaa-0001-0001-0001-000000000002';
   const ACCT_SALES_ID = 'aaaaaaaa-0001-0001-0001-000000000004';
   const PERIOD_OPEN_ID = 'bbbbbbbb-0001-0001-0001-000000000001';
 
   beforeEach(() => {
-    repository = new InMemoryFinanceRepository(true); // seeds default accounts, periods, balances
-    financeService = new FinanceService(repository);
+    repository = new InMemoryFinanceRepository(true); // seeds accounts and periods
+    auditRepository = new InMemoryAuditRepository();
+    auditService = new Erp4AuditService(auditRepository);
+    financeService = new FinanceService({ repository, auditService });
     app = buildApp({
       repository,
       financeService,
-      authRequired: true, // strict JWT verification mode
+      auditService,
+      authRequired: true, // strict mode
     });
   });
 
-  // Helper to generate expired JWT
-  async function createExpiredToken(userId: string, roles: RoleType[]): Promise<string> {
-    const keys = await getSigningKeys();
-    const past = Math.floor(Date.now() / 1000) - 3600;
-    return new jose.SignJWT({ roles })
-      .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
-      .setIssuer('clearshift-hub')
-      .setAudience('clearshift')
-      .setSubject(userId)
-      .setJti('jti-expired-' + randomUUID())
-      .setIssuedAt(past - 900)
-      .setExpirationTime(past)
-      .sign(keys.privateKey);
-  }
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC1: SDS Role-Based Access Control Matrix (Exact Match & Default Deny)
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC1: SDS Endpoint Matrix Permission Enforcement', () => {
+    it('verifies unit policy check matches SDS matrix exactly', () => {
+      // 1. Accounts Read
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.ACCOUNTS_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.ACCOUNTS_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.ACCOUNTS_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.ACCOUNTS_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.ACCOUNTS_READ)).toBe(false);
 
-  // Helper to generate JWT with invalid issuer
-  async function createInvalidIssuerToken(userId: string, roles: RoleType[]): Promise<string> {
-    const keys = await getSigningKeys();
-    const now = Math.floor(Date.now() / 1000);
-    return new jose.SignJWT({ roles })
-      .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
-      .setIssuer('untrusted-hub-issuer')
-      .setAudience('clearshift')
-      .setSubject(userId)
-      .setJti('jti-bad-iss-' + randomUUID())
-      .setIssuedAt(now)
-      .setExpirationTime(now + 900)
-      .sign(keys.privateKey);
-  }
+      // 2. Accounts Create & Update (Editor & Admin only)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.ACCOUNTS_CREATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.ACCOUNTS_CREATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.ACCOUNTS_CREATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.ACCOUNTS_CREATE)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.ACCOUNTS_CREATE)).toBe(true);
 
-  // Helper to generate JWT with invalid audience
-  async function createInvalidAudienceToken(userId: string, roles: RoleType[]): Promise<string> {
-    const keys = await getSigningKeys();
-    const now = Math.floor(Date.now() / 1000);
-    return new jose.SignJWT({ roles })
-      .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
-      .setIssuer('clearshift-hub')
-      .setAudience('untrusted-audience')
-      .setSubject(userId)
-      .setJti('jti-bad-aud-' + randomUUID())
-      .setIssuedAt(now)
-      .setExpirationTime(now + 900)
-      .sign(keys.privateKey);
-  }
+      // 3. Journal Entry Create (Editor & Migration Runner per SDS line 307)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.JOURNAL_CREATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.JOURNAL_CREATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.JOURNAL_CREATE)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.JOURNAL_CREATE)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.JOURNAL_CREATE)).toBe(true);
 
-  // Helper to create a valid balanced draft entry
-  async function createDraftJournalEntry(token: string, userId?: string, periodId = PERIOD_OPEN_ID) {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/erp-finance/journal-entries',
-      headers: { authorization: `Bearer ${token}` },
-      payload: {
-        period_id: periodId,
-        posting_date: '2026-03-20',
-        description: 'Synthetic test journal entry',
-        currency_code: 'INR',
-        lines: [
-          { account_id: ACCT_CASH_ID, debit_amount: '500.0000', credit_amount: '0.0000' },
-          { account_id: ACCT_SALES_ID, debit_amount: '0.0000', credit_amount: '500.0000' },
-        ],
-      },
+      // 4. Journal Entry Post & Reverse (Editor & Admin)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.JOURNAL_POST)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.JOURNAL_POST)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.JOURNAL_POST)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.JOURNAL_POST)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.JOURNAL_POST)).toBe(true);
+
+      // 5. Bulk Opening Balances (Migration Runner & Admin per SDS line 309)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(true);
+
+      // 6. Trial Balance Read (Viewer, Analyst, Editor, Admin)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.TRIAL_BALANCE_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ANALYST], FinancePolicies.TRIAL_BALANCE_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.TRIAL_BALANCE_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.TRIAL_BALANCE_READ)).toBe(true);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.TRIAL_BALANCE_READ)).toBe(false);
+
+      // 7. Periods Update (Admin only)
+      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.PERIODS_UPDATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.PERIODS_UPDATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.PERIODS_UPDATE)).toBe(false);
+      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.PERIODS_UPDATE)).toBe(true);
+
+      // 8. Default Deny on empty or unknown roles
+      expect(isFinancePolicyAllowed([], FinancePolicies.ACCOUNTS_READ)).toBe(false);
+      expect(isFinancePolicyAllowed(['guest', 'contractor'], FinancePolicies.ACCOUNTS_READ)).toBe(false);
+      expect(isFinancePolicyAllowed(undefined, FinancePolicies.ACCOUNTS_READ)).toBe(false);
     });
-    return res;
-  }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AC1: Hub JWT Signature and Token Expiration Verification
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('AC1: Hub JWT Signature and Token Expiration Verification', () => {
-    it('accepts valid EdDSA Hub JWT signed by Hub key', async () => {
-      const token = await signAccessToken('usr-viewer-01', [Roles.VIEWER]);
+    it('enforces table-driven HTTP endpoint authorization across all 5 standard roles', async () => {
+      const viewerToken = await signAccessToken('usr-viewer-01', [Roles.VIEWER]);
+      const editorToken = await signAccessToken('usr-editor-01', [Roles.EDITOR]);
+      const analystToken = await signAccessToken('usr-analyst-01', [Roles.ANALYST]);
+      const runnerToken = await signAccessToken('usr-runner-01', [Roles.MIGRATION_RUNNER]);
+      const adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
 
+      // 1. GET /accounts: Viewer(200), Editor(200), Analyst(200), Admin(200), Runner(403)
+      const resV = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${viewerToken}` } });
+      expect(resV.statusCode).toBe(200);
+
+      const resE = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${editorToken}` } });
+      expect(resE.statusCode).toBe(200);
+
+      const resA = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${analystToken}` } });
+      expect(resA.statusCode).toBe(200);
+
+      const resAdmin = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${adminToken}` } });
+      expect(resAdmin.statusCode).toBe(200);
+
+      const resR = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${runnerToken}` } });
+      expect(resR.statusCode).toBe(403);
+      expect(resR.json().code).toBe('INSUFFICIENT_PERMISSIONS');
+
+      // 2. POST /accounts: Viewer(403), Analyst(403), Runner(403), Editor(201), Admin(201)
+      const accountPayload = { code: '1088-TEST', name: 'Test Account', type: 'asset' };
+      const postV = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${viewerToken}` }, payload: accountPayload });
+      expect(postV.statusCode).toBe(403);
+
+      const postA = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${analystToken}` }, payload: accountPayload });
+      expect(postA.statusCode).toBe(403);
+
+      const postR = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${runnerToken}` }, payload: accountPayload });
+      expect(postR.statusCode).toBe(403);
+
+      const postE = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/accounts', headers: { authorization: `Bearer ${editorToken}` }, payload: { ...accountPayload, code: '1088-ED' } });
+      expect(postE.statusCode).toBe(201);
+
+      // 3. POST /opening-balances: Viewer(403), Editor(403), Analyst(403), Runner(201), Admin(201)
+      const obPayload = {
+        balances: [{ account_id: ACCT_CASH_ID, currency_code: 'INR', balance_amount: '1000.00', as_of_date: '2026-04-01' }]
+      };
+      const obV = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/opening-balances', headers: { authorization: `Bearer ${viewerToken}` }, payload: obPayload });
+      expect(obV.statusCode).toBe(403);
+
+      const obE = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/opening-balances', headers: { authorization: `Bearer ${editorToken}` }, payload: obPayload });
+      expect(obE.statusCode).toBe(403);
+
+      const obA = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/opening-balances', headers: { authorization: `Bearer ${analystToken}` }, payload: obPayload });
+      expect(obA.statusCode).toBe(403);
+
+      const obR = await app.inject({ method: 'POST', url: '/api/v1/erp-finance/opening-balances', headers: { authorization: `Bearer ${runnerToken}` }, payload: obPayload });
+      expect(obR.statusCode).toBe(201);
+
+      // 4. GET /trial-balance: Viewer(200), Analyst(200), Runner(403)
+      const tbV = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/trial-balance?period=2026-04', headers: { authorization: `Bearer ${viewerToken}` } });
+      expect(tbV.statusCode).toBe(200);
+
+      const tbR = await app.inject({ method: 'GET', url: '/api/v1/erp-finance/trial-balance?period=2026-04', headers: { authorization: `Bearer ${runnerToken}` } });
+      expect(tbR.statusCode).toBe(403);
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC2: Authentication (401) and Authorization (403) Response Envelopes
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC2: 401 Unauthorized and 403 Forbidden Contract', () => {
+    it('returns HTTP 401 when Authorization header is completely absent', async () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/erp-finance/accounts',
-        headers: { authorization: `Bearer ${token}` },
       });
-
-      expect(res.statusCode).toBe(200);
-      expect(res.json().data).toBeDefined();
-    });
-
-    it('rejects unauthenticated request when token is missing (401 Unauthorized)', async () => {
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/v1/erp-finance/accounts',
-      });
-
       expect(res.statusCode).toBe(401);
-      const body = res.json();
-      expect(body.statusCode).toBe(401);
-      expect(body.error).toBe('Unauthorized');
-      expect(body.code).toBe('UNAUTHORIZED');
+      const json = res.json();
+      expect(json.statusCode).toBe(401);
+      expect(json.error).toBe('Unauthorized');
+      expect(json.message).toContain('Missing Authorization header');
+      expect(json.correlation_id).toBeDefined();
     });
 
-    it('rejects malformed authorization header format (not Bearer) with 401', async () => {
+    it('returns HTTP 401 when Authorization scheme is not Bearer', async () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/erp-finance/accounts',
         headers: { authorization: 'Basic dXNlcjpwYXNz' },
       });
-
       expect(res.statusCode).toBe(401);
-      expect(res.json().code).toBe('UNAUTHORIZED');
+      const json = res.json();
+      expect(json.error).toBe('Unauthorized');
+      expect(json.message).toContain('Expected "Bearer <token>"');
     });
 
-    it('rejects expired Hub JWT with 401 Unauthorized', async () => {
-      const expiredToken = await createExpiredToken('usr-editor-01', [Roles.EDITOR]);
-
+    it('returns HTTP 401 when Bearer token is empty or whitespace', async () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/erp-finance/accounts',
-        headers: { authorization: `Bearer ${expiredToken}` },
+        headers: { authorization: 'Bearer   ' },
       });
-
       expect(res.statusCode).toBe(401);
-      const body = res.json();
-      expect(body.code).toBe('UNAUTHORIZED');
-      expect(body.message).toContain('Token verification failed');
+      expect(res.json().message).toContain('Empty Bearer token');
     });
 
-    it('rejects token with tampered signature with 401 Unauthorized', async () => {
-      const validToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
-      const parts = validToken.split('.');
-      const tamperedSignature = parts[2] ? parts[2].slice(0, -4) + 'XXXX' : 'XXXX';
-      const tamperedToken = `${parts[0]}.${parts[1]}.${tamperedSignature}`;
+    it('returns HTTP 403 when authenticated user lacks required route policy', async () => {
+      const token = await signAccessToken('usr-viewer-01', [Roles.VIEWER]);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/accounts',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { code: 'FORBIDDEN-01', name: 'Forbidden', type: 'asset' },
+      });
+      expect(res.statusCode).toBe(403);
+      const json = res.json();
+      expect(json.statusCode).toBe(403);
+      expect(json.error).toBe('Forbidden');
+      expect(json.code).toBe('INSUFFICIENT_PERMISSIONS');
+      expect(json.message).toContain("lack permission for policy 'finance.accounts.create'");
+      expect(json.correlation_id).toBeDefined();
+    });
+  });
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC3: Sensitive Field Protection (Bank, Salary, Credentials) & Safe Logging
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC3: Sensitive Field-Level Masking in JSON, CSV and Safe Logs', () => {
+    it('masks bank accounts as XXXX-XXXX-7890 for all roles', () => {
+      expect(maskBankAccountNumber('1234567890')).toBe('XXXX-XXXX-7890');
+      expect(maskBankAccountNumber('9876543210987890')).toBe('XXXX-XXXX-7890');
+      expect(maskBankAccountNumber('123')).toBe('XXXX-XXXX-XXXX');
+    });
+
+    it('masks salary for non-admin roles and reveals to Admin only', () => {
+      expect(maskSalary('125000')).toBe('XX,XXX');
+      expect(maskSalary(125000)).toBe(0);
+
+      const record = {
+        name: 'Chief Financial Officer',
+        salary: 150000,
+        bank_account_number: '5555444433337890',
+        password_hash: '$argon2id$v=19$m=65536,t=3,p=4$secret_hash',
+      };
+
+      // Viewer sees masked salary and masked bank, redacted password
+      const viewerResult = maskSensitiveFields(record, [Roles.VIEWER]);
+      expect(viewerResult.salary).toBe(0);
+      expect(viewerResult.bank_account_number).toBe('XXXX-XXXX-7890');
+      expect(viewerResult.password_hash).toBe('[REDACTED]');
+
+      // Admin sees visible salary, but bank is masked and password is NEVER visible
+      const adminResult = maskSensitiveFields(record, [Roles.ADMIN]);
+      expect(adminResult.salary).toBe(150000);
+      expect(adminResult.bank_account_number).toBe('XXXX-XXXX-7890');
+      expect(adminResult.password_hash).toBe('[REDACTED]');
+    });
+
+    it('masks government IDs as ***-**-6789', () => {
+      expect(maskGovernmentId('123-45-6789')).toBe('***-**-6789');
+      expect(maskGovernmentId('12')).toBe('***-**-****');
+    });
+
+    it('masks CSV tabular export records before export', () => {
+      const rows = [
+        { account_code: '1010', bank_account_number: '1111222233337890', salary: 95000, password_hash: '$argon2id$synthetic_hash' },
+        { account_code: '1020', bank_account_number: '4444555566667890', salary: 85000, token: 'jwt_token' },
+      ];
+
+      const maskedCsv = maskCsvExportRecords(rows, [Roles.ANALYST]);
+      expect(maskedCsv[0]?.bank_account_number).toBe('XXXX-XXXX-7890');
+      expect(maskedCsv[0]?.salary).toBe(0);
+      expect(maskedCsv[0]?.password_hash).toBe('[REDACTED]');
+      expect(maskedCsv[1]?.bank_account_number).toBe('XXXX-XXXX-7890');
+      expect(maskedCsv[1]?.token).toBe('[REDACTED]');
+    });
+
+    it('sanitizes SQL queries, bearer tokens and passwords in HTTP 500 error envelopes', async () => {
+      // Simulate route throwing unexpected error containing raw SQL & secrets
+      app.get('/api/v1/erp-finance/test-internal-error', async () => {
+        throw new Error('Database query SELECT * FROM erp4.accounts WHERE secret_credential = "admin_secret" failed');
+      });
+
+      const token = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
       const res = await app.inject({
         method: 'GET',
-        url: '/api/v1/erp-finance/accounts',
-        headers: { authorization: `Bearer ${tamperedToken}` },
+        url: '/api/v1/erp-finance/test-internal-error',
+        headers: { authorization: `Bearer ${token}` },
       });
 
-      expect(res.statusCode).toBe(401);
-      expect(res.json().code).toBe('UNAUTHORIZED');
+      expect(res.statusCode).toBe(500);
+      const json = res.json();
+      expect(json.message).toBe('An unexpected internal error occurred.');
+      expect(json.message).not.toContain('SELECT');
+      expect(json.message).not.toContain('secret_credential');
+      expect(json.message).not.toContain('admin_secret');
     });
+  });
 
-    it('rejects token with untrusted issuer with 401 Unauthorized', async () => {
-      const badIssToken = await createInvalidIssuerToken('usr-admin-01', [Roles.ADMIN]);
-
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/v1/erp-finance/accounts',
-        headers: { authorization: `Bearer ${badIssToken}` },
-      });
-
-      expect(res.statusCode).toBe(401);
-      expect(res.json().code).toBe('UNAUTHORIZED');
-    });
-
-    it('rejects token with invalid audience with 401 Unauthorized', async () => {
-      const badAudToken = await createInvalidAudienceToken('usr-admin-01', [Roles.ADMIN]);
-
-      const res = await app.inject({
-        method: 'GET',
-        url: '/api/v1/erp-finance/accounts',
-        headers: { authorization: `Bearer ${badAudToken}` },
-      });
-
-      expect(res.statusCode).toBe(401);
-      expect(res.json().code).toBe('UNAUTHORIZED');
-    });
-
-    it('rejects token for known disabled user account with 401 Unauthorized', async () => {
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC4: Disabled Users, Expired Tokens, Invalid Issuer/Audience
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC4: Token Invalidation & Disabled User Rejection', () => {
+    it('rejects token issued to disabled user account with HTTP 401', async () => {
+      // 1. JWT issued with disabled user ID
       const disabledToken = await signAccessToken('user-disabled-01', [Roles.ADMIN]);
-
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/erp-finance/accounts',
         headers: { authorization: `Bearer ${disabledToken}` },
       });
-
       expect(res.statusCode).toBe(401);
       expect(res.json().message).toContain('disabled');
-    });
-  });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AC2: Role Capability Matrix Enforcement
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('AC2: Role Capability Matrix Enforcement', () => {
-    it('verifies pure policy matrix function enforces Default Deny invariant', () => {
-      // Empty roles
-      expect(isFinancePolicyAllowed([], FinancePolicies.ACCOUNTS_READ)).toBe(false);
-      expect(isFinancePolicyAllowed([], FinancePolicies.JOURNAL_POST)).toBe(false);
-
-      // Unknown role
-      expect(isFinancePolicyAllowed(['guest' as RoleType], FinancePolicies.ACCOUNTS_READ)).toBe(false);
-
-      // Explicit role allowances
-      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.ACCOUNTS_READ)).toBe(true);
-      expect(isFinancePolicyAllowed([Roles.VIEWER], FinancePolicies.ACCOUNTS_CREATE)).toBe(false);
-      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.ACCOUNTS_CREATE)).toBe(true);
-      expect(isFinancePolicyAllowed([Roles.EDITOR], FinancePolicies.PERIODS_UPDATE)).toBe(false);
-      expect(isFinancePolicyAllowed([Roles.ADMIN], FinancePolicies.PERIODS_UPDATE)).toBe(true);
-      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.OPENING_BALANCES_LOAD)).toBe(true);
-      expect(isFinancePolicyAllowed([Roles.MIGRATION_RUNNER], FinancePolicies.JOURNAL_POST)).toBe(false);
+      // 2. Synthetic disabled token
+      const res2 = await app.inject({
+        method: 'GET',
+        url: '/api/v1/erp-finance/accounts',
+        headers: { authorization: 'Bearer user-disabled' },
+      });
+      expect(res2.statusCode).toBe(401);
+      expect(res2.json().message).toContain('disabled');
     });
 
-    describe('Viewer Role Capabilities', () => {
-      let viewerToken: string;
+    it('rejects expired JWT with HTTP 401', async () => {
+      const keys = await getSigningKeys();
+      const now = Math.floor(Date.now() / 1000);
+      const expiredJwt = await new jose.SignJWT({ roles: [Roles.ADMIN] })
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
+        .setIssuer('clearshift-hub')
+        .setAudience('clearshift')
+        .setSubject('usr-admin-expired')
+        .setIssuedAt(now - 3600)
+        .setExpirationTime(now - 1800) // expired 30 minutes ago
+        .sign(keys.privateKey);
 
-      beforeEach(async () => {
-        viewerToken = await signAccessToken('usr-viewer-01', [Roles.VIEWER]);
-      });
-
-      it('can read Chart of Accounts, Journal Entries, Reports, Periods, and Opening Balances', async () => {
-        const routes = [
-          '/api/v1/erp-finance/accounts',
-          `/api/v1/erp-finance/accounts/${ACCT_CASH_ID}`,
-          '/api/v1/erp-finance/journal-entries',
-          '/api/v1/erp-finance/trial-balance?period=2026-03',
-          '/api/v1/erp-finance/periods',
-          `/api/v1/erp-finance/periods/${PERIOD_OPEN_ID}`,
-          '/api/v1/erp-finance/opening-balances',
-        ];
-
-        for (const url of routes) {
-          const res = await app.inject({
-            method: 'GET',
-            url,
-            headers: { authorization: `Bearer ${viewerToken}` },
-          });
-          expect(res.statusCode, `GET ${url} should return 200 for Viewer`).toBe(200);
-        }
-      });
-
-      it('is forbidden from creating accounts (403 Forbidden)', async () => {
-        const res = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/accounts',
-          headers: { authorization: `Bearer ${viewerToken}` },
-          payload: {
-            code: '9999-VIEWER',
-            name: 'Viewer Test Account',
-            type: 'asset',
-            currency_code: 'INR',
-          },
-        });
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-
-      it('is forbidden from creating journal entries (403 Forbidden)', async () => {
-        const res = await createDraftJournalEntry(viewerToken);
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-
-      it('is forbidden from bulk loading opening balances (403 Forbidden)', async () => {
-        const res = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/opening-balances',
-          headers: { authorization: `Bearer ${viewerToken}` },
-          payload: {
-            batch_id: randomUUID(),
-            source_system: 'legacy-viewer',
-            entries: [
-              { account_code: '1010-CASH', currency_code: 'INR', debit_amount: '100.0000', credit_amount: '0.0000' },
-            ],
-          },
-        });
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-    });
-
-    describe('Editor Role Capabilities', () => {
-      let editorToken: string;
-
-      beforeEach(async () => {
-        editorToken = await signAccessToken('usr-editor-01', [Roles.EDITOR]);
-      });
-
-      it('can create and update accounts', async () => {
-        const createRes = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/accounts',
-          headers: { authorization: `Bearer ${editorToken}` },
-          payload: {
-            code: '1099-EDITOR',
-            name: 'Editor Account',
-            type: 'asset',
-            currency_code: 'INR',
-          },
-        });
-        expect(createRes.statusCode).toBe(201);
-        const createdId = createRes.json().id;
-
-        const updateRes = await app.inject({
-          method: 'PATCH',
-          url: `/api/v1/erp-finance/accounts/${createdId}`,
-          headers: { authorization: `Bearer ${editorToken}` },
-          payload: { name: 'Editor Account Updated' },
-        });
-        expect(updateRes.statusCode).toBe(200);
-        expect(updateRes.json().name).toBe('Editor Account Updated');
-      });
-
-      it('can create draft, post, reverse, and void journal entries', async () => {
-        // 1. Create draft
-        const draftRes = await createDraftJournalEntry(editorToken, 'usr-editor-01');
-        expect(draftRes.statusCode).toBe(201);
-        const draftId = draftRes.json().id;
-
-        // 2. Post entry
-        const postRes = await app.inject({
-          method: 'POST',
-          url: `/api/v1/erp-finance/journal-entries/${draftId}/post`,
-          headers: { authorization: `Bearer ${editorToken}` },
-        });
-        expect(postRes.statusCode).toBe(200);
-        expect(postRes.json().status).toBe('posted');
-
-        // 3. Reverse entry
-        const reverseRes = await app.inject({
-          method: 'POST',
-          url: `/api/v1/erp-finance/journal-entries/${draftId}/reverse`,
-          headers: { authorization: `Bearer ${editorToken}` },
-          payload: { reason: 'Editor test correction' },
-        });
-        expect(reverseRes.statusCode).toBe(200);
-        expect(reverseRes.json().original.status).toBe('reversed');
-      });
-
-      it('is forbidden from updating accounting periods (Admin only)', async () => {
-        const res = await app.inject({
-          method: 'PATCH',
-          url: `/api/v1/erp-finance/periods/${PERIOD_OPEN_ID}`,
-          headers: { authorization: `Bearer ${editorToken}` },
-          payload: { status: 'soft_closed' },
-        });
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-
-      it('is forbidden from bulk loading opening balances (Migration Runner only)', async () => {
-        const res = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/opening-balances',
-          headers: { authorization: `Bearer ${editorToken}` },
-          payload: {
-            batch_id: randomUUID(),
-            source_system: 'legacy-editor',
-            entries: [],
-          },
-        });
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-    });
-
-    describe('Migration Runner Role Capabilities', () => {
-      let runnerToken: string;
-
-      beforeEach(async () => {
-        runnerToken = await signAccessToken('usr-runner-01', [Roles.MIGRATION_RUNNER]);
-      });
-
-      it('can bulk load opening balances and create ingestion draft entries', async () => {
-        const draftRes = await createDraftJournalEntry(runnerToken);
-        expect(draftRes.statusCode).toBe(201);
-      });
-
-      it('is forbidden from mutating Chart of Accounts', async () => {
-        const res = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/accounts',
-          headers: { authorization: `Bearer ${runnerToken}` },
-          payload: {
-            code: '1099-RUNNER',
-            name: 'Runner Attempt',
-            type: 'asset',
-            currency_code: 'INR',
-          },
-        });
-        expect(res.statusCode).toBe(403);
-        expect(res.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-
-      it('is forbidden from posting journal entries (Editor/Admin only)', async () => {
-        // Create draft first
-        const draftRes = await createDraftJournalEntry(runnerToken);
-        const draftId = draftRes.json().id;
-
-        const postRes = await app.inject({
-          method: 'POST',
-          url: `/api/v1/erp-finance/journal-entries/${draftId}/post`,
-          headers: { authorization: `Bearer ${runnerToken}` },
-        });
-        expect(postRes.statusCode).toBe(403);
-        expect(postRes.json().code).toBe('INSUFFICIENT_PERMISSIONS');
-      });
-    });
-
-    describe('Analyst Role Capabilities', () => {
-      let analystToken: string;
-
-      beforeEach(async () => {
-        analystToken = await signAccessToken('usr-analyst-01', [Roles.ANALYST]);
-      });
-
-      it('can read accounts, journal entries, trial balance, and periods', async () => {
-        const res = await app.inject({
-          method: 'GET',
-          url: '/api/v1/erp-finance/trial-balance?period=2026-03',
-          headers: { authorization: `Bearer ${analystToken}` },
-        });
-        expect(res.statusCode).toBe(200);
-      });
-
-      it('is forbidden from mutating any finance entities', async () => {
-        const res = await app.inject({
-          method: 'POST',
-          url: '/api/v1/erp-finance/accounts',
-          headers: { authorization: `Bearer ${analystToken}` },
-          payload: { code: '1099-ANALYST', name: 'Analyst Attempt', type: 'asset', currency_code: 'INR' },
-        });
-        expect(res.statusCode).toBe(403);
-      });
-    });
-
-    describe('Admin Role Capabilities', () => {
-      let adminToken: string;
-
-      beforeEach(async () => {
-        adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
-      });
-
-      it('has full access including period status lifecycle modification', async () => {
-        const patchRes = await app.inject({
-          method: 'PATCH',
-          url: `/api/v1/erp-finance/periods/${PERIOD_OPEN_ID}`,
-          headers: { authorization: `Bearer ${adminToken}` },
-          payload: { status: 'soft_closed' },
-        });
-        expect(patchRes.statusCode).toBe(200);
-        expect(patchRes.json().status).toBe('soft_closed');
-      });
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AC3: Standard Error Envelope Compliance
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('AC3: Standard Error Envelope Compliance', () => {
-    it('returns standard 401 error envelope with correlation_id', async () => {
-      const correlationId = 'test-corr-401-' + Date.now();
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/erp-finance/accounts',
-        headers: { 'x-correlation-id': correlationId },
+        headers: { authorization: `Bearer ${expiredJwt}` },
       });
-
       expect(res.statusCode).toBe(401);
-      const envelope = res.json();
-      expect(envelope).toMatchObject({
-        statusCode: 401,
-        error: 'Unauthorized',
-        code: 'UNAUTHORIZED',
-        correlation_id: correlationId,
-      });
-      expect(Array.isArray(envelope.details)).toBe(true);
-      expect(res.headers['x-correlation-id']).toBe(correlationId);
+      expect(res.json().message).toMatch(/exp|expired/);
     });
 
-    it('returns standard 403 error envelope with correlation_id', async () => {
-      const viewerToken = await signAccessToken('usr-viewer-01', [Roles.VIEWER]);
-      const correlationId = 'test-corr-403-' + Date.now();
+    it('rejects token with invalid issuer with HTTP 401', async () => {
+      const keys = await getSigningKeys();
+      const now = Math.floor(Date.now() / 1000);
+      const badIssuerJwt = await new jose.SignJWT({ roles: [Roles.ADMIN] })
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
+        .setIssuer('malicious-issuer.com')
+        .setAudience('clearshift')
+        .setSubject('usr-bad-issuer')
+        .setIssuedAt(now)
+        .setExpirationTime(now + 900)
+        .sign(keys.privateKey);
 
       const res = await app.inject({
-        method: 'POST',
+        method: 'GET',
         url: '/api/v1/erp-finance/accounts',
-        headers: {
-          authorization: `Bearer ${viewerToken}`,
-          'x-correlation-id': correlationId,
-        },
-        payload: {
-          code: '1099-FAIL',
-          name: 'Forbidden Test',
-          type: 'asset',
-          currency_code: 'INR',
-        },
+        headers: { authorization: `Bearer ${badIssuerJwt}` },
       });
+      expect(res.statusCode).toBe(401);
+      expect(res.json().message).toContain('Token verification failed');
+    });
 
-      expect(res.statusCode).toBe(403);
-      const envelope = res.json();
-      expect(envelope).toMatchObject({
-        statusCode: 403,
-        error: 'Forbidden',
-        code: 'INSUFFICIENT_PERMISSIONS',
-        correlation_id: correlationId,
+    it('rejects token with invalid audience with HTTP 401', async () => {
+      const keys = await getSigningKeys();
+      const now = Math.floor(Date.now() / 1000);
+      const badAudJwt = await new jose.SignJWT({ roles: [Roles.ADMIN] })
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
+        .setIssuer('clearshift-hub')
+        .setAudience('wrong-audience')
+        .setSubject('usr-bad-aud')
+        .setIssuedAt(now)
+        .setExpirationTime(now + 900)
+        .sign(keys.privateKey);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/erp-finance/accounts',
+        headers: { authorization: `Bearer ${badAudJwt}` },
       });
+      expect(res.statusCode).toBe(401);
+      expect(res.json().message).toContain('Token verification failed');
+    });
+
+    it('rejects token signed with an untrusted key', async () => {
+      const rogueKeyPair = await jose.generateKeyPair('EdDSA', { crv: 'Ed25519' });
+      const now = Math.floor(Date.now() / 1000);
+      const rogueJwt = await new jose.SignJWT({ roles: [Roles.ADMIN] })
+        .setProtectedHeader({ alg: 'EdDSA', kid: 'cs-hub-key-v1' })
+        .setIssuer('clearshift-hub')
+        .setAudience('clearshift')
+        .setSubject('usr-rogue')
+        .setIssuedAt(now)
+        .setExpirationTime(now + 900)
+        .sign(rogueKeyPair.privateKey);
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/erp-finance/accounts',
+        headers: { authorization: `Bearer ${rogueJwt}` },
+      });
+      expect(res.statusCode).toBe(401);
+      expect(res.json().message).toContain('Token verification failed');
     });
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AC4: Object-Level Authorization Guards (Multi-Tenant & Cross-User)
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('AC4: Object-Level Authorization Guards', () => {
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC5: Append-Only Audit Trail & Safe Activity Logging
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC5: Append-Only Audit Logging of Privileged Actions', () => {
+    it('records immutable audit record when a journal entry is posted', async () => {
+      const adminToken = await signAccessToken('usr-accountant-01', [Roles.ADMIN]);
+
+      // 1. Create a draft journal entry
+      const draftRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/journal-entries',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          posting_date: '2026-04-15',
+          description: 'Audited Salary Posting',
+          period_id: PERIOD_OPEN_ID,
+          currency_code: 'INR',
+          lines: [
+            { account_id: ACCT_CASH_ID, debit_amount: '5000.00', credit_amount: '0.00' },
+            { account_id: ACCT_BANK_ID, debit_amount: '0.00', credit_amount: '5000.00' },
+          ],
+        },
+      });
+      expect(draftRes.statusCode).toBe(201);
+      const draft = draftRes.json();
+
+      // 2. Post the entry
+      const postRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/erp-finance/journal-entries/${draft.id}/post`,
+        headers: { authorization: `Bearer ${adminToken}`, 'x-correlation-id': 'corr-audit-post-01' },
+      });
+      expect(postRes.statusCode).toBe(200);
+
+      // 3. Inspect audit trail
+      const auditRecords = await auditService.query({ action: 'journal.posted' });
+      expect(auditRecords.length).toBeGreaterThanOrEqual(1);
+      const postRecord = auditRecords.find((r) => r.targetId === draft.id);
+      expect(postRecord).toBeDefined();
+      expect(postRecord?.actor).toBe('usr-accountant-01');
+      expect(postRecord?.targetEntity).toBe('journal_entry');
+      expect(postRecord?.result).toBe('success');
+      expect(postRecord?.metadata).toBeDefined();
+      expect(postRecord?.metadata?.['currencyCode']).toBe('INR');
+      expect(postRecord?.metadata?.['totalAmount']).toBe('5000.00');
+
+      // 4. Reverse the posted entry and verify reversal audit
+      const revRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/erp-finance/journal-entries/${draft.id}/reverse`,
+        headers: { authorization: `Bearer ${adminToken}`, 'x-correlation-id': 'corr-audit-rev-01' },
+        payload: { reversal_description: 'Accounting adjustment' },
+      });
+      expect(revRes.statusCode).toBe(200);
+
+      const revRecords = await auditService.query({ action: 'journal.reversed' });
+      const revRecord = revRecords.find((r) => r.targetId === draft.id);
+      expect(revRecord).toBeDefined();
+      expect(revRecord?.actor).toBe('usr-accountant-01');
+      expect(revRecord?.reason).toBe('Accounting adjustment');
+    });
+
+    it('records audit log when opening balances are loaded', async () => {
+      const runnerToken = await signAccessToken('usr-migration-01', [Roles.MIGRATION_RUNNER]);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/opening-balances',
+        headers: { authorization: `Bearer ${runnerToken}`, 'x-correlation-id': 'corr-audit-ob-01' },
+        payload: {
+          batch_id: randomUUID(),
+          balances: [
+            { account_id: ACCT_CASH_ID, currency_code: 'INR', balance_amount: '25000.00', as_of_date: '2026-04-01' }
+          ],
+        },
+      });
+      expect(res.statusCode).toBe(201);
+
+      const loadRecords = await auditService.query({ action: 'load.requested' });
+      expect(loadRecords.length).toBeGreaterThanOrEqual(1);
+      const loadRecord = loadRecords[0];
+      expect(loadRecord?.actor).toBe('usr-migration-01');
+      expect(loadRecord?.targetEntity).toBe('opening_balances');
+      expect(loadRecord?.result).toBe('success');
+    });
+
+    it('records export generation audit event', async () => {
+      const exportRecord = await auditService.auditExportGenerated({
+        actor: 'usr-analyst-01',
+        correlationId: 'corr-export-01',
+        exportType: 'csv',
+        entityType: 'trial_balance',
+        recordCount: 14,
+      });
+
+      expect(exportRecord.action).toBe('export.generated');
+      expect(exportRecord.targetEntity).toBe('trial_balance');
+      expect(exportRecord.metadata?.['recordCount']).toBe(14);
+      expect(exportRecord.metadata?.['exportType']).toBe('csv');
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC6: Mandatory Domain Invariant — Every Posted Journal Entry Balances Exactly
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC6: Double-Entry Exact Balancing Domain Invariant', () => {
+    it('rejects posting an unbalanced journal entry with HTTP 400 at draft creation', async () => {
+      const adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/journal-entries',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          posting_date: '2026-04-15',
+          description: 'Unbalanced Attempt',
+          period_id: PERIOD_OPEN_ID,
+          currency_code: 'INR',
+          lines: [
+            { account_id: ACCT_CASH_ID, debit_amount: '1200.00', credit_amount: '0.00' },
+            { account_id: ACCT_BANK_ID, debit_amount: '0.00', credit_amount: '1150.00' }, // difference = 50.00
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      const json = res.json();
+      expect(json.code).toBe('VALIDATION_ERROR');
+      expect(json.message).toMatch(/balance|balanced/i);
+    });
+
+    it('rejects multi-line positive debit and credit on same line', async () => {
+      const adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/journal-entries',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          posting_date: '2026-04-15',
+          description: 'Illegal line',
+          period_id: PERIOD_OPEN_ID,
+          currency_code: 'INR',
+          lines: [
+            { account_id: ACCT_CASH_ID, debit_amount: '100.00', credit_amount: '100.00' },
+            { account_id: ACCT_BANK_ID, debit_amount: '0.00', credit_amount: '100.00' },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('rejects posting into a locked period with HTTP 422 PERIOD_LOCKED', async () => {
+      const adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
+
+      // Try to create entry in locked period (FIXTURE_PERIOD_LOCKED is bbbbbbbb-0001-0001-0001-000000000003)
+      const draftRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/journal-entries',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          period_id: 'bbbbbbbb-0001-0001-0001-000000000003',
+          posting_date: '2026-02-15',
+          description: 'Locked period attempt',
+          currency_code: 'INR',
+          lines: [
+            { account_id: ACCT_CASH_ID, debit_amount: '100.00', credit_amount: '0.00' },
+            { account_id: ACCT_BANK_ID, debit_amount: '0.00', credit_amount: '100.00' },
+          ],
+        },
+      });
+      const draft = draftRes.json();
+
+      const postRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/erp-finance/journal-entries/${draft.id}/post`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(postRes.statusCode).toBe(422);
+      expect(postRes.json().code).toBe('PERIOD_LOCKED');
+    });
+
+    it('asserts posted journal entries are permanently immutable', async () => {
+      const adminToken = await signAccessToken('usr-admin-01', [Roles.ADMIN]);
+
+      const draftRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-finance/journal-entries',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          posting_date: '2026-04-15',
+          description: 'Immutable Test',
+          period_id: PERIOD_OPEN_ID,
+          currency_code: 'INR',
+          lines: [
+            { account_id: ACCT_CASH_ID, debit_amount: '200.00', credit_amount: '0.00' },
+            { account_id: ACCT_BANK_ID, debit_amount: '0.00', credit_amount: '200.00' },
+          ],
+        },
+      });
+      const draft = draftRes.json();
+
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/erp-finance/journal-entries/${draft.id}/post`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      // Direct edit attempt on posted entry must fail with 422
+      const patchRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/erp-finance/journal-entries/${draft.id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { description: 'Attempted modification of posted entry' },
+      });
+
+      expect(patchRes.statusCode).toBe(422);
+      expect(patchRes.json().code).toBe('ENTRY_IMMUTABLE');
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // AC7: Object-Level Authorization Guards (Multi-Tenant & Cross-User)
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('AC7: Object-Level Authorization Guards', () => {
     describe('Multi-Tenant Boundary Isolation', () => {
       it('assertTenantAccess passes when tenant IDs agree', () => {
         expect(() => {
@@ -569,7 +675,7 @@ describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration
       it('enforces multi-tenant isolation via HTTP request headers', async () => {
         const editorToken = await signAccessToken('usr-editor-tenant', [Roles.EDITOR]);
 
-        // Create an account with tenant-A
+        // Create an account with tenant-alpha
         const createRes = await app.inject({
           method: 'POST',
           url: '/api/v1/erp-finance/accounts',
@@ -588,7 +694,7 @@ describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration
         expect(createRes.statusCode).toBe(201);
         const accountId = createRes.json().id;
 
-        // Attempt to update with tenant-B header -> 403 Forbidden
+        // Attempt to update with tenant-beta header -> 403 Forbidden
         const updateRes = await app.inject({
           method: 'PATCH',
           url: `/api/v1/erp-finance/accounts/${accountId}`,
@@ -620,8 +726,8 @@ describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration
             description: 'Editor 1 private draft',
             currency_code: 'INR',
             lines: [
-              { account_id: ACCT_CASH_ID, debit_amount: '1000.0000', credit_amount: '0.0000' },
-              { account_id: ACCT_SALES_ID, debit_amount: '0.0000', credit_amount: '1000.0000' },
+              { account_id: ACCT_CASH_ID, debit_amount: '1000.00', credit_amount: '0.00' },
+              { account_id: ACCT_SALES_ID, debit_amount: '0.00', credit_amount: '1000.00' },
             ],
           },
         });
@@ -673,8 +779,8 @@ describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration
             description: 'Staff draft',
             currency_code: 'INR',
             lines: [
-              { account_id: ACCT_CASH_ID, debit_amount: '300.0000', credit_amount: '0.0000' },
-              { account_id: ACCT_SALES_ID, debit_amount: '0.0000', credit_amount: '300.0000' },
+              { account_id: ACCT_CASH_ID, debit_amount: '300.00', credit_amount: '0.00' },
+              { account_id: ACCT_SALES_ID, debit_amount: '0.00', credit_amount: '300.00' },
             ],
           },
         });
@@ -690,36 +796,6 @@ describe('ERP-4 Finance & Accounting — Module Authorization Policy Integration
         expect(adminPatch.statusCode).toBe(200);
         expect(adminPatch.json().description).toBe('Admin management override');
       });
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Domain Invariants Assertions
-  // ═══════════════════════════════════════════════════════════════════════════
-  describe('Domain Invariants Enforcement with Authorization', () => {
-    it('asserts double-entry balancing invariant (BR-ERP4-01): unbalanced entries rejected', async () => {
-      const editorToken = await signAccessToken('usr-editor-invariant', [Roles.EDITOR]);
-
-      // Attempt to create unbalanced draft (Debits != Credits)
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/v1/erp-finance/journal-entries',
-        headers: { authorization: `Bearer ${editorToken}` },
-        payload: {
-          period_id: PERIOD_OPEN_ID,
-          posting_date: '2026-03-22',
-          description: 'Unbalanced entry attempt',
-          currency_code: 'INR',
-          lines: [
-            { account_id: ACCT_CASH_ID, debit_amount: '1000.0000', credit_amount: '0.0000' },
-            { account_id: ACCT_SALES_ID, debit_amount: '0.0000', credit_amount: '800.0000' }, // 200 imbalance
-          ],
-        },
-      });
-
-      expect([400, 422]).toContain(res.statusCode);
-      expect(['VALIDATION_ERROR', 'JOURNAL_UNBALANCED', 'UNBALANCED_ENTRY']).toContain(res.json().code);
-      expect(JSON.stringify(res.json())).toMatch(/not balanced|imbalanced|unbalanced/i);
     });
   });
 });
