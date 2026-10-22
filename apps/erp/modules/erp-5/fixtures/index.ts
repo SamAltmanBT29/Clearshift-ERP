@@ -95,7 +95,7 @@ export const FIXTURE_EMPLOYEE_NISHA: HrEmployee = {
 };
 
 export const FIXTURE_LEAVE_SICK: HrLeave = {
-  id: 'l1000000-0000-4000-8000-000000000001',
+  id: '1a100000-0000-4000-8000-000000000001',
   employee_id: FIXTURE_EMPLOYEE_ASHA.id,
   date_from: '2026-04-01',
   date_to: '2026-04-05',
@@ -106,7 +106,7 @@ export const FIXTURE_LEAVE_SICK: HrLeave = {
 };
 
 export const FIXTURE_LEAVE_HOLIDAY: HrLeave = {
-  id: 'l1000000-0000-4000-8000-000000000002',
+  id: '1a100000-0000-4000-8000-000000000002',
   employee_id: FIXTURE_EMPLOYEE_ROHAN.id,
   date_from: '2026-04-20',
   date_to: '2026-04-24',
@@ -117,7 +117,7 @@ export const FIXTURE_LEAVE_HOLIDAY: HrLeave = {
 };
 
 export const FIXTURE_PAYROLL_TOTAL_ENGINEERING: HrPayrollTotal = {
-  id: 'p1000000-0000-4000-8000-000000000001',
+  id: 'b1000000-0000-4000-8000-000000000001',
   department_id: FIXTURE_DEPARTMENT_ENGINEERING.id,
   month: '2026-04',
   total_amount: '250000.0000',
@@ -128,7 +128,7 @@ export const FIXTURE_PAYROLL_TOTAL_ENGINEERING: HrPayrollTotal = {
 };
 
 export const FIXTURE_PAYROLL_TOTAL_FINANCE: HrPayrollTotal = {
-  id: 'p1000000-0000-4000-8000-000000000002',
+  id: 'b1000000-0000-4000-8000-000000000002',
   department_id: FIXTURE_DEPARTMENT_FINANCE.id,
   month: '2026-04',
   total_amount: '142000.0000',

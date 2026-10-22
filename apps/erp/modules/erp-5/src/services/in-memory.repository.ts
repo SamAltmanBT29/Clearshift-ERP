@@ -293,6 +293,26 @@ export class InMemoryHrRepository implements HrRepository {
     return { ...record };
   }
 
+  async updateLeave(
+    id: string,
+    updates: Partial<Pick<HrLeave, 'status' | 'date_from' | 'date_to' | 'type'>>
+  ): Promise<HrLeave> {
+    const existing = this.store.leave.get(id);
+    if (!existing) {
+      throw new Error(`Leave record ${id} not found`);
+    }
+    const updated: HrLeave = {
+      ...existing,
+      status: updates.status !== undefined ? updates.status : existing.status,
+      date_from: updates.date_from !== undefined ? updates.date_from : existing.date_from,
+      date_to: updates.date_to !== undefined ? updates.date_to : existing.date_to,
+      type: updates.type !== undefined ? updates.type : existing.type,
+      updated_at: new Date().toISOString(),
+    };
+    this.store.leave.set(id, updated);
+    return { ...updated };
+  }
+
   // ── Payroll totals ────────────────────────────────────────────────────────
 
   async getPayrollTotalById(id: string): Promise<HrPayrollTotal | null> {

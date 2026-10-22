@@ -139,6 +139,11 @@ export interface HrRepository {
   // ── Leave ─────────────────────────────────────────────────────────────────
   getLeaveById(id: string): Promise<HrLeave | null>;
   createLeave(data: NewHrLeave): Promise<HrLeave>;
+  /** Mutable fields of a leave row — the recorded subject never changes. */
+  updateLeave(
+    id: string,
+    updates: Partial<Pick<HrLeave, 'status' | 'date_from' | 'date_to' | 'type'>>
+  ): Promise<HrLeave>;
 
   // ── Payroll totals ────────────────────────────────────────────────────────
   getPayrollTotalById(id: string): Promise<HrPayrollTotal | null>;

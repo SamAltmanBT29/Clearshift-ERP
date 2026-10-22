@@ -22,6 +22,7 @@ export default moduleDefinition;
 export * from './public.js';
 export * from './app.js';
 export * from './domain/rules.js';
+export * from './domain/relationships.js';
 export * from './services/errors.js';
 export * from './services/hr.service.js';
 export * from './services/repository.js';
