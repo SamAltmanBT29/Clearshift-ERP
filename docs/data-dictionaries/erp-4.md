@@ -12,12 +12,14 @@ For the canonical, detailed version see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-4 Finance & Accounting |
-| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation), #39 (Chart of Accounts & Trial Balance UI), #40 (Journal Entry Builder & Live Balance Checker UI), #41 (Domain Relationships) |
+| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation), #39 (Chart of Accounts & Trial Balance UI), #40 (Journal Entry Builder & Live Balance Checker UI), #41 (Domain Relationships), #170 (OpenAPI, Event and Mock Contract Package) |
 | **PostgreSQL Schema** | `erp4` |
 | **API Base** | `/api/v1/erp-finance` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-4.yaml` |
+| **Mock Contract Package** | `@clearshift/contracts/erp-4-mock` (`createErp4MockServer()`, `npm run mock:erp-4`) |
+| **Domain Events** | `@clearshift/contracts/erp-4-events` (PLT-04 / PLT-09 transactional envelopes) |
 | **Tables** | `erp4.accounts`, `erp4.accounting_periods`, `erp4.journal_entries`, `erp4.journal_lines`, `erp4.opening_balances`, `erp4.import_receipts` |
-| **Version** | V1.0 |
+| **Version** | V1.0.0 (Gate G1 Frozen Baseline) |
 | **SDS Reference** | ClearShift ERP v2.0 §7.9, FR-ERP4-01..05, BR-ERP4-01..02 |
 
 ## Table Index
@@ -81,11 +83,31 @@ The ERP-4 frontend implements the Minimal White Theme design system using CSS va
 | **AccountCreateModal** | `apps/erp/modules/erp-4/web/src/components/forms/AccountCreateModal.tsx` | Accessible modal dialog for creating posting GL accounts on the fly without losing in-flight journal draft data. |
 | **TrialBalanceTable** | `apps/erp/modules/erp-4/web/src/components/TrialBalanceTable.tsx` | Grouped debit/credit totals by account and period-end balance banner (`totalDebit === totalCredit`). |
 
-## Module Authorization & Security (Issue #171 / ERP4-15)
+## Domain Event Contracts (PLT-04 / PLT-09)
 
-- **Authentication**: Validates incoming Hub EdDSA JWTs via `@cs/identity` (`verifyAccessToken`). Unauthenticated requests reject with 401 `UNAUTHORIZED`.
-- **Capability Matrix**: Enforces Default Deny. Roles (`viewer`, `editor`, `migration_runner`, `analyst`, `admin`) map to granular endpoint policies (`requireFinanceRead`, `requireFinanceWrite`, `requireJournalCreate`, `requireJournalPost`, `requireOpeningBalancesLoad`, `requirePeriodUpdate`).
-- **Object-Level Guards**:
-  - Multi-tenant isolation (`assertTenantAccess`) returns 403 `OBJECT_ACCESS_DENIED`.
-  - Cross-user draft mutation protection (`assertObjectMutationAccess`) returns 403 `CROSS_USER_MUTATION_FORBIDDEN` when non-admin editors modify drafts created by others.
-- **Error Envelopes**: Standard ClearShift envelope `{ statusCode, error, code, message, details, correlation_id }` with correlation IDs preserved in headers and body.
+Published in `@clearshift/contracts/erp-4-events` with strongly-typed transactional payloads wrapped in `EventEnvelopeSchema`:
+
+| Event Type | Producer | Entity Type | Trigger & Business Meaning |
+|---|---|---|---|
+| `erp.account.created` | `erp-4` | `account` | New GL account established in the Chart of Accounts |
+| `erp.account.updated` | `erp-4` | `account` | Mutable account attributes modified (name, description, active status) |
+| `erp.journal_entry.created` | `erp-4` | `journal_entry` | Balanced journal entry created in `draft` status |
+| `erp.journal_entry.posted` | `erp-4` | `journal_entry` | Journal entry finalized and posted to General Ledger (immutable) |
+| `erp.journal_entry.reversed` | `erp-4` | `journal_entry` | Posted entry reversed via compensating journal entry |
+| `erp.journal_entry.voided` | `erp-4` | `journal_entry` | Unposted draft entry marked void |
+| `erp.period.status_changed` | `erp-4` | `accounting_period` | Fiscal period lifecycle updated (`open` -> `soft_closed` -> `locked`) |
+| `erp.opening_balance.created` | `erp-4` | `opening_balance` | One-time opening balance loaded for an account/currency pair |
+
+## Deterministic Mock Contract Package & Server (Issue #170)
+
+Exported from `@clearshift/contracts/erp-4-mock` and executable via `npm run mock:erp-4` (default port `4014`):
+- Provides representative, schema-valid synthetic responses for all 18 V1 endpoints.
+- Pre-seeded with 100% synthetic, reproducible test accounts, fiscal periods, and balanced journal entries.
+- Validates double-entry balancing (`BR-ERP4-01`), period locking (`BR-ERP4-02`), and bounded pagination (`pageSize <= 100`).
+- Provides in-process test injection via `createErp4MockServer()` and state reset via `mockServer.reset()`.
+
+## Versioned Contract Change Control Log
+
+| Version | Date | Gate / Milestone | Author / Team | Description of Changes |
+|---|---|---|---|---|
+| **`1.0.0`** | 2026-10-22 | Gate G1 Baseline Freeze | Group 9 / Role 2 (Issue #170) | Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published. Approved as frozen baseline for Gate G1. |
