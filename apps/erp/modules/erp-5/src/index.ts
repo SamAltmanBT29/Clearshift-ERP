@@ -27,3 +27,18 @@ export * from './services/errors.js';
 export * from './services/hr.service.js';
 export * from './services/repository.js';
 export * from './routes/index.js';
+
+/**
+ * The Drizzle implementation of the repository contract (ERP5-02).
+ *
+ * It is exported so the platform bootstrap can mount the module against
+ * PostgreSQL:
+ *
+ * ```ts
+ * import { DrizzleHrRepository, buildHrApp } from '@cs/mod-erp5';
+ * import { getDatabase } from '@cs/db';
+ *
+ * const app = buildHrApp({ repository: new DrizzleHrRepository(getDatabase()) });
+ * ```
+ */
+export { DrizzleHrRepository } from '../db/repository.js';

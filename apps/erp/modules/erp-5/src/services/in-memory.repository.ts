@@ -22,16 +22,30 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { HrDepartment, HrEmployee, HrImportReceipt, HrLeave, HrPayrollTotal } from '@clearshift/contracts';
+import type {
+  HrDepartment,
+  HrDepartmentListQuery,
+  HrEmployee,
+  HrEmployeeListQuery,
+  HrIdentityUser,
+  HrIdentityUserListQuery,
+  HrImportReceipt,
+  HrLeave,
+  HrLeaveListQuery,
+  HrPayrollTotal,
+  HrPayrollTotalListQuery,
+} from '@clearshift/contracts';
 import {
   FIXTURE_DEPARTMENTS,
   FIXTURE_EMPLOYEES,
+  FIXTURE_IDENTITY_USERS,
   FIXTURE_LEAVE_RECORDS,
   FIXTURE_PAYROLL_TOTALS,
 } from '../../fixtures/index.js';
 import type {
   HrDepartmentUpdates,
   HrEmployeeUpdates,
+  HrPage,
   HrRepository,
   NewHrDepartment,
   NewHrEmployee,
@@ -40,12 +54,20 @@ import type {
   NewHrPayrollTotal,
 } from './repository.js';
 
+/** Applies the bounded page window to an already ordered array. */
+function paginate<T>(rows: T[], page: number, pageSize: number): HrPage<T> {
+  const total = rows.length;
+  const offset = (page - 1) * pageSize;
+  return { items: rows.slice(offset, offset + pageSize), total };
+}
+
 interface HrStore {
   departments: Map<string, HrDepartment>;
   employees: Map<string, HrEmployee>;
   leave: Map<string, HrLeave>;
   payrollTotals: Map<string, HrPayrollTotal>;
   importReceipts: Map<string, HrImportReceipt>;
+  identityUsers: Map<string, HrIdentityUser>;
 }
 
 function emptyStore(): HrStore {
@@ -55,6 +77,7 @@ function emptyStore(): HrStore {
     leave: new Map(),
     payrollTotals: new Map(),
     importReceipts: new Map(),
+    identityUsers: new Map(),
   };
 }
 
@@ -65,6 +88,7 @@ function cloneStore(store: HrStore): HrStore {
     leave: new Map(store.leave),
     payrollTotals: new Map(store.payrollTotals),
     importReceipts: new Map(store.importReceipts),
+    identityUsers: new Map(store.identityUsers),
   };
 }
 
@@ -92,6 +116,9 @@ export class InMemoryHrRepository implements HrRepository {
     }
     for (const total of FIXTURE_PAYROLL_TOTALS) {
       this.store.payrollTotals.set(total.id, { ...total });
+    }
+    for (const user of FIXTURE_IDENTITY_USERS) {
+      this.store.identityUsers.set(user.id, { ...user });
     }
   }
 
@@ -346,6 +373,117 @@ export class InMemoryHrRepository implements HrRepository {
     };
     this.store.payrollTotals.set(total.id, total);
     return { ...total };
+  }
+
+  // ── Query layer (ERP5-02) ────────────────────────────────────────────────
+
+  async listEmployees(query: HrEmployeeListQuery): Promise<HrPage<HrEmployee>> {
+    let rows = Array.from(this.store.employees.values());
+
+    if (query.search) {
+      const term = query.search.toLowerCase();
+      rows = rows.filter(
+        (employee) =>
+          employee.first_name.toLowerCase().includes(term) ||
+          employee.last_name.toLowerCase().includes(term) ||
+          employee.employee_no.toLowerCase().includes(term)
+      );
+    }
+
+    if (query.department_id) {
+      rows = rows.filter((employee) => employee.department_id === query.department_id);
+    }
+
+    // Stable order with the `id` as the deterministic tie-breaker.
+    rows.sort((a, b) => {
+      switch (query.sort) {
+        case 'employee_no':
+          return a.employee_no.localeCompare(b.employee_no) || a.id.localeCompare(b.id);
+        case 'join_date':
+          return a.join_date.localeCompare(b.join_date) || a.id.localeCompare(b.id);
+        case 'name':
+        default:
+          return (
+            a.last_name.localeCompare(b.last_name) ||
+            a.first_name.localeCompare(b.first_name) ||
+            a.id.localeCompare(b.id)
+          );
+      }
+    });
+
+    return paginate(rows, query.page, query.pageSize);
+  }
+
+  async listDepartments(query: HrDepartmentListQuery): Promise<HrPage<HrDepartment>> {
+    let rows = Array.from(this.store.departments.values());
+
+    if (query.search) {
+      const term = query.search.toLowerCase();
+      rows = rows.filter(
+        (department) =>
+          department.name.toLowerCase().includes(term) ||
+          department.code.toLowerCase().includes(term)
+      );
+    }
+
+    if (query.parent_id) {
+      rows = rows.filter((department) => department.parent_id === query.parent_id);
+    }
+
+    rows.sort((a, b) => {
+      if (query.sort === 'code') {
+        return a.code.localeCompare(b.code) || a.id.localeCompare(b.id);
+      }
+      return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+    });
+
+    return paginate(rows, query.page, query.pageSize);
+  }
+
+  async listLeave(query: HrLeaveListQuery): Promise<HrPage<HrLeave>> {
+    let rows = Array.from(this.store.leave.values());
+
+    if (query.employee_id) {
+      rows = rows.filter((record) => record.employee_id === query.employee_id);
+    }
+    if (query.type) {
+      rows = rows.filter((record) => record.type === query.type);
+    }
+    if (query.status) {
+      rows = rows.filter((record) => record.status === query.status);
+    }
+
+    rows.sort((a, b) => a.date_from.localeCompare(b.date_from) || a.id.localeCompare(b.id));
+
+    return paginate(rows, query.page, query.pageSize);
+  }
+
+  async listPayrollTotals(query: HrPayrollTotalListQuery): Promise<HrPage<HrPayrollTotal>> {
+    let rows = Array.from(this.store.payrollTotals.values());
+
+    if (query.month) {
+      rows = rows.filter((total) => total.month === query.month);
+    }
+    if (query.department_id) {
+      rows = rows.filter((total) => total.department_id === query.department_id);
+    }
+
+    rows.sort((a, b) => a.month.localeCompare(b.month) || a.id.localeCompare(b.id));
+
+    return paginate(rows, query.page, query.pageSize);
+  }
+
+  async listIdentityUsers(query: HrIdentityUserListQuery): Promise<HrPage<HrIdentityUser>> {
+    let rows = Array.from(this.store.identityUsers.values());
+
+    if (query.search) {
+      const term = query.search.toLowerCase();
+      rows = rows.filter((user) => user.username.toLowerCase().includes(term));
+    }
+
+    rows.sort((a, b) => a.username.localeCompare(b.username) || a.id.localeCompare(b.id));
+
+    return paginate(rows, query.page, query.pageSize);
   }
 
   // ── Import receipts ───────────────────────────────────────────────────────

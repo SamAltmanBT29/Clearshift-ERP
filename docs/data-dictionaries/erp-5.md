@@ -15,6 +15,7 @@ For the canonical, detailed version see:
 | **Issue** | #46 — `[ERP5-01] Schema, Drizzle models and guarded migrations` |
 | **Mutation API Issue** | #48 — `[ERP5-03] Mutation API and domain validation` |
 | **Relationship Issue** | #51 — `[ERP5-06] Relationships, state transitions and read-model consistency` |
+| **Read API Issue** | #47 — `[ERP5-02] List/read API with bounded paging and OpenAPI contract` |
 | **PostgreSQL Schema** | `erp5` |
 | **API Base** | `/api/v1/erp-hr` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-5.yaml` |
@@ -23,7 +24,7 @@ For the canonical, detailed version see:
 | **Migration** | `packages/database/migrations/erp5_v1.sql` |
 | **Tables** | `erp5.departments`, `erp5.employees`, `erp5.leave`, `erp5.payroll_totals`, `erp5.import_receipts` |
 | **View** | `erp5.identity_users` — read-only Hub Identity projection (owner: Platform / Hub Identity) |
-| **Version** | V1.2 |
+| **Version** | V1.3 |
 | **SDS Reference** | ClearShift ERP v2.0 §4.6 (FR-ERP5-01..06, BR-ERP5-01..02), §4.7 (ERP-5 tables) |
 
 ## Table Index
@@ -44,16 +45,20 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/v1/erp-hr/employees` | List employees with bounded paging and search |
+| `GET` | `/api/v1/erp-hr/employees/{id}` | Read one employee (masked projection) |
 | `POST` | `/api/v1/erp-hr/employees` | Create an employee (unique `employee_no`, BR-ERP5-01 enforced) |
 | `PATCH` | `/api/v1/erp-hr/employees/{id}` | Edit an employee (allow-listed fields) |
 | `GET` | `/api/v1/erp-hr/departments` | List departments |
+| `GET` | `/api/v1/erp-hr/departments/{id}` | Read one department |
 | `POST` | `/api/v1/erp-hr/departments` | Create a department (unique `code`) |
 | `PATCH` | `/api/v1/erp-hr/departments/{id}` | Edit a department |
 | `GET` | `/api/v1/erp-hr/leave` | List leave records |
+| `GET` | `/api/v1/erp-hr/leave/{id}` | Read one leave record |
 | `POST` | `/api/v1/erp-hr/leave` | Create a leave record |
 | `PATCH` | `/api/v1/erp-hr/leave/{id}` | Edit a leave record and apply the V1 state transition (ERP5-06) |
 | `GET` | `/api/v1/erp-hr/identity-users` | Read-only Hub Identity user projection |
 | `GET` | `/api/v1/erp-hr/payroll-totals?month=YYYY-MM` | Department/month payroll aggregates |
+| `GET` | `/api/v1/erp-hr/payroll-totals/{id}` | Read one department/month aggregate |
 | `POST` | `/api/v1/erp-hr/payroll-totals` | Load one department/month aggregate |
 
 ## Domain Rules
@@ -92,6 +97,19 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Payroll authority | the department/month aggregate is authoritative **as loaded** by the Kit and is never recomputed from the employee rows (DR-11) |
 | Cross-module surface | `Erp5ReferenceResolver` confirms only what it can prove; without a repository it denies every existence check (default deny, DR-12) |
 
+## Query Layer Contract (ERP5-02)
+
+| Aspect | Rule |
+|---|---|
+| Paging | `page` starts at 1, `pageSize` is 1..100 with a default of 25; a larger request is `400` |
+| Ordering | an allow-listed sort field, then the `id` as the deterministic tie-breaker |
+| Response | `{ data: [...], meta: { page, pageSize, total, totalPages } }` — `totalPages` is `0` for an empty collection |
+| Server-side | the search and the filter run in the database and are parameterised — a search term is never interpolated into SQL |
+| Bounded | every query carries a `LIMIT`/`OFFSET`; no collection is returned unbounded |
+| Salary | the employee collection carries the masked projection — the raw `salary` never leaves the module |
+| Identity projection | the read-only Hub Identity projection; empty when the platform has not created it; no credential column; never written by the module |
+| Authorization | the shared `module.read` capability — Viewer, Editor, Analyst and Admin |
+
 ## Open Decision Records (V1)
 
 | ID | Decision | Status |
@@ -108,6 +126,7 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | DR-10 | V1 exposes the leave **state transition** only (`pending → approved \| rejected`, terminal states); the FR-ERP5-10 request → approve/reject workflow with a log stays in V2 | Open — escalated |
 | DR-11 | The department/month payroll aggregate is authoritative as loaded and is never recomputed from the employee rows; only the display values are derived | Open — escalated |
 | DR-12 | The cross-module resolver denies every existence check when it has no data source (default deny) instead of confirming every id | Accepted for V1 — maintainer confirmation requested |
+| DR-13 | The ERP-5 list response keeps its published `{data, meta}` shape; harmonising it with the ERP-4 and PLT-04 envelopes is a platform-wide change | Open — escalated to PLT-04 / PLT-14 |
 
 ## Verification
 

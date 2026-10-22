@@ -6,9 +6,10 @@
 **Issue**: [#46](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/46) — `[ERP5-01] Schema, Drizzle models and guarded migrations`
 **Mutation API Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
 **Relationship Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
+**Read API Issue**: [#47](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/47) — `[ERP5-02] List/read API with bounded paging and OpenAPI contract`
 **PostgreSQL Schema**: `erp5`
 **API Base**: `/api/v1/erp-hr`
-**Version**: V1.2
+**Version**: V1.3
 
 ---
 
@@ -27,6 +28,7 @@
 11. [Migration & verification](#11-migration--verification)
 12. [Mutation API (ERP5-03)](#12-mutation-api-erp503)
 13. [Relationships, state transitions and read model (ERP5-06)](#13-relationships-state-transitions-and-read-model-erp506)
+14. [Query layer — list and read API (ERP5-02)](#14-query-layer--list-and-read-api-erp502)
 
 ---
 
@@ -335,6 +337,13 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 - **Decision**: the resolver validates against the `HrRepository` (`createErp5Resolver(repository)`) and **denies every existence check when it has no data source** (default deny, PLT-06's non-negotiable invariant). The facade keeps a repository-less instance for the module definition; the platform bootstrap constructs the repository-backed one once the Drizzle repository of ERP5-02 exists.
 - **Status**: accepted for V1 — flagged for maintainer confirmation in PR #231.
 
+### DR-13 — The ERP-5 list response keeps its published `{data, meta}` shape
+
+- **Conflict**: three collection shapes exist in the repository — the ERP-5 contract published with ERP5-01 (`{data, meta}`, `HrListMetaSchema`), the ERP-4 list API (`{data, total, page, pageSize, totalPages}`) and the **PLT-04** shared factory `createPaginatedResponseSchema` (`{items, page, pageSize, total, totalPages}`). PLT-04's acceptance criterion says "Every shared schema is imported by server routes instead of duplicated ad hoc", which points at the shared factory.
+- **Decision**: ERP-5 keeps the `{data, meta}` shape it published in ERP5-01. The Zod contract (`HrListMetaSchema`, `hrListResponseSchema`) and the OpenAPI (`EmployeeListResponse`, `DepartmentListResponse`, …) already carry it, and no client consumes the endpoint yet, so changing it would churn a published contract for no consumer benefit.
+- **Rationale**: harmonising the three shapes is a **platform-wide** change — it touches ERP-4 and every module contract, and it is owned by PLT-04 / PLT-14, not by a module issue. Doing it inside ERP5-02 would make ERP-5 the first module to migrate and leave the others behind, which is a programme decision rather than a module one.
+- **Status**: open — escalated in PR #232 (ERP5-02). The pagination **rules** (1-based `page`, `pageSize` 1..100, default 25, the allow-listed sort fields, the deterministic `id` tie-breaker) are identical in all three shapes — only the envelope differs.
+
 
 ---
 
@@ -544,3 +553,69 @@ The resolver never confirms a record it cannot prove exists — see [DR-12](#dr-
 | `apps/erp/modules/erp-5/tests/domain/relationships.test.ts` | domain | the optional-reference warning, the enumerations, every allowed and forbidden transition, the read model, the source identity |
 | `apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts` | service | the relationship failures with no partial write, the state matrix, the warning, the read-back |
 | `apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` | API | the transitions over HTTP, the error envelope, the resolver, the no-partial-mutation proof |
+
+---
+
+## 14. Query layer — list and read API (ERP5-02)
+
+**Issue**: [#47](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/47) — `[ERP5-02] List/read API with bounded paging and OpenAPI contract`
+**Implementation**: `apps/erp/modules/erp-5/db/repository.ts` — the Drizzle implementation of the `HrRepository` contract
+
+### 14.1 Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/erp-hr/employees` | List employees — search, department filter, allow-listed sort |
+| `GET` | `/api/v1/erp-hr/employees/{id}` | Read one employee (masked projection) |
+| `GET` | `/api/v1/erp-hr/departments` | List departments — search, parent filter, allow-listed sort |
+| `GET` | `/api/v1/erp-hr/departments/{id}` | Read one department |
+| `GET` | `/api/v1/erp-hr/leave` | List leave records — employee, type and status filters |
+| `GET` | `/api/v1/erp-hr/leave/{id}` | Read one leave record |
+| `GET` | `/api/v1/erp-hr/payroll-totals` | List department/month aggregates — month and department filters |
+| `GET` | `/api/v1/erp-hr/payroll-totals/{id}` | Read one aggregate |
+| `GET` | `/api/v1/erp-hr/identity-users` | The read-only Hub Identity projection |
+
+Reads require the shared `module.read` capability (Viewer, Editor, Analyst, Admin).
+
+### 14.2 The paging contract
+
+| Rule | Value |
+|---|---|
+| `page` | 1-based, minimum 1, default 1 |
+| `pageSize` | 1..100, default 25 — a larger request is `400` |
+| Ordering | the allow-listed sort field, then the `id` as the deterministic tie-breaker |
+| Response | `{ data: [...], meta: { page, pageSize, total, totalPages } }` |
+| `totalPages` | `0` for an empty collection |
+
+The allow-listed sort fields are `name` / `employee_no` / `join_date` for the employees and
+`name` / `code` for the departments. A sort field outside the list is `400`.
+
+### 14.3 Server-side, parameterised, bounded
+
+The search and the filter are applied **in the database** — never by string-building SQL.
+The live proof (`tests/db/repository.integration.test.ts`) searches for
+`'; DROP TABLE erp5.employees; --` and shows that it is treated as text: no row matches and
+the table is still there.
+
+No collection is ever returned unbounded: every query carries a `LIMIT` and an `OFFSET`, and
+the `total` is counted with a separate, equally parameterised count query.
+
+### 14.4 The Hub Identity projection
+
+`erp5.identity_users` is a **view** over `platform.hub_users`, owned by the platform. The
+module reads it and never writes it.
+
+- The projection is created by the migration **only when `platform.hub_users` exists**. When
+  it is absent the read degrades to an **empty page** — the HR module stays available.
+- The projection carries no credential, hash, token or refresh-token column; the write
+  privileges are revoked from `PUBLIC` by the migration, and the live proof shows the write
+  refused with SQLSTATE `42501` for an application role.
+- A Hub user without a linked employee is returned with `employee_ref: null` — no employee
+  row is invented for it.
+
+### 14.5 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/tests/api/list.test.ts` | API | paging, search, filters, the sort allow-list, the page-size cap, the empty result, the salary mask, the projection shape, `404` / `400` / `401` / `403` |
+| `apps/erp/modules/erp-5/tests/db/repository.integration.test.ts` | database | the Drizzle write path, the parameterised server-side search, the bounded deterministic pages, the transaction commit and rollback, the read-only projection, the read model (live PostgreSQL) |

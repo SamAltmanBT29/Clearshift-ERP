@@ -696,11 +696,23 @@ export const HrLeaveListQuerySchema = HrPaginationQuerySchema.extend({
 export type HrLeaveListQuery = z.infer<typeof HrLeaveListQuerySchema>;
 
 /** GET /api/v1/erp-hr/payroll-totals?month=YYYY-MM */
-export const HrPayrollTotalListQuerySchema = z.object({
+export const HrPayrollTotalListQuerySchema = HrPaginationQuerySchema.extend({
   month: HrMonth.optional(),
   department_id: HrUuid.optional(),
 });
 export type HrPayrollTotalListQuery = z.infer<typeof HrPayrollTotalListQuerySchema>;
+
+/**
+ * GET /api/v1/erp-hr/identity-users
+ *
+ * The read-only Hub Identity projection. The query may only narrow the
+ * result set — it never selects a field, so no credential or token column
+ * can be reached through it.
+ */
+export const HrIdentityUserListQuerySchema = HrPaginationQuerySchema.extend({
+  search: z.string().trim().min(1).max(120).optional(),
+});
+export type HrIdentityUserListQuery = z.infer<typeof HrIdentityUserListQuerySchema>;
 
 /** Collection metadata returned with every list response. */
 export const HrListMetaSchema = z.object({

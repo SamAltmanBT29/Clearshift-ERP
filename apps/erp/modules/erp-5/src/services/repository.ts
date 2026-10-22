@@ -19,9 +19,17 @@
 import type {
   HrDepartment,
   HrEmployee,
+  HrIdentityUser,
   HrImportReceipt,
   HrLeave,
   HrPayrollTotal,
+} from '@clearshift/contracts';
+import type {
+  HrDepartmentListQuery,
+  HrEmployeeListQuery,
+  HrIdentityUserListQuery,
+  HrLeaveListQuery,
+  HrPayrollTotalListQuery,
 } from '@clearshift/contracts';
 
 /** Fields accepted when a department row is created. */
@@ -106,6 +114,10 @@ export interface NewHrImportReceipt {
  * `transaction` is the atomic boundary used by the service layer: the target
  * mutation and its import receipt are written inside one call, so a failure
  * rolls both back (Master Architecture Spec §6.1 slot 01 / KIT-08).
+ *
+ * The **query layer** is part of the same contract: every list operation is
+ * server-side, bounded, deterministically ordered and parameterised. No
+ * implementation may return an unbounded collection.
  */
 export interface HrRepository {
   // ── Departments ───────────────────────────────────────────────────────────
@@ -163,4 +175,32 @@ export interface HrRepository {
    * performed by `fn` back.
    */
   transaction<T>(fn: (tx: HrRepository) => Promise<T>): Promise<T>;
+
+  // ── Query layer (ERP5-02) ────────────────────────────────────────────────
+  /**
+   * The bounded, server-side, deterministically ordered collections.
+   *
+   * Every implementation must apply the search and the filter in the
+   * database (parameterised — never by string-building SQL) and must order
+   * by the requested sort field with the `id` as the deterministic
+   * tie-breaker.
+   */
+  listEmployees(query: HrEmployeeListQuery): Promise<HrPage<HrEmployee>>;
+  listDepartments(query: HrDepartmentListQuery): Promise<HrPage<HrDepartment>>;
+  listLeave(query: HrLeaveListQuery): Promise<HrPage<HrLeave>>;
+  listPayrollTotals(query: HrPayrollTotalListQuery): Promise<HrPage<HrPayrollTotal>>;
+  /**
+   * The read-only Hub Identity projection.
+   *
+   * The implementation must return an **empty** page when the projection is
+   * not available (it is created only when `platform.hub_users` exists), and
+   * must never reach a credential or token column.
+   */
+  listIdentityUsers(query: HrIdentityUserListQuery): Promise<HrPage<HrIdentityUser>>;
+}
+
+/** One bounded page of a collection. */
+export interface HrPage<T> {
+  items: T[];
+  total: number;
 }

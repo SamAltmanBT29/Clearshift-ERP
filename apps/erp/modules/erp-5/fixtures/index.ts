@@ -11,7 +11,13 @@
  * @module erp5/fixtures
  */
 
-import type { HrDepartment, HrEmployee, HrLeave, HrPayrollTotal } from '@clearshift/contracts';
+import type {
+  HrDepartment,
+  HrEmployee,
+  HrIdentityUser,
+  HrLeave,
+  HrPayrollTotal,
+} from '@clearshift/contracts';
 
 /** Fixed timestamp so every fixture run is byte-identical. */
 export const FIXTURE_TIMESTAMP = '2026-04-15T12:00:00.000Z';
@@ -162,4 +168,39 @@ export const FIXTURE_LEAVE_RECORDS: readonly HrLeave[] = [
 export const FIXTURE_PAYROLL_TOTALS: readonly HrPayrollTotal[] = [
   FIXTURE_PAYROLL_TOTAL_ENGINEERING,
   FIXTURE_PAYROLL_TOTAL_FINANCE,
+];
+
+/**
+ * The synthetic stand-in for the read-only Hub Identity projection.
+ *
+ * The real projection (`erp5.identity_users`) is a **view** over
+ * `platform.hub_users`, owned by the platform. The in-memory repository uses
+ * these rows so the read API can be exercised without a Hub Identity
+ * database; the Drizzle implementation reads the view itself.
+ *
+ * The rows carry no credential, hash, token or refresh-token field — the
+ * projection never exposes one (Master Architecture Spec C3).
+ */
+export const FIXTURE_IDENTITY_USERS: readonly HrIdentityUser[] = [
+  {
+    id: 'c1000000-0000-4000-8000-000000000001',
+    username: 'asha.iyer',
+    roles: ['viewer'],
+    employee_ref: FIXTURE_EMPLOYEE_ASHA.id,
+    status: 'active',
+  },
+  {
+    id: 'c1000000-0000-4000-8000-000000000002',
+    username: 'rohan.mehta',
+    roles: ['editor'],
+    employee_ref: FIXTURE_EMPLOYEE_ROHAN.id,
+    status: 'active',
+  },
+  {
+    id: 'c1000000-0000-4000-8000-000000000003',
+    username: 'unlinked.user',
+    roles: ['analyst'],
+    employee_ref: null,
+    status: 'active',
+  },
 ];
