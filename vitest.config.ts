@@ -42,7 +42,7 @@ export default defineConfig({
       '@cs/identity': resolve(__dirname, './packages/identity/src/index.ts'),
       '@cs/rbac': resolve(__dirname, './packages/rbac/src/index.ts'),
       '@cs/ui': resolve(__dirname, './packages/ui/src/index.ts'),
-      '@cs/db': resolve(__dirname, './packages/database/src/index.ts'),
+      '@cs/mod-erp2': resolve(__dirname, './apps/erp/modules/erp-2/src/index.ts'),
     },
   },
 });
