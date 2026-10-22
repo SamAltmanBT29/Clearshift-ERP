@@ -2,10 +2,12 @@
  * ERP-4 Finance & Accounting — Fastify Application Factory
  *
  * Configures the Fastify server instance:
- *   - Error handling producing standard ApiError envelopes
- *   - Bearer token authentication hook
- *   - Route registration under /api/v1/erp-finance
- *   - Dependency injection for FinanceService and FinanceRepository
+ *   - Global error handler producing standard ApiError envelopes (PLT-04)
+ *   - EdDSA asymmetric JWT authentication hook & user resolution (PLT-05 / ERP4-09)
+ *   - Field-level masking hook for sensitive financial details on JSON & CSV (PLT-06)
+ *   - Route policy preHandler guards matching SDS §4.8 matrix
+ *   - Append-only audit trail logging for state transitions (PLT-10)
+ *   - Dependency injection for FinanceService, FinanceRepository, and AuditService
  *
  * @module erp4/app
  */
@@ -13,24 +15,26 @@
 import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
+import { AppError, type ReferenceResolver } from '@cs/kernel';
 import { FinanceService, ServiceError } from './services/finance.service.js';
 import { DomainError } from '../domain/engine.js';
 import type { FinanceRepository } from './services/repository.js';
 import { InMemoryFinanceRepository } from './services/repository.js';
-import type { ReferenceResolver } from '@cs/kernel';
+import { Erp4AuditService } from './services/audit.js';
+import { authPlugin, type AuthenticatedFinanceUser } from './plugins/auth.js';
+import { erp4FieldMaskingPlugin } from './policies/masking.js';
 import { erpFinanceRoutes } from './routes/index.js';
 
 export interface AppOptions {
   repository?: FinanceRepository | undefined;
   financeService?: FinanceService | undefined;
   referenceResolver?: ReferenceResolver | undefined;
+  auditService?: Erp4AuditService | undefined;
   authRequired?: boolean | undefined;
+  isUserDisabled?: ((userId: string) => boolean | Promise<boolean>) | undefined;
 }
 
-export interface AuthenticatedUser {
-  id: string;
-  role: string;
-}
+export type AuthenticatedUser = AuthenticatedFinanceUser;
 
 export function buildApp(options: AppOptions = {}): FastifyInstance {
   const app = fastify({
@@ -38,9 +42,14 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   });
 
   const repository = options.repository ?? new InMemoryFinanceRepository(true);
+  const auditService = options.auditService ?? new Erp4AuditService();
   const financeService =
     options.financeService ??
-    new FinanceService({ repository, referenceResolver: options.referenceResolver });
+    new FinanceService({
+      repository,
+      referenceResolver: options.referenceResolver,
+      auditService,
+    });
   const authRequired = options.authRequired ?? false;
 
   // ── Global Error Handler ───────────────────────────────────────────────────
@@ -51,6 +60,22 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       randomUUID();
     reply.header('x-correlation-id', correlationId);
 
+    // 1. Platform AppError (Auth 401, Forbidden 403, PreHandler guards)
+    if (error instanceof AppError) {
+      const statusCode = error.statusCode;
+      const errorTitle =
+        statusCode === 401 ? 'Unauthorized' : (statusCode === 403 ? 'Forbidden' : error.code);
+      return reply.status(statusCode).send({
+        statusCode,
+        error: errorTitle,
+        code: error.code,
+        message: error.message,
+        details: Array.isArray(error.details) ? error.details : (error.details ? [error.details] : []),
+        correlation_id: correlationId,
+      });
+    }
+
+    // 2. Service layer errors
     if (error instanceof ServiceError) {
       return reply.status(error.statusCode).send({
         statusCode: error.statusCode,
@@ -62,6 +87,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       });
     }
 
+    // 3. Domain invariant errors
     if (error instanceof DomainError || (error && (error as any).name === 'DomainError')) {
       const domErr = error as DomainError;
       return reply.status(422).send({
@@ -74,6 +100,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       });
     }
 
+    // 4. Zod validation failures
     if (
       error instanceof ZodError ||
       (typeof error === 'object' && error !== null && 'issues' in error && Array.isArray((error as { issues: unknown[] }).issues))
@@ -93,6 +120,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       });
     }
 
+    // 5. Unexpected errors — strictly sanitize SQL, tokens, and raw rows
     const err = (error && typeof error === 'object' ? error : {}) as Record<string, unknown>;
     const rawStatusCode = err['statusCode'];
     const statusCode = typeof rawStatusCode === 'number' ? rawStatusCode : 500;
@@ -101,7 +129,6 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     const rawMessage = err['message'];
     const errorMessage = typeof rawMessage === 'string' ? rawMessage : 'An unexpected error occurred';
 
-    // In production / external responses, never leak raw SQL, stack traces, database schema, or internal rows
     let safeMessage = errorMessage;
     if (/(SELECT\s|INSERT\s|UPDATE\s|DELETE\s|FROM\s|WHERE\s|password|secret|bearer\s)/i.test(errorMessage)) {
       safeMessage = 'An unexpected internal error occurred.';
@@ -117,63 +144,13 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     });
   });
 
-  // ── Authentication & Authorization Hook ────────────────────────────────────
-  app.addHook('onRequest', async (request, reply) => {
-    const authHeader = request.headers.authorization;
+  // ── Field-Level Masking Plugin (onSend hook) ───────────────────────────────
+  app.register(erp4FieldMaskingPlugin);
 
-    if (authRequired && !authHeader) {
-      return reply.status(401).send({
-        statusCode: 401,
-        error: 'Unauthorized',
-        message: 'Missing Authorization header. Bearer token required.',
-        details: [],
-      });
-    }
-
-    if (authHeader) {
-      if (!authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          message: 'Invalid Authorization header format. Expected "Bearer <token>".',
-          details: [],
-        });
-      }
-
-      const token = authHeader.slice(7).trim();
-      if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          message: 'Invalid or expired bearer token.',
-          details: [],
-        });
-      }
-
-      let role = 'finance_admin';
-      const id = 'ffffffff-0001-0001-0001-000000000001';
-
-      const match = token.match(/role:([a-z_]+)/);
-      if (match && match[1]) {
-        role = match[1];
-      }
-
-      (request as any).user = {
-        id,
-        role,
-        sub: id,
-        roles: [role],
-      };
-      return;
-    }
-
-    // Default system context when auth is not strictly required
-    (request as any).user = {
-      id: 'ffffffff-0001-0001-0001-000000000001',
-      role: 'finance_admin',
-      sub: 'ffffffff-0001-0001-0001-000000000001',
-      roles: ['finance_admin'],
-    };
+  // ── Authentication Plugin (onRequest hook & verifyAccessToken) ─────────────
+  app.register(authPlugin, {
+    authRequired,
+    ...(options.isUserDisabled ? { isUserDisabled: options.isUserDisabled } : {}),
   });
 
   // ── Register Module Routes ─────────────────────────────────────────────────

@@ -67,9 +67,17 @@ export async function runMigrations(maxRetries = 10, delayMs = 1500): Promise<Mi
     throw new Error('❌ Failed to establish PostgreSQL connection');
   }
 
+  const client = await pool.connect();
+
   try {
+    // Serialize deploy jobs before reading the ledger. The session-level lock
+    // survives the explicit BEGIN/COMMIT blocks inside the migration files.
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', [
+      'clearshift:db:migrate',
+    ]);
+
     // 1. Ensure schema_migrations ledger exists
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS public.schema_migrations (
         id SERIAL PRIMARY KEY,
         migration VARCHAR(256) NOT NULL UNIQUE,
@@ -93,7 +101,7 @@ export async function runMigrations(maxRetries = 10, delayMs = 1500): Promise<Mi
     for (const file of migrationFiles) {
       const migrationName = file.replace(/\.sql$/, '');
 
-      const { rows } = await pool.query(
+      const { rows } = await client.query(
         'SELECT 1 FROM public.schema_migrations WHERE migration = $1',
         [migrationName]
       );
@@ -107,22 +115,28 @@ export async function runMigrations(maxRetries = 10, delayMs = 1500): Promise<Mi
       console.log(`⚡ Applying migration: ${migrationName}...`);
       const sql = readFileSync(join(migrationsDir, file), 'utf-8');
 
-      const client = await pool.connect();
       try {
-        await client.query('BEGIN');
         await client.query(sql);
-        await client.query(
-          'INSERT INTO public.schema_migrations (migration) VALUES ($1)',
+
+        // The current migration files self-record, but verify the ledger so
+        // a future migration cannot silently re-run on every deploy.
+        const ledger = await client.query(
+          'SELECT 1 FROM public.schema_migrations WHERE migration = $1',
           [migrationName]
         );
-        await client.query('COMMIT');
+        if (ledger.rows.length === 0) {
+          await client.query(
+            'INSERT INTO public.schema_migrations (migration) VALUES ($1) ON CONFLICT (migration) DO NOTHING',
+            [migrationName]
+          );
+        }
+
         console.log(`✅ ${migrationName} successfully applied`);
         applied++;
       } catch (err) {
+        // A failed migration must never leave a ledger row behind.
         await client.query('ROLLBACK').catch(() => {});
         throw new Error(`❌ Failed to apply ${migrationName}: ${(err as Error).message}`);
-      } finally {
-        client.release();
       }
     }
 
@@ -133,6 +147,10 @@ export async function runMigrations(maxRetries = 10, delayMs = 1500): Promise<Mi
 
     return { applied, skipped, total: migrationFiles.length };
   } finally {
+    await client.query('SELECT pg_advisory_unlock(hashtext($1))', [
+      'clearshift:db:migrate',
+    ]).catch(() => {});
+    client.release();
     await pool.end();
   }
 }
