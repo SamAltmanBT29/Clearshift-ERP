@@ -66,16 +66,8 @@ export function computeRequestHash(payload: unknown): string {
  * Masks raw bank account details to XXXX-XXXX-7890.
  * Server-side serialization rule (FR-ERP2-06).
  */
-export function maskBankDetails(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (/^XXXX-XXXX-\d{4}$/.test(trimmed)) {
-    return trimmed;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  const last4 = digits.length >= 4 ? digits.slice(-4) : (digits || '0000').padStart(4, '0');
-  return `XXXX-XXXX-${last4}`;
-}
+export { maskBankDetails } from '../domain/rules.js';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Repository Interface
@@ -147,7 +139,9 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
     if (query.search) {
       const s = query.search.toLowerCase();
-      items = items.filter((v) => v.name.toLowerCase().includes(s) || v.tax_number.toLowerCase().includes(s));
+      items = items.filter(
+        (v) => v.name.toLowerCase().includes(s) || v.tax_number.toLowerCase().includes(s)
+      );
     }
 
     items.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
@@ -222,6 +216,7 @@ export class InMemoryErp2Repository implements Erp2Repository {
     }
 
     items.sort((a, b) => b.order_date.localeCompare(a.order_date) || a.id.localeCompare(b.id));
+
     const total = items.length;
 
     const page = query.page;

@@ -10,6 +10,7 @@
  * @module erp2/routes/purchase-orders
  */
 
+import { randomUUID } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import {
   PurchaseOrderListQuerySchema,
@@ -29,12 +30,17 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
   fastify.get('/purchase-orders', async (request, reply) => {
     const parsed = PurchaseOrderListQuerySchema.safeParse(request.query);
     if (!parsed.success) {
+      const correlationId =
+        (request.headers['x-correlation-id'] as string | undefined) ??
+        (request.headers['x-request-id'] as string | undefined) ??
+        randomUUID();
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         code: 'VALIDATION_ERROR',
         message: parsed.error.issues[0]?.message ?? 'Invalid query parameters',
         details: parsed.error.issues,
+        correlation_id: correlationId,
       });
     }
 
@@ -55,11 +61,17 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
     const { id } = request.params as { id: string };
     const validUuid = UuidSchema.safeParse(id);
     if (!validUuid.success) {
+      const correlationId =
+        (request.headers['x-correlation-id'] as string | undefined) ??
+        (request.headers['x-request-id'] as string | undefined) ??
+        randomUUID();
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         code: 'INVALID_UUID',
         message: 'Purchase order ID must be a valid UUID v4',
+        details: [],
+        correlation_id: correlationId,
       });
     }
 
@@ -79,6 +91,10 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
 
     const parsed = CreatePurchaseOrderRequestSchema.safeParse(bodyToValidate);
     if (!parsed.success) {
+      const correlationId =
+        (request.headers['x-correlation-id'] as string | undefined) ??
+        (request.headers['x-request-id'] as string | undefined) ??
+        randomUUID();
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
@@ -89,6 +105,7 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
           message: i.message,
           code: i.code,
         })),
+        correlation_id: correlationId,
       });
     }
 
@@ -116,22 +133,33 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
     const { id } = request.params as { id: string };
     const validUuid = UuidSchema.safeParse(id);
     if (!validUuid.success) {
+      const correlationId =
+        (request.headers['x-correlation-id'] as string | undefined) ??
+        (request.headers['x-request-id'] as string | undefined) ??
+        randomUUID();
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         code: 'INVALID_UUID',
         message: 'Purchase order ID must be a valid UUID v4',
+        details: [],
+        correlation_id: correlationId,
       });
     }
 
     const parsed = UpdatePurchaseOrderStatusRequestSchema.safeParse(request.body);
     if (!parsed.success) {
+      const correlationId =
+        (request.headers['x-correlation-id'] as string | undefined) ??
+        (request.headers['x-request-id'] as string | undefined) ??
+        randomUUID();
       return reply.status(400).send({
         statusCode: 400,
         error: 'Bad Request',
         code: 'VALIDATION_ERROR',
         message: parsed.error.issues[0]?.message ?? 'Invalid purchase order status update',
         details: parsed.error.issues,
+        correlation_id: correlationId,
       });
     }
 
@@ -139,3 +167,4 @@ export const purchaseOrderRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service 
     return reply.status(200).send(updated);
   });
 };
+

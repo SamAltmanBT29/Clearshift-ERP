@@ -17,6 +17,7 @@ import { AppError } from '@cs/kernel';
 import type { ReferenceResolver } from '@cs/kernel';
 import { Erp2Service } from './services/erp2.service.js';
 import { type Erp2Repository, InMemoryErp2Repository } from './services/repository.js';
+import { Erp2DomainError } from './domain/rules.js';
 import { erpVendorsRoutes } from './routes/index.js';
 
 export interface AppOptions {
@@ -37,6 +38,16 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     new Erp2Service({ repository, referenceResolver: options.referenceResolver });
   const authRequired = options.authRequired ?? false;
 
+  // ── Correlation ID Propagation Hook ───────────────────────────────────────
+  app.addHook('onSend', async (request, reply) => {
+    const correlationId =
+      (request.headers['x-correlation-id'] as string | undefined) ??
+      (request.headers['x-request-id'] as string | undefined) ??
+      randomUUID();
+    reply.header('x-correlation-id', correlationId);
+  });
+
+
   // ── Global Error Handler ───────────────────────────────────────────────────
   app.setErrorHandler((error: unknown, request, reply) => {
     const correlationId =
@@ -56,9 +67,25 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       });
     }
 
+    if (error instanceof Erp2DomainError) {
+      return reply.status(422).send({
+        statusCode: 422,
+        error: 'Unprocessable Entity',
+        code: error.code,
+        message: error.message,
+        details: error.field
+          ? [{ field: error.field, message: error.message, code: error.code }]
+          : [],
+        correlation_id: correlationId,
+      });
+    }
+
     if (
       error instanceof ZodError ||
-      (typeof error === 'object' && error !== null && 'issues' in error && Array.isArray((error as { issues: unknown[] }).issues))
+      (typeof error === 'object' &&
+        error !== null &&
+        'issues' in error &&
+        Array.isArray((error as { issues: unknown[] }).issues))
     ) {
       const zodErr = error as ZodError;
       return reply.status(400).send({
@@ -80,8 +107,12 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     const statusCode = typeof rawStatusCode === 'number' ? rawStatusCode : 500;
     const rawName = err['name'];
     const errorName = typeof rawName === 'string' ? rawName : 'Internal Server Error';
-    const rawMessage = err['message'];
-    const errorMessage = typeof rawMessage === 'string' ? rawMessage : 'An unexpected error occurred';
+
+    // Mask internal error messages to prevent leaking SQL, connection strings, or raw data
+    let errorMessage = 'An unexpected internal error occurred';
+    if (statusCode < 500 && typeof err['message'] === 'string') {
+      errorMessage = err['message'];
+    }
 
     // In production / external responses, never leak raw SQL, stack traces, database schema, or internal rows
     let safeMessage = errorMessage;
@@ -107,6 +138,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       return reply.status(401).send({
         statusCode: 401,
         error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
         message: 'Missing Authorization header. Bearer token required.',
         details: [],
       });
@@ -117,6 +149,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
         return reply.status(401).send({
           statusCode: 401,
           error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
           message: 'Invalid Authorization header format. Expected "Bearer <token>".',
           details: [],
         });
@@ -127,6 +160,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
         return reply.status(401).send({
           statusCode: 401,
           error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
           message: 'Invalid or expired bearer token.',
           details: [],
         });
@@ -166,3 +200,4 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   return app;
 }
+
