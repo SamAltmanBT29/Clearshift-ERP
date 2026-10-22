@@ -14,6 +14,9 @@
  */
 
 import type {
+  CreateHrDepartmentRequest,
+  CreateHrEmployeeRequest,
+  CreateHrLeaveRequest,
   HrDepartment,
   HrDepartmentListQuery,
   HrEmployeeListQuery,
@@ -25,6 +28,9 @@ import type {
   HrListMeta,
   HrPayrollTotal,
   HrPayrollTotalListQuery,
+  UpdateHrDepartmentRequest,
+  UpdateHrEmployeeRequest,
+  UpdateHrLeaveRequest,
 } from '@clearshift/contracts';
 import { readAccessToken } from '../auth/session.js';
 
@@ -224,6 +230,62 @@ async function hrRequest<T>(
   }
 }
 
+/**
+ * A write to the module.
+ *
+ * The body is sent exactly as the caller built it. The module's request
+ * schemas are **strict**, so a payload that carries a protected, a masked or
+ * a system-maintained field is refused by the API with
+ * `400 HR_PROTECTED_FIELD` — the browser cannot write around the contract.
+ */
+async function hrWrite<T>(
+  path: string,
+  method: 'POST' | 'PATCH',
+  body: unknown,
+  options: HrRequestOptions = {}
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  const token = readAccessToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${ERP5_API_BASE}${path}`, {
+      method,
+      headers,
+      body: JSON.stringify(body),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+  } catch (cause) {
+    if (isAbortError(cause)) {
+      throw cause;
+    }
+    throw toHrApiError(cause);
+  }
+
+  if (!response.ok) {
+    throw await readHrApiError(response);
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch (cause) {
+    if (isAbortError(cause)) {
+      throw cause;
+    }
+    throw new HrApiError(
+      response.status,
+      'HR_API_MALFORMED_RESPONSE',
+      'The HR module API returned a response that could not be read.'
+    );
+  }
+}
+
 /** `GET /api/v1/erp-hr/employees` — the masked employee projection. */
 export function listEmployees(
   query: HrEmployeeListQuery,
@@ -278,4 +340,76 @@ export function listIdentityUsers(
     toQueryRecord(query),
     options
   );
+}
+
+/** `GET /api/v1/erp-hr/employees/{id}` — one employee, masked. */
+export function getEmployee(
+  id: string,
+  options?: HrRequestOptions
+): Promise<HrEmployeeView> {
+  return hrRequest<HrEmployeeView>(`/employees/${id}`, {}, options);
+}
+
+/** `GET /api/v1/erp-hr/departments/{id}` — one department. */
+export function getDepartment(
+  id: string,
+  options?: HrRequestOptions
+): Promise<HrDepartment> {
+  return hrRequest<HrDepartment>(`/departments/${id}`, {}, options);
+}
+
+/** `GET /api/v1/erp-hr/leave/{id}` — one leave record. */
+export function getLeave(id: string, options?: HrRequestOptions): Promise<HrLeave> {
+  return hrRequest<HrLeave>(`/leave/${id}`, {}, options);
+}
+
+/** `POST /api/v1/erp-hr/employees` — create an employee. */
+export function createEmployee(
+  payload: CreateHrEmployeeRequest,
+  options?: HrRequestOptions
+): Promise<HrEmployeeView> {
+  return hrWrite<HrEmployeeView>('/employees', 'POST', payload, options);
+}
+
+/** `PATCH /api/v1/erp-hr/employees/{id}` — edit an employee. */
+export function updateEmployee(
+  id: string,
+  payload: UpdateHrEmployeeRequest,
+  options?: HrRequestOptions
+): Promise<HrEmployeeView> {
+  return hrWrite<HrEmployeeView>(`/employees/${id}`, 'PATCH', payload, options);
+}
+
+/** `POST /api/v1/erp-hr/departments` — create a department. */
+export function createDepartment(
+  payload: CreateHrDepartmentRequest,
+  options?: HrRequestOptions
+): Promise<HrDepartment> {
+  return hrWrite<HrDepartment>('/departments', 'POST', payload, options);
+}
+
+/** `PATCH /api/v1/erp-hr/departments/{id}` — edit a department. */
+export function updateDepartment(
+  id: string,
+  payload: UpdateHrDepartmentRequest,
+  options?: HrRequestOptions
+): Promise<HrDepartment> {
+  return hrWrite<HrDepartment>(`/departments/${id}`, 'PATCH', payload, options);
+}
+
+/** `POST /api/v1/erp-hr/leave` — create a leave record. */
+export function createLeave(
+  payload: CreateHrLeaveRequest,
+  options?: HrRequestOptions
+): Promise<HrLeave> {
+  return hrWrite<HrLeave>('/leave', 'POST', payload, options);
+}
+
+/** `PATCH /api/v1/erp-hr/leave/{id}` — edit a leave record or decide it. */
+export function updateLeave(
+  id: string,
+  payload: UpdateHrLeaveRequest,
+  options?: HrRequestOptions
+): Promise<HrLeave> {
+  return hrWrite<HrLeave>(`/leave/${id}`, 'PATCH', payload, options);
 }

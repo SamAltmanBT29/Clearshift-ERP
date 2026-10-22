@@ -87,6 +87,13 @@ export const ERP5_ROUTE_DESCRIPTORS: readonly Erp5RouteDescriptor[] = [
     group: null,
   },
   {
+    id: 'employees-edit',
+    path: 'employees/:employeeId/edit',
+    label: 'Edit employee',
+    title: 'Edit employee',
+    group: null,
+  },
+  {
     id: 'departments',
     path: 'departments',
     label: 'Departments',
@@ -108,6 +115,13 @@ export const ERP5_ROUTE_DESCRIPTORS: readonly Erp5RouteDescriptor[] = [
     group: null,
   },
   {
+    id: 'departments-edit',
+    path: 'departments/:departmentId/edit',
+    label: 'Edit department',
+    title: 'Edit department',
+    group: null,
+  },
+  {
     id: 'leave',
     path: 'leave',
     label: 'Leave records',
@@ -126,6 +140,13 @@ export const ERP5_ROUTE_DESCRIPTORS: readonly Erp5RouteDescriptor[] = [
     path: 'leave/:leaveId',
     label: 'Leave record',
     title: 'Leave record',
+    group: null,
+  },
+  {
+    id: 'leave-edit',
+    path: 'leave/:leaveId/edit',
+    label: 'Edit leave record',
+    title: 'Edit leave record',
     group: null,
   },
   {
@@ -245,6 +266,12 @@ export function findErp5NavItemForPath(pathname: string): Erp5RouteDescriptor | 
   );
 }
 
+/** The literal path steps of the module, as they read in a breadcrumb. */
+const SEGMENT_LABELS: Readonly<Record<string, string>> = {
+  new: 'New',
+  edit: 'Edit',
+};
+
 /**
  * Builds the breadcrumb trail for a pathname.
  *
@@ -283,8 +310,9 @@ export function buildErp5Breadcrumbs(
     trail.push({
       // A record identifier is shown verbatim — it is the only handle the
       // operator has on the row until the detail screen (ERP5-21) renders
-      // the real attributes.
-      label: segment === 'new' ? 'New' : segment,
+      // the real attributes. The two literal steps of the module's own
+      // paths read as words.
+      label: SEGMENT_LABELS[segment] ?? segment,
       isCurrent: isLast,
     });
   });

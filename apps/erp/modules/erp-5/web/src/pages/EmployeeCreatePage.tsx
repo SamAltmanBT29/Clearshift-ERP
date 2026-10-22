@@ -1,21 +1,38 @@
 /**
- * ERP-5 HR & Employees — Employee Create Route Target
- *
- * The create form is delivered by ERP5-20 (React Hook Form, client-side Zod
- * validation and server error mapping). This issue registers the route only.
+ * ERP-5 HR & Employees — Employee Create Screen
  *
  * @module erp5/web/pages/EmployeeCreatePage
  */
 
 import React from 'react';
-import { ModulePlaceholderPage } from './ModulePlaceholderPage.js';
+import { useNavigate } from 'react-router-dom';
+import { EmployeeForm } from '../components/forms/EmployeeForm.js';
+import { FormPageLayout } from '../components/FormPageLayout.js';
+import { useDepartmentLookup } from '../hooks/useDepartmentLookup.js';
 
-export const EmployeeCreatePage: React.FC = () => (
-  <ModulePlaceholderPage
-    title="New employee"
-    description="Create a staff record. Employee numbers are unique and the join date can never precede the birth date."
-    ownedBy="ERP5-20"
-  />
-);
+export const EmployeeCreatePage: React.FC = () => {
+  const navigate = useNavigate();
+  const departmentLookup = useDepartmentLookup();
+
+  return (
+    <FormPageLayout
+      title="New employee"
+      description="Create a staff record. The employee number is unique and the join date can never precede the birth date."
+      backTo="/erp5/employees"
+      backLabel="Back to the employee list"
+    >
+      <EmployeeForm
+        mode="create"
+        departments={departmentLookup.options}
+        onSaved={(employee) => {
+          navigate(`/erp5/employees/${employee.id}`);
+        }}
+        onCancel={() => {
+          navigate('/erp5/employees');
+        }}
+      />
+    </FormPageLayout>
+  );
+};
 
 export default EmployeeCreatePage;

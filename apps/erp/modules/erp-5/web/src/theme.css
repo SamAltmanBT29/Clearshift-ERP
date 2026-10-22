@@ -363,3 +363,116 @@
   font-size: 0.8125rem;
   color: var(--cs-text-muted);
 }
+
+/* ── Create, edit and detail screens ─────────────────────────────────────── */
+
+.cs-erp5-form-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-s-4);
+}
+
+.cs-erp5-back-link {
+  align-self: flex-start;
+  color: var(--cs-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cs-erp5-back-link:hover {
+  text-decoration: underline;
+}
+
+.cs-erp5-back-link:focus-visible {
+  outline: none;
+  border-radius: var(--cs-r-sm);
+  box-shadow: 0 0 0 2px var(--cs-bg), 0 0 0 4px var(--cs-accent);
+}
+
+.cs-erp5-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-s-5);
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-r-lg);
+  background-color: var(--cs-bg);
+  padding: var(--cs-s-6);
+}
+
+.cs-erp5-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--cs-s-4) var(--cs-s-6);
+}
+
+.cs-erp5-form-grid .cs-form-field {
+  margin-bottom: 0;
+}
+
+.cs-erp5-form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-s-3);
+  flex-wrap: wrap;
+  border-top: 1px solid var(--cs-border);
+  padding-top: var(--cs-s-4);
+}
+
+.cs-erp5-form-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-readonly-list,
+.cs-erp5-detail {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--cs-s-4);
+}
+
+.cs-erp5-readonly,
+.cs-erp5-detail-row {
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-r-md);
+  background-color: var(--cs-surface);
+  padding: var(--cs-s-3) var(--cs-s-4);
+}
+
+.cs-erp5-readonly-label,
+.cs-erp5-detail-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-readonly-value,
+.cs-erp5-detail-value {
+  margin: var(--cs-s-1) 0 0;
+  font-size: 0.9375rem;
+  color: var(--cs-text);
+  overflow-wrap: anywhere;
+}
+
+.cs-erp5-readonly-hint,
+.cs-erp5-detail-hint {
+  margin: var(--cs-s-1) 0 0;
+  font-size: 0.75rem;
+  color: var(--cs-text-muted);
+}
+
+.cs-erp5-detail-actions {
+  display: flex;
+  gap: var(--cs-s-3);
+}
+
+.cs-erp5-loading {
+  margin: 0;
+  color: var(--cs-text-muted);
+  font-size: 0.9375rem;
+}

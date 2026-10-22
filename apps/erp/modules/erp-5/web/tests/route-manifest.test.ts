@@ -22,18 +22,21 @@ import {
 
 describe('ERP-5 route manifest', () => {
   describe('1. Frozen route table', () => {
-    it('registers the five module resources plus their create and detail routes', () => {
+    it('registers the five module resources plus their create, detail and edit routes', () => {
       const ids = ERP5_ROUTE_DESCRIPTORS.map((descriptor) => descriptor.id);
       expect(ids).toEqual([
         'employees',
         'employees-create',
         'employees-detail',
+        'employees-edit',
         'departments',
         'departments-create',
         'departments-detail',
+        'departments-edit',
         'leave',
         'leave-create',
         'leave-detail',
+        'leave-edit',
         'payroll-totals',
         'identity-users',
       ]);

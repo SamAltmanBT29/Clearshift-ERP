@@ -21,6 +21,10 @@ export interface HrApiMockCall {
   readonly path: string;
   /** The query parameters the screen sent. */
   readonly query: URLSearchParams;
+  /** The HTTP method of the request. */
+  readonly method: string;
+  /** The parsed request body, for a write. */
+  readonly body: unknown;
 }
 
 export interface HrApiMockOptions {
@@ -43,6 +47,12 @@ export interface HrApiMockOptions {
    * lands after the synchronous body of a test.
    */
   readonly pending?: boolean | undefined;
+  /** The response to a write (POST or PATCH) on a path. */
+  readonly writeResponses?: Readonly<Record<string, unknown>> | undefined;
+  /** Answers a write on the given path with this failure. */
+  readonly writeFailures?: Readonly<
+    Record<string, { readonly status: number; readonly body?: unknown }>
+  > | undefined;
 }
 
 export interface HrApiMock {
@@ -52,6 +62,10 @@ export interface HrApiMock {
   callsTo(path: string): HrApiMockCall[];
   /** The most recent call for one module path. */
   lastCallTo(path: string): HrApiMockCall | undefined;
+  /** The most recent write — a POST or a PATCH. */
+  lastWrite(): HrApiMockCall | undefined;
+  /** Every write the screen made, in order. */
+  writes(): HrApiMockCall[];
   /** Removes the stub. */
   restore(): void;
 }
@@ -70,7 +84,7 @@ function jsonResponse(status: number, body: unknown): Response {
 export function installHrApiMock(options: HrApiMockOptions = {}): HrApiMock {
   const calls: HrApiMockCall[] = [];
 
-  const stub = vi.fn(async (input: unknown) => {
+  const stub = vi.fn(async (input: unknown, init?: RequestInit) => {
     const raw =
       typeof input === 'string'
         ? input
@@ -82,12 +96,40 @@ export function installHrApiMock(options: HrApiMockOptions = {}): HrApiMock {
     const path = url.pathname.startsWith(ERP5_API_BASE)
       ? url.pathname.slice(ERP5_API_BASE.length)
       : url.pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
 
-    calls.push({ url, path, query: url.searchParams });
+    let body: unknown = null;
+    if (typeof init?.body === 'string') {
+      try {
+        body = JSON.parse(init.body);
+      } catch {
+        body = init.body;
+      }
+    }
+
+    calls.push({ url, path, query: url.searchParams, method, body });
 
     if (options.pending) {
       // The request never settles — the screen stays in its loading state.
       return new Promise<Response>(() => undefined);
+    }
+
+    const isWrite = method !== 'GET';
+
+    if (isWrite) {
+      const writeFailure = options.writeFailures?.[path];
+      if (writeFailure) {
+        return jsonResponse(
+          writeFailure.status,
+          writeFailure.body ?? {
+            code: 'HR_TEST_FAILURE',
+            message: 'The write failed.',
+            details: [],
+            correlation_id: 'test-correlation-id',
+          }
+        );
+      }
+      return jsonResponse(200, options.writeResponses?.[path] ?? {});
     }
 
     const failure = options.failures?.[path] ?? options.failure;
@@ -103,8 +145,8 @@ export function installHrApiMock(options: HrApiMockOptions = {}): HrApiMock {
       );
     }
 
-    const body = options.responses?.[path] ?? emptyPage();
-    return jsonResponse(200, body);
+    const body2 = options.responses?.[path] ?? emptyPage();
+    return jsonResponse(200, body2);
   });
 
   vi.stubGlobal('fetch', stub);
@@ -116,6 +158,11 @@ export function installHrApiMock(options: HrApiMockOptions = {}): HrApiMock {
       const matching = calls.filter((call) => call.path === path);
       return matching[matching.length - 1];
     },
+    lastWrite: () => {
+      const writes = calls.filter((call) => call.method !== 'GET');
+      return writes[writes.length - 1];
+    },
+    writes: () => calls.filter((call) => call.method !== 'GET'),
     restore: () => {
       vi.unstubAllGlobals();
     },
