@@ -112,6 +112,19 @@ describe('ERP-5 route manifest', () => {
     it('does not match a partially equal static segment', () => {
       expect(matchErp5Route('/erp5/employees-archive')).toBeNull();
     });
+
+    it('matches a detail route whose identifier carries a malformed percent escape', () => {
+      // A browser can hand the module any pathname. `decodeURIComponent`
+      // throws on a malformed escape, which must not take the shell down.
+      const match = matchErp5Route('/erp5/employees/100%');
+      expect(match?.descriptor.id).toBe('employees-detail');
+      expect(match?.params['employeeId']).toBe('100%');
+    });
+
+    it('decodes a well-formed percent escape in a route identifier', () => {
+      const match = matchErp5Route('/erp5/employees/e%20100');
+      expect(match?.params['employeeId']).toBe('e 100');
+    });
   });
 
   describe('4. Active navigation state', () => {
@@ -152,6 +165,11 @@ describe('ERP-5 route manifest', () => {
       const trail = buildErp5Breadcrumbs('/erp5/departments/new');
       expect(trail.map((item) => item.label)).toEqual(['HR & Employees', 'Departments', 'New']);
     });
+
+    it('builds a trail for an identifier with a malformed percent escape', () => {
+      const trail = buildErp5Breadcrumbs('/erp5/employees/100%');
+      expect(trail.map((item) => item.label)).toEqual(['HR & Employees', 'Employees', '100%']);
+    });
   });
 
   describe('6. Browser title', () => {
@@ -166,6 +184,10 @@ describe('ERP-5 route manifest', () => {
 
     it('falls back to the module name outside a known route', () => {
       expect(resolveErp5DocumentTitle('/erp4/accounts')).toBe('HR & Employees · ClearShift ERP');
+    });
+
+    it('titles a detail route whose identifier carries a malformed percent escape', () => {
+      expect(resolveErp5DocumentTitle('/erp5/employees/100%')).toBe('Employee · ClearShift ERP');
     });
   });
 });
