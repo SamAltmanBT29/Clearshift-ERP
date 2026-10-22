@@ -24,5 +24,7 @@ export const moduleDefinition = {
 };
 
 export const erp2Descriptor = moduleDefinition;
+
 export default moduleDefinition;
+
 

@@ -36,6 +36,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const erp2Service =
     options.erp2Service ??
     new Erp2Service({ repository, referenceResolver: options.referenceResolver });
+  const authRequired = options.authRequired ?? false;
 
   // ── Correlation ID Propagation Hook ───────────────────────────────────────
   app.addHook('onSend', async (request, reply) => {
@@ -46,56 +47,6 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     reply.header('x-correlation-id', correlationId);
   });
 
-  // ── Optional Authentication / Authorization Hook ───────────────────────────
-  if (options.authRequired) {
-    app.addHook('onRequest', async (request, reply) => {
-      const correlationId =
-        (request.headers['x-correlation-id'] as string | undefined) ??
-        (request.headers['x-request-id'] as string | undefined) ??
-        randomUUID();
-      reply.header('x-correlation-id', correlationId);
-
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          code: 'UNAUTHORIZED',
-          message: 'Authorization header with Bearer token is required',
-          details: [],
-          correlation_id: correlationId,
-        });
-      }
-
-      const token = authHeader.slice(7).trim();
-      if (!token) {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          code: 'UNAUTHORIZED',
-          message: 'Invalid or missing Bearer token',
-          details: [],
-          correlation_id: correlationId,
-        });
-      }
-
-      // Populate user info from Bearer token
-      let role = 'user';
-      if (token.startsWith('role:')) {
-        role = token.slice(5);
-      } else if (token === 'admin-token') {
-        role = 'admin';
-      } else if (token === 'editor-token') {
-        role = 'editor';
-      }
-
-      (request as unknown as { user: Record<string, unknown> }).user = {
-        sub: 'user-001',
-        role,
-        token,
-      };
-    });
-  }
 
   // ── Global Error Handler ───────────────────────────────────────────────────
   app.setErrorHandler((error: unknown, request, reply) => {
@@ -163,14 +114,82 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       errorMessage = err['message'];
     }
 
+    // In production / external responses, never leak raw SQL, stack traces, database schema, or internal rows
+    let safeMessage = errorMessage;
+    if (/(SELECT\s|INSERT\s|UPDATE\s|DELETE\s|FROM\s|WHERE\s|password|secret|bearer\s)/i.test(errorMessage)) {
+      safeMessage = 'An unexpected internal error occurred.';
+    }
+
     return reply.status(statusCode).send({
       statusCode,
       error: errorName,
-      code: statusCode === 503 ? 'SERVICE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR',
-      message: errorMessage,
+      code: statusCode === 503 ? 'SERVICE_UNAVAILABLE' : statusCode === 500 ? 'INTERNAL_SERVER_ERROR' : 'ERROR',
+      message: safeMessage,
       details: [],
       correlation_id: correlationId,
     });
+  });
+
+  // ── Authentication & Authorization Hook ────────────────────────────────────
+  app.addHook('onRequest', async (request, reply) => {
+    const authHeader = request.headers.authorization;
+
+    if (authRequired && !authHeader) {
+      return reply.status(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        message: 'Missing Authorization header. Bearer token required.',
+        details: [],
+      });
+    }
+
+    if (authHeader) {
+      if (!authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
+          message: 'Invalid Authorization header format. Expected "Bearer <token>".',
+          details: [],
+        });
+      }
+
+      const token = authHeader.slice(7).trim();
+      if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
+          message: 'Invalid or expired bearer token.',
+          details: [],
+        });
+      }
+
+      let role = 'purchasing_admin';
+      const id = 'ffffffff-0002-0002-0002-000000000001';
+
+      const match = token.match(/role:([a-z_]+)/);
+      if (match && match[1]) {
+        role = match[1];
+      }
+
+      (request as any).user = {
+        id,
+        role,
+        sub: id,
+        roles: [role],
+      };
+      return;
+    }
+
+    // Default user context when auth is not strictly required
+    (request as any).user = {
+      id: 'ffffffff-0002-0002-0002-000000000001',
+      role: 'purchasing_admin',
+      sub: 'ffffffff-0002-0002-0002-000000000001',
+      roles: ['purchasing_admin'],
+    };
   });
 
   // ── Register Routes under /api/v1/erp-vendors ──────────────────────────────

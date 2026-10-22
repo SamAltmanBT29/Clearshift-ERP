@@ -115,7 +115,7 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
   private seedFixtures(): void {
     const v1Id = '00000000-0000-0000-0000-000000000001';
-    const now = new Date().toISOString();
+    const now = '2026-03-01T00:00:00.000Z';
     this.vendors.set(v1Id, {
       id: v1Id,
       name: 'Acme Industrial Supplies',

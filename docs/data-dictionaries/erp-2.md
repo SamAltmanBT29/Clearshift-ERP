@@ -9,7 +9,7 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #22: ERP2-07 (Migration Kit Adapter and Durable Import Receipts)<br>#18: ERP2-03 (Mutation API and Domain Validation) |
+| **Issues** | #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #22: ERP2-07 (Migration Kit Adapter) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -144,15 +144,45 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 
 ---
 
-## 7. Synthetic Demo & Mutation Runbook
+## 7. Synthetic Demo & Runbook
 
-The following synthetic scenarios demonstrate the mutation APIs and business invariants of ERP-2:
+### 7.1 Local Verification & Test Execution
 
-### Step 1: Create a Vendor with Server-Side Bank Masking
+Run the complete ERP-2 API and domain test suite:
+
 ```bash
-curl -X POST http://localhost:3000/api/v1/erp-vendors/vendors \
+# Run unit & API test suite for list/read and domain invariants
+npx vitest run apps/erp/modules/erp-2/tests/api/list.test.ts
+
+# Run mutation and domain rules test suites
+npx vitest run apps/erp/modules/erp-2/tests/api/mutations.test.ts apps/erp/modules/erp-2/tests/domain/rules.test.ts
+
+# Run complete ERP-2 test suite (vendors, purchase-orders, idempotency)
+npx vitest run apps/erp/modules/erp-2/tests/
+```
+
+### 7.2 Synthetic Endpoint Demo Flow
+
+#### 1. List Vendors with Bounded Paging & Search
+```bash
+# Bounded pagination (page 1, pageSize 20) with search by legal business name
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/vendors?page=1&pageSize=20&search=Acme" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with `items: [...]`, `total: 1`, `page: 1`, `pageSize: 20`, `totalPages: 1`, with `bank_masked: "XXXX-XXXX-7890"`.
+
+#### 2. Read Single Vendor by ID
+```bash
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/vendors/00000000-0000-0000-0000-000000000001" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with full vendor profile, bank details masked to `XXXX-XXXX-7890`.
+
+#### 3. Create a Vendor with Server-Side Bank Masking
+```bash
+curl -X POST "http://localhost:3000/api/v1/erp-vendors/vendors" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer role:editor" \
+  -H "Authorization: Bearer role:purchasing_admin" \
   -d '{
     "name": "Apex Industrial Supplies",
     "tax_number": "TX-APEX-001",
@@ -165,25 +195,13 @@ curl -X POST http://localhost:3000/api/v1/erp-vendors/vendors \
     "currency": "USD"
   }'
 ```
-**Response (201 Created)**:
-```json
-{
-  "id": "e4a7c88b-1111-42e9-9a88-bbbbbbbbbbbb",
-  "name": "Apex Industrial Supplies",
-  "tax_number": "TX-APEX-001",
-  "email": "procurement@apex-supplies.com",
-  "bank_masked": "XXXX-XXXX-1234",
-  "currency": "USD",
-  "created_at": "2026-10-23T01:00:00.000Z",
-  "updated_at": "2026-10-23T01:00:00.000Z"
-}
-```
+*Expected Output*: HTTP 201 Created with `bank_masked: "XXXX-XXXX-1234"`.
 
-### Step 2: Create a Purchase Order with Lines & Server-Side Totals
+#### 4. Create Purchase Order with ERP-1 Product Verification & Server-Side Totals
 ```bash
-curl -X POST http://localhost:3000/api/v1/erp-vendors/purchase-orders \
+curl -X POST "http://localhost:3000/api/v1/erp-vendors/purchase-orders" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer role:editor" \
+  -H "Authorization: Bearer role:purchasing_admin" \
   -d '{
     "vendor_id": "00000000-0000-0000-0000-000000000001",
     "order_date": "2026-10-25",
@@ -203,50 +221,22 @@ curl -X POST http://localhost:3000/api/v1/erp-vendors/purchase-orders \
     "total": "9999.99"
   }'
 ```
-**Response (201 Created)**: (Note: client-submitted `total: 9999.99` is ignored; server calculates `155.00 + 60.75 = 215.75`):
-```json
-{
-  "id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
-  "po_number": "PO-1761180000-A1B2",
-  "vendor_id": "00000000-0000-0000-0000-000000000001",
-  "order_date": "2026-10-25",
-  "status": "Draft",
-  "currency": "USD",
-  "total": "215.75",
-  "lines": [
-    {
-      "id": "line-001",
-      "po_id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
-      "product_id": "11111111-1111-1111-1111-111111111111",
-      "quantity": "10.00",
-      "price": "15.50",
-      "line_total": "155.00"
-    },
-    {
-      "id": "line-002",
-      "po_id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
-      "product_id": "22222222-2222-2222-2222-222222222222",
-      "quantity": "3.00",
-      "price": "20.25",
-      "line_total": "60.75"
-    }
-  ]
-}
-```
+*Expected Output*: HTTP 201 Created (Note: client-submitted `total: 9999.99` is ignored; server recalculates `155.00 + 60.75 = 215.75`).
 
-### Step 3: Progress Status (Draft -> Sent)
+#### 5. Filter Purchase Orders by Status
 ```bash
-curl -X PATCH http://localhost:3000/api/v1/erp-vendors/purchase-orders/c1f7a2d4-3333-4bb9-8cc4-dddddddddddd \
+curl -X GET "http://localhost:3000/api/v1/erp-vendors/purchase-orders?status=Draft&page=1&pageSize=10" \
+  -H "Authorization: Bearer role:purchasing_admin"
+```
+*Expected Output*: HTTP 200 with list of Draft POs.
+
+#### 6. Transition Purchase Order Status
+```bash
+curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000-0000-0000-0001-000000000001" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer role:editor" \
+  -H "Authorization: Bearer role:purchasing_admin" \
   -d '{ "status": "Sent" }'
 ```
-**Response (200 OK)**:
-```json
-{
-  "id": "c1f7a2d4-3333-4bb9-8cc4-dddddddddddd",
-  "status": "Sent",
-  "total": "215.75"
-}
-```
+*Expected Output*: HTTP 200 with `status: "Sent"`. Attempting to transition back to `Draft` returns HTTP 422 `INVALID_STATUS_TRANSITION`.
+
 
