@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    container_name: clearshift-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cs_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_secret_123}
+      POSTGRES_DB: ${POSTGRES_DB:-clearshift}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cs_app} -d ${POSTGRES_DB:-clearshift}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - clearshift_network
+
+  redis:
+    image: redis:8.10.1-alpine
+    container_name: clearshift-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+    networks:
+      - clearshift_network
+
+volumes:
+  postgres_data:
+    name: clearshift_postgres_data
+  redis_data:
+    name: clearshift_redis_data
+
+networks:
+  clearshift_network:
+    name: clearshift_network
+    driver: bridge
