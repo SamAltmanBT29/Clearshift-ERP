@@ -1,0 +1,288 @@
+openapi: 3.1.0
+info:
+  title: ERP-1 Products & Inventory API Contract
+  version: 1.0.0
+  description: Public API specification for ClearShift ERP Products and Inventory module (Group 6 / ERP-1).
+paths:
+  /api/v1/erp-products/products:
+    get:
+      operationId: listErp1Products
+      tags: [ERP-1 Products]
+      summary: List products with search by name/SKU and bounded pagination
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+        - name: categoryId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, meta]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  meta: { $ref: './common.yaml#/components/schemas/PaginationMeta' }
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+    post:
+      operationId: createErp1Product
+      tags: [ERP-1 Products]
+      summary: Create a product with unique SKU and decimal price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProductInput' }
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "400":
+          description: Validation error or negative price
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "409":
+          description: Duplicate SKU conflict
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/products/{id}:
+    patch:
+      operationId: updateErp1Product
+      tags: [ERP-1 Products]
+      summary: Update a product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProductInput' }
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "400":
+          description: Invalid payload
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/categories:
+    get:
+      operationId: listErp1Categories
+      tags: [ERP-1 Categories]
+      summary: List one-level product categories
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Paginated category list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, meta]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  meta: { $ref: './common.yaml#/components/schemas/PaginationMeta' }
+    post:
+      operationId: createErp1Category
+      tags: [ERP-1 Categories]
+      summary: Create a product category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCategoryInput' }
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        "409":
+          description: Category code conflict
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/stock:
+    get:
+      operationId: listErp1Stock
+      tags: [ERP-1 Stock]
+      summary: Get stock level for product
+      parameters:
+        - name: productId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: warehouseId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Stock level record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevel' }
+        "404":
+          description: Product or warehouse not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/stock/opening:
+    post:
+      operationId: setErp1OpeningStock
+      tags: [ERP-1 Stock]
+      summary: Set initial opening stock quantity for a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetOpeningStockInput' }
+      responses:
+        "200":
+          description: Opening stock recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockLevel' }
+        "400":
+          description: Negative quantity rejected (BR-ERP1-02)
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+components:
+  schemas:
+    UnitOfMeasure:
+      type: string
+      enum: [pcs, kg, g, litre, metre, box]
+
+    Category:
+      type: object
+      required: [id, name, code, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateCategoryInput:
+      type: object
+      required: [name, code]
+      properties:
+        name: { type: string }
+        code: { type: string }
+
+    UpdateCategoryInput:
+      type: object
+      properties:
+        name: { type: string }
+        code: { type: string }
+
+    Product:
+      type: object
+      required: [id, name, sku, normalizedSku, unitOfMeasure, price, currency, taxRate, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        sku: { type: string }
+        normalizedSku: { type: string }
+        categoryId: { type: string, format: uuid, nullable: true }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+        price: { type: string, example: "19.99" }
+        currency: { type: string, example: "USD" }
+        taxRate: { type: string, example: "0.00" }
+        sourceSystem: { type: string, nullable: true }
+        sourceId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateProductInput:
+      type: object
+      required: [name, sku, unitOfMeasure, price]
+      properties:
+        name: { type: string }
+        sku: { type: string }
+        categoryId: { type: string, format: uuid, nullable: true }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+        price: { oneOf: [{ type: string }, { type: number }] }
+        currency: { type: string, default: "USD" }
+        taxRate: { oneOf: [{ type: string }, { type: number }], default: "0.00" }
+        sourceSystem: { type: string }
+        sourceId: { type: string }
+
+    UpdateProductInput:
+      type: object
+      properties:
+        name: { type: string }
+        categoryId: { type: string, format: uuid, nullable: true }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+        price: { oneOf: [{ type: string }, { type: number }] }
+        currency: { type: string }
+        taxRate: { oneOf: [{ type: string }, { type: number }] }
+
+    StockLevel:
+      type: object
+      required: [id, productId, warehouseId, quantity, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        quantity: { type: string, example: "100.00" }
+        updatedAt: { type: string, format: date-time }
+
+    SetOpeningStockInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        warehouseId: { type: string, format: uuid }
+        quantity: { oneOf: [{ type: string }, { type: number }] }
