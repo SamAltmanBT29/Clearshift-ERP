@@ -81,6 +81,12 @@ The ERP-4 frontend implements the Minimal White Theme design system using CSS va
 | **AccountCreateModal** | `apps/erp/modules/erp-4/web/src/components/forms/AccountCreateModal.tsx` | Accessible modal dialog for creating posting GL accounts on the fly without losing in-flight journal draft data. |
 | **TrialBalanceTable** | `apps/erp/modules/erp-4/web/src/components/TrialBalanceTable.tsx` | Grouped debit/credit totals by account and period-end balance banner (`totalDebit === totalCredit`). |
 
+## Security, Authorization & Sensitive-Field Protection (Issue #44 / ERP4-09)
 
+- **Asymmetric JWT Verification**: EdDSA (Ed25519) verification using `@cs/identity` public key pinning (`verifyAccessToken`).
+- **Endpoint Authorization (SDS §4.8)**: PreHandler route policies enforce default-deny across Viewer, Editor, Analyst, Migration Runner, Admin, Auditor, and Staff roles.
+- **Sensitive Field Protection**: Dynamic response and export masking. Bank accounts masked as `XXXX-XXXX-7890`; salary figures masked as `XX,XXX` or `0` for non-admin callers; credentials and tokens replaced with `[REDACTED]`.
+- **Append-Only Audit Trail**: Structured event logging via `@cs/core` `AuditService` on `journal.posted`, `journal.reversed`, `load.requested`, `account.created`, `account.updated`, `period.status_changed`, and `export.generated` with automatic metadata sanitization.
 
+Detailed security documentation: [`apps/erp/modules/erp-4/docs/security.md`](../../apps/erp/modules/erp-4/docs/security.md).
 
