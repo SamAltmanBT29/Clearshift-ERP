@@ -13,3 +13,4 @@ export * from './erp-4.js';
 export * from './erp-5.js';
 export * from './roles.js';
 export * from './golden-id.js';
+export * from './erp-4-mock.js';
