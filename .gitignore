@@ -23,6 +23,10 @@ coverage/
 *.log
 logs/
 
+
+# Documentation
+docs/ERP5_HR_Employees_Issue_Review.md
+
 # Build outputs
 *.js.map
 *.d.ts.map

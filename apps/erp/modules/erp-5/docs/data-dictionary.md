@@ -4,9 +4,10 @@
 **Architecture Reference**: ClearShift V1 Master Architecture Spec, §C3 (identity ownership), §5 (ERD), §6.1 (slot 01)
 **Module**: ERP-5 HR & Employees (Group 10)
 **Issue**: [#46](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/46) — `[ERP5-01] Schema, Drizzle models and guarded migrations`
+**Mutation API Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
 **PostgreSQL Schema**: `erp5`
 **API Base**: `/api/v1/erp-hr`
-**Version**: V1.0
+**Version**: V1.1
 
 ---
 
@@ -23,6 +24,7 @@
 9. [Entity relationship diagram](#9-entity-relationship-diagram)
 10. [Decision records](#10-decision-records)
 11. [Migration & verification](#11-migration--verification)
+12. [Mutation API (ERP5-03)](#12-mutation-api-erp503)
 
 ---
 
@@ -274,6 +276,44 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 - **Decision**: `erp5.payroll_totals`, following the module's `erp5_` prefix convention and the `erp5_` table names frozen by the Master Architecture Spec §6.1.
 - **Status**: naming proposal — flagged for maintainer confirmation in the PR.
 
+### DR-5 — V1 masks the salary for every caller of the mutation API
+
+- **Conflict**: BR-ERP5-02 says the salary is "masked **for viewers**", and the OpenAPI contract merged with ERP5-01 documented the privileged `Employee` schema (raw `salary`) as the response of `POST /employees` and `PATCH /employees/{id}`. The **central matrix merged with PLT-06** (issue #61, `packages/core/src/auth/permissions.ts` → `SENSITIVE_FIELDS.SALARY`, `maskSensitiveFields`) states the platform rule "**Salary: visible to Admin only; masked for Viewer, Editor, Analyst and Migration Runner**", and the route policy `hr.read` is described as "Read employee records (salaries masked for non-admin)". V1, however, defines **no** ERP-5 rule that names the privileged representation, and the shared RBAC matrix (`packages/rbac`) exposes `module.read` / `module.write` only — there is no salary capability to gate on.
+- **Decision**: every employee response of the V1 mutation API uses the masked `HrEmployeeView` projection (`salary_display` = `XX,XXX`). The raw `salary` column never leaves the service layer, for **any** role, including Admin. The privileged `Employee` schema stays in the OpenAPI document as the *internal* representation and is referenced by no endpoint.
+- **Rationale**: BR-ERP5-02 names only `XX,XXX` and `salary hidden` as the permitted representations of the salary, so the stricter of the two readings is the one the ERP-5 rule can be verified against by an automated test. A module that discloses *less* than the platform matrix permits never violates the matrix; the opposite would violate BR-ERP5-02. The divergence from PLT-06 is recorded here and escalated rather than resolved silently in code.
+- **Status**: **open** — escalated to the maintainer in PR #226 (ERP5-03). If the maintainer prefers the PLT-06 reading, the follow-up is an Admin-only privileged projection (`salary` instead of `salary_display`), which needs an approved ERP-5 contract change and a dedicated test. Until then the module stays on the strict side of the conflict.
+
+### DR-6 — Import provenance is a triple
+
+- **Conflict**: the issue requires `batch_id`, `source_row` and an `Idempotency-Key` for import writes, and the Master Architecture Spec fixes the stable idempotency key as *batch id + source row + target entity/schema version*. It does not say what happens when only part of the triple is present.
+- **Decision**: the three fields travel together. A request that carries any of them but not all of them is rejected with `400 HR_IMPORT_PROVENANCE_REQUIRED`. The receipt is written in the same transaction as the target mutation, and a repeated request with the same key returns the original receipt and the original row (`200`) without a second mutation.
+- **Rationale**: an idempotency key without a batch and a source row cannot produce a durable receipt, so honouring it silently would be a lie. Rejecting it is deterministic and observable.
+
+### DR-7 — Source-identity fields are import-only
+
+- **Conflict**: `erp5.employees` carries `source_system` and `source_id` (DR-1), and the partial UNIQUE index on them is the stable source identity for migration loads. A browser write could otherwise claim a source identity.
+- **Decision**: `source_system` and `source_id` may only be set by a request that carries the full import provenance of DR-6. A browser write that carries them is rejected with `400 HR_PROTECTED_FIELD`. `id`, `created_at` and `updated_at` are never writable at all, and `currency_code` is accepted on create (default `INR`) but is immutable afterwards.
+- **Rationale**: it satisfies "never accept protected/system-maintained fields as authoritative from a browser" without removing the Migration Kit's ability to record the source identity of a loaded row.
+
+### DR-8 — The write service depends on a repository contract, not on Drizzle
+
+- **Conflict**: issue #48 (`ERP5-03`) and issue #47 (`ERP5-02`) both name `apps/erp/modules/erp-5/src/services/*.ts`. The canonical slot plan assigns the *repository/query layer* to slot 02 and the *create/update API* to slot 05; this issue is slot 05, and `ERP5-02` is still open.
+- **Decision**: ERP5-03 owns the **repository contract** (`HrRepository` in `src/services/repository.ts`) and a deterministic in-memory implementation used by the mutation tests. ERP5-02 owns the **Drizzle implementation** of the same interface plus the list/read queries. The mutation service depends on the interface only, so the Drizzle repository can be dropped in without touching a single service rule.
+- **Rationale**: it keeps the two issues from forking the data layer, and it keeps the mutation rules testable without a live database. The transaction boundary (`HrRepository.transaction`) is part of the contract, so the Drizzle implementation must commit the target mutation and the import receipt in one PostgreSQL transaction.
+- **Status**: open — the hand-over is stated explicitly in PR #226 so that ERP5-02 can be implemented on top of it.
+
+### DR-9 — Write authorization follows the central matrix of PLT-06
+
+- **Conflict**: the module write gate could be the coarse `module.write` capability of `packages/rbac` (Editor, Admin) or the finer role/action/resource matrix that **PLT-06** (issue #61) merged while this issue was in flight. PLT-06 declares the ERP-5 route policies `hr.mutate` (Editor, Admin — employee master records) and `hr.payroll_bulk` (Migration Runner, Admin — bulk load of payroll totals) in `apps/hub/src/policies/route-policy.ts`, and the resource matrix in `packages/core/src/auth/permissions.ts`. PLT-06 has **no** resource for departments or leave, and it grants no `CREATE` on `payroll` to any role.
+- **Decision**:
+  - Employees, departments and leave use the shared `module.write` capability guard (`requireCapability(Capabilities.MODULE_WRITE)`). The holders of that capability are exactly Editor and Admin — the same role set as PLT-06's `hr.mutate`.
+  - The payroll aggregate uses the **central matrix itself** (`hasPermission` from `@cs/core` on the `payroll` resource), which yields Migration Runner (`EXECUTE_BULK`) and Admin (`UPDATE`). The check is expressed with the shared matrix, not with a local role list, so the module cannot drift from the platform policy.
+  - The module owns **no** role list and **no** permission table of its own.
+- **Rationale**: the Migration Kit is the producer of the department/month aggregates (FR-ERP5-06). A gate that only admits Editor and Admin would make the import path of issue #48 unusable for the Kit, so the payroll load follows the platform's `hr.payroll_bulk` policy.
+- **Open item**: PLT-06 declares no policy for the **identity the Kit uses to load employee, department and leave rows**. The module grants those writes to any holder of the shared `module.write` capability, which today means Editor and Admin; a platform-issued Kit service identity (or a `hr.employee_bulk` policy) is needed to close the gap. This is escalated to **ERP5-15** (module authorization policy integration) and to the PLT-06 owner.
+- **Status**: open — escalated in PR #226.
+
+
 ---
 
 ## 11. Migration & Verification
@@ -288,3 +328,106 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
     npx vitest run apps/erp/modules/erp-5                        # live constraint proofs
   ```
 - **Automated proofs**: `apps/erp/modules/erp-5/tests/db/schema.test.ts` (DDL ↔ Drizzle parity, constraint inventory, ownership boundary) and `apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` (live PostgreSQL: SQLSTATE 23505 / 23514 / 23503 / 42501, read-only projection, trigger behaviour). The integration suite creates and drops its own throwaway database and never touches a developer or production database.
+
+---
+
+## 12. Mutation API (ERP5-03)
+
+**Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
+**Contract**: `packages/contracts/openapi/erp-5.yaml` · `packages/contracts/src/erp-5.ts`
+**Dependencies**: ERP5-01 (schema — merged) · PLT-04 (shared error envelope and standard error codes — merged while this issue was in flight; the module consumes `ErrorEnvelopeSchema`, `ErrorDetail` and `StandardErrorCodes` from `@clearshift/contracts`) · ERP5-02 (list/read API — still open; the `HrRepository` contract of DR-8 is the hand-over point)
+
+### 12.1 Endpoints
+
+| Method | Endpoint | Entity written | Domain rules enforced |
+|---|---|---|---|
+| `POST` | `/api/v1/erp-hr/employees` | `erp5.employees` | unique `employee_no`, unique source identity, existing department, BR-ERP5-01, non-negative salary |
+| `PATCH` | `/api/v1/erp-hr/employees/{id}` | `erp5.employees` | unique `employee_no`, existing department, BR-ERP5-01 against the **stored** dates |
+| `POST` | `/api/v1/erp-hr/departments` | `erp5.departments` | unique `code`, existing parent |
+| `PATCH` | `/api/v1/erp-hr/departments/{id}` | `erp5.departments` | unique `code`, existing parent, no self-parent, acyclic hierarchy |
+| `POST` | `/api/v1/erp-hr/leave` | `erp5.leave` | valid date range, existing employee |
+| `POST` | `/api/v1/erp-hr/payroll-totals` | `erp5.payroll_totals` | one aggregate per department/month, existing department, no employee rows |
+
+The list/read endpoints belong to **ERP5-02** (issue #47) and are not implemented here.
+
+### 12.2 Layering
+
+```
+HTTP request
+  └─ Fastify route (apps/erp/modules/erp-5/src/routes/*)
+       ├─ Zod validation at the route boundary   → 400 / 422
+       ├─ shared RBAC guard (module.write)       → 401 / 403
+       └─ HrService (src/services/hr.service.ts)
+            ├─ domain rules (src/domain/rules.ts)      → 422
+            ├─ uniqueness / existence checks           → 409 / 404
+            └─ HrRepository.transaction(...)
+                 ├─ target mutation
+                 └─ erp5.import_receipts receipt (same transaction)
+  └─ PostgreSQL constraints (second line of defence)
+```
+
+### 12.3 Error envelope
+
+Every failure is rendered with the **shared** platform envelope owned by PLT-04
+(`packages/contracts/src/common.ts` → `ErrorEnvelopeSchema` / `FlatErrorEnvelopeSchema`,
+mirrored by `@cs/kernel` → `ErrorEnvelopeSchema`): `{code, message, details, correlation_id}`.
+The module never defines a second envelope. The `x-correlation-id` request header is echoed;
+when it is missing a UUID is generated.
+
+| Status | When | Example `code` |
+|---|---|---|
+| `400` | malformed request, unknown key, protected field, incomplete import provenance | `VALIDATION_ERROR`, `HR_PROTECTED_FIELD`, `HR_IMPORT_PROVENANCE_REQUIRED` |
+| `401` | no / invalid bearer token | `UNAUTHORIZED` |
+| `403` | the caller has no `module.write` capability | `FORBIDDEN` |
+| `404` | the addressed or referenced record does not exist | `NOT_FOUND`, `HR_DEPARTMENT_REQUIRED`, `HR_EMPLOYEE_REQUIRED` |
+| `409` | duplicate key or idempotency conflict | `HR_EMPLOYEE_NO_DUPLICATE`, `HR_DEPARTMENT_CODE_DUPLICATE`, `HR_PAYROLL_TOTAL_DUPLICATE`, `HR_IDEMPOTENCY_CONFLICT` |
+| `422` | invalid business value | `HR_JOIN_DATE_AFTER_BIRTH_DATE`, `HR_LEAVE_DATE_RANGE_VALID`, `HR_SALARY_NON_NEGATIVE`, `HR_DEPARTMENT_SELF_PARENT`, `HR_DEPARTMENT_CYCLE` |
+| `500` | unexpected failure — correlation id only, never a SQL statement, a stack trace, a secret or a raw row | `INTERNAL_SERVER_ERROR` |
+
+### 12.4 Authorization
+
+The module owns **no** role list and **no** permission table. It consumes the platform primitives:
+
+| Write | Gate | Allowed roles | Source |
+|---|---|---|---|
+| employees, departments, leave | `requireCapability(Capabilities.MODULE_WRITE)` | Editor, Admin | shared capability matrix (`packages/rbac`); the same role set as PLT-06's `hr.mutate` |
+| payroll totals | `hasPermission(roles, …, Resources.PAYROLL)` | Migration Runner, Admin | central matrix (`packages/core`, PLT-06) — `hr.payroll_bulk` |
+
+Viewer and Analyst receive `403` on every write. The Migration Kit loads a payroll
+aggregate through this module's public API as MIGRATION_RUNNER and can never write into
+the `erp5` tables directly (Decision C7). The residual gap — the identity the Kit uses to
+load employee, department and leave rows — is recorded in [DR-9](#dr-9--write-authorization-follows-the-central-matrix-of-plt-06).
+
+### 12.5 Privacy and protected fields (BR-ERP5-02)
+
+- The employee write response is the masked `EmployeeView` projection. The raw `salary`
+  column never leaves the service layer and never appears in a log, an error payload or
+  an import receipt (DR-5).
+- `id`, `created_at`, `updated_at` are never writable. `currency_code` is accepted on
+  create (default `INR`) and immutable afterwards. `source_system` and `source_id` are
+  import-only (DR-7). A payload that carries any of them is rejected with
+  `400 HR_PROTECTED_FIELD`.
+- A payload that carries a credential (`password`, `token`, `roles`, …) is rejected with
+  `400 HR_CREDENTIALS_FORBIDDEN` — HR stores no credentials and grants no application
+  roles (Master Architecture Spec C3).
+- A payroll aggregate that carries an employee-level field is rejected with
+  `400 HR_PROTECTED_FIELD` (FR-ERP5-06).
+
+### 12.6 Import / load writes (KIT-08)
+
+An import write supplies `batch_id`, `source_row` and an `Idempotency-Key` **together**
+(DR-6). The receipt is written in the same transaction as the target mutation, so a
+receipt can never exist without its row and a row can never exist without its receipt.
+A repeated request with the same idempotency key returns the original row and the
+original receipt with `200 OK` and performs **no** second mutation. The same key with a
+different payload is answered with `409 HR_IDEMPOTENCY_CONFLICT`.
+
+### 12.7 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/tests/services/hr.service.test.ts` | service | every invariant with a valid and an invalid input, the transaction rollback, the concurrency replay |
+| `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | API | validation, authorization, status mapping, protected fields, import receipts, correlation id, sanitised 500 |
+| `apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | contract | the Zod contract, the stable business-rule codes, the masked response schemas |
+| `apps/erp/modules/erp-5/tests/contracts/erp-5.openapi.test.ts` | contract | every `$ref` resolves, every write route is documented, unknown properties are forbidden |
+| `apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` | database | the PostgreSQL constraints that back the same invariants (live PostgreSQL) |

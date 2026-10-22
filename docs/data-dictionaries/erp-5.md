@@ -13,6 +13,7 @@ For the canonical, detailed version see:
 |---|---|
 | **Module** | ERP-5 HR & Employees (Group 10) |
 | **Issue** | #46 — `[ERP5-01] Schema, Drizzle models and guarded migrations` |
+| **Mutation API Issue** | #48 — `[ERP5-03] Mutation API and domain validation` |
 | **PostgreSQL Schema** | `erp5` |
 | **API Base** | `/api/v1/erp-hr` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-5.yaml` |
@@ -21,7 +22,7 @@ For the canonical, detailed version see:
 | **Migration** | `packages/database/migrations/erp5_v1.sql` |
 | **Tables** | `erp5.departments`, `erp5.employees`, `erp5.leave`, `erp5.payroll_totals`, `erp5.import_receipts` |
 | **View** | `erp5.identity_users` — read-only Hub Identity projection (owner: Platform / Hub Identity) |
-| **Version** | V1.0 |
+| **Version** | V1.1 |
 | **SDS Reference** | ClearShift ERP v2.0 §4.6 (FR-ERP5-01..06, BR-ERP5-01..02), §4.7 (ERP-5 tables) |
 
 ## Table Index
@@ -55,12 +56,25 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 
 ## Domain Rules
 
-- **Join date guard (BR-ERP5-01)**: `join_date` can never precede `birth_date` — enforced by the database check constraint `employees_join_date_after_birth_date` and by the Zod contract.
-- **Salary masking (BR-ERP5-02)**: salary is never returned in full to a viewer and never appears in a log. The public projection exposes `salary_display` = `XX,XXX` (or `salary hidden`); the raw `salary` column is never serialized to a viewer.
+- **Join date guard (BR-ERP5-01)**: `join_date` can never precede `birth_date` — enforced by the database check constraint `employees_join_date_after_birth_date`, by the Zod contract and by the service layer. A violation is answered with `422 HR_JOIN_DATE_AFTER_BIRTH_DATE`.
+- **Salary masking (BR-ERP5-02)**: salary is never returned in full to a viewer and never appears in a log. The public projection exposes `salary_display` = `XX,XXX` (or `salary hidden`); the raw `salary` column is never serialized to a viewer. The V1 mutation API masks the salary for **every** caller (DR-5).
 - **Leave validity**: `date_to` can never precede `date_from`; the referenced employee must exist.
 - **Payroll aggregates**: one aggregate per department and month; the payload carries no employee-level data (FR-ERP5-06).
-- **Identity ownership**: HR stores no credentials and grants no application roles. `erp5.identity_users` is a read-only view over `platform.hub_users` with no credential or token column and no write privilege.
+- **Identity ownership**: HR stores no credentials and grants no application roles. `erp5.identity_users` is a read-only view over `platform.hub_users` with no credential or token column and no write privilege. A write that carries a credential is rejected with `400 HR_CREDENTIALS_FORBIDDEN`.
 - **Cross-module boundary (Decision C7)**: every foreign key in `erp5` targets an `erp5` table. No sibling module or Kit adapter may write into the `erp5` schema.
+
+## Mutation API Contract (ERP5-03)
+
+| Aspect | Rule |
+|---|---|
+| Validation | Zod at the route boundary; every write request schema forbids unknown properties (`additionalProperties: false`) |
+| Authorization | shared `module.write` capability — Editor and Admin may write (PLT-06 `hr.mutate`); the payroll aggregate follows the central matrix (`hr.payroll_bulk`) — Migration Runner and Admin; Viewer and Analyst receive `403` |
+| Transaction | the target mutation and its `erp5.import_receipts` receipt commit in one transaction |
+| Import provenance | `batch_id` + `source_row` + `Idempotency-Key` travel together; a partial triple is `400 HR_IMPORT_PROVENANCE_REQUIRED` |
+| Idempotency | a repeated import returns the original row and the original receipt with `200 OK` and performs no second mutation; a different payload with the same key is `409 HR_IDEMPOTENCY_CONFLICT` |
+| Protected fields | `id`, `created_at`, `updated_at` are never writable; `currency_code` is immutable after create; `source_system` / `source_id` are import-only — all rejected with `400 HR_PROTECTED_FIELD` |
+| Error envelope | the shared `{code, message, details, correlation_id}` envelope owned by PLT-04 (`@clearshift/contracts` → `ErrorEnvelopeSchema`) — never a second envelope |
+| Status mapping | `400` malformed · `401` unauthenticated · `403` forbidden · `404` missing record · `409` duplicate/idempotency · `422` invalid business value · `500` unexpected (correlation id only) |
 
 ## Open Decision Records (V1)
 
@@ -70,6 +84,11 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | DR-2 | Salary stored as `NUMERIC(20,4)` and masked at serialization (SDS §4.7 vs Master Arch. ERD `bytea salary_enc`) | Accepted for V1 — escalated; encryption at rest deferred to PLT-12 / ERP5-09 |
 | DR-3 | `erp5_users` implemented as a read-only projection, not an ERP-5 table | Accepted (Master Arch. C3) |
 | DR-4 | Payroll aggregate table named `erp5.payroll_totals` (SDS names no table) | Naming proposal — maintainer confirmation requested |
+| DR-5 | V1 masks the salary for every caller of the mutation API — BR-ERP5-02 permits only `XX,XXX` / `salary hidden`, while the central matrix of PLT-06 permits Admin to see it | Open — escalated; an Admin-only privileged projection belongs to a follow-up |
+| DR-6 | Import provenance is a triple (`batch_id` + `source_row` + idempotency key); a partial triple is rejected | Accepted for V1 |
+| DR-7 | `source_system` / `source_id` are import-only; `currency_code` is immutable after create | Accepted for V1 |
+| DR-8 | The write service depends on the `HrRepository` contract; ERP5-02 owns the Drizzle implementation | Open — hand-over stated for ERP5-02 |
+| DR-9 | Write authorization follows the central matrix of PLT-06 — `module.write` for the HR master records, `hr.payroll_bulk` (Migration Runner, Admin) for the payroll aggregate; the Kit's identity for employee/leave loads is still undefined | Open — escalated to ERP5-15 / the PLT-06 owner |
 
 ## Verification
 
@@ -77,4 +96,5 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 |---|---|
 | Schema contract & DDL ↔ Drizzle parity | `npx vitest run apps/erp/modules/erp-5/tests/db/schema.test.ts` |
 | Live PostgreSQL constraint proofs | `DATABASE_URL_TEST=postgresql://user:pass@localhost:5432/postgres npx vitest run apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` |
+| Mutation API (service + API level) | `npx vitest run apps/erp/modules/erp-5/tests` |
 | Migration apply / re-apply | `npm run db:migrate` twice against an empty database |
