@@ -1,8 +1,16 @@
 openapi: 3.1.0
 info:
   title: ERP-1 Products & Inventory API Contract
-  version: 1.0.0
-  description: Public API specification for ClearShift ERP Products and Inventory module (Group 6 / ERP-1).
+  version: 1.1.0
+  description: |
+    Public API specification for the ClearShift ERP Products and Inventory
+    module (Group 6 / ERP-1). Collections use deterministic, bounded
+    server-side pagination. Writes that the Migration Kit can replay accept an
+    `Idempotency-Key` header or the equivalent body field.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
 paths:
   /api/v1/erp-products/products:
     get:
@@ -10,10 +18,7 @@ paths:
       tags: [ERP-1 Products]
       summary: List products with search by name/SKU and bounded pagination
       parameters:
-        - name: search
-          in: query
-          required: false
-          schema: { type: string }
+        - $ref: '#/components/parameters/Search'
         - name: categoryId
           in: query
           required: false
@@ -62,58 +67,58 @@ paths:
           required: false
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
       responses:
-        "200":
-          description: Paginated product list
+        '200':
+          description: Deterministically ordered page of products
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProductListResponse' }
-        "400":
+        '400':
           description: Invalid query parameters
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "401":
-          description: Unauthenticated session
-          content:
-            application/json:
-              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "403":
-          description: Forbidden (missing inventory:read capability)
-          content:
-            application/json:
-              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       operationId: createErp1Product
       tags: [ERP-1 Products]
-      summary: Create a product with unique SKU, explicit currency and decimal price
+      summary: Create a product with unique SKU and decimal price
+      description: |
+        Creates a zero-quantity stock row at the default warehouse. A retry with
+        the same idempotency key and payload returns the original product with
+        `prior_result: true` and `200`; a different payload returns `409`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CreateProductInput' }
       responses:
-        "201":
+        '201':
           description: Product created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Product' }
-        "400":
-          description: Validation error
+              schema: { $ref: '#/components/schemas/ProductMutationResponse' }
+        '200':
+          description: Idempotent replay of an earlier successful create
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductMutationResponse' }
+        '400':
+          description: Validation error or negative price
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "409":
-          description: Duplicate SKU or normalized SKU conflict
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Duplicate SKU or idempotency-key payload mismatch
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "422":
-          description: Database invariant violation (negative price/tax or invalid currency)
+        '422':
+          description: Unknown category
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
@@ -122,19 +127,23 @@ paths:
     get:
       operationId: getErp1Product
       tags: [ERP-1 Products]
-      summary: Read a product by ID
+      summary: Read a single product by ID
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/ResourceId'
       responses:
-        "200":
+        '200':
           description: Product
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
-        "404":
+        '400':
+          description: Malformed identifier
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
           description: Product not found
           content:
             application/json:
@@ -142,29 +151,28 @@ paths:
     patch:
       operationId: updateErp1Product
       tags: [ERP-1 Products]
-      summary: Update a product by ID
+      summary: Update editable product fields by ID
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/ResourceId'
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/UpdateProductInput' }
       responses:
-        "200":
+        '200':
           description: Product updated
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Product' }
-        "400":
-          description: Invalid payload
+        '400':
+          description: Invalid payload or protected field
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "404":
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
           description: Product not found
           content:
             application/json:
@@ -254,84 +262,117 @@ paths:
       tags: [ERP-1 Categories]
       summary: List one-level product categories
       parameters:
-        - name: page
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: pageSize
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
       responses:
-        "200":
-          description: Paginated category list
+        '200':
+          description: Deterministically ordered page of categories
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CategoryListResponse' }
-        "400":
+        '400':
           description: Invalid query parameters
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       operationId: createErp1Category
       tags: [ERP-1 Categories]
       summary: Create a product category
+      description: |
+        Category codes are unique case-insensitively. A retry with the same
+        idempotency key and payload returns the original category with
+        `prior_result: true` and `200`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CreateCategoryInput' }
       responses:
-        "201":
+        '201':
           description: Category created
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Category' }
-        "400":
-          description: Invalid payload
+              schema: { $ref: '#/components/schemas/CategoryMutationResponse' }
+        '200':
+          description: Idempotent replay of an earlier successful create
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryMutationResponse' }
+        '400':
+          description: Validation error or protected field
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "409":
-          description: Category code conflict
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Duplicate category code or idempotency-key payload mismatch
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
   /api/v1/erp-products/categories/{id}:
+    get:
+      operationId: getErp1Category
+      tags: [ERP-1 Categories]
+      summary: Read a single category by ID
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400':
+          description: Malformed identifier
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
     patch:
       operationId: updateErp1Category
       tags: [ERP-1 Categories]
-      summary: Update a one-level product category by ID
+      summary: Update editable category fields by ID
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/ResourceId'
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/UpdateCategoryInput' }
       responses:
-        "200":
+        '200':
           description: Category updated
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Category' }
-        "400":
-          description: Invalid payload
+        '400':
+          description: Invalid payload or protected field
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "404":
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
           description: Category not found
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "409":
-          description: Category code conflict
+        '409':
+          description: Duplicate category code conflict
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
@@ -340,66 +381,131 @@ paths:
     get:
       operationId: listErp1Stock
       tags: [ERP-1 Stock]
-      summary: Get stock level for a product and the V1 warehouse
+      summary: List stock levels with product and warehouse filters
+      description: |
+        For backwards compatibility, when `productId` is supplied and exactly
+        one level matches, its fields are also copied to the top level of the
+        response.
       parameters:
         - name: productId
           in: query
-          required: true
+          required: false
           schema: { type: string, format: uuid }
         - name: warehouseId
           in: query
           required: false
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
       responses:
-        "200":
-          description: Stock level record
+        '200':
+          description: Page of stock levels
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/StockLevel' }
-        "400":
+              schema: { $ref: '#/components/schemas/StockLevelListResponse' }
+        '400':
           description: Invalid query parameters
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "404":
-          description: Product or warehouse not found
-          content:
-            application/json:
-              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /api/v1/erp-products/stock/opening:
     post:
       operationId: setErp1OpeningStock
       tags: [ERP-1 Stock]
-      summary: Set the initial opening stock quantity for a product
+      summary: Set the absolute opening stock quantity for a product
+      description: |
+        Opening stock is an absolute upsert into the single V1 default
+        warehouse. A stable idempotency key is mandatory, either as the
+        `Idempotency-Key` header or as `idempotency_key` / `idempotencyKey` in
+        the body. The stock mutation and durable import receipt commit
+        atomically. Replaying the same key and payload returns the original
+        result with `prior_result: true`; a different payload returns `409`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/SetOpeningStockInput' }
       responses:
-        "200":
-          description: Opening stock recorded idempotently for the product/warehouse pair
+        '200':
+          description: Opening stock recorded or idempotently replayed
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/StockLevel' }
-        "400":
-          description: Invalid payload
-          content:
-            application/json:
-              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "404":
-          description: Product or warehouse not found
+              schema: { $ref: '#/components/schemas/OpeningStockResponse' }
+        '400':
+          description: Missing idempotency key or invalid payload
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "422":
-          description: Negative quantity rejected (BR-ERP1-02)
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '409':
+          description: Idempotency-key payload mismatch
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '422':
+          description: Negative quantity, unknown warehouse, or non-default warehouse in V1
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Search:
+      name: search
+      in: query
+      required: false
+      schema: { type: string, maxLength: 200 }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Stable key for replay-safe migration loads; may instead be supplied in the JSON body.
+      schema: { type: string, minLength: 1, maxLength: 255 }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Authenticated role lacks the required capability
+      content:
+        application/json:
+          schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
   schemas:
     UnitOfMeasure:
       type: string
@@ -410,6 +516,28 @@ components:
       pattern: '^[A-Z]{3}$'
       description: Uppercase ISO 4217 currency code. There is no implicit V1 default.
       example: USD
+    ImportProvenance:
+      type: object
+      properties:
+        idempotency_key: { type: string, minLength: 1, maxLength: 255 }
+        idempotencyKey: { type: string, minLength: 1, maxLength: 255 }
+        batch_id: { type: string, format: uuid }
+        batchId: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        sourceRow: { type: integer, minimum: 0 }
+        source_system: { type: string, maxLength: 64 }
+        sourceSystem: { type: string, maxLength: 64 }
+        source_id: { type: string, maxLength: 128 }
+        sourceId: { type: string, maxLength: 128 }
+
+    PaginationFields:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     Category:
       type: object
@@ -421,18 +549,41 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    CategoryListResponse:
+      allOf:
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Category' }
+        - $ref: '#/components/schemas/PaginationFields'
+
+    CategoryMutationResponse:
+      allOf:
+        - $ref: '#/components/schemas/Category'
+        - type: object
+          required: [prior_result]
+          properties:
+            prior_result: { type: boolean }
+
     CreateCategoryInput:
-      type: object
-      required: [name, code]
-      properties:
-        name: { type: string, minLength: 1 }
-        code: { type: string, minLength: 1 }
+      allOf:
+        - type: object
+          required: [name, code]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 255 }
+            code: { type: string, minLength: 1, maxLength: 64 }
+        - $ref: '#/components/schemas/ImportProvenance'
+      additionalProperties: false
 
     UpdateCategoryInput:
       type: object
+      minProperties: 1
+      additionalProperties: false
       properties:
-        name: { type: string, minLength: 1 }
-        code: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 255 }
+        code: { type: string, minLength: 1, maxLength: 64 }
 
     Product:
       type: object
@@ -461,24 +612,45 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    ProductListResponse:
+      allOf:
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Product' }
+        - $ref: '#/components/schemas/PaginationFields'
+
+    ProductMutationResponse:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          required: [prior_result]
+          properties:
+            prior_result: { type: boolean }
+
     CreateProductInput:
-      type: object
-      required: [name, sku, unitOfMeasure, price, currency]
-      properties:
-        name: { type: string, minLength: 1 }
-        sku: { type: string, minLength: 1 }
-        categoryId: { type: string, format: uuid, nullable: true }
-        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
-        price: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
-        currency: { $ref: '#/components/schemas/Currency' }
-        taxRate: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,2})?$' }, { type: number, minimum: 0 }], default: "0.00" }
-        notificationEmail: { type: string, format: email, description: "Optional supplier or alert notification email address" }
-        contactPhone: { type: string, pattern: '^\+?[0-9\s\-()]{7,20}$', description: "Optional supplier contact phone number" }
-        sourceSystem: { type: string, minLength: 1, maxLength: 64 }
-        sourceId: { type: string, minLength: 1, maxLength: 128 }
+      allOf:
+        - type: object
+          required: [name, sku, unitOfMeasure, price, currency]
+          properties:
+            name: { type: string, minLength: 1, maxLength: 255 }
+            sku: { type: string, minLength: 1, maxLength: 128 }
+            categoryId: { type: string, format: uuid, nullable: true }
+            unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+            price: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
+            currency: { $ref: '#/components/schemas/Currency' }
+            taxRate: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,2})?$' }, { type: number, minimum: 0 }], default: "0.00" }
+            notificationEmail: { type: string, format: email, description: "Optional supplier or alert notification email address" }
+            contactPhone: { type: string, pattern: '^\+?[0-9\s\-()]{7,20}$', description: "Optional supplier contact phone number" }
+        - $ref: '#/components/schemas/ImportProvenance'
+      additionalProperties: false
 
     UpdateProductInput:
       type: object
+      minProperties: 1
+      additionalProperties: false
       properties:
         name: { type: string, minLength: 1 }
         categoryId: { type: string, format: uuid, nullable: true }
@@ -558,9 +730,27 @@ components:
           example: "100.0000"
         updatedAt: { type: string, format: date-time }
 
-    SetOpeningStockInput:
+    StockLevelListResponse:
+      allOf:
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/StockLevel' }
+        - $ref: '#/components/schemas/PaginationFields'
+        - type: object
+          description: Flattened single-product compatibility fields, present only when productId matched exactly one level.
+          properties:
+            id: { type: string, format: uuid }
+            productId: { type: string, format: uuid }
+            warehouseId: { type: string, format: uuid }
+            quantity: { type: string }
+            updatedAt: { type: string, format: date-time }
+
+    ImportReceipt:
       type: object
-      required: [productId, quantity]
+      required: [id, batch_id, source_row, target_id, target_entity, idempotency_key, outcome, created_at]
       properties:
         productId: { type: string, format: uuid }
         warehouseId: { type: string, format: uuid }
@@ -768,5 +958,58 @@ components:
               reasons: { type: array, items: { type: string } }
         generated_at: { type: string, format: date-time }
 
+    RelationshipWarning:
+      type: object
+      description: |
+        An absent optional relationship. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["category"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["categoryId"]
+        code:
+          type: string
+          enum: [ERP1_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
 
+    ImportReceipt:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        batch_id: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        target_id: { type: string, format: uuid }
+        target_entity: { type: string }
+        idempotency_key: { type: string }
+        outcome: { type: string }
+        created_at: { type: string, format: date-time }
 
+    OpeningStockResponse:
+      allOf:
+        - $ref: '#/components/schemas/StockLevel'
+        - type: object
+          required: [prior_result]
+          properties:
+            prior_result: { type: boolean }
+            import_receipt: { $ref: '#/components/schemas/ImportReceipt' }
+
+    SetOpeningStockInput:
+      allOf:
+        - type: object
+          required: [productId, quantity]
+          properties:
+            productId: { type: string, format: uuid }
+            warehouseId:
+              type: string
+              format: uuid
+              description: Optional only when it resolves to the single default V1 warehouse.
+            quantity: { oneOf: [{ type: string }, { type: number }] }
+        - $ref: '#/components/schemas/ImportProvenance'
+      additionalProperties: false

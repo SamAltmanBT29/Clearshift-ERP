@@ -405,9 +405,66 @@ On decision execution, the following immutable audit record is appended via `Aud
 }
 ```
 
-## 12. Create/Edit/Detail Workflow & Client-Side Validation Specification (ERP2-05 / Issue #20)
+---
 
-### 12.1 Overview & Architecture
+## 12. Idempotent Retry & Partial-Load Stop Behavior Specification (ERP2-13 / KIT-12 / Issue #129)
+
+### 12.1 Overview & Architecture Boundaries
+
+ERP-2 implements high-reliability batch migration loading conforming to the ClearShift System Design Specification (SDS) and Architecture Decision Records (ADRs). The batch load engine guarantees safe chunking, transient failure resiliency, deterministic stop criteria on abnormal error rates, and complete audit durability without destructive compensating rollbacks.
+
+### 12.2 Chunking Invariant (500 Rows)
+
+- Batch payloads are partitioned into sequential, bounded chunks of at most **500 rows** (`CHUNK_SIZE = 500`).
+- Processing occurs sequentially chunk by chunk, ensuring streaming memory bounds, predictable transaction lifecycles, and avoiding PostgreSQL statement timeout / lock escalation risks.
+- Chunk boundaries do not alter per-row transactional boundaries: each row's business write and import receipt commit atomically in a single transaction.
+
+### 12.3 Transient Failure Detection & Bounded Exponential Retry
+
+- **Retry Policy**:
+  - Max Retries: 3 attempts (`maxRetries = 3`).
+  - Initial Delay: 50 ms (`initialDelayMs = 50`).
+  - Backoff Factor: 2.0 exponential (`backoffFactor = 2.0`), yielding retry delays of 50ms, 100ms, and 200ms.
+- **Classification of Errors**:
+  - *Transient (Retryable)*: HTTP 503 Service Unavailable, HTTP 504 Gateway Timeout, connection reset (`ECONNRESET`), connection timeout (`ETIMEDOUT`), PostgreSQL deadlock detected (`40P01`), PostgreSQL admin shutdown (`57P01`), and transient query timeouts.
+  - *Deterministic (Non-Retryable)*: Schema validation failures (400), domain integrity violations (422), business rule rejections, and natural key conflicts (409) are deterministic and fail immediately on the first attempt without retrying.
+- **Strict Idempotency Key Preservation**:
+  - Retries on transient errors **never** mutate, salt, or recompute the idempotency key (`batch_id + source_row + target entity/schema version`).
+  - The exact same idempotency key and payload hash are reused across all retry attempts. If a transient network disconnect occurs after the database commit but before the HTTP response returns, the retry immediately matches the committed receipt and returns `prior_result: true` without secondary writes.
+
+### 12.4 10% Failure Rate Stop Threshold Rule
+
+- **Statistical Floor**: Evaluation begins only after a minimum statistical floor of **10 attempted rows** (`DEFAULT_MIN_ATTEMPTED_ROWS = 10`) to eliminate premature halts on early isolated row errors.
+- **Threshold Rule**: Execution stops immediately when the failure rate exceeds **10% of attempted rows**:
+  $$\text{Failure Rate} = \frac{\text{rejected}}{\text{attempted}} > 0.10$$
+- **Halt Behavior**:
+  - The batch transitions immediately to status `STOPPED_EXCESSIVE_FAILURES`.
+  - Processing halts instantly: no further rows or chunks are attempted.
+  - Remaining unattempted rows in the batch are explicitly recorded with outcome `unattempted`.
+  - A comprehensive diagnostic message is recorded in `stoppedReason` detailing the exact failure count, attempted count, and calculated percentage.
+
+### 12.5 Durability, Accounting Invariant, and Replay Safety
+
+- **Durability**: All rows and import receipts committed prior to the halt remain fully durable in PostgreSQL.
+- **Reconciliation Invariant**:
+  $$\text{total} = \text{loaded} + \text{rejected} + \text{unattempted}$$
+  $$\text{unaccounted} = 0$$
+  Every row in the source batch has a deterministic, audited outcome state.
+- **Idempotent Replay / Resumption**:
+  - Operators or migration runners may re-submit the batch after correcting source data or transient issues.
+  - Rows already committed return `prior_result: true` and are skipped idempotently without re-executing domain writes.
+  - Previously unattempted or corrected rows proceed through normal ingestion.
+
+### 12.6 Prohibition of V1 Rollback Sagas
+
+- In strict compliance with ClearShift Core Rules, compensating rollback sagas are explicitly prohibited in V1 (`ROLLBACK_SAGA_PROHIBITED`).
+- When a batch stops due to excessive failures, ClearShift preserves all durable evidence, target rows, and receipt logs for human inspection and auditable resumption. Under no circumstances are committed business rows or receipts rolled back or deleted.
+
+---
+
+## 13. Create/Edit/Detail Workflow & Client-Side Validation Specification (ERP2-05 / Issue #20)
+
+### 13.1 Overview & Architecture
 
 Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows for both Vendors and Purchase Orders in ERP-2. Consistent with SDS ClearShift ERP v2.0 §4.3 and §4.9:
 - All forms provide real-time, field-level client-side validation for instant feedback while preserving the server's authoritative validation.
@@ -416,7 +473,7 @@ Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows 
 - Purchase order lines compute exact line totals (`quantity * price`) live using decimal arithmetic, with the overall order total presented as read-only.
 - Status transitions are strictly unidirectional (`Draft -> Sent -> Received -> Closed`) and gated behind an explicit confirmation dialog (`ConfirmActionDialog`).
 
-### 12.2 Vendor Create, Edit & Detail Workflows
+### 13.2 Vendor Create, Edit & Detail Workflows
 
 | View | Route | Component | Key Behaviors |
 |---|---|---|---|
@@ -432,7 +489,7 @@ Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows 
 - **Currency (`currency`)**: Optional, defaults to `USD`. Must be a 3-letter ISO 4217 code.
 - **Bank Account Details (`bank_details`)**: Optional. On create, entering plain text values submits to server for SHA-256 masking and storage of last 4 digits. If entered, minimum length is 4 characters. On edit, existing masked details are displayed, and users may optionally provide replacement numbers.
 
-### 12.3 Purchase Order Create & Detail Workflows
+### 13.3 Purchase Order Create & Detail Workflows
 
 | View | Route | Component | Key Behaviors |
 |---|---|---|---|
@@ -447,7 +504,7 @@ Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows 
 - **Foreign Key Validation**: Requires valid RFC 4122 UUID for `vendor_id` (ERP-2) and `product_id` (ERP-1 product catalog).
 - **Numeric Invariants**: Quantity must be strictly positive (`> 0`); Unit price must be non-negative (`>= 0`).
 
-### 12.4 Irreversible Forward Status Transitions & Confirmation Gates
+### 13.4 Irreversible Forward Status Transitions & Confirmation Gates
 
 In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions in V1 are strictly forward-only:
 

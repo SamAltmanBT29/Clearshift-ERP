@@ -158,6 +158,37 @@ cannot create a second stock row for the same pair.
 
 ---
 
+---
+
+## 5. `erp1.import_receipts` — Durable Migration Receipts
+
+**Purpose**: Records durable import receipts for idempotent migration loads in a single transaction.
+**Architecture Reference**: Decision C4 & KIT-08
+
+| Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
+|---|---|---|---|---|---|
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
+| `batch_id` | `UUID` | NOT NULL | — | Migration Kit batch UUID | B-tree index |
+| `source_row` | `INTEGER` | NOT NULL | — | 0-indexed row position in source payload | — |
+| `target_id` | `UUID` | NOT NULL | — | UUID of created/updated target record | — |
+| `target_entity` | `VARCHAR(64)` | NOT NULL | `'product'` | Entity name | — |
+| `idempotency_key` | `VARCHAR(255)` | NOT NULL | — | Deterministic unique key | UNIQUE |
+| `source_system` | `VARCHAR(64)` | NULL | — | Originating import system | — |
+| `source_id` | `VARCHAR(128)` | NULL | — | Source record identifier | — |
+| `request_hash` | `VARCHAR(64)` | NOT NULL | `''` | SHA-256 of the canonical request payload; detects key reuse with different data | — |
+| `outcome` | `VARCHAR(16)` | NOT NULL | `'loaded'` | Terminal receipt outcome | — |
+| `response_payload` | `TEXT` | NULL | — | Durable JSON result replayed on an identical retry | — |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | Creation timestamp | — |
+
+**Indexes**:
+- `erp1_import_receipts_idempotency_idx` — UNIQUE on `(idempotency_key)`
+- `erp1_import_receipts_batch_idx` — B-tree on `(batch_id)`
+- `erp1_import_receipts_batch_row_idx` — B-tree on `(batch_id, source_row_index)`
+
+**Migration**: additive columns and the single-default-warehouse partial unique index are applied by `packages/database/migrations/erp1_v2.sql`.
+
+---
+
 ## 6. `erp1.import_receipts` — Durable Migration Receipts
 
 **Purpose**: Durable KIT-08 receipt proving a source row was loaded into a target entity. Written in the same PostgreSQL transaction as the target mutation.
@@ -214,6 +245,29 @@ cannot create a second stock row for the same pair.
 6. **Exact decimal handling.** Money uses `NUMERIC(19,4)`, quantities use `NUMERIC(19,4)`; no floating-point columns.
 7. **Explicit currency.** Every product stores an uppercase ISO 4217 code; there is no implicit currency default.
 8. **Migration idempotency.** `idempotency_key` is unique and opening stock is unique per product/warehouse pair.
+
+### 8.1 Relationships, State Transitions & Read Model Consistency (ERP1-06)
+
+**Issue**: [#11](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/11) — `[ERP1-06] ERP-1 Products and Inventory: Relationships, state transitions and read-model consistency`
+**Implementation**: `apps/erp/modules/erp-1/src/domain/relationships.ts`, `apps/erp/modules/erp-1/src/domain/rules.ts`, `packages/contracts/src/erp-1.ts`, `tests/domain/relationships.test.ts`.
+
+#### Rules & Invariants:
+1. **Optional Relationship Handling (`handleOptionalRelationship`)**: When an optional relationship (e.g. `categoryId` on products) is absent, the module returns `null` along with the approved `ERP1_OPTIONAL_REFERENCE_ABSENT` warning code. It never fabricates synthetic or placeholder records.
+2. **Provenance Pair Completeness (`assertSourceIdentityIsComplete`)**: `source_system` and `source_id` must be supplied together. Supplying one without the other is rejected with `SOURCE_IDENTITY_INCOMPLETE`.
+3. **Fixed Enumeration Enforcement**:
+   - `unit_of_measure`: Strictly validated against `['pcs', 'kg', 'g', 'litre', 'metre', 'box']` (`INVALID_UNIT_OF_MEASURE`).
+   - `currency`: Validated against uppercase ISO 4217 3-letter codes (`INVALID_CURRENCY_CODE`).
+   - `stock_status`: Derived and validated against `['out_of_stock', 'low_stock', 'in_stock']` (`INVALID_STOCK_STATUS`).
+   - `product_status`: Validated against lifecycle statuses `['draft', 'active', 'discontinued', 'archived']` (`INVALID_PRODUCT_STATUS`).
+4. **State Transition Matrices**:
+   - **Stock Status Transitions**: Transitions between `out_of_stock`, `low_stock`, and `in_stock` are governed by authoritative physical stock balances. Any stock mutation resulting in negative quantities is strictly rejected with `NEGATIVE_STOCK` (BR-ERP1-02).
+   - **Product Lifecycle Transitions**: Forward transitions follow `draft -> active -> discontinued -> archived`. Identical status updates are idempotent no-ops. `archived` is a terminal status; transitions out of `archived` are rejected with `INVALID_STATUS_TRANSITION`.
+5. **Read Model Consistency**:
+   - **Products**: Persisted entity and read projection agree on `normalizedSku === normalizeSku(sku)`, non-negative price with scale <= 4, non-negative tax rate with scale <= 2, and explicit currency.
+   - **Stock Levels**: Quantity must be non-negative, and authoritative derived stock status matches `deriveStockStatus(quantity)`.
+   - **Categories**: Invariant of single-level categories enforced; nested parent relationships (`parentId`) are rejected.
+6. **Cross-Module Private Table Isolation**:
+   - Sibling private tables (`erp2.*`, `erp3.*`, `erp4.*`, `erp5.*`, `crm.*`) are strictly prohibited from being written to by ERP-1. Cross-module reads resolve through contract-safe public reference resolvers (`Erp1ReferenceResolver`).
 
 ---
 
@@ -313,9 +367,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 12. Search, Filters and Sorting Controls (ERP1-18)
+## 12. Search, Filters and Sorting Controls (ERP1-04 / ERP1-18)
 
-**Issue**: [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) — `[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) (`[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/` — API client, faceted sidebar, active filter pills, sorting controls, debounced search, and products list page.
 
 ### 12.1 Query Parameters (`GET /api/v1/erp-products/products`)
@@ -343,9 +397,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 13. Loading, Empty, Error and Access-Denied States (ERP1-19)
+## 13. Loading, Empty, Error and Access-Denied States (ERP1-04 / ERP1-19)
 
-**Issue**: [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) — `[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) (`[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/components/StateViews.tsx`, `ProductsListPage.tsx`, `theme.css`.
 
 ### 13.1 State Specifications & Acceptance Criteria
@@ -366,9 +420,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 14. Product Creation Form with Field-Level Validation (ERP1-20)
+## 14. Product Creation Form with Field-Level Validation (ERP1-05 / ERP1-20)
 
-**Issue**: [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) — `[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) (`[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/hooks/useProductForm.ts`, `ProductCreateModal.tsx`, `ProductsListPage.tsx`, `api/erp-1.ts`, `theme.css`.
 
 ### 14.1 Form Fields, Rules and Acceptance Criteria
@@ -394,9 +448,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 15. Detail/Edit Workflow and Linked Records (ERP1-21)
+## 15. Detail/Edit Workflow and Linked Records (ERP1-05 / ERP1-21)
 
-**Issue**: [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) — `[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) (`[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/pages/ProductDetailPage.tsx`, `ProductAuditPanel.tsx`, `ProductLinkedRecordsTable.tsx`, `ProductEditDrawer.tsx`, `hooks/useProductEditForm.ts`, `api/erp-1.ts`, `theme.css`.
 
 ### 15.1 Architectural Scope & Acceptance Criteria
