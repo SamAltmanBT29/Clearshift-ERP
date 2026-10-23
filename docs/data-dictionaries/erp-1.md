@@ -867,3 +867,40 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 |---|---|---|:---:|:---:|
 | `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
 | `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
+
+---
+
+## 23. Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)
+
+**Issue Reference**: [#109](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/109)<br />
+**Contract Reference**: KIT-12 / Decision C4 (`@cs/kit` batch processing & threshold policy)<br />
+**Implementation**: `apps/erp/modules/erp-1/src/migration/batch-runner.ts`, `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
+
+### 23.1 Chunked Batch Partitioning (AC1)
+
+Load operations enforce chunked batch processing bounded at 500 rows per chunk (`DEFAULT_CHUNK_SIZE = 500`). Multi-thousand row migration jobs are partitioned sequentially without unbound memory growth.
+
+### 23.2 Bounded Exponential Backoff Retry (AC2)
+
+Transient infrastructure failures (HTTP 503/504, PostgreSQL deadlock code `40P01`, connection resets) trigger bounded retries with exponential backoff:
+- `maxRetries`: 3
+- `initialDelayMs`: 50 ms
+- `backoffFactor`: 2.0
+- **Idempotency Key Preservation**: Client-supplied stable idempotency keys and payloads are strictly preserved across all retry attempts. Deterministic domain validation failures (400, 409, 422) fail immediately and are never retried.
+
+### 23.3 10% Failure Rate Stop Threshold Rule (AC3)
+
+Batch execution tracks attempted and rejected row counts. Once attempted rows reach `minAttemptedRows` (default 10), execution halts immediately if:
+$$\text{Failure Rate} = \frac{\text{Rejected Rows}}{\text{Attempted Rows}} > 0.10 \quad (10\%)$$
+
+### 23.4 Durability & STOPPED_EXCESSIVE_FAILURES State Transition (AC4)
+
+When a batch halts due to excessive failures:
+1. All previously committed rows and durable receipts remain persisted in the target database.
+2. The batch status transitions to `STOPPED_EXCESSIVE_FAILURES` with diagnostic reason.
+3. Remaining rows in the batch are marked with outcome `unattempted`.
+4. Replaying the batch after fixing source errors safely replays committed rows with `prior_result: true` without duplication.
+
+### 23.5 Prohibition of Rollback Sagas (AC5)
+
+In compliance with ClearShift V1 non-negotiable architectural rules, compensating rollback sagas are strictly out of scope. System implements stop-safely behavior, preserving durable evidence for operator remediation.
