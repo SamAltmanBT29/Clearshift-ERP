@@ -389,6 +389,16 @@ export class Erp1Service {
     });
   }
 
+  // ── Warehouses ────────────────────────────────────────────────────────────
+
+  async getDefaultWarehouse(): Promise<Warehouse | null> {
+    return this.repo.getDefaultWarehouse();
+  }
+
+  async getWarehouseById(id: string): Promise<Warehouse | null> {
+    return this.repo.getWarehouseById(id);
+  }
+
   // ── Stock ─────────────────────────────────────────────────────────────────
 
   async listStockLevels(query: StockLevelListQuery): Promise<Erp1Page<StockLevel>> {

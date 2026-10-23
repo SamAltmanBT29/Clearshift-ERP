@@ -842,6 +842,38 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 
 ---
 
+## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
+
+**Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
+**Contract Reference**: KIT-08 / Decision C4 (`@cs/kit` TargetAdapter port)
+**Implementation**: `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
+
+### 22.1 Architecture & Invariants
+
+1. **In-Process Execution**: The Migration Kit interacts with ERP-1 exclusively in-process through the typed `Erp1TargetAdapter` or via authenticated public HTTP endpoints (`/import`, `/import/batch`). The Kit possesses no direct database write privileges to `erp1.*` tables.
+2. **Atomic Dual-Write**: Business entity creation/linking and durable receipt persistence commit within a single local PostgreSQL transaction (`this.repo.transaction`). Either both succeed or both roll back together.
+3. **Idempotency Invariant**:
+   - Receipt lookup by `idempotency_key` strictly precedes any database write.
+   - Same `idempotency_key` + identical request payload returns HTTP 200 with `prior_result: true` and the existing target record.
+   - Same `idempotency_key` + conflicting request payload returns HTTP 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` with zero database writes.
+4. **Type-Safe UPSERT Semantics**:
+   - When `upsert: true`, incoming rows matching an existing natural key (normalized SKU for `product`, code for `category`) update existing records in-place and produce an import receipt with `kind: 'linked'`.
+   - When `upsert: false`, duplicate natural keys trigger HTTP 409 `SKU_DUPLICATE` rejection.
+5. **Batch Execution & Error Isolation**:
+   - `loadBatch` processes rows in sequential chunks of up to 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
+   - Business rejections (400, 409, 422) are isolated per-row as `rejected` outcomes and do not abort subsequent rows.
+   - Transient infrastructure errors (503, connection reset, PostgreSQL deadlocks) trigger bounded exponential backoff retries without mutating client idempotency keys.
+   - Batch execution safely halts if row failures exceed the 10% threshold (`STOPPED_EXCESSIVE_FAILURES`). No compensating rollback sagas exist in V1.
+
+### 22.2 HTTP Endpoints
+
+| Method | Path | Summary | Success Status | Replay Status |
+|---|---|---|:---:|:---:|
+| `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
+| `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
+
+---
+
 ## 23. Exact Duplicate Key Policy & Human Review Workflow (ERP1-12)
 
 **Issue**: [#108](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/108) — `[ERP1-12] ERP-1 Products and Inventory: Exact duplicate key policy for the module`<br />
@@ -882,37 +914,6 @@ In compliance with ClearShift V1 non-negotiable rules, duplicate detection uses 
    - `reason`: Operator documented review rationale
 
 ---
-## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
-
-**Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
-**Contract Reference**: KIT-08 / Decision C4 (`@cs/kit` TargetAdapter port)
-**Implementation**: `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
-
-### 22.1 Architecture & Invariants
-
-1. **In-Process Execution**: The Migration Kit interacts with ERP-1 exclusively in-process through the typed `Erp1TargetAdapter` or via authenticated public HTTP endpoints (`/import`, `/import/batch`). The Kit possesses no direct database write privileges to `erp1.*` tables.
-2. **Atomic Dual-Write**: Business entity creation/linking and durable receipt persistence commit within a single local PostgreSQL transaction (`this.repo.transaction`). Either both succeed or both roll back together.
-3. **Idempotency Invariant**:
-   - Receipt lookup by `idempotency_key` strictly precedes any database write.
-   - Same `idempotency_key` + identical request payload returns HTTP 200 with `prior_result: true` and the existing target record.
-   - Same `idempotency_key` + conflicting request payload returns HTTP 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` with zero database writes.
-4. **Type-Safe UPSERT Semantics**:
-   - When `upsert: true`, incoming rows matching an existing natural key (normalized SKU for `product`, code for `category`) update existing records in-place and produce an import receipt with `kind: 'linked'`.
-   - When `upsert: false`, duplicate natural keys trigger HTTP 409 `SKU_DUPLICATE` rejection.
-5. **Batch Execution & Error Isolation**:
-   - `loadBatch` processes rows in sequential chunks of up to 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
-   - Business rejections (400, 409, 422) are isolated per-row as `rejected` outcomes and do not abort subsequent rows.
-   - Transient infrastructure errors (503, connection reset, PostgreSQL deadlocks) trigger bounded exponential backoff retries without mutating client idempotency keys.
-   - Batch execution safely halts if row failures exceed the 10% threshold (`STOPPED_EXCESSIVE_FAILURES`). No compensating rollback sagas exist in V1.
-
-### 22.2 HTTP Endpoints
-
-| Method | Path | Summary | Success Status | Replay Status |
-|---|---|---|:---:|:---:|
-| `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
-| `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
-
----
 
 ## 24. Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)
 
@@ -951,20 +952,99 @@ In compliance with ClearShift V1 non-negotiable architectural rules, compensatin
 
 ---
 
-## 25. Module Authorization and Policy Integration (ERP1-15)
+## 25. OpenAPI, Event Contracts, and Mock Package (ERP1-14)
+
+**Issue Reference**: [#110](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/110)<br />
+**Contract Reference**: `@clearshift/contracts` (`packages/contracts`)<br />
+**OpenAPI Specification**: `packages/contracts/openapi/erp-1.yaml`<br />
+**Event Contracts**: `packages/contracts/src/erp-1-events.ts`<br />
+**Deterministic Mock Server**: `packages/contracts/src/erp-1-mock.ts`
+
+### 25.1 OpenAPI 3.1 Specification Parity (AC1)
+
+The complete ERP-1 surface is specified in `packages/contracts/openapi/erp-1.yaml` with OpenAPI 3.1.0 compliance:
+- Bounded pagination parameters (`pageSize` default 25, maximum 100).
+- Standard ADR-002 / PLT-04 error envelopes (`{ code, message, details }`).
+- Decimal string formats for all monetary amounts and inventory balances (zero IEEE-754 floating point inaccuracies).
+- Operation definitions for products, categories, warehouses, stock levels, and batch imports.
+
+### 25.2 Domain Event Specifications (AC2)
+
+All state-changing domain mutations emit transactional event envelopes conforming to the ClearShift Event Envelope Schema (`PLT-04` / `PLT-09`):
+
+| Event Type | Producer | Entity Type | Trigger | Key Payload Fields |
+|---|---|---|---|---|
+| `erp.product.created` | `erp-1` | `product` | Product master record created | `id`, `sku`, `name`, `categoryId`, `unitOfMeasure`, `price`, `currency` |
+| `erp.product.updated` | `erp-1` | `product` | Product attributes or price updated | `id`, `sku`, `name`, `previousPrice`, `newPrice`, `categoryId`, `status` |
+| `erp.category.created` | `erp-1` | `category` | Product category registered | `id`, `code`, `name` |
+| `erp.warehouse.created` | `erp-1` | `warehouse` | Warehouse facility configured | `id`, `code`, `name`, `isDefault` |
+| `erp.stock_level.adjusted` | `erp-1` | `stock_level` | Inventory quantity adjusted | `productId`, `warehouseId`, `previousQuantity`, `newQuantity`, `adjustmentQuantity`, `stockStatus`, `reason` |
+
+#### Cross-Module Inbound Events Consumed
+- `erp.purchase_order.received` (from ERP-2): Goods received against purchase order lines, increasing warehouse inventory.
+- `erp.sales_order.fulfilled` (from ERP-3): Goods dispatched against sales orders, decrementing warehouse inventory without breaching the non-negative stock constraint (`BR-ERP1-01`).
+
+### 25.3 Deterministic Mock Server & Fixture Package (AC3)
+
+For dependent teams (ERP-2, ERP-3, CRM-2, Migration Kit), `@clearshift/contracts` exposes:
+```typescript
+import { createErp1MockServer } from '@clearshift/contracts';
+
+const mock = createErp1MockServer();
+// mock.app: Fastify instance with all ERP-1 routes
+// mock.store: Deterministic synthetic in-memory data store
+// mock.reset(): Resets fixtures to clean baseline state
+// mock.stop(): Closes server instance
+```
+
+#### Deterministic Seed Fixtures
+- Default Warehouse: `WH-MAIN` (`aaaaaaaa-0001-4000-8000-000000000001`)
+- Categories: `TOOLS` (`bbbbbbbb-0001-4000-8000-000000000001`), `GEN` (`bbbbbbbb-0001-4000-8000-000000000002`)
+- Products: `TOOL-HEX-01` (`cccccccc-0001-4000-8000-000000000001`), `GEN-TIE-100` (`cccccccc-0001-4000-8000-000000000002`), `LUB-GRS-500` (`cccccccc-0001-4000-8000-000000000003`)
+- Pre-seeded stock levels for all products in `WH-MAIN`.
+
+---
+
+## 26. QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)
+
+### 26.1 Test Evidence & Invariant Mapping
+
+| Invariant / Requirement | Contract & Enforcement | Verification Test File | Status |
+|---|---|---|:---:|
+| **BR-ERP1-01** (Unique SKU) | `erp1_products_sku_unique` index + normalized uppercase matching | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **BR-ERP1-02** (Non-negative stock) | `check_erp1_stock_quantity_non_negative` constraint | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/constraints.test.ts` | **Verified** |
+| **FR-ERP1-03** (1-level category hierarchy) | Schema has no `parent_id`, validator prohibits nested subcategories | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/e2e/demo-journey.test.ts` | **Verified** |
+| **FR-ERP1-04** (Fixed units: pcs, kg, g, litre, metre, box) | `erp1.unit_of_measure` enum & `UnitOfMeasureSchema` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **FR-ERP1-05** (Single warehouse in V1) | `erp1_warehouses_single_idx` on constant `true` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **Explicit Currency (USD)** | Uppercase ISO-4217 code required on create | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **Decimal Price (NUMERIC 19,4)** | Decimal format preserved without float rounding | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **OpenAPI Parity** | 100% routes mapped to `packages/contracts/openapi/erp-1.yaml` | `apps/erp/modules/erp-1/tests/contract/openapi-parity.test.ts` | **Verified** |
+| **Deterministic Seed & Reset** | Re-running produces identical IDs without duplicate writes | `apps/erp/modules/erp-1/tests/seed/seed.test.ts`, `sample-data/erp-1/seed.ts` | **Verified** |
+| **Scripted 5-Minute Demo** | In-process execution of full V1 demo workflow | `apps/erp/modules/erp-1/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-1-v1.md` | **Verified** |
+| **Error Envelope Compliance** | Conforms to `{ statusCode, error, code, message, details, correlation_id }` | `apps/erp/modules/erp-1/tests/api/auth-and-envelope.test.ts` | **Verified** |
+
+### 26.2 Handoff Sign-Off
+- **Issue Reference**: Resolves [#15](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/15) ([ERP1-10])
+- **Author**: Samarth (`Samarth-ITM`)
+- **Role**: Group 6 / Role 4 — Data & QA Lead
+- **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
+---
+
+## 27. Module Authorization and Policy Integration (ERP1-15)
 
 **Issue Reference**: [#111](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/111)<br />
 **Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.8, §7.9, §9.3; PLT-05, PLT-06<br />
 **Implementation**: `apps/erp/modules/erp-1/src/app.ts`, `apps/erp/modules/erp-1/src/routes/guard.ts`
 
-### 25.1 Hub JWT Token Signature & Expiry Validation (AC1)
+### 27.1 Hub JWT Token Signature & Expiry Validation (AC1)
 
 Every ERP-1 endpoint validates incoming Bearer tokens using `@cs/identity` (`verifyAccessToken`):
 - **Cryptographic Verification**: Ed25519 (EdDSA) asymmetric public key signature validation (`cs-hub-key-v1`).
 - **Standard Token Claims**: Validates `iss` (`clearshift-hub`), `aud` (`clearshift`), `exp` (15-minute token TTL), `sub`, and `roles`.
 - **Default Deny**: Missing `Authorization` header, invalid token format, expired tokens, tampered signatures, or revoked/disabled user accounts (`USER_DISABLED`) immediately return `401 Unauthorized`.
 
-### 25.2 Role Capability Matrix Enforcement (AC2 & AC3)
+### 27.2 Role Capability Matrix Enforcement (AC2 & AC3)
 
 Authorization consumes the platform RBAC capability matrix (PLT-03):
 
@@ -976,7 +1056,7 @@ Authorization consumes the platform RBAC capability matrix (PLT-03):
 | **Analyst** | `analyst` | `module.read`, `kit.read`, `control.read` | Read-only analytics across products, categories, stock levels | All mutation and ingestion operations (`403 Forbidden`) |
 | **Admin** | `admin` | `module.read`, `module.write`, `kit.read`, `kit.review`, `kit.admin`, `control.read`, `hub.admin` | Unrestricted read, write, bulk ingestion, duplicate reviews, and system maintenance | — |
 
-### 25.3 Object-Level Authorization & Boundary Isolation (AC4)
+### 27.3 Object-Level Authorization & Boundary Isolation (AC4)
 
 To prevent cross-tenant leakage or unauthorized record hijacking:
 1. **Multi-Tenant Boundary Isolation (`assertTenantAccess`)**:
@@ -987,7 +1067,7 @@ To prevent cross-tenant leakage or unauthorized record hijacking:
    - Non-admin callers attempting to mutate or modify records created by another user are rejected with `HTTP 403` and error code `CROSS_USER_MUTATION_FORBIDDEN`.
    - Administrators retain cross-user management rights within their tenant boundary.
 
-### 25.4 Standard Error Envelope Conformance
+### 27.4 Standard Error Envelope Conformance
 
 All `401 Unauthorized` and `403 Forbidden` responses strictly conform to the standard ClearShift error envelope:
 ```json
@@ -998,3 +1078,4 @@ All `401 Unauthorized` and `403 Forbidden` responses strictly conform to the sta
   "correlation_id": "12345678-1234-4234-8234-1234567890ab"
 }
 ```
+
