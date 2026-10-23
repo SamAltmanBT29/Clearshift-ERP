@@ -454,6 +454,12 @@ components:
           nullable: true
         currency:
           type: string
+        source_system:
+          type: string
+          nullable: true
+        source_id:
+          type: string
+          nullable: true
 
     PaginatedVendorsResponse:
       type: object
