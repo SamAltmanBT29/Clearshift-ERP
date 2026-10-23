@@ -14,7 +14,6 @@
 
 import { randomUUID } from "node:crypto";
 import fastify, { type FastifyInstance } from "fastify";
-import { ZodError } from "zod";
 import { AppError, type ReferenceResolver } from "@cs/kernel";
 import { Erp3DomainError } from "./domain/rules.js";
 import { Erp3Service } from "./services/erp3.service.js";
@@ -23,6 +22,28 @@ import {
   type Erp3Repository,
 } from "./services/repository.js";
 import { erpOrdersRoutes } from "./routes/index.js";
+
+/** Structural shape of a Zod issue — the module does not import `zod`. */
+interface ZodIssueLike {
+  code: string;
+  message: string;
+  path: (string | number)[];
+}
+
+/** Structural shape of a Zod error. */
+interface ZodErrorLike {
+  issues: ZodIssueLike[];
+}
+
+/** True when the value looks like a Zod error (Zod 3 or Zod 4). */
+function isZodErrorLike(error: unknown): error is ZodErrorLike {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "issues" in error &&
+    Array.isArray((error as { issues: unknown[] }).issues)
+  );
+}
 
 export interface AppOptions {
   repository?: Erp3Repository | undefined;
@@ -139,20 +160,13 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
       });
     }
 
-    if (
-      error instanceof ZodError ||
-      (typeof error === "object" &&
-        error !== null &&
-        "issues" in error &&
-        Array.isArray((error as { issues: unknown[] }).issues))
-    ) {
-      const zodErr = error as ZodError;
+    if (isZodErrorLike(error)) {
       return reply.status(400).send({
         statusCode: 400,
         error: "Bad Request",
         code: "VALIDATION_ERROR",
-        message: zodErr.issues[0]?.message ?? "Validation failed",
-        details: zodErr.issues.map((i) => ({
+        message: error.issues[0]?.message ?? "Validation failed",
+        details: error.issues.map((i: ZodIssueLike) => ({
           field: i.path.join("."),
           message: i.message,
           code: i.code,
