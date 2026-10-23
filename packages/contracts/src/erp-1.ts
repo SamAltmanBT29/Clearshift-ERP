@@ -437,5 +437,106 @@ export const ModuleMigrationMetadataSchema = z.object({
 });
 export type ModuleMigrationMetadata = z.infer<typeof ModuleMigrationMetadataSchema>;
 
+/**
+ * Migration Kit Rejection & Review Schemas (KIT-16 / ERP1-23)
+ */
+export const RejectionColumnConfigSchema = z.object({
+  field: z.string().min(1),
+  label: z.string().min(1),
+  isIdentifier: z.boolean().optional(),
+  isSensitive: z.boolean().optional(),
+});
+export type RejectionColumnConfig = z.infer<typeof RejectionColumnConfigSchema>;
+
+export const FailureExplanationSchema = z.object({
+  code: z.string().min(1),
+  title: z.string().min(1),
+  explanation: z.string().min(1),
+  docReference: z.string().optional(),
+  resolution: z.string().optional(),
+});
+export type FailureExplanation = z.infer<typeof FailureExplanationSchema>;
+
+export const ModuleRejectionContextSchema = z.object({
+  moduleId: z.string().min(1),
+  moduleName: z.string().min(1),
+  entity: z.string().min(1),
+  identifierColumns: z.array(RejectionColumnConfigSchema),
+  additionalColumns: z.array(RejectionColumnConfigSchema).optional(),
+  sensitiveFields: z.array(z.string()).optional(),
+  failureExplanations: z.record(FailureExplanationSchema),
+});
+export type ModuleRejectionContext = z.infer<typeof ModuleRejectionContextSchema>;
+
+export const RejectedRowSchema = z.object({
+  id: z.string().min(1),
+  batchId: z.string().min(1),
+  sourceRow: z.number().int().min(1),
+  entity: z.string().min(1),
+  schemaVersion: z.number().int().min(1).optional(),
+  errorCode: z.string().min(1),
+  failureReason: z.string().optional(),
+  field: z.string().optional(),
+  rawData: z.record(z.unknown()),
+  createdAt: z.string().optional(),
+});
+export type RejectedRow = z.infer<typeof RejectedRowSchema>;
+
+/**
+ * Data Quality Rule Schema (KIT-17 / ERP1-24)
+ */
+export const DataQualityRuleSchema = z.object({
+  rule_id: z.string().min(1),
+  version: z.string().min(1),
+  record_type: z.enum(['category', 'warehouse', 'product', 'stock_level', 'all']),
+  field: z.string().min(1),
+  condition: z.string().min(1),
+  action: z.enum(['normalize', 'reject', 'review']),
+  reason_code: z.string().optional(),
+  explanation: z.string().min(1),
+  doc_reference: z.string().min(1),
+});
+export type DataQualityRule = z.infer<typeof DataQualityRuleSchema>;
+
+/**
+ * Reconciliation Summary Schema
+ */
+export const ReconciliationSummarySchema = z.object({
+  total_source_rows: z.number().int().nonnegative(),
+  accepted: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  review: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  unaccounted: z.number().int().nonnegative(),
+  is_balanced: z.boolean(),
+});
+export type ReconciliationSummary = z.infer<typeof ReconciliationSummarySchema>;
+
+/**
+ * Dirty Data Profile Report Schema (KIT-17 / ERP1-24)
+ */
+export const DirtyDataProfileReportSchema = z.object({
+  profile_schema_version: z.number().int().positive(),
+  rules_version: z.string().min(1),
+  module: z.literal('erp1'),
+  fixture: z.string().min(1),
+  fixture_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  total_rows: z.number().int().nonnegative(),
+  reconciliation: ReconciliationSummarySchema,
+  by_record_type: z.record(
+    z.object({
+      accepted: z.number().int().nonnegative(),
+      rejected: z.number().int().nonnegative(),
+      review: z.number().int().nonnegative(),
+      skipped: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    })
+  ),
+  by_reason_code: z.record(z.number().int().nonnegative()),
+  generated_at: z.string().datetime(),
+});
+export type DirtyDataProfileReport = z.infer<typeof DirtyDataProfileReportSchema>;
+
 export { ErrorEnvelopeSchema };
+
 

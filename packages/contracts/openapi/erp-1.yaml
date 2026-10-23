@@ -214,6 +214,39 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ModuleMigrationMetadata' }
 
+  /api/v1/erp-products/rejections:
+    get:
+      operationId: listErp1Rejections
+      tags: [ERP-1 Migration Kit]
+      summary: List migration rejection records with module context and standardized error codes
+      parameters:
+        - name: batchId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: errorCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: entity
+          in: query
+          required: false
+          schema: { type: string, default: products }
+      responses:
+        "200":
+          description: List of rejected rows with module context
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, context]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RejectedRow' }
+                  total: { type: integer, minimum: 0 }
+                  context: { $ref: '#/components/schemas/ModuleRejectionContext' }
+
   /api/v1/erp-products/categories:
 
     get:
@@ -617,4 +650,114 @@ components:
         supportedSourceTypes:
           type: array
           items: { type: string }
+
+    RejectionColumnConfig:
+      type: object
+      required: [field, label]
+      properties:
+        field: { type: string }
+        label: { type: string }
+        isIdentifier: { type: boolean }
+        isSensitive: { type: boolean }
+
+    FailureExplanation:
+      type: object
+      required: [code, title, explanation]
+      properties:
+        code: { type: string }
+        title: { type: string }
+        explanation: { type: string }
+        docReference: { type: string }
+        resolution: { type: string }
+
+    ModuleRejectionContext:
+      type: object
+      required: [moduleId, moduleName, entity, identifierColumns, failureExplanations]
+      properties:
+        moduleId: { type: string }
+        moduleName: { type: string }
+        entity: { type: string }
+        identifierColumns:
+          type: array
+          items: { $ref: '#/components/schemas/RejectionColumnConfig' }
+        additionalColumns:
+          type: array
+          items: { $ref: '#/components/schemas/RejectionColumnConfig' }
+        sensitiveFields:
+          type: array
+          items: { type: string }
+        failureExplanations:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/FailureExplanation' }
+
+    RejectedRow:
+      type: object
+      required: [id, batchId, sourceRow, entity, errorCode, rawData]
+      properties:
+        id: { type: string }
+        batchId: { type: string }
+        sourceRow: { type: integer, minimum: 1 }
+        entity: { type: string }
+        schemaVersion: { type: integer, minimum: 1 }
+        errorCode: { type: string }
+        failureReason: { type: string }
+        field: { type: string }
+        rawData:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+
+    DataQualityRule:
+      type: object
+      required: [rule_id, version, record_type, field, condition, action, explanation, doc_reference]
+      properties:
+        rule_id: { type: string }
+        version: { type: string }
+        record_type: { type: string, enum: [category, warehouse, product, stock_level, all] }
+        field: { type: string }
+        condition: { type: string }
+        action: { type: string, enum: [normalize, reject, review] }
+        reason_code: { type: string }
+        explanation: { type: string }
+        doc_reference: { type: string }
+
+    ReconciliationSummary:
+      type: object
+      required: [total_source_rows, accepted, rejected, review, skipped, unaccounted, is_balanced]
+      properties:
+        total_source_rows: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        rejected: { type: integer, minimum: 0 }
+        review: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        unaccounted: { type: integer, minimum: 0 }
+        is_balanced: { type: boolean }
+
+    DirtyDataProfileReport:
+      type: object
+      required: [profile_schema_version, rules_version, module, fixture, fixture_sha256, total_rows, reconciliation, by_record_type, by_reason_code, generated_at]
+      properties:
+        profile_schema_version: { type: integer, minimum: 1 }
+        rules_version: { type: string }
+        module: { type: string, enum: [erp1] }
+        fixture: { type: string }
+        fixture_sha256: { type: string }
+        total_rows: { type: integer, minimum: 0 }
+        reconciliation: { $ref: '#/components/schemas/ReconciliationSummary' }
+        by_record_type:
+          type: object
+          additionalProperties:
+            type: object
+            required: [accepted, rejected, review, skipped, total]
+            properties:
+              accepted: { type: integer, minimum: 0 }
+              rejected: { type: integer, minimum: 0 }
+              review: { type: integer, minimum: 0 }
+              skipped: { type: integer, minimum: 0 }
+              total: { type: integer, minimum: 0 }
+        by_reason_code:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        generated_at: { type: string, format: date-time }
+
 

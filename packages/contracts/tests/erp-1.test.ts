@@ -346,5 +346,33 @@ describe('ERP-1 Products & Inventory contracts', () => {
         expect(componentNames.has(ref as string), `missing component ${ref}`).toBe(true);
       }
     });
+
+    it('validates DirtyDataProfileReport and DataQualityRule schemas', async () => {
+      const {
+        DataQualityRuleSchema,
+        DirtyDataProfileReportSchema,
+      } = await import('../src/erp-1.js');
+
+      const rule = DataQualityRuleSchema.parse({
+        rule_id: 'PRD-001',
+        version: '1.0.0',
+        record_type: 'product',
+        field: 'name',
+        condition: 'product name is empty or whitespace',
+        action: 'reject',
+        reason_code: 'PRODUCT_NAME_REQUIRED',
+        explanation: 'Product name is mandatory.',
+        doc_reference: 'FR-ERP1-01',
+      });
+      expect(rule.rule_id).toBe('PRD-001');
+
+      const expectedProfile = JSON.parse(
+        readFileSync(resolve(__dirname, '../../../sample-data/erp-1/expected-profile.json'), 'utf8')
+      );
+      const parsedReport = DirtyDataProfileReportSchema.parse(expectedProfile);
+      expect(parsedReport.module).toBe('erp1');
+      expect(parsedReport.reconciliation.is_balanced).toBe(true);
+      expect(parsedReport.reconciliation.unaccounted).toBe(0);
+    });
   });
 });

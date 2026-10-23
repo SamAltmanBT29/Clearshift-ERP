@@ -53,11 +53,15 @@ export const SYNTHETIC_SOURCE_PRESETS: Record<string, { label: string; columns: 
   },
 };
 
+import { ProductRejectionReviewPage } from './ProductRejectionReviewPage.js';
+
 export interface ProductImportPageProps {
   readonly onNavigateBack?: () => void;
   readonly initialPresetKey?: keyof typeof SYNTHETIC_SOURCE_PRESETS;
   readonly onProceedDryRun?: (mapping: Record<string, string>, entityName: string) => void;
   readonly onProceedLoad?: (mapping: Record<string, string>, entityName: string) => void;
+  readonly onNavigateToRejections?: () => void;
+  readonly initialView?: 'wizard' | 'rejections';
 }
 
 export const ProductImportPage: React.FC<ProductImportPageProps> = ({
@@ -65,9 +69,21 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   initialPresetKey = 'standard_csv',
   onProceedDryRun,
   onProceedLoad,
+  onNavigateToRejections,
+  initialView = 'wizard',
 }) => {
   const [selectedPresetKey, setSelectedPresetKey] = useState<string>(initialPresetKey);
+  const [isRejectionsView, setIsRejectionsView] = useState<boolean>(initialView === 'rejections');
   const activePreset = SYNTHETIC_SOURCE_PRESETS[selectedPresetKey] || SYNTHETIC_SOURCE_PRESETS['standard_csv']!;
+
+  if (isRejectionsView) {
+    return (
+      <ProductRejectionReviewPage
+        onNavigateBack={() => setIsRejectionsView(false)}
+        onNavigateToImport={() => setIsRejectionsView(false)}
+      />
+    );
+  }
 
   return (
     <div className="cs-product-import-page space-y-6" data-testid="product-import-page">
@@ -97,18 +113,33 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
           </p>
         </div>
 
-        {/* Source Preset Selector for operator simulation */}
-        <div className="flex items-center gap-2 bg-[var(--cs-surface)] p-2 rounded-md border border-[var(--cs-border)]">
-          <label htmlFor="source-preset-select" className="text-xs font-medium text-[var(--cs-text-muted)] whitespace-nowrap">
-            Simulate File:
-          </label>
-          <select
-            id="source-preset-select"
-            data-testid="select-source-preset"
-            value={selectedPresetKey}
-            onChange={(e) => setSelectedPresetKey(e.target.value)}
-            className="text-xs border border-[var(--cs-border)] bg-[var(--cs-bg)] text-[var(--cs-text)] rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--cs-accent)]"
+        {/* Action Controls: Preset selector + Rejections button */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="btn-view-rejections"
+            onClick={() => {
+              setIsRejectionsView(true);
+              onNavigateToRejections?.();
+            }}
+            className="text-xs font-semibold px-3 py-1.5 rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition flex items-center gap-1.5"
+            title="Review rejected rows from migration dry runs and loads"
           >
+            <span>⚠️</span>
+            <span>Review Rejections (5)</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-[var(--cs-surface)] p-2 rounded-md border border-[var(--cs-border)]">
+            <label htmlFor="source-preset-select" className="text-xs font-medium text-[var(--cs-text-muted)] whitespace-nowrap">
+              Simulate File:
+            </label>
+            <select
+              id="source-preset-select"
+              data-testid="select-source-preset"
+              value={selectedPresetKey}
+              onChange={(e) => setSelectedPresetKey(e.target.value)}
+              className="text-xs border border-[var(--cs-border)] bg-[var(--cs-bg)] text-[var(--cs-text)] rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--cs-accent)]"
+            >
             {Object.entries(SYNTHETIC_SOURCE_PRESETS).map(([key, preset]) => (
               <option key={key} value={key}>
                 {preset.label}
@@ -117,6 +148,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
           </select>
         </div>
       </div>
+    </div>
 
       {/* Embedded Shared Migration Kit Wizard Pre-Bound to ERP-1 (AC 1 & H2) */}
       <MigrationKitWizard
