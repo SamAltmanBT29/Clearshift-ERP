@@ -202,7 +202,20 @@ paths:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
+  /api/v1/erp-products/migration-metadata:
+    get:
+      operationId: getErp1MigrationMetadata
+      tags: [ERP-1 Migration Kit]
+      summary: Retrieve ERP-1 target schema metadata for shared Migration Kit wizard
+      responses:
+        "200":
+          description: ERP-1 module migration metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModuleMigrationMetadata' }
+
   /api/v1/erp-products/categories:
+
     get:
       operationId: listErp1Categories
       tags: [ERP-1 Categories]
@@ -543,3 +556,65 @@ components:
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+
+    TargetFieldDefinition:
+      type: object
+      required: [name, label, type, required]
+      properties:
+        name: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [string, number, decimal, boolean, date, enum, uuid] }
+        required: { type: boolean }
+        description: { type: string }
+        enumOptions:
+          type: array
+          items: { type: string }
+        rules:
+          type: array
+          items: { type: string }
+        example:
+          oneOf:
+            - { type: string }
+            - { type: number }
+            - { type: boolean }
+
+    TargetEntityMetadata:
+      type: object
+      required: [entity, label, module, schemaVersion, targetTable, primaryKey, fields]
+      properties:
+        entity: { type: string }
+        label: { type: string }
+        module: { type: string }
+        schemaVersion: { type: integer, minimum: 1 }
+        targetTable: { type: string }
+        primaryKey: { type: string }
+        naturalKey: { type: string }
+        fields:
+          type: array
+          items: { $ref: '#/components/schemas/TargetFieldDefinition' }
+        mappingDefaults:
+          type: object
+          additionalProperties: { type: string }
+        validationRules:
+          type: array
+          items:
+            type: object
+            required: [code, description]
+            properties:
+              code: { type: string }
+              description: { type: string }
+
+    ModuleMigrationMetadata:
+      type: object
+      required: [moduleId, moduleName, defaultEntity, entities]
+      properties:
+        moduleId: { type: string }
+        moduleName: { type: string }
+        defaultEntity: { type: string }
+        entities:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/TargetEntityMetadata' }
+        supportedSourceTypes:
+          type: array
+          items: { type: string }
+

@@ -108,7 +108,9 @@
     <button class="state-btn" onclick="switchState('filtered_empty')">Filtered Empty State (AC2)</button>
     <button class="state-btn" onclick="switchState('error')">API Failure + Retry (AC3)</button>
     <button class="state-btn" onclick="switchState('forbidden')">403 Access Denied (AC4)</button>
+    <button class="state-btn" onclick="switchState('migration')">Migration Wizard (ERP1-22)</button>
   </div>
+
 
   <!-- Search & Sorting Toolbar -->
   <div class="cs-erp1-toolbar" role="search" aria-label="Search and sort products">
@@ -137,8 +139,10 @@
         </select>
         <button id="sort-dir-btn" class="cs-erp1-sort-direction-btn" aria-label="Sort direction">▲ Asc</button>
       </div>
+      <button type="button" class="cs-erp1-btn cs-erp1-btn-secondary cs-erp1-import-btn" onclick="switchState('migration')">📥 Migration Kit</button>
       <button type="button" class="cs-erp1-btn cs-erp1-btn-primary cs-erp1-add-product-btn" onclick="openCreateModal()">+ New Product</button>
     </div>
+
   </div>
 
   <!-- Toast Confirmation Banner -->
@@ -302,6 +306,94 @@
           Please contact your system administrator to assign the necessary role to your account.
         </p>
       </section>
+
+      <!-- 7. Migration Kit Wizard Simulation View (ERP1-22) -->
+      <section id="view-migration" class="cs-migration-wizard" style="display: none; padding: 24px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background-color: var(--color-background);" aria-label="Migration Kit Wizard">
+        <div class="cs-wizard-header" style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle);">
+          <span class="preview-badge">Shared Migration Kit (H2 / KIT-14)</span>
+          <h2 style="font-size: 1.25rem; font-weight: 700; margin-top: 8px;">Step 4: Map Source Columns to ERP-1 Target Schema</h2>
+          <p style="font-size: 0.875rem; color: var(--color-text-muted);">
+            Target Table: <code>erp1_products</code> • Schema Version: <strong>1</strong> • Natural Key: <code>sku</code>
+          </p>
+        </div>
+
+        <!-- Incompatible Type Warning (AC3) -->
+        <div class="cs-alert rounded border p-4 mb-4" style="background-color: #fffbeb; border-color: #f59e0b; display: flex; gap: 12px; margin-bottom: 16px; border-radius: var(--radius-md);">
+          <span style="color: #b45309; font-weight: bold;">⚠</span>
+          <div style="font-size: 0.875rem; color: #92400e;">
+            <strong>Type Incompatibility Warning:</strong> Source column <code>created_date</code> (type: date) cannot be safely mapped to target field <code>price</code> (decimal).
+          </div>
+        </div>
+
+        <!-- Required Unmapped Alert (AC4) -->
+        <div id="preview-unmapped-alert" class="cs-alert rounded border p-4 mb-4" style="background-color: #fef2f2; border-color: #ef4444; display: flex; gap: 12px; margin-bottom: 20px; border-radius: var(--radius-md);">
+          <span style="color: #b91c1c; font-weight: bold;">✕</span>
+          <div style="font-size: 0.875rem; color: #991b1b;">
+            <strong>Dry-Run & Load Blocked:</strong> Required target fields must be mapped before proceeding: <em>Unit of Measure, Unit Price, Currency Code</em>.
+          </div>
+        </div>
+
+        <!-- Target Schema Table (AC2) -->
+        <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 20px;">
+          <table class="cs-erp1-table" style="width: 100%; text-align: left; font-size: 0.875rem;">
+            <thead>
+              <tr style="background-color: var(--color-surface); border-bottom: 1px solid var(--border-subtle);">
+                <th style="padding: 12px;">Target Field</th>
+                <th style="padding: 12px;">Data Type</th>
+                <th style="padding: 12px;">Requirement</th>
+                <th style="padding: 12px;">Source Column Mapping</th>
+                <th style="padding: 12px;">Governing Rule</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 12px;"><strong>Product Name</strong><br><code style="font-size: 0.75rem; color: var(--color-text-muted);">name</code></td>
+                <td style="padding: 12px;"><span class="cs-badge-type" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">string</span></td>
+                <td style="padding: 12px;"><span class="cs-badge-required" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">Required</span></td>
+                <td style="padding: 12px;"><select class="cs-erp1-sort-select" style="width: 100%;"><option selected>product_name</option></select></td>
+                <td style="padding: 12px;"><span class="cs-erp1-uom-tag">FR-ERP1-01</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 12px;"><strong>SKU (Stock Keeping Unit)</strong><br><code style="font-size: 0.75rem; color: var(--color-text-muted);">sku</code></td>
+                <td style="padding: 12px;"><span class="cs-badge-type" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">string</span></td>
+                <td style="padding: 12px;"><span class="cs-badge-required" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">Required</span></td>
+                <td style="padding: 12px;"><select class="cs-erp1-sort-select" style="width: 100%;"><option selected>sku_code</option></select></td>
+                <td style="padding: 12px;"><span class="cs-erp1-uom-tag">BR-ERP1-01</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 12px;"><strong>Unit of Measure</strong><br><code style="font-size: 0.75rem; color: var(--color-text-muted);">unitOfMeasure</code></td>
+                <td style="padding: 12px;"><span class="cs-badge-type" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">enum</span><br><small style="color: var(--color-text-muted);">[pcs, kg, g, litre, metre, box]</small></td>
+                <td style="padding: 12px;"><span class="cs-badge-required" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">Required</span></td>
+                <td style="padding: 12px;"><select class="cs-erp1-sort-select" style="width: 100%;"><option>-- Unmapped --</option></select></td>
+                <td style="padding: 12px;"><span class="cs-erp1-uom-tag">FR-ERP1-04</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 12px;"><strong>Unit Price</strong><br><code style="font-size: 0.75rem; color: var(--color-text-muted);">price</code></td>
+                <td style="padding: 12px;"><span class="cs-badge-type" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">decimal</span></td>
+                <td style="padding: 12px;"><span class="cs-badge-required" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">Required</span></td>
+                <td style="padding: 12px;"><select class="cs-erp1-sort-select" style="width: 100%;"><option>created_date (date)</option></select><br><span style="color: #b45309; font-size: 0.75rem;">⚠ Incompatible source type (date -> decimal)</span></td>
+                <td style="padding: 12px;"><span class="cs-erp1-uom-tag">FR-ERP1-02</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 12px;"><strong>Tax Rate (%)</strong><br><code style="font-size: 0.75rem; color: var(--color-text-muted);">taxRate</code></td>
+                <td style="padding: 12px;"><span class="cs-badge-type" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">decimal</span></td>
+                <td style="padding: 12px;"><span class="cs-badge-optional" style="padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">Optional</span></td>
+                <td style="padding: 12px;"><select class="cs-erp1-sort-select" style="width: 100%;"><option selected>tax_rate</option></select></td>
+                <td style="padding: 12px;"><span class="cs-erp1-uom-tag">FR-ERP1-02</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer Actions (AC4) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+          <span style="font-size: 0.8125rem; color: var(--color-error);">✕ Dry-Run blocked: 3 required fields unmapped</span>
+          <div style="display: flex; gap: 12px;">
+            <button type="button" class="cs-erp1-btn" disabled style="opacity: 0.5; cursor: not-allowed;" title="Dry-run blocked until required fields are mapped">Proceed to Dry-Run (Step 5)</button>
+            <button type="button" class="cs-erp1-btn cs-erp1-btn-primary" disabled style="opacity: 0.5; cursor: not-allowed;">Start Migration Load (Step 7)</button>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -334,7 +426,7 @@
       const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.getAttribute('onclick')?.includes(simState));
       if (activeBtn) activeBtn.classList.add('active');
 
-      const views = ['view-table', 'view-loading', 'view-zero-data', 'view-filtered-empty', 'view-error', 'view-forbidden'];
+      const views = ['view-table', 'view-loading', 'view-zero-data', 'view-filtered-empty', 'view-error', 'view-forbidden', 'view-migration'];
       views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -352,8 +444,11 @@
         document.getElementById('view-error').style.display = 'flex';
       } else if (simState === 'forbidden') {
         document.getElementById('view-forbidden').style.display = 'flex';
+      } else if (simState === 'migration') {
+        document.getElementById('view-migration').style.display = 'block';
       }
     };
+
 
     function render() {
       if (state.activeSimulation !== 'normal') return;

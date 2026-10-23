@@ -33,6 +33,7 @@ import {
 } from '../components/StateViews.js';
 import { ProductCreateModal } from '../components/ProductCreateModal.js';
 import { ProductDetailPage } from './ProductDetailPage.js';
+import { ProductImportPage } from './ProductImportPage.js';
 
 export interface ProductsListPageProps {
   /** Optional initial filters passed by host shell or router */
@@ -45,9 +46,14 @@ export interface ProductsListPageProps {
   onProductCreated?: ((product: Product) => void) | undefined;
   /** Optional callback when a product is selected for detail/edit */
   onSelectProduct?: ((product: Product) => void) | undefined;
+  /** Optional initial view: list or import */
+  initialView?: 'list' | 'import' | undefined;
+  /** Optional callback when navigating to migration kit import */
+  onNavigateImport?: (() => void) | undefined;
   /** Optional permissions array for access control */
   userPermissions?: readonly string[] | undefined;
 }
+
 
 function parseFiltersFromUrl(): Partial<ProductListQuery> {
   if (typeof window === 'undefined' || !window.location) {
@@ -112,8 +118,11 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   onCreateProduct,
   onProductCreated,
   onSelectProduct,
+  initialView,
+  onNavigateImport,
   userPermissions,
 }) => {
+
   // 1. Initial State Resolution from URL or Props
   const urlFilters = useMemo(() => parseFiltersFromUrl(), []);
   const initial = { ...urlFilters, ...initialFilters };
@@ -142,6 +151,10 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
 
   // Selected product detail view state
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
+  // Migration Kit import view state
+  const [isImportView, setIsImportView] = useState<boolean>(initialView === 'import');
+
 
   // 2. Data state
   const [products, setProducts] = useState<ProductWithStock[]>([]);
@@ -341,6 +354,14 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
     sortDirection,
   };
 
+  if (isImportView) {
+    return (
+      <ProductImportPage
+        onNavigateBack={() => setIsImportView(false)}
+      />
+    );
+  }
+
   if (selectedProductId) {
     const selectedProd = products.find((p) => p.id === selectedProductId) || null;
     return (
@@ -358,6 +379,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
       />
     );
   }
+
 
   return (
     <div className="cs-erp1-module-root">
@@ -409,11 +431,25 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
 
           <button
             type="button"
+            className="cs-erp1-btn cs-erp1-btn-secondary cs-erp1-import-btn"
+            data-testid="btn-import-products"
+            onClick={() => {
+              setIsImportView(true);
+              onNavigateImport?.();
+            }}
+            title="Import catalog data through shared Migration Kit wizard"
+          >
+            📥 Migration Kit
+          </button>
+
+          <button
+            type="button"
             className="cs-erp1-btn cs-erp1-btn-primary cs-erp1-add-product-btn"
             onClick={handleOpenCreateModal}
           >
             + New Product
           </button>
+
         </div>
       </div>
 
