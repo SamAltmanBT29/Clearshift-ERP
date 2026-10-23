@@ -120,8 +120,11 @@ export const ProductSchema = z.object({
     .string()
     .regex(TaxRatePattern, 'Tax rate must be a valid non-negative decimal percentage')
     .default('0.00'),
+  notificationEmail: z.string().nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
   sourceSystem: z.string().nullable().optional(),
   sourceId: z.string().nullable().optional(),
+  goldenId: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -150,6 +153,14 @@ export const CreateProductInputSchema = z.object({
     )
     .default('0.00')
     .optional(),
+  notificationEmail: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().email('Invalid email address format').optional()
+  ),
+  contactPhone: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().regex(/^\+?[0-9\s\-()]{7,20}$/, 'Invalid phone number format').optional()
+  ),
   sourceSystem: z.string().trim().min(1).max(64).optional(),
   sourceId: z.string().trim().min(1).max(128).optional(),
 });
@@ -177,8 +188,74 @@ export const UpdateProductInputSchema = z.object({
       normalizeDecimalInput(val, 2, 'Tax rate must be non-negative', ctx)
     )
     .optional(),
+  notificationEmail: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().email('Invalid email address format').optional()
+  ),
+  contactPhone: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().regex(/^\+?[0-9\s\-()]{7,20}$/, 'Invalid phone number format').optional()
+  ),
+  version: z.string().optional(),
 });
 export type UpdateProductInput = z.infer<typeof UpdateProductInputSchema>;
+
+/**
+ * Linked warehouse stock record for Product detail views.
+ */
+export const ProductWarehouseStockLinkedRecordSchema = z.object({
+  warehouseId: z.string().uuid(),
+  warehouseCode: z.string(),
+  warehouseName: z.string(),
+  quantity: z.string(),
+  unitOfMeasure: UnitOfMeasureSchema,
+  updatedAt: z.string().datetime(),
+});
+export type ProductWarehouseStockLinkedRecord = z.infer<typeof ProductWarehouseStockLinkedRecordSchema>;
+
+/**
+ * Linked ERP-2 Purchase Order line for Product detail views.
+ */
+export const ProductPurchaseLineLinkedRecordSchema = z.object({
+  id: z.string().uuid(),
+  purchaseOrderId: z.string().uuid(),
+  poNumber: z.string(),
+  vendorName: z.string(),
+  orderDate: z.string(),
+  quantity: z.string(),
+  unitPrice: z.string(),
+  currency: CurrencySchema,
+  status: z.string(),
+});
+export type ProductPurchaseLineLinkedRecord = z.infer<typeof ProductPurchaseLineLinkedRecordSchema>;
+
+/**
+ * Linked ERP-3 Sales Order / Invoice line for Product detail views.
+ */
+export const ProductSalesLineLinkedRecordSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  orderNumber: z.string(),
+  customerGoldenId: z.string(),
+  orderDate: z.string(),
+  quantity: z.string(),
+  unitPrice: z.string(),
+  lineTotal: z.string(),
+  currency: CurrencySchema,
+  status: z.string(),
+});
+export type ProductSalesLineLinkedRecord = z.infer<typeof ProductSalesLineLinkedRecordSchema>;
+
+/**
+ * Aggregated linked records for a Product across ERP-1 inventory, ERP-2 purchasing, and ERP-3 sales.
+ */
+export const ProductLinkedRecordsSchema = z.object({
+  productId: z.string().uuid(),
+  stockLevels: z.array(ProductWarehouseStockLinkedRecordSchema),
+  purchaseOrders: z.array(ProductPurchaseLineLinkedRecordSchema),
+  salesOrders: z.array(ProductSalesLineLinkedRecordSchema),
+});
+export type ProductLinkedRecords = z.infer<typeof ProductLinkedRecordsSchema>;
 
 /**
  * Stock Level Schema (FR-ERP1-06, BR-ERP1-02: quantity >= 0).
@@ -222,9 +299,67 @@ const Erp1PaginationQuerySchema = PaginationQuerySchema.extend({
     .default(25),
 });
 
+export const ProductSortFieldSchema = z.enum([
+  'name',
+  'sku',
+  'price',
+  'createdAt',
+  'quantity',
+]);
+export type ProductSortField = z.infer<typeof ProductSortFieldSchema>;
+
+export const StockStatusFilterSchema = z.enum([
+  'all',
+  'in_stock',
+  'low_stock',
+  'out_of_stock',
+]);
+export type StockStatusFilter = z.infer<typeof StockStatusFilterSchema>;
+
 export const ProductListQuerySchema = Erp1PaginationQuerySchema.extend({
   search: z.string().trim().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryId: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().uuid().optional()
+  ),
+  unitOfMeasure: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    UnitOfMeasureSchema.optional()
+  ),
+  stockStatus: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    StockStatusFilterSchema.optional()
+  ),
+  minPrice: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z
+      .union([z.string(), z.number()])
+      .transform((val, ctx) =>
+        normalizeDecimalInput(val, 4, 'Min price must be non-negative', ctx)
+      )
+      .optional()
+  ),
+  maxPrice: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z
+      .union([z.string(), z.number()])
+      .transform((val, ctx) =>
+        normalizeDecimalInput(val, 4, 'Max price must be non-negative', ctx)
+      )
+      .optional()
+  ),
+  sortBy: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    ProductSortFieldSchema.optional()
+  ),
+  sortOrder: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['asc', 'desc']).optional()
+  ),
+  sortDirection: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['asc', 'desc']).optional()
+  ),
 });
 export type ProductListQuery = z.infer<typeof ProductListQuerySchema>;
 
@@ -237,4 +372,70 @@ export type PaginatedProductsResponse = z.infer<typeof PaginatedProductsResponse
 export const PaginatedCategoriesResponseSchema = createPaginatedResponseSchema(CategorySchema);
 export type PaginatedCategoriesResponse = z.infer<typeof PaginatedCategoriesResponseSchema>;
 
+/**
+ * Target Field Type Schema for Migration Kit Integration (KIT-14 / ERP1-22).
+ */
+export const TargetFieldTypeSchema = z.enum([
+  'string',
+  'number',
+  'decimal',
+  'boolean',
+  'date',
+  'enum',
+  'uuid',
+]);
+export type TargetFieldType = z.infer<typeof TargetFieldTypeSchema>;
+
+/**
+ * Target Field Definition Schema for Migration Kit Integration.
+ */
+export const TargetFieldDefinitionSchema = z.object({
+  name: z.string().min(1),
+  label: z.string().min(1),
+  type: TargetFieldTypeSchema,
+  required: z.boolean(),
+  description: z.string().optional(),
+  enumOptions: z.array(z.string()).optional(),
+  rules: z.array(z.string()).optional(),
+  example: z.union([z.string(), z.number(), z.boolean()]).optional(),
+});
+export type TargetFieldDefinition = z.infer<typeof TargetFieldDefinitionSchema>;
+
+/**
+ * Target Entity Metadata Schema for Migration Kit Integration.
+ */
+export const TargetEntityMetadataSchema = z.object({
+  entity: z.string().min(1),
+  label: z.string().min(1),
+  module: z.string().min(1),
+  schemaVersion: z.number().int().positive(),
+  targetTable: z.string().min(1),
+  primaryKey: z.string().min(1),
+  naturalKey: z.string().optional(),
+  fields: z.array(TargetFieldDefinitionSchema),
+  mappingDefaults: z.record(z.string()).optional(),
+  validationRules: z
+    .array(
+      z.object({
+        code: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+});
+export type TargetEntityMetadata = z.infer<typeof TargetEntityMetadataSchema>;
+
+/**
+ * Module Migration Metadata Schema supplied to shared Migration Kit wizard.
+ */
+export const ModuleMigrationMetadataSchema = z.object({
+  moduleId: z.string().min(1),
+  moduleName: z.string().min(1),
+  defaultEntity: z.string().min(1),
+  entities: z.record(TargetEntityMetadataSchema),
+  supportedSourceTypes: z.array(z.string()).optional(),
+});
+export type ModuleMigrationMetadata = z.infer<typeof ModuleMigrationMetadataSchema>;
+
 export { ErrorEnvelopeSchema };
+

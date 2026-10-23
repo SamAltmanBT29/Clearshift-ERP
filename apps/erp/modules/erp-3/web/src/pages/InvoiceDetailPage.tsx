@@ -33,7 +33,7 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
     try {
       const [inv, paymentsRes] = await Promise.all([
         fetchInvoiceById(invoiceId),
-        fetchPayments({ invoiceId, page: 1, pageSize: 50 }).catch(() => ({ items: [] })),
+        fetchPayments({ invoice_id: invoiceId, page: 1, pageSize: 50 }).catch(() => ({ items: [] })),
       ]);
       setInvoice(inv);
       setPayments(paymentsRes.items || []);
@@ -96,12 +96,10 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
     );
   }
 
-  const remainingCents = Math.max(
-    0,
-    Math.round(parseFloat(invoice.total || '0') * 100) - Math.round(parseFloat(invoice.paidAmount || '0') * 100)
-  );
-  const remainingAmount = (remainingCents / 100).toFixed(2);
-  const isFullyPaid = invoice.status === 'paid' || remainingCents === 0;
+  const isFullyPaid = invoice.status === 'Paid';
+  const paidAmount = isFullyPaid ? invoice.total : '0.0000';
+  const totalFormatted2Dp = parseFloat(invoice.total || '0').toFixed(2);
+  const remainingAmount2Dp = isFullyPaid ? '0.00' : totalFormatted2Dp;
 
   return (
     <div className="cs-module-root">
@@ -120,11 +118,11 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
       <header className="cs-detail-header">
         <div className="cs-detail-title-group">
           <div className="cs-detail-title-row">
-            <h1 className="cs-page-title">Invoice {invoice.invoiceNumber}</h1>
+            <h1 className="cs-page-title">Invoice {invoice.invoice_number}</h1>
             <StatusBadge status={invoice.status} />
           </div>
           <p className="cs-page-description">
-            Internal ID: <span className="cs-mono">{invoice.id}</span> • Issued on {invoice.invoiceDate}
+            Internal ID: <span className="cs-mono">{invoice.id}</span> • Issued on {invoice.invoice_date}
           </p>
         </div>
 
@@ -138,17 +136,17 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                 setPaymentApiError(null);
                 setIsPaymentModalOpen(true);
               }}
-              aria-label={`Record payment for invoice ${invoice.invoiceNumber}`}
+              aria-label={`Record payment for invoice ${invoice.invoice_number}`}
             >
               Record Payment
             </button>
           )}
-          {onViewOrder && invoice.orderId && (
+          {onViewOrder && invoice.order_id && (
             <button
               type="button"
               className="cs-btn-secondary"
-              onClick={() => onViewOrder(invoice.orderId)}
-              aria-label={`View linked sales order ${invoice.orderId}`}
+              onClick={() => onViewOrder(invoice.order_id!)}
+              aria-label={`View linked sales order ${invoice.order_id}`}
             >
               View Sales Order
             </button>
@@ -156,30 +154,30 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
         </div>
       </header>
 
-      <main className="cs-detail-layout">
+      <div className="cs-detail-layout">
         {/* Info metadata cards */}
         <div className="cs-detail-meta-grid">
           <div className="cs-meta-card">
             <span className="cs-meta-label">Customer Golden ID</span>
             <span className="cs-meta-value cs-mono" style={{ fontWeight: 600 }}>
-              {invoice.customerGoldenId}
+              {invoice.customer_golden_id}
             </span>
           </div>
 
           <div className="cs-meta-card">
             <span className="cs-meta-label">Due Date</span>
             <span
-              className={`cs-meta-value ${invoice.status === 'overdue' ? 'cs-text-danger' : ''}`}
+              className={`cs-meta-value ${invoice.status === 'Overdue' ? 'cs-text-danger' : ''}`}
               style={{ fontWeight: 600 }}
             >
-              {invoice.dueDate} {invoice.status === 'overdue' && '⚠️ Overdue'}
+              {invoice.due_date} {invoice.status === 'Overdue' && '⚠️ Overdue'}
             </span>
           </div>
 
           <div className="cs-meta-card">
             <span className="cs-meta-label">Total Amount</span>
             <span className="cs-meta-value cs-mono" style={{ fontWeight: 700 }}>
-              ${invoice.total} {invoice.currencyCode}
+              ${totalFormatted2Dp} {invoice.currency}
             </span>
           </div>
 
@@ -192,17 +190,10 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                 color: isFullyPaid ? 'var(--color-success)' : 'var(--color-primary)',
               }}
             >
-              ${remainingAmount} {invoice.currencyCode}
+              ${remainingAmount2Dp} {invoice.currency}
             </span>
           </div>
         </div>
-
-        {invoice.notes && (
-          <div className="cs-meta-notes-card">
-            <strong>Payment Terms & Notes:</strong>
-            <p>{invoice.notes}</p>
-          </div>
-        )}
 
         {/* Payments History Table */}
         <section className="cs-table-card" style={{ marginTop: '24px' }}>
@@ -217,7 +208,6 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                   <th scope="col">Payment ID</th>
                   <th scope="col">Date</th>
                   <th scope="col">Method</th>
-                  <th scope="col">Reference / Memo</th>
                   <th scope="col" style={{ textAlign: 'right' }}>Amount</th>
                   <th scope="col" style={{ textAlign: 'center' }}>Settlement</th>
                 </tr>
@@ -227,11 +217,10 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                   payments.map((p) => (
                     <tr key={p.id}>
                       <td className="cs-mono">{p.id}</td>
-                      <td>{p.paidAt}</td>
+                      <td>{p.paid_at.slice(0, 10)}</td>
                       <td style={{ textTransform: 'capitalize' }}>{p.method}</td>
-                      <td>{p.reference || '—'}</td>
                       <td className="cs-mono" style={{ textAlign: 'right', fontWeight: 600 }}>
-                        ${p.amount} {p.currencyCode}
+                        ${parseFloat(p.amount).toFixed(2)} {invoice.currency}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className="cs-badge cs-badge-paid">Paid</span>
@@ -240,7 +229,7 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>
                       No payments recorded yet. Click "Record Payment" above to record settlement.
                     </td>
                   </tr>
@@ -249,12 +238,13 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
             </table>
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Payment Recording Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         invoice={invoice}
+        paidAmount={paidAmount}
         onClose={() => setIsPaymentModalOpen(false)}
         onSubmit={handleRecordPayment}
         isLoading={isSubmittingPayment}

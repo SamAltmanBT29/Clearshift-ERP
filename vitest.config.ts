@@ -14,6 +14,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: [
+        'apps/erp/modules/erp-1/web/src/**',
         'apps/erp/modules/erp-2/db/**',
         'apps/erp/modules/erp-2/src/**',
         'apps/erp/modules/erp-2/web/src/**',
@@ -80,6 +81,10 @@ export default defineConfig({
       {
         find: '@cs/ui',
         replacement: resolve(__dirname, './packages/ui/src/index.ts'),
+      },
+      {
+        find: '@cs/mod-erp1',
+        replacement: resolve(__dirname, './apps/erp/modules/erp-1/src/index.ts'),
       },
       {
         find: '@cs/mod-erp2',

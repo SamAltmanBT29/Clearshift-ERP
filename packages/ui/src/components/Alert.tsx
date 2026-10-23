@@ -8,6 +8,8 @@ export interface AlertProps {
   children: React.ReactNode;
   onDismiss?: () => void;
   className?: string;
+  id?: string;
+  "data-testid"?: string;
 }
 
 const variantStyles: Record<AlertVariant, { container: string; text: string; icon: string; role: "alert" | "status" }> = {
@@ -42,15 +44,20 @@ export const Alert: React.FC<AlertProps> = ({
   title,
   children,
   onDismiss,
-  className = ""
+  className = "",
+  id,
+  "data-testid": testId
 }) => {
   const styles = variantStyles[variant];
 
   return (
     <div
+      id={id}
+      data-testid={testId}
       role={styles.role}
       className={`cs-alert rounded border p-4 ${styles.container} ${className}`}
     >
+
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <span className={`text-base font-bold ${styles.text}`} aria-hidden="true">

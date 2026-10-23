@@ -9,6 +9,8 @@
  *   - FR-ERP2-05: Server-side calculated totals using Decimal arithmetic
  *   - BR-ERP2-01: Line product verification via ERP-1 ReferenceResolver
  *   - KIT-08 / Decision C4: Atomic dual-write import with deterministic idempotency
+ *   - ERP2-11: loadBatch UPSERT support — when upsert=true and natural key already exists,
+ *              update vendor in-place and store receipt with kind='linked'.
  *
  * @module erp2/services/erp2.service
  */
@@ -29,11 +31,29 @@ import type {
   ImportRowRequest,
   ImportRowResponse,
 } from '@clearshift/contracts';
+
+/**
+ * Extended import row request with optional upsert semantics (ERP2-11).
+ * When upsert=true the adapter will UPDATE an existing record rather than
+ * rejecting with DUPLICATE_TAX_NUMBER, and the receipt will carry kind='linked'.
+ */
+export interface ImportRowRequestExtended extends ImportRowRequest {
+  /** When true, existing record with matching natural key will be updated (UPSERT). */
+  upsert?: boolean;
+}
 import {
   type Erp2Repository,
   computeRequestHash,
   maskBankDetails,
 } from './repository.js';
+import {
+  assertValidPurchaseOrderStatus,
+  assertPurchaseOrderStatusTransition,
+  assertVendorReadConsistency,
+  assertPurchaseOrderReadConsistency,
+  assertSourceIdentityIsComplete,
+} from '../domain/relationships.js';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service Options
@@ -120,6 +140,8 @@ export class Erp2Service {
   }
 
   async createVendor(data: CreateVendorRequest): Promise<Vendor> {
+    assertSourceIdentityIsComplete(data.source_system, data.source_id);
+
     // Check duplicate tax number
     const existing = await this.repo.getVendorByTaxNumber(data.tax_number);
     if (existing) {
@@ -131,11 +153,20 @@ export class Erp2Service {
     }
 
     const maskedBank = maskBankDetails(data.bank_details);
-    return this.repo.createVendor(data, maskedBank);
+    const created = await this.repo.createVendor(data, maskedBank);
+    assertVendorReadConsistency(created);
+    return created;
   }
 
   async updateVendor(id: string, updates: UpdateVendorRequest): Promise<Vendor> {
     const existing = await this.getVendorById(id);
+
+    if (updates.source_system !== undefined || updates.source_id !== undefined) {
+      assertSourceIdentityIsComplete(
+        updates.source_system !== undefined ? updates.source_system : existing.source_system,
+        updates.source_id !== undefined ? updates.source_id : existing.source_id
+      );
+    }
 
     if (updates.tax_number && updates.tax_number !== existing.tax_number) {
       const duplicate = await this.repo.getVendorByTaxNumber(updates.tax_number);
@@ -160,8 +191,12 @@ export class Erp2Service {
       updatePayload.bank_masked = maskBankDetails(updates.bank_details);
     }
     if (updates.currency !== undefined) updatePayload.currency = updates.currency;
+    if (updates.source_system !== undefined) updatePayload.source_system = updates.source_system;
+    if (updates.source_id !== undefined) updatePayload.source_id = updates.source_id;
 
-    return this.repo.updateVendor(id, updatePayload);
+    const updated = await this.repo.updateVendor(id, updatePayload);
+    assertVendorReadConsistency(updated);
+    return updated;
   }
 
   // ── Purchase Orders ────────────────────────────────────────────────────────
@@ -226,7 +261,7 @@ export class Erp2Service {
     const poNumber = data.po_number ?? `PO-${Date.now()}-${randomUUID().slice(0, 4).toUpperCase()}`;
 
     // 4. Persist purchase order (default status: Draft)
-    return this.repo.createPurchaseOrder({
+    const created = await this.repo.createPurchaseOrder({
       id: poId,
       po_number: poNumber,
       vendor_id: data.vendor_id,
@@ -236,6 +271,8 @@ export class Erp2Service {
       total: computedTotal.toFixed(2),
       lines: calculatedLines,
     });
+    assertPurchaseOrderReadConsistency(created);
+    return created;
   }
 
   async updatePurchaseOrderStatus(
@@ -244,26 +281,20 @@ export class Erp2Service {
   ): Promise<PurchaseOrder> {
     const po = await this.getPurchaseOrderById(id);
 
-    // Enforce strict unidirectional transitions: Draft -> Sent -> Received -> Closed (FR-ERP2-04)
-    const allowedTransitions: Record<PurchaseOrderStatus, PurchaseOrderStatus[]> = {
-      Draft: ['Sent'],
-      Sent: ['Received'],
-      Received: ['Closed'],
-      Closed: [],
-    };
+    assertValidPurchaseOrderStatus(newStatus);
 
-    const validNextStates = allowedTransitions[po.status] ?? [];
-    if (!validNextStates.includes(newStatus)) {
-      throw new DomainError(
-        'INVALID_STATUS_TRANSITION',
-        `Cannot transition purchase order from '${po.status}' to '${newStatus}'. Allowed forward flow is Draft -> Sent -> Received -> Closed.`,
-        { currentStatus: po.status, requestedStatus: newStatus }
-      );
+    if (po.status === newStatus) {
+      return po;
     }
 
+    assertPurchaseOrderStatusTransition(po.status, newStatus);
+
     // Changing status to Received does not mutate stock (goods receipts are V2)
-    return this.repo.updatePurchaseOrderStatus(id, newStatus);
+    const updated = await this.repo.updatePurchaseOrderStatus(id, newStatus);
+    assertPurchaseOrderReadConsistency(updated);
+    return updated;
   }
+
 
   // ── Migration Kit Import (KIT-08 / Decision C4) ───────────────────────────
 
@@ -271,7 +302,8 @@ export class Erp2Service {
    * Commits domain mutation and durable receipt together in a single transaction.
    * Handles idempotent replays and detects key reuse with mismatched payloads.
    */
-  async importRow(req: ImportRowRequest): Promise<ImportRowResponse> {
+  async importRow(req: ImportRowRequest | ImportRowRequestExtended): Promise<ImportRowResponse> {
+    const upsert = (req as ImportRowRequestExtended).upsert ?? false;
     const requestHash = computeRequestHash(req.record);
 
     // Check prior receipt
@@ -300,22 +332,44 @@ export class Erp2Service {
     return this.repo.executeTransactional(async (txRepo) => {
       let targetId: string;
       let responsePayload: unknown;
+      let receiptKind: 'created' | 'linked' = 'created';
 
       if (req.entity === 'vendor') {
         const vendorData = req.record as unknown as CreateVendorRequest;
-        // Business validation
+        // Duplicate key check — strict-create or UPSERT depending on options
         const existing = await txRepo.getVendorByTaxNumber(vendorData.tax_number);
         if (existing) {
-          throw new ConflictError(
-            'DUPLICATE_TAX_NUMBER',
-            `Vendor with tax number '${vendorData.tax_number}' already exists`,
-            { field: 'tax_number' }
-          );
+          if (!upsert) {
+            throw new ConflictError(
+              'DUPLICATE_TAX_NUMBER',
+              `Vendor with tax number '${vendorData.tax_number}' already exists`,
+              { field: 'tax_number' }
+            );
+          }
+          // UPSERT path: update existing vendor fields in-place (kind='linked')
+          const maskedBank = maskBankDetails(vendorData.bank_details);
+          const updatedVendor = await txRepo.updateVendor(existing.id, {
+            name: vendorData.name,
+            email: vendorData.email,
+            phone: vendorData.phone ?? existing.phone,
+            address_line: vendorData.address_line ?? existing.address_line,
+            city: vendorData.city ?? existing.city,
+            country: vendorData.country ?? existing.country,
+            bank_masked: maskedBank ?? existing.bank_masked,
+            currency: vendorData.currency ?? existing.currency,
+            source_system: vendorData.source_system ?? existing.source_system,
+            source_id: vendorData.source_id ?? existing.source_id,
+          });
+          targetId = updatedVendor.id;
+          receiptKind = 'linked';
+          responsePayload = updatedVendor;
+        } else {
+          // CREATE path
+          const maskedBank = maskBankDetails(vendorData.bank_details);
+          const createdVendor = await txRepo.createVendor(vendorData, maskedBank);
+          targetId = createdVendor.id;
+          responsePayload = createdVendor;
         }
-        const maskedBank = maskBankDetails(vendorData.bank_details);
-        const createdVendor = await txRepo.createVendor(vendorData, maskedBank);
-        targetId = createdVendor.id;
-        responsePayload = createdVendor;
       } else if (req.entity === 'purchase_order') {
         const poData = req.record as unknown as CreatePurchaseOrderRequest;
 
@@ -386,7 +440,7 @@ export class Erp2Service {
         idempotency_key: req.idempotency_key,
         request_hash: requestHash,
         target_id: targetId,
-        kind: 'created',
+        kind: receiptKind,
         outcome: 'loaded',
         response_payload: responsePayload,
       });

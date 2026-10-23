@@ -10,3 +10,5 @@ export * from "./components/StateViews.js";
 export * from "./components/Dialog.js";
 export * from "./components/StatusBadge.js";
 export * from "./components/CsvAction.js";
+export * from "./components/MigrationKitWizard.js";
+

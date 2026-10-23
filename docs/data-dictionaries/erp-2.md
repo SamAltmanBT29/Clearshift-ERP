@@ -11,8 +11,8 @@ For the canonical, detailed version see:
 
 | Field | Value |
 |---|---|
-| **Module** | ERP-2 Vendors & Purchasing (Group 7) |
-| **Issues** | #16: ERP2-01 (Schema & Migrations), #17: ERP2-02 (List/Read API), #18: ERP2-03 (Mutation API), #21: ERP2-06 (State Transitions), #22: ERP2-07 (Migration Adapter), #25: ERP2-10 (QA Evidence), #132: ERP2-16 (Frontend Route Registration) |
+| **Module** | ERP-2 Vendors and Purchasing (Group 7) |
+| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed), #132: ERP2-16 (Frontend Route Registration) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -244,7 +244,34 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 
 ---
 
-## 8. QA Evidence (ERP2-10)
+## 8. State Machine & Read Model Consistency Matrix (ERP2-06)
+
+### 8.1 Purchase Order Status Transition Matrix
+
+| Current Status | Allowed Next Status | Forbidden Next Statuses | Failure Code | Behavior on Same Status |
+|---|---|---|---|---|
+| `Draft` | `Sent` | `Received`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Sent` | `Received` | `Draft`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Received` | `Closed` | `Draft`, `Sent` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Closed` (Terminal) | *None* | `Draft`, `Sent`, `Received` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+
+> **Note on Received Status**: Transitioning to `Received` marks the purchase order as fulfilled from the supplier perspective but does **not** alter warehouse stock levels in V1 (goods receipts and stock ledger adjustments are V2).
+
+### 8.2 Read Model Consistency Guarantees
+1. **Vendor**:
+   - `bank_masked` matches regex `^XXXX-XXXX-\d{4}$` if present.
+   - `source_system` and `source_id` are complete pairs.
+2. **Purchase Order**:
+   - Status is valid enumeration: `Draft`, `Sent`, `Received`, `Closed`.
+   - Every line item's `line_total` equals `round(quantity * price, 2)` using half-up decimal rounding.
+   - The purchase order `total` equals the exact sum of all line totals.
+   - Client and API agree immediately upon mutation commit.
+3. **Optional Link Handling**:
+   - When an optional relationship (e.g. `source_system`/`source_id`, phone) is absent, code `ERP2_OPTIONAL_REFERENCE_ABSENT` is surfaced in warnings and the value remains `null`. No synthetic records are materialized.
+
+---
+
+## 9. QA Evidence (ERP2-10)
 
 | Layer | Location |
 |---|---|
@@ -264,9 +291,34 @@ Notes:
 
 ---
 
-## 9. Frontend Route & Shell Registration Matrix (ERP2-16)
+## 9. Primary Module List Screen Specification (ERP2-04 / Issue #19)
 
-### 9.1 Route Table Manifest
+### 9.1 Overview & Architecture
+
+The primary list screen for ERP-2 Vendors & Purchasing is delivered as a production vertical slice connecting React/TypeScript web components to the Fastify `/api/v1/erp-vendors` REST API.
+
+| Aspect | Implementation Details |
+|---|---|
+| **Location** | `apps/erp/modules/erp-2/web/src/pages/VendorsListPage.tsx` |
+| **API Client** | `apps/erp/modules/erp-2/web/src/api/erp-2.ts` (`fetchVendors`, `fetchPurchaseOrders`) |
+| **Components** | `VendorsTable.tsx`, `PurchaseOrdersTable.tsx`, `FilterBar.tsx`, `StateViews.tsx` |
+| **Styling** | `apps/erp/modules/erp-2/web/src/theme.css` (Minimal White Theme using `:root` CSS variables) |
+| **Preview** | `apps/erp/modules/erp-2/web/preview.html` |
+| **Tests** | `apps/erp/modules/erp-2/web/tests/VendorsListPage.test.tsx` (RTL) & `VendorsListPage.test.ts` (Domain) |
+
+### 9.2 UI State Lifecycle
+
+1. **Loading State**: `SkeletonTable` with shimmer effect, accessible `role="status"` and `aria-busy="true"`.
+2. **Empty State**: `EmptyState` component displaying contextual zero-data messages when 0 records match the query.
+3. **Error State**: `ErrorState` component with `role="alert"` and a recoverable "Try Again" retry button.
+4. **Access Denied State**: `AccessDeniedState` component rendered on HTTP 403 Forbidden responses.
+5. **Pagination**: Bounded server-side pagination with "Previous" / "Next" buttons and active page indicator. Any filter or search change immediately resets pagination to page 1.
+
+---
+
+## 10. Frontend Route & Shell Registration Matrix (ERP2-16)
+
+### 10.1 Route Table Manifest
 
 | Route ID | Path (relative to `/erp2`) | Full Path | Document Title | Nav Group | Nav Label | Screen Purpose |
 |---|---|---|---|---|---|---|
@@ -279,7 +331,7 @@ Notes:
 | `purchase-orders-detail` | `purchase-orders/:purchaseOrderId` | `/erp2/purchase-orders/:purchaseOrderId` | Purchase order · ClearShift ERP | *None* | Purchase order | PO details, line items & status transitions |
 | `import-receipts` | `import-receipts` | `/erp2/import-receipts` | Import receipts · ClearShift ERP | `integration` | Import receipts | Durable migration receipt audit (KIT-08) |
 
-### 9.2 Shell Layout & Accessibility Architecture
+### 10.2 Shell Layout & Accessibility Architecture
 
 1. **Accessibility Landmarks**:
    - Skip Link: Targets `#erp2-main`, first in keyboard tab order.
@@ -291,4 +343,3 @@ Notes:
 
 2. **Route Guards & Session State**:
    - `RequireAuth`: Inspects `clearshift.access_token` in `sessionStorage`. Missing or expired tokens redirect to `/login?returnTo=<encodedPath>` preserving the requested URL.
-

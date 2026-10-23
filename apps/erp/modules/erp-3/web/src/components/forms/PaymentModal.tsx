@@ -4,6 +4,7 @@ import type { CreatePaymentInput, Invoice, PaymentMethod } from '@clearshift/con
 export interface PaymentModalProps {
   isOpen: boolean;
   invoice: Invoice;
+  paidAmount?: string;
   onClose: () => void;
   onSubmit: (data: CreatePaymentInput) => Promise<void>;
   isLoading?: boolean;
@@ -13,25 +14,29 @@ export interface PaymentModalProps {
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   invoice,
+  paidAmount = '0.0000',
   onClose,
   onSubmit,
   isLoading = false,
   apiError = null,
 }) => {
+  const totalFormatted2Dp = parseFloat(invoice.total || '0').toFixed(2);
+  const paidFormatted2Dp = parseFloat(paidAmount || '0').toFixed(2);
   const remainingCents = Math.max(
     0,
-    Math.round(parseFloat(invoice.total || '0') * 100) - Math.round(parseFloat(invoice.paidAmount || '0') * 100)
+    Math.round(parseFloat(invoice.total || '0') * 100) -
+      Math.round(parseFloat(paidAmount || '0') * 100)
   );
-  const remainingAmount = (remainingCents / 100).toFixed(2);
+  const remainingAmount2Dp = (remainingCents / 100).toFixed(2);
 
-  const [amount, setAmount] = useState(remainingAmount);
+  const [amount, setAmount] = useState(remainingAmount2Dp);
   const [paidAt, setPaidAt] = useState(new Date().toISOString().split('T')[0] || '');
   const [method, setMethod] = useState<PaymentMethod>('bank');
   const [reference, setReference] = useState('');
 
   const [errors, setErrors] = useState<{
     amount?: string | undefined;
-    paidAt?: string | undefined;
+    paid_at?: string | undefined;
   }>({});
 
   if (!isOpen) return null;
@@ -44,14 +49,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     if (isNaN(numAmount) || numAmount <= 0) {
       newErrors.amount = 'Payment amount must be greater than zero';
       isValid = false;
-    } else if (amount !== remainingAmount) {
-      // V1 rule: V1 accepts full payment per invoice
-      newErrors.amount = `V1 requires full invoice settlement ($${remainingAmount} ${invoice.currencyCode})`;
+    } else if (Math.round(numAmount * 100) !== remainingCents) {
+      newErrors.amount = `V1 requires full invoice settlement ($${remainingAmount2Dp} ${invoice.currency})`;
       isValid = false;
     }
 
     if (!paidAt || !/^\d{4}-\d{2}-\d{2}$/.test(paidAt)) {
-      newErrors.paidAt = 'Payment date is required and must be in YYYY-MM-DD format';
+      newErrors.paid_at = 'Payment date is required and must be in YYYY-MM-DD format';
       isValid = false;
     }
 
@@ -63,12 +67,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     e.preventDefault();
     if (!validate()) return;
 
+    const isoPaidAt = paidAt.includes('T') ? paidAt : `${paidAt}T00:00:00.000Z`;
+
     await onSubmit({
-      invoiceId: invoice.id,
-      amount: parseFloat(amount).toFixed(2),
-      paidAt,
+      invoice_id: invoice.id,
+      amount: parseFloat(amount).toFixed(4),
+      paid_at: isoPaidAt,
       method,
-      reference: reference.trim() || undefined,
     });
   };
 
@@ -82,7 +87,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       >
         <header className="cs-modal-header">
           <h2 id="payment-modal-title" className="cs-modal-title">
-            Record Payment for {invoice.invoiceNumber}
+            Record Payment for {invoice.invoice_number}
           </h2>
           <button
             type="button"
@@ -111,21 +116,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="cs-invoice-balance-box">
               <div className="cs-balance-item">
                 <span className="cs-balance-label">Invoice Total:</span>
-                <span className="cs-balance-value">${invoice.total} {invoice.currencyCode}</span>
+                <span className="cs-balance-value">${totalFormatted2Dp} {invoice.currency}</span>
               </div>
               <div className="cs-balance-item">
                 <span className="cs-balance-label">Already Paid:</span>
-                <span className="cs-balance-value">${invoice.paidAmount} {invoice.currencyCode}</span>
+                <span className="cs-balance-value">${paidFormatted2Dp} {invoice.currency}</span>
               </div>
               <div className="cs-balance-item cs-balance-due">
                 <span className="cs-balance-label">Remaining Balance Due:</span>
-                <span className="cs-balance-value">${remainingAmount} {invoice.currencyCode}</span>
+                <span className="cs-balance-value">${remainingAmount2Dp} {invoice.currency}</span>
               </div>
             </div>
 
             <div className="cs-form-field" style={{ marginTop: '16px' }}>
               <label htmlFor="payment-amount" className="cs-form-label">
-                Payment Amount ({invoice.currencyCode}) <span className="cs-required-marker">*</span>
+                Payment Amount ({invoice.currency}) <span className="cs-required-marker">*</span>
               </label>
               <input
                 id="payment-amount"
@@ -147,7 +152,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </span>
               ) : (
                 <span id="payment-amount-help" className="cs-field-helper">
-                  V1 policy: one full payment transitions invoice to Paid status automatically
+                  V1 policy: full payment transitions invoice to Paid status automatically (FR-ERP3-04)
                 </span>
               )}
             </div>
@@ -160,20 +165,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <input
                   id="payment-date"
                   type="date"
-                  className={`cs-input ${errors.paidAt ? 'cs-input-error' : ''}`}
+                  className={`cs-input ${errors.paid_at ? 'cs-input-error' : ''}`}
                   value={paidAt}
                   onChange={(e) => {
                     setPaidAt(e.target.value);
-                    if (errors.paidAt) setErrors((prev) => ({ ...prev, paidAt: undefined }));
+                    if (errors.paid_at) setErrors((prev) => ({ ...prev, paid_at: undefined }));
                   }}
                   disabled={isLoading}
-                  aria-invalid={!!errors.paidAt}
-                  aria-describedby={errors.paidAt ? 'payment-date-err' : undefined}
+                  aria-invalid={!!errors.paid_at}
+                  aria-describedby={errors.paid_at ? 'payment-date-err' : undefined}
                   required
                 />
-                {errors.paidAt && (
+                {errors.paid_at && (
                   <span id="payment-date-err" className="cs-field-error" role="alert">
-                    {errors.paidAt}
+                    {errors.paid_at}
                   </span>
                 )}
               </div>
