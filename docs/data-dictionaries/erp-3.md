@@ -37,6 +37,7 @@ For the contract and mock architecture decision record see:
 | `erp3_invoices` (`InvoiceSchema`) | Billing invoice document with status and mandatory `due_date` | `id` (PK, UUID), `UNIQUE(invoice_number)`, optional `order_id` (FK to `erp3_sales_orders`; `||--o{` in Master Spec §5c), mandatory `customer_golden_id` (UUID) and `due_date` (`DR-2`), `status` (`Open`, `Paid`, `Overdue`) |
 | `erp3_invoice_lines` (`InvoiceLineSchema`) | Embedded invoice line items (`FR-ERP3-02`, Master Spec §5c) | `id` (PK, UUID), `FK(invoice_id)` to `erp3_invoices`, logical `product_id` (UUID) ref to ERP-1, `quantity > 0`, server-computed `tax_amount` and `line_total` |
 | `erp3_payments` (`PaymentSchema`) | Cash, bank, or card payment settlement records applied to an invoice | `id` (PK, UUID), `FK(invoice_id)` to `erp3_invoices`, `amount > 0`, `method` in `cash \| bank \| card` (`FR-ERP3-03`) |
+| `erp3_import_receipts` (`ImportReceiptRecordSchema`) | Durable migration receipts for idempotent ingestion (KIT-08 / Decision C4) | `id` (PK, UUID), `batch_id` (UUID), `UNIQUE(idempotency_key)`, `(batch_id, source_row)` index |
 
 ---
 
@@ -120,15 +121,24 @@ For the contract and mock architecture decision record see:
 | `method` | `VARCHAR(20)` | Yes | Payment method (`FR-ERP3-03`) | `bank` | Enum (`PaymentMethodEnum`): `cash`, `bank`, `card` |
 | `created_at` | `TIMESTAMPTZ` | Yes (response) | UTC creation timestamp | `2026-01-20T14:30:00.000Z` | ISO 8601 `date-time` |
 
-### 6. Migration Kit Idempotency Request Fields (`CreateSalesOrderRequest`, `CreateInvoiceRequest`, `CreatePaymentRequest`)
+### 6. `erp3.import_receipts` (`ImportReceiptRecordSchema`, KIT-08 / Decision C4)
 
-In this branch's `ERP3-14` contract (`packages/contracts/src/erp-3.ts` and `packages/contracts/openapi/erp-3.yaml`), the following optional/nullable fields are defined on `CreateSalesOrderRequestSchema`, `CreateInvoiceRequestSchema`, and `CreatePaymentRequestSchema`. They are **not** returned on response entities (`SalesOrderSchema`, `InvoiceSchema`, `PaymentSchema`), are **not** used for deduplication by the in-memory mock (`erp-3-mock.ts`), and are **absent** from the competing `origin/main` `Create*InputSchema` definitions.
-
-| Field | Contract Type | Required | Description |
-|---|---|---|---|
-| `idempotency_key` | `string \| null` (max 128) | Optional & nullable (create requests only) | Stable idempotency key (`batch ID + source row + target entity/schema version`) |
-| `batch_id` | `UUID \| null` | Optional & nullable (create requests only) | Migration Kit batch UUID |
-| `source_row` | `integer >= 0 \| null` | Optional & nullable (create requests only) | Non-negative integer source row index in migration batch |
+| Field | Storage / Contract Type | Required | Description | Example | Validation & Authority Rule |
+|---|---|---|---|---|---|
+| `id` | `UUID` | Yes | Primary key | `35000000-0000-4000-8000-000000000001` | UUID (`UuidSchema`) |
+| `batch_id` | `UUID` | Yes | Migration Kit batch identifier | `3b000000-0000-4000-8000-000000000001` | UUID (`UuidSchema`) |
+| `source_row` | `INTEGER` | Yes | 1-indexed source row number | `42` | Non-negative integer |
+| `source_system` | `VARCHAR(64)` | No | Source system name | `legacy_erp` | Nullable string, max 64 |
+| `source_id` | `VARCHAR(128)` | No | Source record identifier | `LEGACY-001` | Nullable string, max 128 |
+| `entity` | `VARCHAR(64)` | Yes | Entity name | `sales_order` | `sales_order`, `invoice`, or `payment` |
+| `schema_version` | `INTEGER` | Yes | Target schema version | `1` | Default `1` |
+| `idempotency_key` | `VARCHAR(128)` | Yes | Unique idempotency key (`batch_id + row + version`) | `3b000000-0000-4000-8000-000000000001:42:1` | Unique constraint (`import_receipts_erp3_idempotency_key_unique`) |
+| `request_hash` | `VARCHAR(64)` | Yes | SHA-256 canonical hash | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 64 hex chars |
+| `target_id` | `UUID` | Yes | Primary key of loaded business record | `30000000-0000-4000-8000-000000000001` | UUID |
+| `kind` | `VARCHAR(16)` | Yes | Receipt kind | `created` | `created` \| `linked` |
+| `outcome` | `VARCHAR(16)` | Yes | Row outcome | `loaded` | `loaded` \| `rejected` \| `merged` \| `skipped` |
+| `response_payload`| `TEXT` | No | Serialized response JSON payload | `{"id":"..."}` | JSON string or null |
+| `created_at` | `TIMESTAMPTZ` | Yes | Creation timestamp | `2026-10-23T12:00:00.000Z` | ISO 8601 `date-time` |
 
 ---
 
