@@ -13,3 +13,22 @@ export * from './pages/OrderCreatePage.js';
 export * from './pages/OrderDetailPage.js';
 export * from './pages/InvoiceCreatePage.js';
 export * from './pages/InvoiceDetailPage.js';
+
+// Route registration, shell, navigation & auth (ERP3-16)
+export * from './route-manifest.js';
+export * from './routes.js';
+export * from './auth/session.js';
+export * from './auth/RequireAuth.js';
+export * from './components/ModuleShell.js';
+export * from './components/ModuleNav.js';
+export * from './components/ModuleBreadcrumbs.js';
+export * from './pages/SalesOrdersListPage.js';
+export * from './pages/InvoicesListPage.js';
+export * from './pages/PaymentsListPage.js';
+export * from './pages/SalesOrderCreatePage.js';
+export * from './pages/SalesOrderDetailPage.js';
+export * from './pages/SalesOrderEditPage.js';
+export * from './pages/InvoiceCreateRoutePage.js';
+export * from './pages/InvoiceDetailRoutePage.js';
+export * from './pages/InvoiceEditRoutePage.js';
+export * from './pages/ModuleNotFoundPage.js';

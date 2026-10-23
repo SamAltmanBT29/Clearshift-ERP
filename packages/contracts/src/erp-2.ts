@@ -55,12 +55,50 @@ export const PurchaseOrderStatusEnum = z.enum([
 ]);
 export type PurchaseOrderStatus = z.infer<typeof PurchaseOrderStatusEnum>;
 
-export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> = {
+export const ERP2_PURCHASE_ORDER_STATUSES = ['Draft', 'Sent', 'Received', 'Closed'] as const;
+
+export const ERP2_PURCHASE_ORDER_STATUS_TRANSITIONS: Record<
+  PurchaseOrderStatus,
+  readonly PurchaseOrderStatus[]
+> = {
   Draft: ['Sent'],
   Sent: ['Received'],
   Received: ['Closed'],
   Closed: [],
+};
+
+export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> =
+  ERP2_PURCHASE_ORDER_STATUS_TRANSITIONS;
+
+export const ERP2_PURCHASE_ORDER_TERMINAL_STATUSES: readonly PurchaseOrderStatus[] = ['Closed'];
+
+export const ERP2_OPTIONAL_REFERENCE_ABSENT = 'ERP2_OPTIONAL_REFERENCE_ABSENT';
+
+export const ERP2_DOMAIN_RULES = {
+  UNKNOWN_PRODUCT: 'UNKNOWN_PRODUCT',
+  VENDOR_NOT_FOUND: 'VENDOR_NOT_FOUND',
+  DUPLICATE_TAX_NUMBER: 'DUPLICATE_TAX_NUMBER',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  INVALID_PO_STATUS: 'INVALID_PO_STATUS',
+  INVALID_BANK_DETAILS: 'INVALID_BANK_DETAILS',
+  INVALID_CURRENCY_CODE: 'INVALID_CURRENCY_CODE',
+  EMPTY_ORDER_LINES: 'EMPTY_ORDER_LINES',
+  READ_MODEL_INCONSISTENT: 'READ_MODEL_INCONSISTENT',
+  SOURCE_IDENTITY_INCOMPLETE: 'SOURCE_IDENTITY_INCOMPLETE',
+  LINE_PRODUCT_CROSS_MODULE_ERROR: 'LINE_PRODUCT_CROSS_MODULE_ERROR',
+  CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
+  FUZZY_AUTO_MERGE_PROHIBITED: 'FUZZY_AUTO_MERGE_PROHIBITED',
+  DUPLICATE_CANDIDATE_NOT_FOUND: 'DUPLICATE_CANDIDATE_NOT_FOUND',
+  INVALID_MERGE_DECISION: 'INVALID_MERGE_DECISION',
+  MERGE_TARGET_IDENTICAL: 'MERGE_TARGET_IDENTICAL',
 } as const;
+
+export interface Erp2RelationshipWarning {
+  relationship: string;
+  field: string;
+  code: string;
+  message: string;
+}
 
 export function isValidPoStatusTransition(from: string, to: string): boolean {
   const norm = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -145,7 +183,6 @@ export const VENDOR_DOMAIN_RULES = {
   IDEMPOTENCY_CONFLICT: 'ERP2_IDEMPOTENCY_CONFLICT',
 } as const;
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Vendor Schemas
 // GET /api/v1/erp-vendors/vendors
@@ -205,6 +242,8 @@ export const UpdateVendorRequestSchema = z.object({
   country: z.string().max(64).optional().nullable(),
   bank_details: z.string().min(4).max(64).optional().nullable(),
   currency: CurrencyCode.optional(),
+  source_system: z.string().max(64).optional().nullable(),
+  source_id: z.string().max(128).optional().nullable(),
 });
 export type UpdateVendorRequest = z.infer<typeof UpdateVendorRequestSchema>;
 export const PatchVendorRequestSchema = UpdateVendorRequestSchema;
@@ -333,3 +372,127 @@ export const PaginatedPurchaseOrdersResponseSchema = z.object({
   totalPages: z.number().int().nonnegative(),
 });
 export type PaginatedPurchaseOrdersResponse = z.infer<typeof PaginatedPurchaseOrdersResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exact Duplicate Key Policy & Human Review (KIT-10 / ERP2-12 / Issue #128)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes a vendor tax number for deterministic exact duplicate matching.
+ * Trims leading/trailing whitespace, converts to uppercase, and removes
+ * common punctuation/separators (hyphens, dots, spaces, underscores, slashes).
+ */
+export function normalizeTaxNumber(taxNumber: string): string {
+  if (typeof taxNumber !== 'string') return '';
+  return taxNumber.trim().toUpperCase().replace(/[\s\-._/]/g, '');
+}
+
+/**
+ * Normalizes an email address for deterministic exact duplicate matching.
+ * Trims leading/trailing whitespace and converts to lowercase.
+ */
+export function normalizeEmail(email: string): string {
+  if (typeof email !== 'string') return '';
+  return email.trim().toLowerCase();
+}
+
+/**
+ * Normalizes a purchase order number for deterministic exact duplicate matching.
+ * Trims leading/trailing whitespace and converts to uppercase.
+ */
+export function normalizePoNumber(poNumber: string): string {
+  if (typeof poNumber !== 'string') return '';
+  return poNumber.trim().toUpperCase();
+}
+
+/**
+ * Nature of the match between candidate and target record.
+ */
+export const DuplicateMatchKindEnum = z.enum([
+  'EXACT_TAX_NUMBER',
+  'EXACT_EMAIL',
+  'EXACT_PO_NUMBER',
+  'AMBIGUOUS',
+]);
+export type DuplicateMatchKind = z.infer<typeof DuplicateMatchKindEnum>;
+
+/**
+ * Review state of a duplicate candidate.
+ */
+export const DuplicateCandidateStatusEnum = z.enum([
+  'PENDING_REVIEW',
+  'MERGED',
+  'REJECTED',
+  'KEPT_BOTH',
+]);
+export type DuplicateCandidateStatus = z.infer<typeof DuplicateCandidateStatusEnum>;
+
+/**
+ * Permitted human merge decisions in V1.
+ */
+export const MergeDecisionTypeEnum = z.enum([
+  'MERGE',
+  'REJECT',
+  'KEEP_BOTH',
+]);
+export type MergeDecisionType = z.infer<typeof MergeDecisionTypeEnum>;
+
+/**
+ * Exact duplicate candidate record presented for human review.
+ */
+export const DuplicateCandidateRecordSchema = z.object({
+  candidate_id: z.string().uuid(),
+  entity: z.enum(['vendor', 'purchase_order']),
+  match_kind: DuplicateMatchKindEnum,
+  status: DuplicateCandidateStatusEnum.default('PENDING_REVIEW'),
+  matching_key: z.string(),
+  matching_value: z.string(),
+  incoming_record: z.record(z.unknown()),
+  existing_record: z.record(z.unknown()),
+  confidence: z.literal(1.0), // V1 invariant: exact matches only (1.0). Fuzzy scoring prohibited.
+  created_at: z.string(),
+  decided_at: z.string().optional().nullable(),
+  decided_by: z.string().optional().nullable(),
+  decision: MergeDecisionTypeEnum.optional().nullable(),
+  rationale: z.string().optional().nullable(),
+});
+export type DuplicateCandidateRecord = z.infer<typeof DuplicateCandidateRecordSchema>;
+
+/** POST /api/v1/erp-vendors/duplicates/check — request. */
+export const CheckDuplicatesRequestSchema = z.object({
+  entity: z.enum(['vendor', 'purchase_order']),
+  records: z.array(z.record(z.unknown())).min(1, 'At least one record is required'),
+});
+export type CheckDuplicatesRequest = z.infer<typeof CheckDuplicatesRequestSchema>;
+
+/** POST /api/v1/erp-vendors/duplicates/check — response. */
+export const CheckDuplicatesResponseSchema = z.object({
+  entity: z.enum(['vendor', 'purchase_order']),
+  total_checked: z.number().int().nonnegative(),
+  duplicates_found: z.number().int().nonnegative(),
+  candidates: z.array(DuplicateCandidateRecordSchema),
+});
+export type CheckDuplicatesResponse = z.infer<typeof CheckDuplicatesResponseSchema>;
+
+/** POST /api/v1/erp-vendors/duplicates/review — request. */
+export const ReviewDuplicateRequestSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: MergeDecisionTypeEnum,
+  kept_id: UuidSchema.optional(),
+  merged_id: UuidSchema.optional(),
+  rationale: z.string().min(5, 'Review rationale must be at least 5 characters'),
+});
+export type ReviewDuplicateRequest = z.infer<typeof ReviewDuplicateRequestSchema>;
+
+/** POST /api/v1/erp-vendors/duplicates/review — response. */
+export const ReviewDuplicateResponseSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: MergeDecisionTypeEnum,
+  status: DuplicateCandidateStatusEnum,
+  kept_id: UuidSchema.optional(),
+  merged_id: UuidSchema.optional(),
+  actor_id: z.string(),
+  timestamp: z.string(),
+  audit_record_id: z.string().uuid(),
+});
+export type ReviewDuplicateResponse = z.infer<typeof ReviewDuplicateResponseSchema>;

@@ -11,8 +11,8 @@ For the canonical, detailed version see:
 
 | Field | Value |
 |---|---|
-| **Module** | ERP-2 Vendors & Purchasing (Group 7) |
-| **Issue** | #16 — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations` |
+| **Module** | ERP-2 Vendors and Purchasing (Group 7) |
+| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed), #132: ERP2-16 (Frontend Route Registration) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -244,7 +244,34 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 
 ---
 
-## 8. QA Evidence (ERP2-10)
+## 8. State Machine & Read Model Consistency Matrix (ERP2-06)
+
+### 8.1 Purchase Order Status Transition Matrix
+
+| Current Status | Allowed Next Status | Forbidden Next Statuses | Failure Code | Behavior on Same Status |
+|---|---|---|---|---|
+| `Draft` | `Sent` | `Received`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Sent` | `Received` | `Draft`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Received` | `Closed` | `Draft`, `Sent` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Closed` (Terminal) | *None* | `Draft`, `Sent`, `Received` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+
+> **Note on Received Status**: Transitioning to `Received` marks the purchase order as fulfilled from the supplier perspective but does **not** alter warehouse stock levels in V1 (goods receipts and stock ledger adjustments are V2).
+
+### 8.2 Read Model Consistency Guarantees
+1. **Vendor**:
+   - `bank_masked` matches regex `^XXXX-XXXX-\d{4}$` if present.
+   - `source_system` and `source_id` are complete pairs.
+2. **Purchase Order**:
+   - Status is valid enumeration: `Draft`, `Sent`, `Received`, `Closed`.
+   - Every line item's `line_total` equals `round(quantity * price, 2)` using half-up decimal rounding.
+   - The purchase order `total` equals the exact sum of all line totals.
+   - Client and API agree immediately upon mutation commit.
+3. **Optional Link Handling**:
+   - When an optional relationship (e.g. `source_system`/`source_id`, phone) is absent, code `ERP2_OPTIONAL_REFERENCE_ABSENT` is surfaced in warnings and the value remains `null`. No synthetic records are materialized.
+
+---
+
+## 9. QA Evidence (ERP2-10)
 
 | Layer | Location |
 |---|---|
@@ -261,3 +288,119 @@ Notes:
 - Purchase order header and lines are written in one transaction.
 - The public API accepts prices with up to 2 decimals. `line_total = round_half_up(quantity x price, 2)` and the order total is the sum of the line totals.
 - Open defects and their issue links are tracked in the README "Known defects" table.
+
+---
+
+## 9. Primary Module List Screen Specification (ERP2-04 / Issue #19)
+
+### 9.1 Overview & Architecture
+
+The primary list screen for ERP-2 Vendors & Purchasing is delivered as a production vertical slice connecting React/TypeScript web components to the Fastify `/api/v1/erp-vendors` REST API.
+
+| Aspect | Implementation Details |
+|---|---|
+| **Location** | `apps/erp/modules/erp-2/web/src/pages/VendorsListPage.tsx` |
+| **API Client** | `apps/erp/modules/erp-2/web/src/api/erp-2.ts` (`fetchVendors`, `fetchPurchaseOrders`) |
+| **Components** | `VendorsTable.tsx`, `PurchaseOrdersTable.tsx`, `FilterBar.tsx`, `StateViews.tsx` |
+| **Styling** | `apps/erp/modules/erp-2/web/src/theme.css` (Minimal White Theme using `:root` CSS variables) |
+| **Preview** | `apps/erp/modules/erp-2/web/preview.html` |
+| **Tests** | `apps/erp/modules/erp-2/web/tests/VendorsListPage.test.tsx` (RTL) & `VendorsListPage.test.ts` (Domain) |
+
+### 9.2 UI State Lifecycle
+
+1. **Loading State**: `SkeletonTable` with shimmer effect, accessible `role="status"` and `aria-busy="true"`.
+2. **Empty State**: `EmptyState` component displaying contextual zero-data messages when 0 records match the query.
+3. **Error State**: `ErrorState` component with `role="alert"` and a recoverable "Try Again" retry button.
+4. **Access Denied State**: `AccessDeniedState` component rendered on HTTP 403 Forbidden responses.
+5. **Pagination**: Bounded server-side pagination with "Previous" / "Next" buttons and active page indicator. Any filter or search change immediately resets pagination to page 1.
+
+---
+
+## 10. Frontend Route & Shell Registration Matrix (ERP2-16)
+
+### 10.1 Route Table Manifest
+
+| Route ID | Path (relative to `/erp2`) | Full Path | Document Title | Nav Group | Nav Label | Screen Purpose |
+|---|---|---|---|---|---|---|
+| `vendors` | `vendors` | `/erp2/vendors` | Vendors · ClearShift ERP | `purchasing` | Vendors | Supplier catalog list with search & paging |
+| `vendors-create` | `vendors/new` | `/erp2/vendors/new` | New vendor · ClearShift ERP | *None* | New vendor | Vendor creation form |
+| `vendors-detail` | `vendors/:vendorId` | `/erp2/vendors/:vendorId` | Vendor · ClearShift ERP | *None* | Vendor | Vendor profile & terms view |
+| `vendors-edit` | `vendors/:vendorId/edit` | `/erp2/vendors/:vendorId/edit` | Edit vendor · ClearShift ERP | *None* | Edit vendor | Vendor update form |
+| `purchase-orders` | `purchase-orders` | `/erp2/purchase-orders` | Purchase orders · ClearShift ERP | `purchasing` | Purchase orders | Purchase order list with status filter |
+| `purchase-orders-create` | `purchase-orders/new` | `/erp2/purchase-orders/new` | New purchase order · ClearShift ERP | *None* | New purchase order | PO creation with product picker |
+| `purchase-orders-detail` | `purchase-orders/:purchaseOrderId` | `/erp2/purchase-orders/:purchaseOrderId` | Purchase order · ClearShift ERP | *None* | Purchase order | PO details, line items & status transitions |
+| `import-receipts` | `import-receipts` | `/erp2/import-receipts` | Import receipts · ClearShift ERP | `integration` | Import receipts | Durable migration receipt audit (KIT-08) |
+| `duplicates` | `duplicates` | `/erp2/duplicates` | Duplicate candidates · ClearShift ERP | `integration` | Duplicate candidates | Exact duplicate candidate review & audited decisions (ERP2-12 / KIT-10) |
+
+### 10.2 Shell Layout & Accessibility Architecture
+
+1. **Accessibility Landmarks**:
+   - Skip Link: Targets `#erp2-main`, first in keyboard tab order.
+   - Banner Landmark: `<header role="banner" aria-label="Vendors & Purchasing">` with eyebrow and module title.
+   - Navigation Landmark: `<nav role="navigation" aria-label="Vendors and Purchasing">` with semantic groups.
+   - Breadcrumb Landmark: `<nav role="navigation" aria-label="Breadcrumb">` rendering `Vendors & Purchasing → <Resource> → <Sub-action>`.
+   - Main Content Landmark: `<main id="erp2-main" role="main" tabIndex={-1} aria-label="Vendors & Purchasing content">`.
+   - Heading Rules: Exactly one `<h1>` rendered per page component.
+
+2. **Route Guards & Session State**:
+   - `RequireAuth`: Inspects `clearshift.access_token` in `sessionStorage`. Missing or expired tokens redirect to `/login?returnTo=<encodedPath>` preserving the requested URL.
+
+---
+
+## 11. Exact Duplicate Key Policy & Human Review Specification (ERP2-12 / KIT-10)
+
+### 11.1 Overview & Invariants
+
+ERP-2 Vendors & Purchasing enforces a deterministic, exact duplicate matching policy in accordance with ClearShift V1 core invariants:
+1. **Deterministic Matching Only**: Duplicate detection relies strictly on exact normalized string equality (`confidence = 1.0`). Probabilistic scoring, fuzzy string matching (Levenshtein, Jaro-Winkler), and distance metrics are strictly out of scope for V1.
+2. **Strict Prohibition of Fuzzy Auto-Merge**: Automated target-side merge sagas are prohibited in V1. Any duplicate consolidation requires explicit operator review and authorization.
+3. **Ambiguity Handling**: Conflicting key matches across multiple entities (e.g., matching email but differing tax number) are classified as `AMBIGUOUS` and held in the review queue (`PENDING_REVIEW`).
+4. **Immutable Audit Trail**: All human review decisions (`MERGE`, `REJECT`, `KEEP_BOTH`) are recorded synchronously in the shared `AuditService` with action `merge.decided`, actor ID, timestamp, kept ID, and merged ID.
+
+### 11.2 Key Normalization Formulas
+
+| Entity | Field | Normalization Function | Normalization Rule | Example Transformation |
+|---|---|---|---|---|
+| `erp2.vendors` | `tax_number` | `normalizeTaxNumber` | Trim leading/trailing whitespace, uppercase, strip separators `[\s\-._/]` | `"  us-ein-123.456/789  "` $\rightarrow$ `"USEIN123456789"` |
+| `erp2.vendors` | `email` | `normalizeEmail` | Trim leading/trailing whitespace, convert to lowercase | `"  Sales@Acme.COM  "` $\rightarrow$ `"sales@acme.com"` |
+| `erp2.purchase_orders` | `po_number` | `normalizePoNumber` | Trim leading/trailing whitespace, convert to uppercase | `"  po-2026-0001  "` $\rightarrow$ `"PO-2026-0001"` |
+
+### 11.3 Classification Rules
+
+| Classification | Condition | Resulting Action |
+|---|---|---|
+| `UNIQUE` | No normalized key matches any existing target record | Candidate is permitted to import directly without review |
+| `EXACT_DUPLICATE` | Normalized `tax_number` or `email` matches an existing record with complete concordance | Held as duplicate candidate (`status: PENDING_REVIEW`, `confidence: 1.0`) |
+| `AMBIGUOUS_CANDIDATE` | Keys conflict (e.g. tax number matches Vendor A, but email matches Vendor B) or match multiple distinct records | Held in review queue with `match_kind: AMBIGUOUS` for human operator adjudication |
+
+### 11.4 Human Review API Contracts
+
+- `POST /api/v1/erp-vendors/duplicates/check`: Deterministic batch scanner returning identified candidate collisions.
+- `GET /api/v1/erp-vendors/duplicates/candidates`: Retrieves held candidate queue filtered by entity (`vendor`, `purchase_order`) or status.
+- `GET /api/v1/erp-vendors/duplicates/candidates/:id`: Inspects candidate record details, diffs, and matching keys.
+- `POST /api/v1/erp-vendors/duplicates/review`: Submits operator merge decision. Requires role `admin`, `migration_runner`, or `editor`, distinct `kept_id` and `merged_id` for merges, and a minimum 5-character documented rationale.
+
+### 11.5 Audit Log Record Specification
+
+On decision execution, the following immutable audit record is appended via `AuditService`:
+
+```json
+{
+  "action": "merge.decided",
+  "actor": "operator-user-id",
+  "actorRole": "migration_runner",
+  "targetEntity": "erp2.vendors",
+  "targetId": "<kept_id>",
+  "correlationId": "<correlation_id>",
+  "result": "success",
+  "reason": "Confirmed duplicate legal entity; retaining master account.",
+  "metadata": {
+    "candidateId": "<candidate_uuid>",
+    "keptId": "<kept_id>",
+    "mergedId": "<merged_id>",
+    "decision": "MERGE",
+    "matchingKey": "tax_number",
+    "matchingValue": "TX-998877"
+  }
+}
+```

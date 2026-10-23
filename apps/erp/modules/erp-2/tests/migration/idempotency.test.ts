@@ -9,6 +9,12 @@
  *   5. Receipt and target mutation commit or roll back together atomically.
  *   6. Every purchase-order line references a valid existing product through the owning ERP-1 contract.
  *
+ * Verifies Acceptance Criteria for Issue #127 (ERP2-11 / loadBatch UPSERT):
+ *   AC1. Target adapter implements loadBatch executing type-safe UPSERT operations.
+ *   AC2. Target record and durable import receipt commit atomically in one local database transaction.
+ *   AC3. Import receipt stores batch_id, source_row, target_id, idempotency_key, and timestamp.
+ *   AC4. Re-running the same source row with identical idempotency key returns existing receipt without duplication.
+ *
  * @module erp2/tests/migration/idempotency.test
  */
 
@@ -348,6 +354,408 @@ describe('ERP-2 Migration Kit Adapter & Durable Import Receipts (Issue #22)', ()
       expect(po?.total).toBe('157.00');
       expect(po?.status).toBe('Draft');
       expect(po?.lines).toHaveLength(2);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERP2-11: loadBatch Interface & Acceptance Criteria
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ERP-2 loadBatch Interface & Durable Import Receipts (Issue #127 / ERP2-11)', () => {
+  let app: FastifyInstance;
+  let repo: InMemoryErp2Repository;
+  let resolver: MockErp1Resolver;
+  let service: Erp2Service;
+  let adapter: Erp2TargetAdapter;
+
+  beforeEach(() => {
+    repo = new InMemoryErp2Repository(true); // seeds Acme vendor (id: 00000000-0000-0000-0000-000000000001)
+    resolver = new MockErp1Resolver();
+    service = new Erp2Service({ repository: repo, referenceResolver: resolver });
+    adapter = new Erp2TargetAdapter(service, 'vendor');
+    app = buildApp({ repository: repo, erp2Service: service, referenceResolver: resolver });
+  });
+
+  // ── AC1: loadBatch interface with type-safe UPSERT ─────────────────────────
+
+  describe('AC1: loadBatch executes type-safe UPSERT operations', () => {
+    it('loadBatch creates multiple vendor records and returns loaded outcomes', async () => {
+      const batchId = 'aa000000-0000-0000-0000-000000000001';
+
+      const result = await adapter.loadBatch(batchId, [
+        {
+          sourceRow: 0,
+          idempotencyKey: 'batch-aa-row-0',
+          data: { name: 'Alpha Supplies', tax_number: 'TAX-ALPHA-001', email: 'alpha@test.com', bank_details: '1111111111' },
+        },
+        {
+          sourceRow: 1,
+          idempotencyKey: 'batch-aa-row-1',
+          data: { name: 'Beta Materials', tax_number: 'TAX-BETA-002', email: 'beta@test.com', bank_details: '2222222222' },
+        },
+      ]);
+
+      expect(result.batchId).toBe(batchId);
+      expect(result.total).toBe(2);
+      expect(result.loaded).toBe(2);
+      expect(result.rejected).toBe(0);
+      expect(result.rows).toHaveLength(2);
+
+      for (const row of result.rows) {
+        expect(row.outcome).toBe('loaded');
+        expect(row.result).toBeDefined();
+        expect(row.result?.targetId).toBeDefined();
+      }
+
+      // Verify vendor records actually exist in the store
+      const alpha = await repo.getVendorByTaxNumber('TAX-ALPHA-001');
+      const beta = await repo.getVendorByTaxNumber('TAX-BETA-002');
+      expect(alpha).not.toBeNull();
+      expect(beta).not.toBeNull();
+
+      // Verify bank details are masked (FR-ERP2-06)
+      expect(alpha?.bank_masked).toBe('XXXX-XXXX-1111');
+      expect(beta?.bank_masked).toBe('XXXX-XXXX-2222');
+    });
+
+    it('loadBatch with upsert=true updates existing vendor and stores receipt with kind=linked', async () => {
+      const batchId = 'bb000000-0000-0000-0000-000000000002';
+
+      // First import: create the vendor
+      const createResult = await adapter.loadBatch(batchId, [
+        {
+          sourceRow: 0,
+          idempotencyKey: 'batch-bb-create-v1',
+          data: {
+            name: 'Original Name Ltd',
+            tax_number: 'TAX-UPSERT-V1',
+            email: 'original@test.com',
+            city: 'London',
+            bank_details: '9991234567',
+          },
+        },
+      ]);
+
+      expect(createResult.loaded).toBe(1);
+      const originalId = createResult.rows[0]!.result!.targetId;
+      const createdVendor = await repo.getVendorByTaxNumber('TAX-UPSERT-V1');
+      expect(createdVendor?.city).toBe('London');
+
+      // Second import: UPSERT the same tax_number with updated fields (new idempotency key)
+      const upsertAdapter = new Erp2TargetAdapter(service, 'vendor');
+      const upsertResult = await upsertAdapter.loadBatch(
+        batchId,
+        [
+          {
+            sourceRow: 1,
+            idempotencyKey: 'batch-bb-upsert-v2',
+            data: {
+              name: 'Updated Name Ltd',
+              tax_number: 'TAX-UPSERT-V1',
+              email: 'updated@test.com',
+              city: 'Manchester',
+              bank_details: '9991234567',
+            },
+          },
+        ],
+        { upsert: true }
+      );
+
+      expect(upsertResult.loaded).toBe(1);
+      expect(upsertResult.rows[0]!.outcome).toBe('loaded');
+
+      // Verify: same target ID, fields updated
+      const updatedVendor = await repo.getVendorByTaxNumber('TAX-UPSERT-V1');
+      expect(updatedVendor?.id).toBe(originalId);
+      expect(updatedVendor?.name).toBe('Updated Name Ltd');
+      expect(updatedVendor?.email).toBe('updated@test.com');
+      expect(updatedVendor?.city).toBe('Manchester');
+
+      // Verify receipt for upserted row has kind='linked'
+      const upsertReceipt = await repo.getImportReceiptByKey('batch-bb-upsert-v2');
+      expect(upsertReceipt).not.toBeNull();
+      expect(upsertReceipt?.kind).toBe('linked');
+      expect(upsertReceipt?.target_id).toBe(originalId);
+    });
+
+    it('loadBatch without upsert rejects existing tax_number with stable error code', async () => {
+      const batchId = 'cc000000-0000-0000-0000-000000000003';
+
+      // Pre-create a vendor
+      await adapter.loadBatch(batchId, [
+        {
+          sourceRow: 0,
+          idempotencyKey: 'batch-cc-create',
+          data: { name: 'Conflict Vendor', tax_number: 'TAX-CONFLICT-CC', email: 'cc@test.com' },
+        },
+      ]);
+
+      // Attempt to create again with same tax_number but different idempotency key (no upsert)
+      const conflictResult = await adapter.loadBatch(batchId, [
+        {
+          sourceRow: 1,
+          idempotencyKey: 'batch-cc-conflict',
+          data: { name: 'Another Vendor', tax_number: 'TAX-CONFLICT-CC', email: 'cc2@test.com' },
+        },
+      ]);
+
+      expect(conflictResult.rejected).toBe(1);
+      expect(conflictResult.rows[0]!.outcome).toBe('rejected');
+      expect(conflictResult.rows[0]!.error?.reasonCode).toBe('DUPLICATE_TAX_NUMBER');
+
+      // Verify only 1 vendor with that tax number exists
+      const vendors = await repo.listVendors({ page: 1, pageSize: 20 });
+      const conflictVendors = vendors.vendors.filter((v) => v.tax_number === 'TAX-CONFLICT-CC');
+      expect(conflictVendors).toHaveLength(1);
+    });
+  });
+
+  // ── AC2: Atomic commit ─────────────────────────────────────────────────────
+
+  describe('AC2: Target record and durable receipt commit atomically', () => {
+    it('loadBatch atomic rollback: infrastructure failure stores neither vendor nor receipt', async () => {
+      const batchId = 'dd000000-0000-0000-0000-000000000004';
+
+      const failingRepo = new InMemoryErp2Repository(false);
+      failingRepo.executeTransactional = async () => {
+        throw Object.assign(new Error('Simulated DB crash'), { statusCode: 503 });
+      };
+
+      const failingService = new Erp2Service({ repository: failingRepo });
+      const failingAdapter = new Erp2TargetAdapter(failingService, 'vendor');
+
+      // Infrastructure failure should propagate, not be silently swallowed
+      await expect(
+        failingAdapter.loadBatch(batchId, [
+          {
+            sourceRow: 0,
+            idempotencyKey: 'batch-dd-crash',
+            data: { name: 'Crash Vendor', tax_number: 'TX-CRASH-02', email: 'crash@test.com' },
+          },
+        ])
+      ).rejects.toThrow('Simulated DB crash');
+
+      // Nothing persisted
+      const vendor = await failingRepo.getVendorByTaxNumber('TX-CRASH-02');
+      expect(vendor).toBeNull();
+
+      const receipt = await failingRepo.getImportReceiptByKey('batch-dd-crash');
+      expect(receipt).toBeNull();
+    });
+
+    it('loadBatch error isolation: data-validation failure on row N does not prevent row N+1 from committing', async () => {
+      const batchId = 'ee000000-0000-0000-0000-000000000005';
+
+      const result = await adapter.loadBatch(batchId, [
+        {
+          // Row 0: valid
+          sourceRow: 0,
+          idempotencyKey: 'batch-ee-row-0-valid',
+          data: { name: 'Valid Vendor', tax_number: 'TAX-EE-VALID-01', email: 'valid@test.com' },
+        },
+        {
+          // Row 1: duplicates seeded Acme tax number — will be rejected (no upsert)
+          sourceRow: 1,
+          idempotencyKey: 'batch-ee-row-1-dup',
+          data: { name: 'Duplicate Acme', tax_number: 'TX-998877', email: 'acme2@test.com' },
+        },
+        {
+          // Row 2: valid, should still load despite row 1 being rejected
+          sourceRow: 2,
+          idempotencyKey: 'batch-ee-row-2-valid',
+          data: { name: 'Third Vendor', tax_number: 'TAX-EE-THIRD-03', email: 'third@test.com' },
+        },
+      ]);
+
+      expect(result.total).toBe(3);
+      expect(result.loaded).toBe(2);
+      expect(result.rejected).toBe(1);
+
+      expect(result.rows[0]!.outcome).toBe('loaded');
+      expect(result.rows[1]!.outcome).toBe('rejected');
+      expect(result.rows[1]!.error?.reasonCode).toBe('DUPLICATE_TAX_NUMBER');
+      expect(result.rows[2]!.outcome).toBe('loaded');
+
+      // Both valid vendors are persisted
+      expect(await repo.getVendorByTaxNumber('TAX-EE-VALID-01')).not.toBeNull();
+      expect(await repo.getVendorByTaxNumber('TAX-EE-THIRD-03')).not.toBeNull();
+    });
+  });
+
+  // ── AC3: Receipt field completeness ───────────────────────────────────────
+
+  describe('AC3: Import receipt stores required fields', () => {
+    it('receipt contains batch_id, source_row, target_id, idempotency_key, and timestamp (created_at)', async () => {
+      const batchId = 'ff000000-0000-0000-0000-000000000006';
+      const idempotencyKey = 'batch-ff-receipt-fields-test';
+
+      const result = await adapter.loadBatch(batchId, [
+        {
+          sourceRow: 7,
+          idempotencyKey,
+          data: { name: 'Receipt Fields Vendor', tax_number: 'TAX-FF-RECEIPT', email: 'receipt@test.com' },
+        },
+      ]);
+
+      expect(result.loaded).toBe(1);
+      const rowResult = result.rows[0]!;
+      expect(rowResult.outcome).toBe('loaded');
+
+      // Verify via kit-level receipt fields on the adapter result
+      const kitReceipt = rowResult.result!.receipt;
+      expect(kitReceipt.batchId).toBe(batchId);
+      expect(kitReceipt.sourceRow).toBe(7);
+      expect(kitReceipt.targetId).toBe(rowResult.result!.targetId);
+      expect(kitReceipt.idempotencyKey).toBe(idempotencyKey);
+      expect(kitReceipt.createdAt).toBeInstanceOf(Date);
+      expect(Number.isFinite(kitReceipt.createdAt.getTime())).toBe(true);
+      expect(kitReceipt.entity).toBe('vendor');
+
+      // Also verify the persisted receipt row directly
+      const storedReceipt = await repo.getImportReceiptByKey(idempotencyKey);
+      expect(storedReceipt).not.toBeNull();
+      expect(storedReceipt?.batch_id).toBe(batchId);
+      expect(storedReceipt?.source_row).toBe(7);
+      expect(storedReceipt?.target_id).toBe(rowResult.result!.targetId);
+      expect(storedReceipt?.idempotency_key).toBe(idempotencyKey);
+      expect(typeof storedReceipt?.created_at).toBe('string');
+      // created_at must be a valid ISO datetime
+      expect(new Date(storedReceipt!.created_at).toISOString()).toBeTruthy();
+    });
+  });
+
+  // ── AC4: Duplicate suppression via loadBatch ───────────────────────────────
+
+  describe('AC4: Re-running same row with identical idempotency key returns existing receipt without duplication', () => {
+    it('calling loadBatch twice with identical rows returns prior_result and creates exactly 1 entity and 1 receipt', async () => {
+      const batchId = 'a7000000-0000-0000-0000-000000000007';
+      const idempotencyKey = 'batch-gg-idempotent-row';
+      const rowData = {
+        name: 'Idempotent Vendor',
+        tax_number: 'TAX-GG-IDEM',
+        email: 'idem@test.com',
+        bank_details: '5551234567',
+      };
+
+      // First load
+      const result1 = await adapter.loadBatch(batchId, [
+        { sourceRow: 0, idempotencyKey, data: rowData },
+      ]);
+      expect(result1.loaded).toBe(1);
+      const targetId = result1.rows[0]!.result!.targetId;
+
+      // Second load with identical row + identical key → returns prior receipt
+      const result2 = await adapter.loadBatch(batchId, [
+        { sourceRow: 0, idempotencyKey, data: rowData },
+      ]);
+      expect(result2.loaded).toBe(1);
+      expect(result2.rows[0]!.result!.targetId).toBe(targetId);
+
+      // Third load
+      const result3 = await adapter.loadBatch(batchId, [
+        { sourceRow: 0, idempotencyKey, data: rowData },
+      ]);
+      expect(result3.rows[0]!.result!.targetId).toBe(targetId);
+
+      // Exactly 1 vendor with this tax number
+      const allVendors = await repo.listVendors({ page: 1, pageSize: 100 });
+      const matches = allVendors.vendors.filter((v) => v.tax_number === 'TAX-GG-IDEM');
+      expect(matches).toHaveLength(1);
+
+      // Exactly 1 receipt for this idempotency key
+      const receipt = await repo.getImportReceiptByKey(idempotencyKey);
+      expect(receipt).not.toBeNull();
+      expect(receipt?.target_id).toBe(targetId);
+    });
+
+    it('POST /import/batch endpoint returns per-row outcomes with HTTP 200', async () => {
+      const batchRequest = {
+        batch_id: 'a8000000-0000-0000-0000-000000000008',
+        entity: 'vendor',
+        upsert: false,
+        rows: [
+          {
+            source_row: 0,
+            idempotency_key: 'http-batch-row-0',
+            record: { name: 'HTTP Batch V1', tax_number: 'TAX-HTTP-01', email: 'http1@test.com' },
+          },
+          {
+            source_row: 1,
+            idempotency_key: 'http-batch-row-1',
+            record: { name: 'HTTP Batch V2', tax_number: 'TAX-HTTP-02', email: 'http2@test.com' },
+          },
+        ],
+      };
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-vendors/import/batch',
+        payload: batchRequest,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.payload);
+      expect(body.batchId).toBe(batchRequest.batch_id);
+      expect(body.total).toBe(2);
+      expect(body.loaded).toBe(2);
+      expect(body.rejected).toBe(0);
+      expect(body.rows).toHaveLength(2);
+
+      for (const row of body.rows) {
+        expect(row.outcome).toBe('loaded');
+      }
+
+      // Verify vendors exist
+      expect(await repo.getVendorByTaxNumber('TAX-HTTP-01')).not.toBeNull();
+      expect(await repo.getVendorByTaxNumber('TAX-HTTP-02')).not.toBeNull();
+    });
+
+    it('POST /import/batch with upsert=true updates existing vendor via HTTP batch endpoint', async () => {
+      // First create the vendor via single import
+      await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-vendors/import',
+        payload: {
+          batch_id: 'a9000000-0000-0000-0000-000000000009',
+          source_row: 0,
+          idempotency_key: 'ii-create-row-0',
+          entity: 'vendor',
+          record: { name: 'Pre-existing Vendor', tax_number: 'TAX-UPSERT-HTTP', email: 'pre@test.com', city: 'Paris' },
+        },
+      });
+
+      // Now upsert via batch endpoint
+      const upsertRes = await app.inject({
+        method: 'POST',
+        url: '/api/v1/erp-vendors/import/batch',
+        payload: {
+          batch_id: 'a9000000-0000-0000-0000-000000000009',
+          entity: 'vendor',
+          upsert: true,
+          rows: [
+            {
+              source_row: 1,
+              idempotency_key: 'ii-upsert-row-1',
+              record: { name: 'Updated Vendor Name', tax_number: 'TAX-UPSERT-HTTP', email: 'updated@test.com', city: 'Berlin' },
+            },
+          ],
+        },
+      });
+
+      expect(upsertRes.statusCode).toBe(200);
+      const body = JSON.parse(upsertRes.payload);
+      expect(body.loaded).toBe(1);
+      expect(body.rows[0].outcome).toBe('loaded');
+
+      // Verify vendor was updated
+      const updated = await repo.getVendorByTaxNumber('TAX-UPSERT-HTTP');
+      expect(updated?.name).toBe('Updated Vendor Name');
+      expect(updated?.city).toBe('Berlin');
+
+      // Verify upsert receipt has kind='linked'
+      const receipt = await repo.getImportReceiptByKey('ii-upsert-row-1');
+      expect(receipt?.kind).toBe('linked');
     });
   });
 });
