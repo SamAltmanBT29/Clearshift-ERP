@@ -2,7 +2,7 @@ import React from 'react';
 import type { InvoiceStatus, InvoicesFilterQuery } from '@clearshift/contracts';
 
 export interface InvoiceFilterBarProps {
-  filters: InvoicesFilterQuery;
+  filters: Partial<InvoicesFilterQuery>;
   onFilterChange: (updated: Partial<InvoicesFilterQuery>) => void;
   onReset: () => void;
   isLoading?: boolean;
@@ -24,7 +24,7 @@ export const InvoiceFilterBar: React.FC<InvoiceFilterBarProps> = ({
           id="invoice-search-input"
           type="text"
           className="cs-input"
-          placeholder="Search by invoice #, order ID, or customer Golden ID..."
+          placeholder="Search by invoice #, order ID, or customer Golden ID (UUID)..."
           value={filters.search || ''}
           onChange={(e) => onFilterChange({ search: e.target.value, page: 1 })}
           disabled={isLoading}
@@ -48,9 +48,9 @@ export const InvoiceFilterBar: React.FC<InvoiceFilterBarProps> = ({
           aria-label="Filter by invoice status"
         >
           <option value="">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
+          <option value="Open">Open</option>
+          <option value="Paid">Paid</option>
+          <option value="Overdue">Overdue</option>
         </select>
       </div>
 
