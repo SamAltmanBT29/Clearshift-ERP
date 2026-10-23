@@ -353,6 +353,7 @@ When an optional relationship is absent, the system emits an approved warning ob
 ### 11.3 Versioned Change Control Log
 - **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
 - **Version 1.1.0 (2026-10-23)**: Sprint 3 / Gate G4 sign-off by Data / QA Lead (Issue #43). Defined module data quality rules catalogue, cleaning routines, 143-row synthetic dirty data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and automated migration test suite.
+- **Version 1.2.0 (2026-10-23)**: Sprint 2 / Gate G2 sign-off by Data / QA Lead (Issue #182 / ERP4-26). Delivered shared profiler integration (`@cs/kit` / `KIT-03`), module column profiling rules, exact duplicate candidate assertions, formula-safe CSV data health export, Fastify 5 endpoints (`/api/v1/erp-finance/migration/profile`), React UI screen (`DataHealthProfilePage`), and 20 automated assertion tests.
 
 ---
 
@@ -373,3 +374,24 @@ When an optional relationship is absent, the system emits an approved warning ob
 - **No-Fuzzy-Merge / Review Policy**: V1 migration does NOT perform automated fuzzy merges. Exact duplicate candidate keys are flagged for explicit human review (`review` outcome) with reason codes `DUPLICATE_ACCOUNT_CODE_REVIEW`, `DUPLICATE_OPENING_BALANCE_REVIEW`, and `DUPLICATE_ENTRY_NUMBER_REVIEW`.
 - **100% Outcome Reconciliation**: Every source row evaluates to exactly one terminal outcome: accepted, rejected, or review (`unaccounted = 0`).
 - **Atomic Entry Invariant**: If any child line fails validation or if lines fail to balance, the entire journal entry is rejected (`LINE_REJECTED`) along with all peer lines (`PARENT_ENTRY_REJECTED`).
+
+---
+
+## 13. Column Profiling Configuration & Expected-Result Assertions (Issue #182 / ERP4-26 / KIT-03)
+
+### 13.1 Shared Migration Kit Profiler Engine
+- Domain engine implemented in `@cs/kit` (`packages/kit/src/domain/profiler.ts`) complying with SDS §4.3 (FR-PR-01..04).
+- Computes total rows, null counts, distinct values, invalid format counts/rates, and top 5 values per column.
+- Identifies exact duplicate candidate keys and duplicate row associations.
+- Strictly non-destructive: verifies raw input byte and SHA-256 immutability.
+- Exports formula-safe CSV Data Health Reports with OWASP formula injection protection (`=`, `+`, `-`, `@`, `\t`, `\r` prefixed with `'`).
+
+### 13.2 ERP-4 Profiling Rules & Artifacts
+- **Profiling Configuration**: [`apps/erp/modules/erp-4/src/migration/profiling-config.ts`](../src/migration/profiling-config.ts) defines 24 column profiling rules across accounts, opening balances, journal entries, and lines.
+- **Exact Duplicate Keys**: Declares exact duplicate key rules for Account Code, Opening Balance (`code + currency`), and Journal Entry Number.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/profiling.ts`](../src/routes/profiling.ts):
+  - `GET /api/v1/erp-finance/migration/profile` (returns JSON profile report)
+  - `GET /api/v1/erp-finance/migration/profile/export` (downloads formula-safe CSV)
+  - `POST /api/v1/erp-finance/migration/profile` (in-memory non-destructive profiling on uploaded CSV)
+- **Frontend Screen**: Accessible React component [`DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics table, duplicate review candidates, and formula-safe CSV download.
+- **Automated Assertions**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../tests/migration/profiling.test.ts) (20 tests) asserting all column metrics and duplicate candidate numbers match the manifest.
