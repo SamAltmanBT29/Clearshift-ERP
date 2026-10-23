@@ -72,6 +72,21 @@ paths:
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: Unauthenticated session
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "403":
+          description: Forbidden (missing inventory:read capability)
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
     post:
       operationId: createErp1Product
       tags: [ERP-1 Products]
