@@ -63,6 +63,10 @@ npm run db:reset                                                                
 | Bounded exponential backoff retries for transient errors while strictly preserving idempotency key | `tests/migration/batch-retry-stop.test.ts` |
 | Batch execution halts immediately when row failure rate exceeds 10% (`> 0.10`) after minimum 10 attempted rows | `tests/migration/batch-retry-stop.test.ts` |
 | Committed target records and receipts remain durable on halt; unattempted rows audited; rollback sagas prohibited | `tests/migration/batch-retry-stop.test.ts` |
+| Main paginated data table displays entity rows with stable columns matching data dictionary | `web/tests/paginated-data-table.test.tsx` |
+| Pagination controls bind to API page and pageSize query parameters (10, 20, 50, 100) | `web/tests/paginated-data-table.test.tsx` |
+| Sorting by column headers toggles ascending/descending order predictably with aria-sort | `web/tests/paginated-data-table.test.tsx` |
+| Bounded pagination (pageSize <= 100) prevents DOM performance degradation | `web/tests/paginated-data-table.test.tsx` |
 
 ## Known defects (file each as an issue and link it here before closing ERP2-10)
 | # | Sev | Defect | Status |

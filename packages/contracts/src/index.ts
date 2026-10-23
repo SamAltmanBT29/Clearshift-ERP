@@ -9,6 +9,8 @@ export const ERP_CONTRACT_VERSION = '1.0.0';
 export * from './common.js';
 export * from './events.js';
 export * from './erp-1.js';
+export * from './erp-1-events.js';
+export * from './erp-1-mock.js';
 export * from './erp-2.js';
 export * from './erp-3.js';
 export * from './erp-3-events.js';
