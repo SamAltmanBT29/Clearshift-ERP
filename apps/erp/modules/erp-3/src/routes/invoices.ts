@@ -16,6 +16,7 @@ import type { FastifyPluginAsync } from "fastify";
 import {
   CreateInvoiceRequestSchema,
   Erp3IdParamSchema,
+  InvoiceListQuerySchema,
 } from "@clearshift/contracts";
 import type { Erp3Service } from "../services/erp3.service.js";
 
@@ -23,6 +24,32 @@ export const invoiceRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+
+  // GET /invoices (paginated list/search)
+  fastify.get("/invoices", async (request, reply) => {
+    const parsedQuery = InvoiceListQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      const correlationId =
+        (request.headers["x-correlation-id"] as string | undefined) ??
+        (request.headers["x-request-id"] as string | undefined) ??
+        randomUUID();
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        code: "VALIDATION_ERROR",
+        message: "Invalid query parameters for invoices",
+        details: parsedQuery.error.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+          code: i.code,
+        })),
+        correlation_id: correlationId,
+      });
+    }
+
+    const result = await service.listInvoices(parsedQuery.data);
+    return reply.status(200).send(result);
+  });
 
   // Minimal by-ID read-back for mutation verification (list/search is #27 scope)
   fastify.get("/invoices/:id", async (request, reply) => {

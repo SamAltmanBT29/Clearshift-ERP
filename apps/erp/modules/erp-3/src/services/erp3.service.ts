@@ -35,9 +35,15 @@ import {
   type ImportRowResponse,
   type Invoice,
   type InvoiceLine,
+  type InvoiceListQuery,
+  type InvoiceListResponse,
   type Payment,
+  type PaymentListQuery,
+  type PaymentListResponse,
   type SalesOrder,
   type SalesOrderLine,
+  type SalesOrderListQuery,
+  type SalesOrderListResponse,
   type SalesOrderStatus,
 } from "@clearshift/contracts";
 import {
@@ -235,6 +241,10 @@ export class Erp3Service {
 
   // ── Sales Orders ───────────────────────────────────────────────────────────
 
+  async listSalesOrders(query: SalesOrderListQuery): Promise<SalesOrderListResponse> {
+    return this.repo.listSalesOrders(query);
+  }
+
   async getSalesOrderById(id: string): Promise<SalesOrder> {
     const order = await this.repo.getSalesOrderById(id);
     if (!order) {
@@ -346,6 +356,30 @@ export class Erp3Service {
   }
 
   // ── Invoices ───────────────────────────────────────────────────────────────
+
+  async listInvoices(query: InvoiceListQuery): Promise<InvoiceListResponse> {
+    const res = await this.repo.listInvoices(query);
+    // dynamically ensure overdue status is accurately evaluated against today's date
+    const today = this.nowUtcDate();
+    const data = await Promise.all(
+      res.data.map(async (inv: Invoice) => {
+        if (inv.status === "Paid") return inv;
+        const payments = await this.repo.listPaymentsByInvoiceId(inv.id);
+        const paidScaled = payments.reduce(
+          (sum, p) => sum + parseScaledDecimal4Dp(p.amount),
+          0n,
+        );
+        const resolved = resolveInvoiceStatus(
+          inv.total,
+          formatScaledDecimal4Dp(paidScaled),
+          inv.due_date,
+          today,
+        );
+        return { ...inv, status: resolved };
+      }),
+    );
+    return { ...res, data };
+  }
 
   async getInvoiceById(id: string): Promise<Invoice> {
     const invoice = await this.repo.getInvoiceById(id);
@@ -528,6 +562,10 @@ export class Erp3Service {
   }
 
   // ── Payments ───────────────────────────────────────────────────────────────
+
+  async listPayments(query: PaymentListQuery): Promise<PaymentListResponse> {
+    return this.repo.listPayments(query);
+  }
 
   async createPayment(data: CreatePaymentRequest): Promise<Payment> {
     return this.repo.executeTransactional((txRepo) =>

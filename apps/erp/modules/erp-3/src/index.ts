@@ -16,10 +16,12 @@ import {
 } from "./services/erp3.service.js";
 import {
   InMemoryErp3Repository,
+  DrizzleErp3Repository,
   type Erp3Repository,
   canonicalizeJson,
   computeRequestHash,
 } from "./services/repository.js";
+import { erpOrdersRoutes } from "./routes/index.js";
 import * as domainRules from "./domain/index.js";
 
 export * from "./domain/index.js";
@@ -39,9 +41,11 @@ export {
   NotFoundError,
   ValidationError,
   InMemoryErp3Repository,
+  DrizzleErp3Repository,
   type Erp3Repository,
   canonicalizeJson,
   computeRequestHash,
+  erpOrdersRoutes,
   domainRules,
 };
 
@@ -50,6 +54,9 @@ export const moduleDefinition = {
   schema: "erp3",
   routePrefix: "/api/v1/erp-orders",
   referenceResolvers: erp3Resolver,
+  routes: erpOrdersRoutes,
 };
+
+export const erp3Descriptor = moduleDefinition;
 
 export default moduleDefinition;

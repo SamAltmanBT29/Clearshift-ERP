@@ -17,6 +17,7 @@ import type { FastifyPluginAsync } from "fastify";
 import {
   CreateSalesOrderRequestSchema,
   Erp3IdParamSchema,
+  SalesOrderListQuerySchema,
   UpdateSalesOrderStatusRequestSchema,
 } from "@clearshift/contracts";
 import type { Erp3Service } from "../services/erp3.service.js";
@@ -27,6 +28,32 @@ export const salesOrderRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+
+  // GET /sales-orders (paginated list/search)
+  fastify.get("/sales-orders", async (request, reply) => {
+    const parsedQuery = SalesOrderListQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      const correlationId =
+        (request.headers["x-correlation-id"] as string | undefined) ??
+        (request.headers["x-request-id"] as string | undefined) ??
+        randomUUID();
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        code: "VALIDATION_ERROR",
+        message: "Invalid query parameters for sales orders",
+        details: parsedQuery.error.issues.map((i) => ({
+          field: i.path.join("."),
+          message: i.message,
+          code: i.code,
+        })),
+        correlation_id: correlationId,
+      });
+    }
+
+    const result = await service.listSalesOrders(parsedQuery.data);
+    return reply.status(200).send(result);
+  });
 
   // Minimal by-ID read-back for mutation verification (list/search is #27 scope)
   fastify.get("/sales-orders/:id", async (request, reply) => {

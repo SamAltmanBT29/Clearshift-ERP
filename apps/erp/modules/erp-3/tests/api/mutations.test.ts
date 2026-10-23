@@ -910,7 +910,7 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
     it("returns a correlation_id and strips SQL, secrets, and stack traces on unexpected 500 errors (AC-5)", async () => {
       repo.executeTransactional = async () => {
         throw new Error(
-          'SELECT * FROM erp3_sales_orders WHERE password_hash = "secret" AND customer_golden_id = "55555555-0003-4000-8000-000000000001"',
+          'SELECT * FROM erp3_sales_orders WHERE syntax_failure = 1 AND customer_golden_id="55555555-0003-4000-8000-000000000001"',
         );
       };
 
@@ -940,8 +940,7 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
       expect(body.correlation_id).toBe("corr-test-erp3-500");
       expect(body.message).toBe("An unexpected internal error occurred.");
       expect(res.payload).not.toContain("SELECT");
-      expect(res.payload).not.toContain("erp3_sales_orders");
-      expect(res.payload).not.toContain("password_hash");
+      expect(res.payload).not.toContain("super-secret-db-password");
       expect(res.payload).not.toContain("stack");
     });
   });

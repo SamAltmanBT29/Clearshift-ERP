@@ -474,6 +474,24 @@ export const CreatePaymentRequestSchema = z.object({
 });
 export type CreatePaymentRequest = z.infer<typeof CreatePaymentRequestSchema>;
 
+/** GET /api/v1/erp-orders/payments — query parameters. */
+export const PaymentListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  invoice_id: UuidSchema.optional(),
+});
+export type PaymentListQuery = z.infer<typeof PaymentListQuerySchema>;
+
+/** GET /api/v1/erp-orders/payments — paginated response. */
+export const PaymentListResponseSchema = z.object({
+  data: z.array(PaymentSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1).max(100),
+  totalPages: z.number().int().nonnegative(),
+});
+export type PaymentListResponse = z.infer<typeof PaymentListResponseSchema>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Domain Error Codes
 // ─────────────────────────────────────────────────────────────────────────────
