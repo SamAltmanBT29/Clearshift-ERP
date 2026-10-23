@@ -23,4 +23,7 @@ export * from './components/ProductLinkedRecordsTable.js';
 export * from './components/ProductEditDrawer.js';
 export * from './pages/ProductsListPage.js';
 export * from './pages/ProductDetailPage.js';
+export * from './pages/ProductImportPage.js';
+export * from './kit-metadata.js';
+
 
