@@ -1,0 +1,83 @@
+{
+  "profile_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp1",
+  "fixture": "sample-data/erp-1/dirty-data-v1.csv",
+  "fixture_sha256": "e9e55b4d27445f1f9a73fa39dcbd72c14cea85c8d6240dacfe5b91fcaff42e00",
+  "total_rows": 79,
+  "reconciliation": {
+    "total_source_rows": 79,
+    "accepted": 39,
+    "rejected": 36,
+    "review": 4,
+    "skipped": 0,
+    "unaccounted": 0,
+    "is_balanced": true
+  },
+  "by_record_type": {
+    "category": {
+      "accepted": 6,
+      "rejected": 3,
+      "review": 1,
+      "skipped": 0,
+      "total": 10
+    },
+    "warehouse": {
+      "accepted": 1,
+      "rejected": 3,
+      "review": 0,
+      "skipped": 0,
+      "total": 4
+    },
+    "product": {
+      "accepted": 16,
+      "rejected": 21,
+      "review": 2,
+      "skipped": 0,
+      "total": 39
+    },
+    "stock_level": {
+      "accepted": 16,
+      "rejected": 9,
+      "review": 1,
+      "skipped": 0,
+      "total": 26
+    }
+  },
+  "by_reason_code": {
+    "CATEGORY_CODE_REQUIRED": 1,
+    "CATEGORY_NAME_REQUIRED": 1,
+    "CATEGORY_CODE_TOO_LONG": 1,
+    "DUPLICATE_CATEGORY_CODE_REVIEW": 1,
+    "MULTIPLE_WAREHOUSES_REJECTED": 2,
+    "WAREHOUSE_CODE_REQUIRED": 1,
+    "WAREHOUSE_NAME_REQUIRED": 1,
+    "DUPLICATE_SKU_REVIEW": 2,
+    "PRODUCT_NAME_REQUIRED": 1,
+    "SKU_REQUIRED": 1,
+    "UNIT_OF_MEASURE_REQUIRED": 1,
+    "INVALID_UNIT_OF_MEASURE": 3,
+    "PRICE_REQUIRED": 1,
+    "NEGATIVE_PRICE": 1,
+    "INVALID_PRICE_FORMAT": 1,
+    "EXCESS_DECIMAL_PLACES": 2,
+    "CURRENCY_REQUIRED": 1,
+    "INVALID_CURRENCY": 2,
+    "NEGATIVE_TAX_RATE": 1,
+    "TAX_RATE_OUT_OF_RANGE": 1,
+    "INVALID_TAX_RATE_FORMAT": 1,
+    "CATEGORY_NOT_FOUND": 1,
+    "INVALID_EMAIL_FORMAT": 1,
+    "INVALID_PHONE_FORMAT": 1,
+    "FORMULA_INJECTION_DETECTED": 2,
+    "DUPLICATE_STOCK_LEVEL_REVIEW": 1,
+    "NEGATIVE_STOCK": 2,
+    "PRODUCT_NOT_FOUND": 2,
+    "PRODUCT_REQUIRED": 1,
+    "WAREHOUSE_REQUIRED": 2,
+    "QUANTITY_REQUIRED": 3,
+    "WAREHOUSE_NOT_FOUND": 1,
+    "INVALID_QUANTITY_FORMAT": 1
+  },
+  "generated_at": "2026-10-23T00:00:00.000Z"
+}
