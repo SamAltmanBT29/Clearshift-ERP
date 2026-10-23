@@ -30,8 +30,8 @@ import type { Erp2Service } from '../services/erp2.service.js';
 import type { VendorService } from '../services/vendor.service.js';
 
 export interface VendorRoutesOptions {
-  erp2Service?: Erp2Service;
-  vendorService?: VendorService;
+  erp2Service?: Erp2Service | undefined;
+  vendorService?: VendorService | undefined;
 }
 
 export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
@@ -93,9 +93,12 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -134,9 +137,12 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const parsed = CreateVendorRequestSchema.safeParse(bodyToValidate);
       if (!parsed.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -158,11 +164,6 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
           ? request.headers['x-correlation-id']
           : undefined);
 
-      if (vendorService) {
-        const created = await vendorService.createVendor(parsed.data, { actor, correlationId });
-        return reply.status(201).send(created);
-      }
-
       // If batch_id and idempotency_key are present, execute via atomic import dual-write
       if (parsed.data.batch_id && parsed.data.idempotency_key && service) {
         const importRes = await service.importRow({
@@ -176,6 +177,11 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
         });
         const vendor = await service.getVendorById(importRes.target_id);
         return reply.status(importRes.prior_result ? 200 : 201).send(vendor);
+      }
+
+      if (vendorService) {
+        const created = await vendorService.createVendor(parsed.data, { actor, correlationId });
+        return reply.status(201).send(created);
       }
 
       const vendor = await service!.createVendor(parsed.data);
@@ -194,9 +200,12 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -210,9 +219,12 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const parsed = UpdateVendorRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',

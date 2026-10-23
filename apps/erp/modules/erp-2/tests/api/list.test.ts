@@ -527,7 +527,7 @@ describe('ERP-2 Vendors & Purchasing API — List & Read Endpoints (Issue #17)',
 
       expect(res.statusCode).toBe(422);
       const json = res.json();
-      expect(json.code).toBe('INVALID_PRODUCT_REFERENCE');
+      expect(json.code).toBe('UNKNOWN_PRODUCT');
       expect(json.message).toContain('references unknown product ID');
     });
 

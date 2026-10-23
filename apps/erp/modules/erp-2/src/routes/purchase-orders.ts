@@ -30,8 +30,8 @@ import type { Erp2Service } from '../services/erp2.service.js';
 import type { PurchaseOrderService } from '../services/purchase-order.service.js';
 
 export interface PurchaseOrderRoutesOptions {
-  erp2Service?: Erp2Service;
-  purchaseOrderService?: PurchaseOrderService;
+  erp2Service?: Erp2Service | undefined;
+  purchaseOrderService?: PurchaseOrderService | undefined;
 }
 
 export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions> = async (
@@ -51,9 +51,12 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = PurchaseOrderListQuerySchema.safeParse(request.query);
       if (!parsed.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -93,9 +96,12 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -134,9 +140,12 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = CreatePurchaseOrderRequestSchema.safeParse(bodyToValidate);
       if (!parsed.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -158,11 +167,6 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
           ? request.headers['x-correlation-id']
           : undefined);
 
-      if (poService) {
-        const created = await poService.createPurchaseOrder(parsed.data, { actor, correlationId });
-        return reply.status(201).send(created);
-      }
-
       // If batch_id and idempotency_key are present, execute via atomic import dual-write
       if (parsed.data.batch_id && parsed.data.idempotency_key && service) {
         const importRes = await service.importRow({
@@ -176,6 +180,11 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
         });
         const po = await service.getPurchaseOrderById(importRes.target_id);
         return reply.status(importRes.prior_result ? 200 : 201).send(po);
+      }
+
+      if (poService) {
+        const created = await poService.createPurchaseOrder(parsed.data, { actor, correlationId });
+        return reply.status(201).send(created);
       }
 
       const po = await service!.createPurchaseOrder(parsed.data);
@@ -197,9 +206,12 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -213,9 +225,12 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = UpdatePurchaseOrderStatusRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         const correlationId =
+          (request as any).correlationId ??
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',

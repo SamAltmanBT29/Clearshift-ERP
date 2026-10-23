@@ -25,6 +25,8 @@ import {
   numeric,
   integer,
   uniqueIndex,
+  unique,
+  check,
   index,
   text,
 } from 'drizzle-orm/pg-core';
@@ -50,6 +52,10 @@ export const poStatusEnum = erp2Schema.enum('po_status', [
   'Received',
   'Closed',
 ]);
+
+export const purchaseOrderStatusEnum = {
+  enumValues: ['draft', 'sent', 'received', 'closed'],
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Table 1 — erp2_vendors (Vendor Master)
@@ -89,6 +95,16 @@ export const erp2Vendors = erp2Schema.table(
     taxNumberUniqueIdx: uniqueIndex('vendors_tax_number_unique').on(table.tax_number),
     nameIdx: index('vendors_name_idx').on(table.name),
     sourceIdx: index('vendors_source_idx').on(table.source_system, table.source_id),
+
+    nameNotEmptyCheck: check('vendors_name_not_empty', sql`length(trim(${table.name})) > 0`),
+    taxNumberNotEmptyCheck: check(
+      'vendors_tax_number_not_empty',
+      sql`length(trim(${table.tax_number})) > 0`
+    ),
+    bankMaskedFormatCheck: check(
+      'vendors_bank_masked_format',
+      sql`${table.bank_masked} IS NULL OR ${table.bank_masked} ~ '^XXXX-XXXX-[0-9]{4}$'`
+    ),
   })
 );
 
@@ -114,6 +130,9 @@ export const erp2PurchaseOrders = erp2Schema.table(
     status: poStatusEnum('status').notNull().default('Draft'),
     currency: varchar('currency', { length: 3 }).notNull().default('USD'),
     total: numeric('total', { precision: 18, scale: 2 }).notNull().default('0.00'),
+    notes: text('notes'),
+    source_system: varchar('source_system', { length: 64 }),
+    source_id: varchar('source_id', { length: 128 }),
 
     created_at: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -126,6 +145,19 @@ export const erp2PurchaseOrders = erp2Schema.table(
     poNumberUniqueIdx: uniqueIndex('purchase_orders_po_number_unique').on(table.po_number),
     vendorIdIdx: index('purchase_orders_vendor_id_idx').on(table.vendor_id),
     statusIdx: index('purchase_orders_status_idx').on(table.status),
+
+    poNumberNotEmptyCheck: check(
+      'purchase_orders_po_number_not_empty',
+      sql`length(trim(${table.po_number})) > 0`
+    ),
+    currencyFormatCheck: check(
+      'purchase_orders_currency_format',
+      sql`${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    totalNonNegativeCheck: check(
+      'purchase_orders_total_non_negative',
+      sql`${table.total} >= 0`
+    ),
   })
 );
 
@@ -148,13 +180,28 @@ export const erp2PoLines = erp2Schema.table(
       .notNull()
       .references(() => erp2PurchaseOrders.id, { onDelete: 'cascade' }),
     product_id: uuid('product_id').notNull(),
+    line_number: integer('line_number').notNull().default(1),
     quantity: numeric('quantity', { precision: 12, scale: 2 }).notNull(),
     price: numeric('price', { precision: 18, scale: 2 }).notNull(),
     line_total: numeric('line_total', { precision: 18, scale: 2 }).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updated_at: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
   },
   (table) => ({
+    poLineNumberUnique: unique('po_lines_po_line_number_unique').on(table.po_id, table.line_number),
     poIdIdx: index('po_lines_po_id_idx').on(table.po_id),
     productIdIdx: index('po_lines_product_id_idx').on(table.product_id),
+
+    quantityPositiveCheck: check('po_lines_quantity_positive', sql`${table.quantity} > 0`),
+    priceNonNegativeCheck: check('po_lines_price_non_negative', sql`${table.price} >= 0`),
+    lineTotalNonNegativeCheck: check(
+      'po_lines_line_total_non_negative',
+      sql`${table.line_total} >= 0`
+    ),
   })
 );
 
@@ -190,6 +237,9 @@ export const erp2ImportReceipts = erp2Schema.table(
       .default(sql`now()`),
   },
   (table) => ({
+    idempotencyKeyUnique: unique('import_receipts_idempotency_key_unique').on(
+      table.idempotency_key
+    ),
     idempotencyKeyUniqueIdx: uniqueIndex('erp2_import_receipts_key_unique').on(
       table.idempotency_key
     ),

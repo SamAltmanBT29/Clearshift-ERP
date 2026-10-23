@@ -8,6 +8,8 @@ import {
   ProductSchema,
   SetOpeningStockInputSchema,
   UpdateCategoryInputSchema,
+  UpdateProductInputSchema,
+  ProductLinkedRecordsSchema,
 } from '../src/erp-1.js';
 
 const PRODUCT_ID = '00000000-0000-4000-8000-000000000001';
@@ -85,6 +87,38 @@ describe('ERP-1 Products & Inventory contracts', () => {
       ).toBe(false);
     });
 
+    it('validates email format and phone numbers when provided', () => {
+      const base = {
+        name: 'Synthetic Widget',
+        sku: 'WDG-001',
+        unitOfMeasure: 'pcs',
+        currency: 'USD',
+        price: '19.99',
+      };
+
+      // Valid email and phone
+      const valid = CreateProductInputSchema.safeParse({
+        ...base,
+        notificationEmail: 'supplier@example.com',
+        contactPhone: '+1-555-019-2834',
+      });
+      expect(valid.success).toBe(true);
+
+      // Invalid email
+      const invalidEmail = CreateProductInputSchema.safeParse({
+        ...base,
+        notificationEmail: 'invalid-email-address',
+      });
+      expect(invalidEmail.success).toBe(false);
+
+      // Invalid phone
+      const invalidPhone = CreateProductInputSchema.safeParse({
+        ...base,
+        contactPhone: 'bad-phone',
+      });
+      expect(invalidPhone.success).toBe(false);
+    });
+
     it('normalizes stock quantities to four decimal places', () => {
       const parsed = SetOpeningStockInputSchema.parse({
         productId: PRODUCT_ID,
@@ -117,6 +151,42 @@ describe('ERP-1 Products & Inventory contracts', () => {
       expect(parsed.search).toBe('widget');
       expect(parsed.categoryId).toBe(PRODUCT_ID);
     });
+
+    it('accepts faceted filters and sorting controls (ERP1-18)', () => {
+      const parsed = ProductListQuerySchema.parse({
+        search: 'bolts',
+        categoryId: PRODUCT_ID,
+        unitOfMeasure: 'box',
+        stockStatus: 'in_stock',
+        minPrice: '10.50',
+        maxPrice: '100.00',
+        sortBy: 'price',
+        sortDirection: 'asc',
+      });
+      expect(parsed.unitOfMeasure).toBe('box');
+      expect(parsed.stockStatus).toBe('in_stock');
+      expect(parsed.minPrice).toBe('10.5000');
+      expect(parsed.maxPrice).toBe('100.0000');
+      expect(parsed.sortBy).toBe('price');
+      expect(parsed.sortDirection).toBe('asc');
+    });
+
+    it('handles empty string filter values by converting them to undefined', () => {
+      const parsed = ProductListQuerySchema.parse({
+        categoryId: '',
+        unitOfMeasure: '',
+        stockStatus: '',
+        minPrice: '',
+        maxPrice: '',
+        sortBy: '',
+      });
+      expect(parsed.categoryId).toBeUndefined();
+      expect(parsed.unitOfMeasure).toBeUndefined();
+      expect(parsed.stockStatus).toBeUndefined();
+      expect(parsed.minPrice).toBeUndefined();
+      expect(parsed.maxPrice).toBeUndefined();
+      expect(parsed.sortBy).toBeUndefined();
+    });
   });
 
   describe('Category edit contract', () => {
@@ -124,6 +194,103 @@ describe('ERP-1 Products & Inventory contracts', () => {
       expect(UpdateCategoryInputSchema.parse({ name: 'Renamed' })).toEqual({
         name: 'Renamed',
       });
+    });
+  });
+
+  describe('Product edit contract (ERP1-21)', () => {
+    it('accepts partial product updates for allowlisted fields', () => {
+      const parsed = UpdateProductInputSchema.parse({
+        name: 'Updated Widget Name',
+        price: '29.99',
+        currency: 'EUR',
+        taxRate: '12.50',
+        unitOfMeasure: 'box',
+        notificationEmail: 'ops@clearshift.internal',
+        contactPhone: '+1-555-888-9999',
+        version: '2026-10-23T12:00:00.000Z',
+      });
+
+      expect(parsed.name).toBe('Updated Widget Name');
+      expect(parsed.price).toBe('29.9900');
+      expect(parsed.currency).toBe('EUR');
+      expect(parsed.taxRate).toBe('12.50');
+      expect(parsed.unitOfMeasure).toBe('box');
+      expect(parsed.notificationEmail).toBe('ops@clearshift.internal');
+      expect(parsed.contactPhone).toBe('+1-555-888-9999');
+      expect(parsed.version).toBe('2026-10-23T12:00:00.000Z');
+    });
+
+    it('rejects invalid email and phone in update payload', () => {
+      expect(
+        UpdateProductInputSchema.safeParse({
+          notificationEmail: 'not-an-email',
+        }).success
+      ).toBe(false);
+
+      expect(
+        UpdateProductInputSchema.safeParse({
+          contactPhone: 'abc',
+        }).success
+      ).toBe(false);
+    });
+
+    it('rejects negative prices in update payload', () => {
+      expect(() =>
+        UpdateProductInputSchema.parse({
+          price: '-10.00',
+        })
+      ).toThrow(/Price must be greater than or equal to 0/);
+    });
+  });
+
+  describe('Product linked records contract (ERP1-21)', () => {
+    it('validates linked stock, purchasing, and sales records', () => {
+      const parsed = ProductLinkedRecordsSchema.parse({
+        productId: PRODUCT_ID,
+        stockLevels: [
+          {
+            warehouseId: '00000000-0000-4000-8000-000000000010',
+            warehouseCode: 'WH-01',
+            warehouseName: 'Central Logistics Hub',
+            quantity: '340.0000',
+            unitOfMeasure: 'pcs',
+            updatedAt: '2026-10-23T08:00:00.000Z',
+          },
+        ],
+        purchaseOrders: [
+          {
+            id: '00000000-0000-4000-8000-000000000020',
+            purchaseOrderId: '00000000-0000-4000-8000-000000000021',
+            poNumber: 'PO-2026-0041',
+            vendorName: 'Apex Precision Supplies',
+            orderDate: '2026-10-15',
+            quantity: '500.0000',
+            unitPrice: '14.5000',
+            currency: 'USD',
+            status: 'received',
+          },
+        ],
+        salesOrders: [
+          {
+            id: '00000000-0000-4000-8000-000000000030',
+            orderId: '00000000-0000-4000-8000-000000000031',
+            orderNumber: 'SO-2026-1089',
+            customerGoldenId: 'CUST-GLD-88219',
+            orderDate: '2026-10-20',
+            quantity: '25.0000',
+            unitPrice: '29.9900',
+            lineTotal: '749.7500',
+            currency: 'USD',
+            status: 'invoiced',
+          },
+        ],
+      });
+
+      expect(parsed.stockLevels).toHaveLength(1);
+      expect(parsed.purchaseOrders).toHaveLength(1);
+      expect(parsed.salesOrders).toHaveLength(1);
+      expect(parsed.purchaseOrders[0]?.poNumber).toBe('PO-2026-0041');
+      expect(parsed.salesOrders[0]?.customerGoldenId).toBe('CUST-GLD-88219');
     });
   });
 
@@ -137,6 +304,7 @@ describe('ERP-1 Products & Inventory contracts', () => {
       const requiredPaths = [
         '/api/v1/erp-products/products:',
         '/api/v1/erp-products/products/{id}:',
+        '/api/v1/erp-products/products/{id}/linked-records:',
         '/api/v1/erp-products/categories:',
         '/api/v1/erp-products/categories/{id}:',
         '/api/v1/erp-products/stock:',
@@ -148,6 +316,7 @@ describe('ERP-1 Products & Inventory contracts', () => {
       }
       expect(content).toContain('operationId: updateErp1Category');
       expect(content).toContain('operationId: getErp1Product');
+      expect(content).toContain('operationId: getErp1ProductLinkedRecords');
     });
 
     it('uses the shared flat pagination response instead of an undefined PaginationMeta', () => {
@@ -176,6 +345,34 @@ describe('ERP-1 Products & Inventory contracts', () => {
       for (const ref of localRefs) {
         expect(componentNames.has(ref as string), `missing component ${ref}`).toBe(true);
       }
+    });
+
+    it('validates DirtyDataProfileReport and DataQualityRule schemas', async () => {
+      const {
+        DataQualityRuleSchema,
+        DirtyDataProfileReportSchema,
+      } = await import('../src/erp-1.js');
+
+      const rule = DataQualityRuleSchema.parse({
+        rule_id: 'PRD-001',
+        version: '1.0.0',
+        record_type: 'product',
+        field: 'name',
+        condition: 'product name is empty or whitespace',
+        action: 'reject',
+        reason_code: 'PRODUCT_NAME_REQUIRED',
+        explanation: 'Product name is mandatory.',
+        doc_reference: 'FR-ERP1-01',
+      });
+      expect(rule.rule_id).toBe('PRD-001');
+
+      const expectedProfile = JSON.parse(
+        readFileSync(resolve(__dirname, '../../../sample-data/erp-1/expected-profile.json'), 'utf8')
+      );
+      const parsedReport = DirtyDataProfileReportSchema.parse(expectedProfile);
+      expect(parsedReport.module).toBe('erp1');
+      expect(parsedReport.reconciliation.is_balanced).toBe(true);
+      expect(parsedReport.reconciliation.unaccounted).toBe(0);
     });
   });
 });

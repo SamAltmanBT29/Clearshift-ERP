@@ -21,7 +21,7 @@ import type {
   PurchaseOrderStatus,
   ImportReceiptRecord,
 } from '@clearshift/contracts';
-import { eq, like, desc, sql, count } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   erp2Vendors,
@@ -210,11 +210,12 @@ export class InMemoryErp2Repository implements Erp2Repository {
     return updated;
   }
 
-  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; total: number }> {
+  async listPurchaseOrders(query: any): Promise<{ purchaseOrders: PurchaseOrder[]; items: PurchaseOrder[]; total: number }> {
     let items = Array.from(this.purchaseOrders.values());
 
-    if (query.vendor_id) {
-      items = items.filter((po) => po.vendor_id === query.vendor_id);
+    const vendorId = query.vendor_id ?? query.vendorId;
+    if (vendorId) {
+      items = items.filter((po) => po.vendor_id === vendorId);
     }
     if (query.status) {
       items = items.filter((po) => po.status === query.status);
@@ -224,12 +225,12 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
     const total = items.length;
 
-    const page = query.page;
-    const pageSize = query.pageSize;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const start = (page - 1) * pageSize;
     const paged = items.slice(start, start + pageSize);
 
-    return { purchaseOrders: paged, total };
+    return { purchaseOrders: paged, items: paged, total };
   }
 
   async getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
@@ -246,13 +247,15 @@ export class InMemoryErp2Repository implements Erp2Repository {
   }
 
   async createPurchaseOrder(po: Omit<PurchaseOrder, 'created_at' | 'updated_at'>): Promise<PurchaseOrder> {
+    const id = po.id || randomUUID();
     const now = new Date().toISOString();
     const created: PurchaseOrder = {
       ...po,
+      id,
       created_at: now,
       updated_at: now,
     };
-    this.purchaseOrders.set(po.id, created);
+    this.purchaseOrders.set(id, created);
     return created;
   }
 
@@ -327,21 +330,32 @@ export class InMemoryErp2Repository implements Erp2Repository {
 // Production Drizzle Repository
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Escapes LIKE/ILIKE wildcards so user search text is matched literally. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 export class DrizzleErp2Repository implements Erp2Repository {
   constructor(private readonly db: NodePgDatabase) {}
 
-  async listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; total: number }> {
+  async listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; items: Vendor[]; total: number }> {
     const page = query.page;
     const pageSize = query.pageSize;
     const offset = (page - 1) * pageSize;
 
-    let baseQuery = this.db.select().from(erp2Vendors);
-    if (query.search) {
-      baseQuery = baseQuery.where(like(erp2Vendors.name, `%${query.search}%`)) as any;
-    }
+    const pattern = query.search ? `%${escapeLike(query.search)}%` : null;
+    const where = pattern
+      ? or(ilike(erp2Vendors.name, pattern), ilike(erp2Vendors.tax_number, pattern))
+      : undefined;
 
-    const rows = await (baseQuery as any).limit(pageSize).offset(offset).orderBy(erp2Vendors.name);
-    const countRes = await this.db.select({ value: count() }).from(erp2Vendors);
+    const rows = await this.db
+      .select()
+      .from(erp2Vendors)
+      .where(where)
+      .orderBy(erp2Vendors.name, erp2Vendors.id)
+      .limit(pageSize)
+      .offset(offset);
+    const countRes = await this.db.select({ value: count() }).from(erp2Vendors).where(where);
     const countVal = countRes[0]?.value ?? 0;
 
     const vendors: Vendor[] = rows.map((r: Erp2Vendor) => ({
@@ -361,7 +375,7 @@ export class DrizzleErp2Repository implements Erp2Repository {
       updated_at: r.updated_at.toISOString(),
     }));
 
-    return { vendors, total: Number(countVal) };
+    return { vendors, items: vendors, total: Number(countVal) };
   }
 
   async getVendorById(id: string): Promise<Vendor | null> {
@@ -486,21 +500,24 @@ export class DrizzleErp2Repository implements Erp2Repository {
     };
   }
 
-  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; total: number }> {
+  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; items: PurchaseOrder[]; total: number }> {
     const page = query.page;
     const pageSize = query.pageSize;
     const offset = (page - 1) * pageSize;
 
-    let baseQuery = this.db.select().from(erp2PurchaseOrders);
-    if (query.vendor_id) {
-      baseQuery = baseQuery.where(eq(erp2PurchaseOrders.vendor_id, query.vendor_id)) as any;
-    }
-    if (query.status) {
-      baseQuery = baseQuery.where(eq(erp2PurchaseOrders.status, query.status)) as any;
-    }
+    const conditions: SQL[] = [];
+    if (query.vendor_id) conditions.push(eq(erp2PurchaseOrders.vendor_id, query.vendor_id));
+    if (query.status) conditions.push(eq(erp2PurchaseOrders.status, query.status));
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const rows = await (baseQuery as any).limit(pageSize).offset(offset).orderBy(desc(erp2PurchaseOrders.order_date));
-    const countRes = await this.db.select({ value: count() }).from(erp2PurchaseOrders);
+    const rows = await this.db
+      .select()
+      .from(erp2PurchaseOrders)
+      .where(where)
+      .orderBy(desc(erp2PurchaseOrders.order_date), erp2PurchaseOrders.id)
+      .limit(pageSize)
+      .offset(offset);
+    const countRes = await this.db.select({ value: count() }).from(erp2PurchaseOrders).where(where);
     const countVal = countRes[0]?.value ?? 0;
 
     const purchaseOrders: PurchaseOrder[] = [];
@@ -527,7 +544,7 @@ export class DrizzleErp2Repository implements Erp2Repository {
       });
     }
 
-    return { purchaseOrders, total: Number(countVal) };
+    return { purchaseOrders, items: purchaseOrders, total: Number(countVal) };
   }
 
   async getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
@@ -583,37 +600,42 @@ export class DrizzleErp2Repository implements Erp2Repository {
   }
 
   async createPurchaseOrder(po: Omit<PurchaseOrder, 'created_at' | 'updated_at'>): Promise<PurchaseOrder> {
-    const [createdPo] = await this.db
-      .insert(erp2PurchaseOrders)
-      .values({
-        id: po.id,
-        po_number: po.po_number,
-        vendor_id: po.vendor_id,
-        order_date: po.order_date,
-        status: po.status,
-        currency: po.currency,
-        total: po.total,
-      })
-      .returning();
+    // Header and lines commit together or not at all (nested call inside executeTransactional becomes a savepoint).
+    return this.db.transaction(async (tx) => {
+      const [createdPo] = await tx
+        .insert(erp2PurchaseOrders)
+        .values({
+          id: po.id,
+          po_number: po.po_number,
+          vendor_id: po.vendor_id,
+          order_date: po.order_date,
+          status: po.status,
+          currency: po.currency,
+          total: po.total,
+        })
+        .returning();
 
-    if (!createdPo) throw new Error('Failed to create purchase order');
+      if (!createdPo) throw new Error('Failed to create purchase order');
 
-    for (const line of po.lines) {
-      await this.db.insert(erp2PoLines).values({
-        id: line.id,
-        po_id: po.id,
-        product_id: line.product_id,
-        quantity: line.quantity,
-        price: line.price,
-        line_total: line.line_total,
-      });
-    }
+      if (po.lines.length > 0) {
+        await tx.insert(erp2PoLines).values(
+          po.lines.map((line) => ({
+            id: line.id,
+            po_id: po.id,
+            product_id: line.product_id,
+            quantity: line.quantity,
+            price: line.price,
+            line_total: line.line_total,
+          }))
+        );
+      }
 
-    return {
-      ...po,
-      created_at: createdPo.created_at.toISOString(),
-      updated_at: createdPo.updated_at.toISOString(),
-    };
+      return {
+        ...po,
+        created_at: createdPo.created_at.toISOString(),
+        updated_at: createdPo.updated_at.toISOString(),
+      };
+    });
   }
 
   async updatePurchaseOrderStatus(id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> {

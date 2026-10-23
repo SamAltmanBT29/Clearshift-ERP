@@ -12,7 +12,7 @@ For the canonical, detailed version see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-4 Finance & Accounting |
-| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation), #39 (Chart of Accounts & Trial Balance UI), #40 (Journal Entry Builder & Live Balance Checker UI), #41 (Domain Relationships), #170 (OpenAPI, Event and Mock Contract Package) |
+| **Issues** | #36 (Data Model), #37 (List/Read API & Contracts), #38 (Mutation API & Domain Validation), #39 (Chart of Accounts & Trial Balance UI), #40 (Journal Entry Builder & Live Balance Checker UI), #41 (Domain Relationships), #43 (Migration Profiling, Cleaning, Mapping & Dirty Data Pack), #170 (OpenAPI, Event and Mock Contract Package) |
 | **PostgreSQL Schema** | `erp4` |
 | **API Base** | `/api/v1/erp-finance` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-4.yaml` |
@@ -106,8 +106,31 @@ Exported from `@clearshift/contracts/erp-4-mock` and executable via `npm run moc
 - Validates double-entry balancing (`BR-ERP4-01`), period locking (`BR-ERP4-02`), and bounded pagination (`pageSize <= 100`).
 - Provides in-process test injection via `createErp4MockServer()` and state reset via `mockServer.reset()`.
 
+## Migration Data Quality Rules, Profiling & Dirty Data Pack (Issue #43)
+
+As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete data migration pack for legacy chart of accounts, opening balances, journal entries, and lines:
+- **Rule Catalogue & Specification**: [`apps/erp/modules/erp-4/docs/data-quality-rules.md`](../../apps/erp/modules/erp-4/docs/data-quality-rules.md) defines 50+ deterministic rules across cleaning, field validation, and domain invariants (`ACC-*`, `OPB-*`, `JRN-*`, `JRL-*`).
+- **Rule Engine & Profiler**: [`apps/erp/modules/erp-4/src/migration/rules.ts`](../../apps/erp/modules/erp-4/src/migration/rules.ts) implements deterministic streaming row evaluation, exact duplicate review candidate flagging, clean entity projection, and trial balance synthesis.
+- **Dirty Data Pack**: [`sample-data/erp-4/dirty-data-v1.csv`](../../sample-data/erp-4/dirty-data-v1.csv) contains 143 deterministic synthetic rows covering all 4 entity types with explicit valid and invalid test cases for every field, enumeration, and domain invariant.
+- **Canonical Profile & Manifest**: [`sample-data/erp-4/expected-profile.json`](../../sample-data/erp-4/expected-profile.json) establishes the immutable SHA-256 fingerprint, row-level outcome reconciliation (`source = accepted + rejected + review`, `unaccounted = 0`), and isolated balanced trial balance totals.
+- **Target Mapping Template**: [`sample-data/erp-4/mapping-template.json`](../../sample-data/erp-4/mapping-template.json) specifies source-to-target schema projections, deterministic normalization policies, dependency-ordered loading sequences, and no-fuzzy-merge candidate review constraints.
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/rules.test.ts`](../../apps/erp/modules/erp-4/tests/migration/rules.test.ts) provides 27 comprehensive tests asserting fixture checksums, non-mutation invariants (`BR-KIT-03`), domain invariants (`BR-ERP4-01`, `BR-ERP4-02`), and public API contract conformance.
+
+## Column Profiling Configuration & Expected-Result Assertions (Issue #182 / ERP4-26 / KIT-03)
+
+- **Shared Migration Kit Profiler**: Integrated with `@cs/kit` shared column profiler (`packages/kit/src/domain/profiler.ts`) providing column-level profiling metrics, exact duplicate candidate grouping, and formula-safe CSV export (`exportProfileReportToCsv`).
+- **Module Profiling Rules**: Configured in [`apps/erp/modules/erp-4/src/migration/profiling-config.ts`](../../apps/erp/modules/erp-4/src/migration/profiling-config.ts) for 24 module columns and exact duplicate keys (Account Code, Opening Balance, Journal Entry Number).
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/profiling.ts`](../../apps/erp/modules/erp-4/src/routes/profiling.ts):
+  - `GET /api/v1/erp-finance/migration/profile`
+  - `GET /api/v1/erp-finance/migration/profile/export`
+  - `POST /api/v1/erp-finance/migration/profile`
+- **Frontend Screen**: Accessible UI component [`DataHealthProfilePage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics, duplicate candidates review, and formula-safe CSV export.
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../../apps/erp/modules/erp-4/tests/migration/profiling.test.ts) (20 tests).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
 |---|---|---|---|---|
 | **`1.0.0`** | 2026-10-22 | Gate G1 Baseline Freeze | Group 9 / Role 2 (Issue #170) | Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published. Approved as frozen baseline for Gate G1. |
+| **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
+| **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |

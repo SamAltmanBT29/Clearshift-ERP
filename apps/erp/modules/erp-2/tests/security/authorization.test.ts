@@ -74,6 +74,43 @@ describe('ERP-2 Authorization, Sensitive Field Protection, Audit & Safe Logging 
 
   beforeEach(async () => {
     repository = new InMemoryErp2Repository(true);
+    repository.vendors.set('22222222-0001-0001-0001-000000000001', {
+      id: '22222222-0001-0001-0001-000000000001',
+      name: 'Acme Supplies',
+      tax_number: 'TX-222001',
+      email: 'sales@acme-supplies.example.com',
+      phone: '+1-555-0101',
+      address_line: '100 Industrial Parkway',
+      city: 'Chicago',
+      country: 'United States',
+      bank_masked: 'XXXX-XXXX-7890',
+      currency: 'USD',
+      source_system: 'ERP-LEGACY',
+      source_id: 'V-1001',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    repository.purchaseOrders.set('33333333-0001-0001-0001-000000000001', {
+      id: '33333333-0001-0001-0001-000000000001',
+      po_number: 'PO-333001',
+      vendor_id: '22222222-0001-0001-0001-000000000001',
+      order_date: '2026-10-21',
+      status: 'Draft',
+      currency: 'USD',
+      total: '100.00',
+      lines: [
+        {
+          id: '44444444-0001-0001-0001-000000000001',
+          po_id: '33333333-0001-0001-0001-000000000001',
+          product_id: '11111111-0001-0001-0001-000000000001',
+          quantity: '2.00',
+          price: '50.00',
+          line_total: '100.00',
+        },
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
     auditService = new AuditService();
     referenceResolver = new MockErp1Resolver();
 
@@ -793,7 +830,7 @@ describe('ERP-2 Authorization, Sensitive Field Protection, Audit & Safe Logging 
 
       expect(res.statusCode).toBe(422);
       const json = res.json();
-      expect(json.code).toBe('INVALID_PRODUCT_REFERENCE');
+      expect(json.code).toBe('UNKNOWN_PRODUCT');
       expect(json.message).toContain('BR-ERP2-01');
       expect(json.message).toMatch(/unknown product ID/i);
     });

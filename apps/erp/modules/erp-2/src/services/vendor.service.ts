@@ -32,20 +32,22 @@ export class VendorService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 20, 100);
 
-    const { items, total } = await this.repository.listVendors({
+    const res = await this.repository.listVendors({
       search: query.search,
       page,
       pageSize,
     });
 
-    const hasMore = page * pageSize < total;
+    const items = res.items ?? res.vendors ?? [];
+    const total = res.total ?? 0;
+    const totalPages = Math.ceil(total / pageSize) || 1;
 
     return {
       items,
       total,
       page,
       pageSize,
-      hasMore,
+      totalPages,
     };
   }
 
@@ -63,9 +65,11 @@ export class VendorService {
   ): Promise<Vendor> {
     // 1. Idempotency check if idempotency_key is provided
     if (data.idempotency_key) {
-      const existingReceipt = await this.repository.getImportReceipt(data.idempotency_key);
+      const existingReceipt = await this.repository.getImportReceiptByKey(data.idempotency_key);
       if (existingReceipt) {
-        const existing = await this.repository.getVendorById(existingReceipt.entityId);
+        const existing = await this.repository.getVendorById(
+          (existingReceipt as any).target_id ?? (existingReceipt as any).entityId
+        );
         if (existing) {
           return existing;
         }
@@ -76,7 +80,7 @@ export class VendorService {
     const existingTax = await this.repository.getVendorByTaxNumber(data.tax_number);
     if (existingTax) {
       throw new AppError(
-        'CONFLICT',
+        'DUPLICATE_TAX_NUMBER',
         `A vendor with tax number '${data.tax_number}' already exists.`,
         409,
         [{ field: 'tax_number', message: 'Tax number must be unique' }]
@@ -84,24 +88,10 @@ export class VendorService {
     }
 
     // 3. Mask bank details server-side before persisting (FR-ERP2-06)
-    const rawBank = data.bank_details || data.bank_masked;
+    const rawBank = data.bank_details;
     const bankMasked = maskBankDetails(rawBank);
 
-    const created = await this.repository.createVendor({
-      name: data.name,
-      tax_number: data.tax_number,
-      email: data.email,
-      phone: data.phone,
-      address_line: data.address_line,
-      city: data.city,
-      country: data.country,
-      bank_masked: bankMasked,
-      source_system: data.source_system,
-      source_id: data.source_id,
-      idempotency_key: data.idempotency_key,
-      batch_id: data.batch_id,
-      source_row: data.source_row,
-    });
+    const created = await this.repository.createVendor(data, bankMasked);
 
     // 4. Record audit event
     await this.auditService.log({
@@ -132,7 +122,7 @@ export class VendorService {
       const conflict = await this.repository.getVendorByTaxNumber(updates.tax_number);
       if (conflict && conflict.id !== id) {
         throw new AppError(
-          'CONFLICT',
+          'DUPLICATE_TAX_NUMBER',
           `A vendor with tax number '${updates.tax_number}' already exists.`,
           409,
           [{ field: 'tax_number', message: 'Tax number must be unique' }]
@@ -150,8 +140,8 @@ export class VendorService {
     if (updates.city !== undefined) cleanUpdates.city = updates.city;
     if (updates.country !== undefined) cleanUpdates.country = updates.country;
 
-    if (updates.bank_details !== undefined || updates.bank_masked !== undefined) {
-      cleanUpdates.bank_masked = maskBankDetails(updates.bank_details || updates.bank_masked);
+    if (updates.bank_details !== undefined) {
+      cleanUpdates.bank_masked = maskBankDetails(updates.bank_details);
     }
 
     const updated = await this.repository.updateVendor(id, cleanUpdates);

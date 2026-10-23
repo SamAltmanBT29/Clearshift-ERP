@@ -281,3 +281,32 @@ export async function createOpeningBalances(
     body: JSON.stringify(data),
   });
 }
+
+export interface DataHealthProfileResponse {
+  success: boolean;
+  data: any;
+}
+
+/**
+ * Retrieve column profiling and data health report.
+ */
+export async function fetchDataHealthProfile(): Promise<any> {
+  const res = await request<DataHealthProfileResponse>('/migration/profile');
+  return res.data;
+}
+
+/**
+ * Download formula-safe CSV data health export.
+ */
+export async function downloadDataHealthCsv(): Promise<string> {
+  const url = `${API_BASE}/migration/profile/export`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'text/csv',
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, 'CSV_DOWNLOAD_FAILED', 'Failed to download data health CSV');
+  }
+  return await response.text();
+}

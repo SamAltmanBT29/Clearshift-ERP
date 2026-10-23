@@ -234,7 +234,7 @@ describe('ERP-5 department create, edit and detail screens', () => {
       const back = await screen.findByRole('link', { name: /Back to the department list/ });
       expect(back.getAttribute('href')).toBe('/erp5/departments');
 
-      const edit = screen.getByRole('link', { name: 'Edit department' });
+      const edit = await screen.findByRole('link', { name: 'Edit department' });
       expect(edit.getAttribute('href')).toBe(`/erp5/departments/${PLATFORM.id}/edit`);
     });
   });

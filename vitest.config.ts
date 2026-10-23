@@ -14,6 +14,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: [
+        'apps/erp/modules/erp-1/web/src/**',
+        'apps/erp/modules/erp-2/db/**',
+        'apps/erp/modules/erp-2/src/**',
+        'apps/erp/modules/erp-2/web/src/**',
         'apps/erp/modules/erp-4/domain/**',
         'apps/erp/modules/erp-4/src/**',
         'apps/erp/modules/erp-5/db/**',

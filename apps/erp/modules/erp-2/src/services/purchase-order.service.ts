@@ -11,6 +11,7 @@
  * @module erp2/services/purchase-order.service
  */
 
+import { randomUUID } from 'node:crypto';
 import { AppError, type ReferenceResolver } from '@cs/kernel';
 import { Money } from '@cs/core';
 import type {
@@ -37,21 +38,24 @@ export class PurchaseOrderService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 20, 100);
 
-    const { items, total } = await this.repository.listPurchaseOrders({
+    const res = await this.repository.listPurchaseOrders({
+      vendor_id: query.vendor_id,
       vendorId: query.vendor_id,
       status: query.status,
       page,
       pageSize,
     });
 
-    const hasMore = page * pageSize < total;
+    const items = res.items ?? res.purchaseOrders ?? [];
+    const total = res.total ?? 0;
+    const totalPages = Math.ceil(total / pageSize) || 1;
 
     return {
       items,
       total,
       page,
       pageSize,
-      hasMore,
+      totalPages,
     };
   }
 
@@ -69,9 +73,11 @@ export class PurchaseOrderService {
   ): Promise<PurchaseOrder> {
     // 1. Idempotency check if idempotency_key is provided
     if (data.idempotency_key) {
-      const existingReceipt = await this.repository.getImportReceipt(data.idempotency_key);
+      const existingReceipt = await this.repository.getImportReceiptByKey(data.idempotency_key);
       if (existingReceipt) {
-        const existing = await this.repository.getPurchaseOrderById(existingReceipt.entityId);
+        const existing = await this.repository.getPurchaseOrderById(
+          (existingReceipt as any).target_id ?? (existingReceipt as any).entityId
+        );
         if (existing) {
           return existing;
         }
@@ -82,9 +88,9 @@ export class PurchaseOrderService {
     const vendor = await this.repository.getVendorById(data.vendor_id);
     if (!vendor) {
       throw new AppError(
-        'NOT_FOUND',
+        'VENDOR_NOT_FOUND',
         `Referenced vendor with ID '${data.vendor_id}' does not exist.`,
-        404,
+        422,
         [{ field: 'vendor_id', message: 'Vendor does not exist' }]
       );
     }
@@ -99,7 +105,7 @@ export class PurchaseOrderService {
       );
     }
 
-    const currency = data.currency_code ?? 'USD';
+    const currency = data.currency ?? (data as any).currency_code ?? 'USD';
     let runningTotal = new Money('0.00', currency);
     const computedLines: Omit<PurchaseOrderLine, 'id' | 'po_id' | 'created_at'>[] = [];
 
@@ -110,7 +116,7 @@ export class PurchaseOrderService {
       const productExists = await this.referenceResolver.exists('product', line.product_id);
       if (!productExists) {
         throw new AppError(
-          'INVALID_PRODUCT_REFERENCE',
+          'UNKNOWN_PRODUCT',
           `BR-ERP2-01: Purchase order line at index ${i} references unknown product ID '${line.product_id}'. Row rejected.`,
           422,
           [{ field: `lines[${i}].product_id`, message: 'Unknown product ID' }]
@@ -132,19 +138,24 @@ export class PurchaseOrderService {
     }
 
     const poTotal = runningTotal.toFixed();
-    const poNumber = `PO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
+    const poNumber =
+      data.po_number ??
+      `PO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 900 + 100)}`;
 
+    const poId = randomUUID();
     const created = await this.repository.createPurchaseOrder({
+      id: poId,
       po_number: poNumber,
       vendor_id: data.vendor_id,
       order_date: data.order_date,
       status: 'Draft',
-      currency_code: currency,
+      currency,
       total: poTotal,
-      lines: computedLines as PurchaseOrderLine[],
-      idempotency_key: data.idempotency_key,
-      batch_id: data.batch_id,
-      source_row: data.source_row,
+      lines: computedLines.map((l) => ({
+        ...l,
+        id: randomUUID(),
+        po_id: poId,
+      })) as PurchaseOrderLine[],
     });
 
     // Record audit event
@@ -158,7 +169,7 @@ export class PurchaseOrderService {
         vendor_id: created.vendor_id,
         status: created.status,
         total: created.total,
-        currency_code: created.currency_code,
+        currency_code: (created as any).currency_code ?? created.currency,
         line_count: created.lines.length,
       },
       correlationId: context.correlationId,

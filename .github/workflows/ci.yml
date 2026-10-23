@@ -32,5 +32,8 @@ jobs:
       - name: Code Quality & ESLint
         run: npm run lint
 
+      - name: OpenAPI Contract Validation (Spectral)
+        run: npm --workspace=@clearshift/contracts run lint:openapi
+
       - name: Run Vitest Unit & Integration Tests
         run: npm test

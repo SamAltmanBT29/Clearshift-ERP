@@ -14,7 +14,7 @@ export * from './services/vendor.service.js';
 export * from './services/purchase-order.service.js';
 export * from './services/erp2.service.js';
 export * from './services/audit.js';
-export * from './policies/field-masking.js';
+export { maskSalary, sanitizeForLogging } from './policies/field-masking.js';
 export * from './policies/rbac.js';
 export * from './policies/status-transitions.js';
 export * from './plugins/auth.js';

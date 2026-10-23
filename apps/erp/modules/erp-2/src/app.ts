@@ -72,6 +72,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   // ── Global Error Handler ───────────────────────────────────────────────────
   app.setErrorHandler((error: unknown, request, reply) => {
     const correlationId =
+      (reply.getHeader('x-correlation-id') as string | undefined) ??
       (request as any).correlationId ??
       (request.headers['x-correlation-id'] as string | undefined) ??
       (request.headers['x-request-id'] as string | undefined) ??
@@ -79,9 +80,21 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     reply.header('x-correlation-id', correlationId);
 
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send({
-        statusCode: error.statusCode,
-        error: error.name,
+      const statusCode = error.statusCode ?? 500;
+      const statusNames: Record<number, string> = {
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        403: 'Forbidden',
+        404: 'Not Found',
+        409: 'Conflict',
+        422: 'Unprocessable Entity',
+        500: 'Internal Server Error',
+        503: 'Service Unavailable',
+      };
+      const errorName = statusNames[statusCode] || (error.name !== 'AppError' ? error.name : 'Error');
+      return reply.status(statusCode).send({
+        statusCode,
+        error: errorName,
         code: error.code,
         message: error.message,
         details: error.details,
@@ -131,7 +144,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     const errorName = typeof rawName === 'string' ? rawName : 'Internal Server Error';
 
     // Mask internal error messages to prevent leaking SQL, connection strings, or raw data
-    let errorMessage = 'An unexpected internal error occurred';
+    let errorMessage = 'An unexpected internal error occurred.';
     if (statusCode < 500 && typeof err['message'] === 'string') {
       errorMessage = err['message'];
     }

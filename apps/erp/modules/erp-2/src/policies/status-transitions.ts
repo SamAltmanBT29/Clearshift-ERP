@@ -41,7 +41,7 @@ export function validateStatusTransition(
       valid: false,
       message: `Invalid status transition from '${currentStatus}' to '${targetStatus}'. Allowed transitions: ${
         allowedNext.length > 0 ? allowedNext.join(', ') : 'none (terminal state)'
-      }. Backwards transitions and cancellations are not permitted in V1.`,
+      }. Allowed forward flow is Draft -> Sent -> Received -> Closed. Backwards transitions and cancellations are not permitted in V1.`,
     };
   }
 

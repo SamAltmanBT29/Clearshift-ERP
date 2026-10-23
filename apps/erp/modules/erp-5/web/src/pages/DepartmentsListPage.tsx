@@ -45,6 +45,7 @@ export const DepartmentsListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<DepartmentSort>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const debouncedSearch = useDebouncedValue(search);
   const departmentLookup = useDepartmentLookup();
@@ -54,9 +55,10 @@ export const DepartmentsListPage: React.FC = () => {
       page,
       pageSize,
       sort,
+      sort_dir: sortDir,
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
     }),
-    [page, pageSize, sort, debouncedSearch]
+    [page, pageSize, sort, sortDir, debouncedSearch]
   );
 
   const { items, meta, isLoading, error, reload } = useHrList<
@@ -69,6 +71,7 @@ export const DepartmentsListPage: React.FC = () => {
   const handleReset = () => {
     setSearch('');
     setSort('name');
+    setSortDir('asc');
     setPage(1);
   };
 
@@ -77,7 +80,12 @@ export const DepartmentsListPage: React.FC = () => {
     if (!next) {
       return;
     }
-    setSort(next);
+    if (sort === next) {
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSort(next);
+      setSortDir('asc');
+    }
     setPage(1);
   };
 
@@ -130,7 +138,7 @@ export const DepartmentsListPage: React.FC = () => {
           departments={items}
           departmentLookup={departmentLookup}
           sortColumn={SORT_COLUMN[sort]}
-          sortDirection="asc"
+          sortDirection={sortDir}
           onSort={handleSort}
         />
       </ListStateBoundary>

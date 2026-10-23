@@ -58,6 +58,7 @@ export const EmployeesListPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [departmentId, setDepartmentId] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<EmployeeSort>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const debouncedSearch = useDebouncedValue(search);
   const departmentLookup = useDepartmentLookup();
@@ -67,10 +68,11 @@ export const EmployeesListPage: React.FC = () => {
       page,
       pageSize,
       sort,
+      sort_dir: sortDir,
       ...(debouncedSearch ? { search: debouncedSearch } : {}),
       ...(departmentId ? { department_id: departmentId } : {}),
     }),
-    [page, pageSize, sort, debouncedSearch, departmentId]
+    [page, pageSize, sort, sortDir, debouncedSearch, departmentId]
   );
 
   const { items, meta, isLoading, error, reload } = useHrList<
@@ -84,6 +86,7 @@ export const EmployeesListPage: React.FC = () => {
     setSearch('');
     setDepartmentId(undefined);
     setSort('name');
+    setSortDir('asc');
     setPage(1);
   };
 
@@ -92,7 +95,13 @@ export const EmployeesListPage: React.FC = () => {
     if (!next) {
       return;
     }
-    setSort(next);
+    if (sort === next) {
+      // Toggle the direction when the same column is clicked again.
+      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSort(next);
+      setSortDir('asc');
+    }
     setPage(1);
   };
 
@@ -175,7 +184,7 @@ export const EmployeesListPage: React.FC = () => {
           employees={items}
           departmentLookup={departmentLookup}
           sortColumn={SORT_COLUMN[sort]}
-          sortDirection={sort === 'join_date' ? 'asc' : 'asc'}
+          sortDirection={sortDir}
           onSort={handleSort}
         />
       </ListStateBoundary>

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearShift ERP-3 — Sales Orders & Invoices Preview</title>
+  <style>
+    /* ClearShift ERP-3 Minimal White Theme & Component Tokens */
+    :root {
+      --color-background: #ffffff;
+      --color-surface: #f9fafb;
+      --color-surface-hover: #f3f4f6;
+      --color-text: #111827;
+      --color-text-muted: #6b7280;
+      --color-text-subtle: #9ca3af;
+
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --border-focus: #2563eb;
+
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-primary-text: #ffffff;
+
+      --color-success: #166534;
+      --color-success-bg: #dcfce7;
+      --color-success-border: #bbf7d0;
+
+      --color-warning: #92400e;
+      --color-warning-bg: #fef3c7;
+      --color-warning-border: #fde68a;
+
+      --color-error: #991b1b;
+      --color-error-bg: #fee2e2;
+      --color-error-border: #fecaca;
+
+      --color-info: #1e40af;
+      --color-info-bg: #dbeafe;
+      --color-info-border: #bfdbfe;
+
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-background);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      padding: var(--space-6);
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Simulation Control Toolbar */
+    .sim-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      background-color: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .sim-buttons {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .btn-sim {
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--color-background);
+      cursor: pointer;
+    }
+
+    .btn-sim.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: var(--space-6);
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      margin-bottom: var(--space-1);
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-6);
+    }
+
+    .tab-btn {
+      padding: var(--space-2) var(--space-4);
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      background-color: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-4);
+    }
+
+    .input-search {
+      flex: 1 1 260px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+
+    .select-status {
+      padding: 0.5rem 1rem 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      outline: none;
+    }
+
+    .btn-reset {
+      padding: 0.5rem 0.875rem;
+      font-size: 0.875rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    /* Table Card */
+    .table-card {
+      background-color: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    .data-table th {
+      padding: var(--space-3) var(--space-4);
+      background-color: var(--color-surface);
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .data-table td {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .data-table tbody tr:hover {
+      background-color: var(--color-surface);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-open {
+      background-color: var(--color-info-bg);
+      color: var(--color-info);
+      border: 1px solid var(--color-info-border);
+    }
+
+    .badge-invoiced {
+      background-color: var(--color-warning-bg);
+      color: var(--color-warning);
+      border: 1px solid var(--color-warning-border);
+    }
+
+    .badge-closed {
+      background-color: var(--color-surface-hover);
+      color: var(--color-text-muted);
+      border: 1px solid var(--border-strong);
+    }
+
+    .badge-paid {
+      background-color: var(--color-success-bg);
+      color: var(--color-success);
+      border: 1px solid var(--color-success-border);
+    }
+
+    .badge-overdue {
+      background-color: var(--color-error-bg);
+      color: var(--color-error);
+      border: 1px solid var(--color-error-border);
+    }
+
+    /* Pagination */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      background-color: var(--color-surface);
+      border-top: 1px solid var(--border-subtle);
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 4px;
+    }
+
+    .page-btn {
+      padding: 4px 10px;
+      font-size: 13px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .page-btn.current {
+      background-color: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    /* States */
+    .empty-box, .error-box {
+      padding: var(--space-8);
+      text-align: center;
+    }
+
+    .error-box {
+      background-color: var(--color-error-bg);
+      border: 1px solid var(--color-error-border);
+      border-radius: var(--radius-md);
+      color: var(--color-error);
+      margin-bottom: var(--space-4);
+    }
+
+    .skeleton-cell {
+      height: 14px;
+      background-color: var(--color-surface-hover);
+      border-radius: 4px;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Simulator controls -->
+    <div class="sim-bar">
+      <span style="font-size: 13px; font-weight: 600;">Simulation States:</span>
+      <div class="sim-buttons">
+        <button class="btn-sim active" id="btn-normal">Normal Data</button>
+        <button class="btn-sim" id="btn-loading">Loading State</button>
+        <button class="btn-sim" id="btn-empty">Empty State</button>
+        <button class="btn-sim" id="btn-error">Error State</button>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <h1 class="title">Sales Orders & Invoices</h1>
+      <p class="subtitle">ClearShift ERP-3 — Customer purchase orders, line items, billing invoices, and payment statuses.</p>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="tabs" aria-label="Views">
+      <button class="tab-btn active" id="tab-orders">Sales Orders (3)</button>
+      <button class="tab-btn" id="tab-invoices">Invoices (3)</button>
+    </nav>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar" id="filter-bar">
+      <label for="search-input" class="sr-only" style="display:none">Search</label>
+      <input type="text" id="search-input" class="input-search" placeholder="Search by order # or customer Golden ID...">
+
+      <label for="status-select" class="sr-only" style="display:none">Status</label>
+      <select id="status-select" class="select-status">
+        <option value="">All Statuses</option>
+        <option value="open">Open</option>
+        <option value="invoiced">Invoiced</option>
+        <option value="closed">Closed</option>
+      </select>
+
+      <button type="button" class="btn-reset" id="btn-reset">Reset Filters</button>
+    </div>
+
+    <!-- Content Views -->
+    <div id="view-container">
+      <!-- Injected via JavaScript -->
+    </div>
+  </div>
+
+  <script>
+    const mockOrders = [
+      { id: "so-1", orderNumber: "SO-1001", customerGoldenId: "gid-cust-001", orderDate: "2026-10-20", status: "open", subtotal: "1250.00", taxTotal: "125.00", total: "1375.00", currencyCode: "USD" },
+      { id: "so-2", orderNumber: "SO-1002", customerGoldenId: "gid-cust-002", orderDate: "2026-10-21", status: "invoiced", subtotal: "4500.00", taxTotal: "450.00", total: "4950.00", currencyCode: "USD" },
+      { id: "so-3", orderNumber: "SO-1003", customerGoldenId: "gid-cust-003", orderDate: "2026-10-22", status: "closed", subtotal: "820.00", taxTotal: "82.00", total: "902.00", currencyCode: "USD" }
+    ];
+
+    const mockInvoices = [
+      { id: "inv-1", invoiceNumber: "INV-2026-001", orderId: "so-2", customerGoldenId: "gid-cust-002", invoiceDate: "2026-10-21", dueDate: "2026-11-20", total: "4950.00", status: "open", currencyCode: "USD" },
+      { id: "inv-2", invoiceNumber: "INV-2026-002", orderId: "so-3", customerGoldenId: "gid-cust-003", invoiceDate: "2026-09-15", dueDate: "2026-10-15", total: "902.00", status: "overdue", currencyCode: "USD" },
+      { id: "inv-3", invoiceNumber: "INV-2026-003", orderId: "so-4", customerGoldenId: "gid-cust-004", invoiceDate: "2026-10-01", dueDate: "2026-10-31", total: "3100.00", status: "paid", currencyCode: "USD" }
+    ];
+
+    let currentTab = 'orders';
+    let currentState = 'normal';
+
+    function render() {
+      const container = document.getElementById('view-container');
+
+      if (currentState === 'loading') {
+        container.innerHTML = `
+          <div class="table-card">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th><div class="skeleton-cell" style="width: 50%;"></div></th>
+                  <th><div class="skeleton-cell" style="width: 60%;"></div></th>
+                  <th><div class="skeleton-cell" style="width: 40%;"></div></th>
+                  <th><div class="skeleton-cell" style="width: 50%;"></div></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[1, 2, 3, 4, 5].map(() => `
+                  <tr>
+                    <td><div class="skeleton-cell" style="width: 70%;"></div></td>
+                    <td><div class="skeleton-cell" style="width: 85%;"></div></td>
+                    <td><div class="skeleton-cell" style="width: 50%;"></div></td>
+                    <td><div class="skeleton-cell" style="width: 60%;"></div></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div style="text-align: center; padding: 16px; color: var(--color-text-muted); font-size: 13px;">
+              Loading data from server API...
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentState === 'error') {
+        container.innerHTML = `
+          <div class="error-box">
+            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">Failed to Load Sales Orders</h3>
+            <p style="font-size: 0.875rem; margin-bottom: 16px;">HTTP 500: An unexpected error occurred while communicating with the server.</p>
+            <button class="btn-sim" style="background:#fff; color:var(--color-error); border-color:var(--color-error);" onclick="setState('normal')">Try Again</button>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentState === 'empty') {
+        container.innerHTML = `
+          <div class="table-card">
+            <div class="empty-box">
+              <div style="font-size: 2.5rem; margin-bottom: 8px;">📦</div>
+              <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">No records found</h3>
+              <p style="font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 16px;">There are no records matching your current filter criteria.</p>
+              <button class="btn-reset" onclick="setState('normal')">Reset Filters</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentTab === 'orders') {
+        container.innerHTML = `
+          <div class="table-card">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Customer Golden ID</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Subtotal</th>
+                  <th style="text-align: right;">Tax</th>
+                  <th style="text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${mockOrders.map(o => `
+                  <tr>
+                    <td><span class="mono" style="font-weight: 600;">${o.orderNumber}</span></td>
+                    <td><span class="mono">${o.customerGoldenId}</span></td>
+                    <td>${o.orderDate}</td>
+                    <td><span class="badge badge-${o.status}">${o.status}</span></td>
+                    <td style="text-align: right;" class="mono">$${parseFloat(o.subtotal).toFixed(2)}</td>
+                    <td style="text-align: right;" class="mono">$${parseFloat(o.taxTotal).toFixed(2)}</td>
+                    <td style="text-align: right;" class="mono"><strong>$${parseFloat(o.total).toFixed(2)}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="pagination-bar">
+              <div>Showing 1 to 3 of 3 orders</div>
+              <div class="pagination-controls">
+                <button class="page-btn" disabled>Previous</button>
+                <button class="page-btn current">1</button>
+                <button class="page-btn" disabled>Next</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="table-card">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Order ID</th>
+                  <th>Customer Golden ID</th>
+                  <th>Issue Date</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${mockInvoices.map(i => `
+                  <tr>
+                    <td><span class="mono" style="font-weight: 600;">${i.invoiceNumber}</span></td>
+                    <td><span class="mono">${i.orderId}</span></td>
+                    <td><span class="mono">${i.customerGoldenId}</span></td>
+                    <td>${i.invoiceDate}</td>
+                    <td><span style="${i.status === 'overdue' ? 'color: var(--color-error); font-weight: 600;' : ''}">${i.dueDate}</span></td>
+                    <td><span class="badge badge-${i.status}">${i.status}</span></td>
+                    <td style="text-align: right;" class="mono"><strong>$${parseFloat(i.total).toFixed(2)}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="pagination-bar">
+              <div>Showing 1 to 3 of 3 invoices</div>
+              <div class="pagination-controls">
+                <button class="page-btn" disabled>Previous</button>
+                <button class="page-btn current">1</button>
+                <button class="page-btn" disabled>Next</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function setState(state) {
+      currentState = state;
+      document.querySelectorAll('.btn-sim').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + state).classList.add('active');
+      render();
+    }
+
+    document.getElementById('btn-normal').addEventListener('click', () => setState('normal'));
+    document.getElementById('btn-loading').addEventListener('click', () => setState('loading'));
+    document.getElementById('btn-empty').addEventListener('click', () => setState('empty'));
+    document.getElementById('btn-error').addEventListener('click', () => setState('error'));
+
+    document.getElementById('tab-orders').addEventListener('click', () => {
+      currentTab = 'orders';
+      document.getElementById('tab-orders').classList.add('active');
+      document.getElementById('tab-invoices').classList.remove('active');
+      render();
+    });
+
+    document.getElementById('tab-invoices').addEventListener('click', () => {
+      currentTab = 'invoices';
+      document.getElementById('tab-invoices').classList.add('active');
+      document.getElementById('tab-orders').classList.remove('active');
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

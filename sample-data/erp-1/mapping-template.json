@@ -1,0 +1,262 @@
+{
+  "mapping_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp1",
+  "source_system": "SYNTH-ERP1-DIRTY-V1",
+  "fixture": "sample-data/erp-1/dirty-data-v1.csv",
+  "policy": {
+    "fuzzy_matching": false,
+    "automatic_merge": false,
+    "raw_input_mutation": false,
+    "duplicate_handling": "Exact candidate keys only; later duplicates get outcome review and are never loaded or merged until a human decides.",
+    "sku_handling": "SKU is normalized to uppercase and trimmed (BR-ERP1-01). Case-insensitive duplicates held for review.",
+    "unit_of_measure_handling": "Units must strictly be one of the approved V1 list: pcs, kg, g, litre, metre, box (FR-ERP1-04).",
+    "currency_handling": "Currency is explicit on every product; accepted ISO-4217 uppercase codes; no implicit currency default.",
+    "warehouse_handling": "ClearShift V1 strictly operates with one warehouse (WH-01); attempts to register secondary warehouses rejected (BR-ERP1-03).",
+    "negative_stock_handling": "Stock quantity cannot become negative (BR-ERP1-02). Negative stock rows rejected.",
+    "formula_injection_defense": "OWASP formula injection prefixes (=, +, -, @, \\t, \\r) neutralized per PLT-12 / KIT-16.",
+    "sensitive_field_masking": "Bank account numbers and government IDs are automatically masked in review screens and export payloads.",
+    "idempotency_key": "SYNTH-ERP1-DIRTY-V1:{entity}:{source_id}"
+  },
+  "load_order": [
+    "category",
+    "warehouse",
+    "product",
+    "stock_level"
+  ],
+  "reference_fixtures": {
+    "default_warehouse": {
+      "code": "WH-01",
+      "name": "Central Distribution Hub",
+      "is_default": true
+    },
+    "registered_categories": [
+      "GEN",
+      "ELEC",
+      "CHEM",
+      "RAW",
+      "PKG",
+      "TOOLS"
+    ],
+    "approved_units_of_measure": [
+      "pcs",
+      "kg",
+      "g",
+      "litre",
+      "metre",
+      "box"
+    ]
+  },
+  "entities": {
+    "category": {
+      "record_type": "category",
+      "adapter_entity": "category",
+      "target_table": "erp1.categories",
+      "api": "POST /api/v1/erp-products/categories",
+      "candidate_key": [
+        "code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": false
+        },
+        {
+          "source": "code",
+          "target": "code",
+          "required": true,
+          "normalization": "UPPERCASE_TRIM"
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "required": true,
+          "normalization": "COLLAPSE_WHITESPACE"
+        }
+      ]
+    },
+    "warehouse": {
+      "record_type": "warehouse",
+      "adapter_entity": "warehouse",
+      "target_table": "erp1.warehouses",
+      "api": "POST /api/v1/erp-products/warehouses",
+      "candidate_key": [
+        "code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": false
+        },
+        {
+          "source": "code",
+          "target": "code",
+          "required": true,
+          "normalization": "UPPERCASE_TRIM"
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "required": true,
+          "normalization": "COLLAPSE_WHITESPACE"
+        },
+        {
+          "source": "is_default",
+          "target": "is_default",
+          "required": false,
+          "default": true
+        }
+      ]
+    },
+    "product": {
+      "record_type": "product",
+      "adapter_entity": "product",
+      "target_table": "erp1.products",
+      "api": "POST /api/v1/erp-products/products",
+      "candidate_key": [
+        "sku"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": false
+        },
+        {
+          "source": "sku",
+          "target": "sku",
+          "required": true,
+          "normalization": "UPPERCASE_TRIM"
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "required": true,
+          "normalization": "COLLAPSE_WHITESPACE"
+        },
+        {
+          "source": "category_code",
+          "target": "category_id",
+          "required": false,
+          "foreign_lookup": {
+            "entity": "category",
+            "match_field": "code"
+          }
+        },
+        {
+          "source": "unit_of_measure",
+          "target": "unit_of_measure",
+          "required": true,
+          "enum_validation": [
+            "pcs",
+            "kg",
+            "g",
+            "litre",
+            "metre",
+            "box"
+          ]
+        },
+        {
+          "source": "price",
+          "target": "price",
+          "required": true,
+          "scale": 4,
+          "non_negative": true
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "required": true,
+          "normalization": "UPPERCASE_TRIM",
+          "iso_4217": true
+        },
+        {
+          "source": "tax_rate",
+          "target": "tax_rate",
+          "required": false,
+          "default": "0.00",
+          "scale": 2,
+          "non_negative": true,
+          "max": 100.0
+        },
+        {
+          "source": "notification_email",
+          "target": "notification_email",
+          "required": false
+        },
+        {
+          "source": "contact_phone",
+          "target": "contact_phone",
+          "required": false
+        },
+        {
+          "source": "supplier_bank_account",
+          "target": "supplier_bank_account",
+          "required": false,
+          "sensitive": true
+        },
+        {
+          "source": "employee_ssn",
+          "target": "employee_ssn",
+          "required": false,
+          "sensitive": true
+        },
+        {
+          "source": "source_system",
+          "target": "source_system",
+          "required": false
+        }
+      ]
+    },
+    "stock_level": {
+      "record_type": "stock_level",
+      "adapter_entity": "stock_level",
+      "target_table": "erp1.stock_levels",
+      "api": "POST /api/v1/erp-products/stock/opening",
+      "candidate_key": [
+        "sku",
+        "warehouse_code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": false
+        },
+        {
+          "source": "sku",
+          "target": "product_id",
+          "required": true,
+          "foreign_lookup": {
+            "entity": "product",
+            "match_field": "sku"
+          }
+        },
+        {
+          "source": "warehouse_code",
+          "target": "warehouse_id",
+          "required": true,
+          "foreign_lookup": {
+            "entity": "warehouse",
+            "match_field": "code"
+          }
+        },
+        {
+          "source": "quantity",
+          "target": "quantity",
+          "required": true,
+          "scale": 4,
+          "non_negative": true
+        },
+        {
+          "source": "as_of_date",
+          "target": "as_of_date",
+          "required": false,
+          "iso_8601": true
+        }
+      ]
+    }
+  }
+}
