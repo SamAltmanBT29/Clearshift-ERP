@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import type { CreateInvoiceInput, Invoice } from '@clearshift/contracts';
+import type { CreateInvoiceInput, Invoice, SalesOrder } from '@clearshift/contracts';
 import { createInvoice } from '../api/erp-3.js';
 import { InvoiceForm } from '../components/forms/InvoiceForm.js';
 
 export interface InvoiceCreatePageProps {
   initialOrderId?: string;
+  initialOrder?: SalesOrder | null;
   onBack: () => void;
   onInvoiceCreated: (invoice: Invoice) => void;
 }
 
 export const InvoiceCreatePage: React.FC<InvoiceCreatePageProps> = ({
   initialOrderId = '',
+  initialOrder = null,
   onBack,
   onInvoiceCreated,
 }) => {
@@ -46,14 +48,15 @@ export const InvoiceCreatePage: React.FC<InvoiceCreatePageProps> = ({
       <header className="cs-page-header">
         <h1 className="cs-page-title">Generate Billing Invoice</h1>
         <p className="cs-page-description">
-          Generate an invoice associated with a sales order. V1 mandates a required due date
+          Generate an invoice associated with a sales order. V1 mandates a required due date (DR-2)
           for automated overdue status derivation.
         </p>
       </header>
 
       <div className="cs-form-content">
         <InvoiceForm
-          initialValues={{ orderId: initialOrderId }}
+          initialValues={{ order_id: initialOrderId || initialOrder?.id || '' }}
+          sourceOrder={initialOrder}
           onSubmit={handleSubmit}
           onCancel={onBack}
           isLoading={isLoading}

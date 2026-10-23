@@ -41,8 +41,8 @@ export const OrderCreatePage: React.FC<OrderCreatePageProps> = ({ onBack, onOrde
       <header className="cs-page-header">
         <h1 className="cs-page-title">New Sales Order</h1>
         <p className="cs-page-description">
-          Enter customer Golden ID, select currency, and configure dynamic product line items.
-          Subtotals and taxes calculate live according to domain rule BR-ERP3-02.
+          Enter customer Golden ID (UUID), select currency, and configure dynamic product line items.
+          Subtotals and taxes calculate live according to domain rule BR-ERP3-02 (DR-1 pending).
         </p>
       </header>
 

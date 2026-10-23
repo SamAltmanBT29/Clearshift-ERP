@@ -7,9 +7,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { Payment, PaymentsFilterQuery } from '@clearshift/contracts';
+import type { Payment } from '@clearshift/contracts';
 import { PageTitle } from '@cs/ui';
-import { fetchPayments } from '../api/erp-3.js';
+import { fetchPayments, type PaymentsFilterQuery } from '../api/erp-3.js';
 import { SkeletonTable, EmptyState, ErrorState } from '../components/StateViews.js';
 
 export const PaymentsListPage: React.FC = () => {
@@ -83,14 +83,14 @@ export const PaymentsListPage: React.FC = () => {
               {payments.map((p) => (
                 <tr key={p.id}>
                   <td className="cs-cell-mono font-bold">{p.id}</td>
-                  <td className="cs-cell-mono">{p.invoiceId}</td>
+                  <td className="cs-cell-mono">{p.invoice_id || (p as any).invoiceId}</td>
                   <td className="cs-cell-numeric font-bold">{p.amount}</td>
                   <td>
                     <span className="cs-badge cs-badge-open">{p.method || 'standard'}</span>
                   </td>
-                  <td className="cs-cell-muted">{p.reference || '—'}</td>
+                  <td className="cs-cell-muted">{(p as any).reference || '—'}</td>
                   <td className="cs-cell-muted">
-                    {p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '—'}
+                    {p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}
                   </td>
                 </tr>
               ))}

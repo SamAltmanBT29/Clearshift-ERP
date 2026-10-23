@@ -21,7 +21,7 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
   const [isLoading, setIsLoading] = useState(!initialOrder);
   const [error, setError] = useState<string | null>(null);
 
-  // Status transition state
+  // Status transition state (isolated PATCH /sales-orders/{id} workflow)
   const [pendingStatus, setPendingStatus] = useState<SalesOrderStatus | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
@@ -93,6 +93,17 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
     );
   }
 
+  const totalNum = parseFloat(order.total || '0');
+  const taxTotalNum =
+    order.lines && order.lines.length > 0
+      ? order.lines.reduce((acc, l) => acc + parseFloat(l.tax_amount || '0'), 0)
+      : 0;
+  const lineTotalSum =
+    order.lines && order.lines.length > 0
+      ? order.lines.reduce((acc, l) => acc + parseFloat(l.line_total || '0'), 0)
+      : totalNum;
+  const subtotalNum = Math.max(0, lineTotalSum - taxTotalNum);
+
   return (
     <div className="cs-module-root">
       <nav className="cs-back-nav" aria-label="Order detail navigation">
@@ -120,22 +131,22 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
       <header className="cs-detail-header">
         <div className="cs-detail-title-group">
           <div className="cs-detail-title-row">
-            <h1 className="cs-page-title">Sales Order {order.orderNumber}</h1>
+            <h1 className="cs-page-title">Sales Order {order.order_number}</h1>
             <StatusBadge status={order.status} />
           </div>
           <p className="cs-page-description">
-            Internal ID: <span className="cs-mono">{order.id}</span> • Created on {order.orderDate}
+            Internal ID: <span className="cs-mono">{order.id}</span> • Created on {order.order_date}
           </p>
         </div>
 
         {/* Workflow Actions */}
         <div className="cs-detail-actions">
-          {order.status === 'open' && (
+          {order.status === 'Open' && (
             <>
               <button
                 type="button"
                 className="cs-btn-secondary"
-                onClick={() => setPendingStatus('invoiced')}
+                onClick={() => setPendingStatus('Invoiced')}
                 disabled={isTransitioning}
                 aria-label="Mark order as invoiced"
               >
@@ -144,7 +155,7 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
               <button
                 type="button"
                 className="cs-btn-danger"
-                onClick={() => setPendingStatus('closed')}
+                onClick={() => setPendingStatus('Closed')}
                 disabled={isTransitioning}
                 aria-label="Close sales order"
               >
@@ -153,11 +164,11 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
             </>
           )}
 
-          {order.status === 'invoiced' && (
+          {order.status === 'Invoiced' && (
             <button
               type="button"
               className="cs-btn-danger"
-              onClick={() => setPendingStatus('closed')}
+              onClick={() => setPendingStatus('Closed')}
               disabled={isTransitioning}
               aria-label="Close sales order"
             >
@@ -165,12 +176,12 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
             </button>
           )}
 
-          {order.status !== 'closed' && onCreateInvoice && (
+          {order.status !== 'Closed' && onCreateInvoice && (
             <button
               type="button"
               className="cs-btn-primary"
               onClick={() => onCreateInvoice(order)}
-              aria-label={`Generate invoice for order ${order.orderNumber}`}
+              aria-label={`Generate invoice for order ${order.order_number}`}
             >
               Generate Invoice
             </button>
@@ -184,34 +195,27 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
           <div className="cs-meta-card">
             <span className="cs-meta-label">Customer Golden ID</span>
             <span className="cs-meta-value cs-mono" style={{ fontWeight: 600 }}>
-              {order.customerGoldenId}
+              {order.customer_golden_id}
             </span>
           </div>
 
           <div className="cs-meta-card">
             <span className="cs-meta-label">Order Date</span>
-            <span className="cs-meta-value">{order.orderDate}</span>
+            <span className="cs-meta-value">{order.order_date}</span>
           </div>
 
           <div className="cs-meta-card">
             <span className="cs-meta-label">Currency</span>
-            <span className="cs-meta-value">{order.currencyCode}</span>
+            <span className="cs-meta-value">{order.currency}</span>
           </div>
 
           <div className="cs-meta-card">
             <span className="cs-meta-label">Total Amount</span>
             <span className="cs-meta-value cs-mono" style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-              ${order.total} {order.currencyCode}
+              ${totalNum.toFixed(2)} {order.currency}
             </span>
           </div>
         </div>
-
-        {order.notes && (
-          <div className="cs-meta-notes-card">
-            <strong>Notes / Instructions:</strong>
-            <p>{order.notes}</p>
-          </div>
-        )}
 
         {/* Lines Table */}
         <section className="cs-table-card" style={{ marginTop: '24px' }}>
@@ -224,7 +228,6 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
               <thead>
                 <tr>
                   <th scope="col">Product ID</th>
-                  <th scope="col">Product Name</th>
                   <th scope="col" style={{ textAlign: 'right' }}>Quantity</th>
                   <th scope="col" style={{ textAlign: 'right' }}>Unit Price</th>
                   <th scope="col" style={{ textAlign: 'right' }}>Tax Rate</th>
@@ -236,26 +239,27 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
                 {order.lines && order.lines.length > 0 ? (
                   order.lines.map((line, idx) => (
                     <tr key={line.id || idx}>
-                      <td className="cs-mono">{line.productId}</td>
-                      <td>{line.productName || '—'}</td>
-                      <td className="cs-mono" style={{ textAlign: 'right' }}>{line.quantity}</td>
+                      <td className="cs-mono">{line.product_id}</td>
                       <td className="cs-mono" style={{ textAlign: 'right' }}>
-                        ${line.unitPrice} {order.currencyCode}
+                        {parseFloat(line.quantity)}
                       </td>
                       <td className="cs-mono" style={{ textAlign: 'right' }}>
-                        {(parseFloat(line.taxRate) * 100).toFixed(0)}%
+                        ${parseFloat(line.price).toFixed(2)} {order.currency}
                       </td>
                       <td className="cs-mono" style={{ textAlign: 'right' }}>
-                        ${line.taxAmount} {order.currencyCode}
+                        {parseFloat(line.tax_rate).toFixed(0)}%
+                      </td>
+                      <td className="cs-mono" style={{ textAlign: 'right' }}>
+                        ${parseFloat(line.tax_amount).toFixed(2)} {order.currency}
                       </td>
                       <td className="cs-mono" style={{ textAlign: 'right', fontWeight: 600 }}>
-                        ${line.lineTotal} {order.currencyCode}
+                        ${parseFloat(line.line_total).toFixed(2)} {order.currency}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px' }}>
                       No line items recorded for this order.
                     </td>
                   </tr>
@@ -268,15 +272,15 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
           <div className="cs-totals-summary-card">
             <div className="cs-totals-row">
               <span>Subtotal:</span>
-              <span className="cs-mono">${order.subtotal} {order.currencyCode}</span>
+              <span className="cs-mono">${subtotalNum.toFixed(2)} {order.currency}</span>
             </div>
             <div className="cs-totals-row">
               <span>Tax Total (BR-ERP3-02):</span>
-              <span className="cs-mono">${order.taxTotal} {order.currencyCode}</span>
+              <span className="cs-mono">${taxTotalNum.toFixed(2)} {order.currency}</span>
             </div>
             <div className="cs-totals-row cs-totals-final">
               <strong>Order Total (BR-ERP3-01):</strong>
-              <strong className="cs-mono">${order.total} {order.currencyCode}</strong>
+              <strong className="cs-mono">${totalNum.toFixed(2)} {order.currency}</strong>
             </div>
           </div>
         </section>
@@ -285,15 +289,15 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
       {/* Confirmation Dialog for Irreversible Status Transitions */}
       <ConfirmActionDialog
         isOpen={!!pendingStatus}
-        title={pendingStatus === 'closed' ? 'Close Sales Order?' : `Mark Order as ${pendingStatus}?`}
+        title={pendingStatus === 'Closed' ? 'Close Sales Order?' : `Mark Order as ${pendingStatus}?`}
         message={
-          pendingStatus === 'closed'
+          pendingStatus === 'Closed'
             ? 'Closing this sales order is an irreversible action. No further lines or invoices can be attached once closed.'
             : `Are you sure you want to transition this order status to "${pendingStatus}"?`
         }
-        confirmLabel={pendingStatus === 'closed' ? 'Yes, Close Order' : 'Yes, Update Status'}
+        confirmLabel={pendingStatus === 'Closed' ? 'Yes, Close Order' : 'Yes, Update Status'}
         cancelLabel="Cancel"
-        isDestructive={pendingStatus === 'closed'}
+        isDestructive={pendingStatus === 'Closed'}
         isLoading={isTransitioning}
         onConfirm={handleConfirmStatusChange}
         onCancel={() => setPendingStatus(null)}

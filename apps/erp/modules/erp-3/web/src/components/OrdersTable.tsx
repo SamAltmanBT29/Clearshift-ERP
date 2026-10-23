@@ -10,8 +10,19 @@ interface OrdersTableProps {
   pageSize: number;
   totalPages: number;
   onPageChange: (newPage: number) => void;
-  onRefresh?: () => void;
-  onSelectOrder?: (order: SalesOrder) => void;
+  onRefresh?: (() => void) | undefined;
+  onSelectOrder?: ((order: SalesOrder) => void) | undefined;
+}
+
+function computeOrderBreakdown(order: SalesOrder): { subtotal: number; taxTotal: number; total: number } {
+  const total = parseFloat(order.total || '0');
+  if (!order.lines || order.lines.length === 0) {
+    return { subtotal: total, taxTotal: 0, total };
+  }
+  const taxTotal = order.lines.reduce((acc, l) => acc + parseFloat(l.tax_amount || '0'), 0);
+  const lineSum = order.lines.reduce((acc, l) => acc + parseFloat(l.line_total || '0'), 0);
+  const subtotal = Math.max(0, lineSum - taxTotal);
+  return { subtotal, taxTotal, total };
 }
 
 export const OrdersTable: React.FC<OrdersTableProps> = ({
@@ -60,56 +71,59 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id}>
-                <td>
-                  <span className="cs-mono" style={{ fontWeight: 600 }}>
-                    {order.orderNumber}
-                  </span>
-                </td>
-                <td>
-                  <span className="cs-mono">{order.customerGoldenId}</span>
-                </td>
-                <td>{order.orderDate}</td>
-                <td>
-                  <StatusBadge status={order.status} />
-                </td>
-                <td style={{ textAlign: 'right' }} className="cs-mono">
-                  {parseFloat(order.subtotal).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  {order.currencyCode}
-                </td>
-                <td style={{ textAlign: 'right' }} className="cs-mono">
-                  {parseFloat(order.taxTotal).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  {order.currencyCode}
-                </td>
-                <td style={{ textAlign: 'right' }} className="cs-mono">
-                  <span style={{ fontWeight: 600 }}>
-                    {parseFloat(order.total).toLocaleString(undefined, {
+            {orders.map((order) => {
+              const breakdown = computeOrderBreakdown(order);
+              return (
+                <tr key={order.id}>
+                  <td>
+                    <span className="cs-mono" style={{ fontWeight: 600 }}>
+                      {order.order_number}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="cs-mono">{order.customer_golden_id}</span>
+                  </td>
+                  <td>{order.order_date}</td>
+                  <td>
+                    <StatusBadge status={order.status} />
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="cs-mono">
+                    {breakdown.subtotal.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    {order.currencyCode}
-                  </span>
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    className="cs-btn-secondary"
-                    style={{ padding: '2px 8px', fontSize: '12px' }}
-                    onClick={() => onSelectOrder && onSelectOrder(order)}
-                    aria-label={`View order ${order.orderNumber}`}
-                  >
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    {order.currency}
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="cs-mono">
+                    {breakdown.taxTotal.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{' '}
+                    {order.currency}
+                  </td>
+                  <td style={{ textAlign: 'right' }} className="cs-mono">
+                    <span style={{ fontWeight: 600 }}>
+                      {breakdown.total.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      {order.currency}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      type="button"
+                      className="cs-btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '12px' }}
+                      onClick={() => onSelectOrder && onSelectOrder(order)}
+                      aria-label={`View order ${order.order_number}`}
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -30,6 +30,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(initialTab);
   const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   // Sales Orders state
@@ -39,7 +40,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
 
-  const [orderFilters, setOrderFilters] = useState<SalesOrdersFilterQuery>({
+  const [orderFilters, setOrderFilters] = useState<Partial<SalesOrdersFilterQuery>>({
     page: 1,
     pageSize: 20,
     search: '',
@@ -53,7 +54,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
 
-  const [invoiceFilters, setInvoiceFilters] = useState<InvoicesFilterQuery>({
+  const [invoiceFilters, setInvoiceFilters] = useState<Partial<InvoicesFilterQuery>>({
     page: 1,
     pageSize: 20,
     search: '',
@@ -61,7 +62,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   });
 
   // Load Sales Orders
-  const loadOrders = useCallback(async (filters: SalesOrdersFilterQuery) => {
+  const loadOrders = useCallback(async (filters: Partial<SalesOrdersFilterQuery>) => {
     setIsOrdersLoading(true);
     setOrdersError(null);
     try {
@@ -77,7 +78,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   }, []);
 
   // Load Invoices
-  const loadInvoices = useCallback(async (filters: InvoicesFilterQuery) => {
+  const loadInvoices = useCallback(async (filters: Partial<InvoicesFilterQuery>) => {
     setIsInvoicesLoading(true);
     setInvoicesError(null);
     try {
@@ -113,6 +114,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
         }}
         onOrderCreated={(created) => {
           setSelectedOrderId(created.id);
+          setSelectedOrder(created);
           setViewMode('order-detail');
           loadOrders(orderFilters);
         }}
@@ -130,6 +132,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
         }}
         onCreateInvoice={(ord) => {
           setSelectedOrderId(ord.id);
+          setSelectedOrder(ord);
           setViewMode('create-invoice');
         }}
       />
@@ -140,6 +143,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     return (
       <InvoiceCreatePage
         initialOrderId={selectedOrderId || ''}
+        initialOrder={selectedOrder}
         onBack={() => {
           setViewMode('list');
           loadInvoices(invoiceFilters);
@@ -192,7 +196,10 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
             <button
               type="button"
               className="cs-btn-secondary"
-              onClick={() => setViewMode('create-invoice')}
+              onClick={() => {
+                setSelectedOrder(null);
+                setViewMode('create-invoice');
+              }}
               aria-label="Create new invoice"
             >
               + New Invoice
@@ -251,6 +258,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
               onRefresh={() => setOrderFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
               onSelectOrder={(ord) => {
                 setSelectedOrderId(ord.id);
+                setSelectedOrder(ord);
                 setViewMode('order-detail');
               }}
             />

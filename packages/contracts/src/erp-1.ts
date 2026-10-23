@@ -222,9 +222,67 @@ const Erp1PaginationQuerySchema = PaginationQuerySchema.extend({
     .default(25),
 });
 
+export const ProductSortFieldSchema = z.enum([
+  'name',
+  'sku',
+  'price',
+  'createdAt',
+  'quantity',
+]);
+export type ProductSortField = z.infer<typeof ProductSortFieldSchema>;
+
+export const StockStatusFilterSchema = z.enum([
+  'all',
+  'in_stock',
+  'low_stock',
+  'out_of_stock',
+]);
+export type StockStatusFilter = z.infer<typeof StockStatusFilterSchema>;
+
 export const ProductListQuerySchema = Erp1PaginationQuerySchema.extend({
   search: z.string().trim().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryId: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().uuid().optional()
+  ),
+  unitOfMeasure: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    UnitOfMeasureSchema.optional()
+  ),
+  stockStatus: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    StockStatusFilterSchema.optional()
+  ),
+  minPrice: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z
+      .union([z.string(), z.number()])
+      .transform((val, ctx) =>
+        normalizeDecimalInput(val, 4, 'Min price must be non-negative', ctx)
+      )
+      .optional()
+  ),
+  maxPrice: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z
+      .union([z.string(), z.number()])
+      .transform((val, ctx) =>
+        normalizeDecimalInput(val, 4, 'Max price must be non-negative', ctx)
+      )
+      .optional()
+  ),
+  sortBy: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    ProductSortFieldSchema.optional()
+  ),
+  sortOrder: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['asc', 'desc']).optional()
+  ),
+  sortDirection: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.enum(['asc', 'desc']).optional()
+  ),
 });
 export type ProductListQuery = z.infer<typeof ProductListQuerySchema>;
 
