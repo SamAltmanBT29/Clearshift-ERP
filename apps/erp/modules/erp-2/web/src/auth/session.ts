@@ -107,7 +107,7 @@ export function getSession(currentTimeMs: number = Date.now()): Erp2Session | nu
     return null;
   }
 
-  const expSec = typeof claims.exp === 'number' ? claims.exp : null;
+  const expSec = typeof claims['exp'] === 'number' ? claims['exp'] : null;
   if (expSec === null) {
     return null;
   }
@@ -117,9 +117,9 @@ export function getSession(currentTimeMs: number = Date.now()): Erp2Session | nu
     return null;
   }
 
-  const subject = typeof claims.sub === 'string' ? claims.sub : null;
-  const roles = Array.isArray(claims.roles)
-    ? claims.roles.filter((r): r is string => typeof r === 'string')
+  const subject = typeof claims['sub'] === 'string' ? claims['sub'] : null;
+  const roles = Array.isArray(claims['roles'])
+    ? claims['roles'].filter((r): r is string => typeof r === 'string')
     : [];
 
   return {
