@@ -758,6 +758,15 @@ components:
         by_reason_code:
           type: object
           additionalProperties: { type: integer, minimum: 0 }
+        rows:
+          type: object
+          additionalProperties:
+            type: object
+            required: [outcome, reasons]
+            properties:
+              outcome: { type: string, enum: [accepted, rejected, review, skipped] }
+              reasons: { type: array, items: { type: string } }
         generated_at: { type: string, format: date-time }
+
 
 

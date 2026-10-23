@@ -675,17 +675,19 @@ The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove
 
 ### 20.2 Synthetic Edge-Case Scenarios
 
-The Dirty Data Pack exercises 10 distinct failure categories across all 4 entity types:
-1. **Natural Key Duplication**: Exact SKU duplicates (`FAST-BOLT-HEX-001`) and case/whitespace variations (` fast-bolt-hex-001 `). Candidate duplicates receive terminal outcome `review` and are held in the deduplication queue; automatic destructive merges are forbidden.
-2. **Missing Mandatory Fields**: Omitted product name, blank SKU, omitted unit of measure, blank price, missing currency, and blank category code.
+The Dirty Data Pack exercises 12 distinct failure categories across all 4 entity types with 131 deterministic synthetic rows (zero real PII):
+1. **Natural Key Duplication**: Exact SKU duplicates (`FAST-BOLT-HEX-001`) and case/whitespace variations (`  fast-bolt-hex-001  `). Candidate duplicates receive terminal outcome `review` and are held in the deduplication queue; automatic destructive merges are forbidden.
+2. **Missing Mandatory Fields**: Omitted product name, blank SKU, omitted unit of measure, blank price, missing currency, blank category code, missing warehouse code, and missing stock quantity.
 3. **Invalid Enumerations**: Non-standard units of measure (`gallons`, `inches`, `pallets`).
-4. **Decimal Out-of-Bounds**: Negative price (`-15.5000`), non-numeric price (`TWENTY_BUCKS`), excess decimal places (> 4 decimal digits: `12.34567`).
-5. **Currency Violations**: Non-standard currency codes (`US`, `123`) and missing currency values.
-6. **Tax Rate Violations**: Negative tax percentage (`-5.00`), percentage overflow (`125.00%`), and non-numeric strings (`EIGHTEEN_PCT`).
-7. **Referential Integrity Failures**: Products referencing unregistered category codes (`NON_EXISTENT_CAT`); stock balances referencing unknown SKUs (`UNKNOWN-PRODUCT-999`) or unknown warehouse codes (`WH-UNKNOWN`).
-8. **Negative Stock Levels**: Negative inventory stock quantity (`-50.0000`), violating domain rule BR-ERP1-02.
-9. **Multi-Warehouse Violations**: Attempts to register secondary facilities (`WH-02`), violating BR-ERP1-03 / FR-ERP1-05.
-10. **Security & Formula Injection Payloads**: Text containing spreadsheet formula execution prefixes (`=cmd|' /C calc'!A0`, `+12345FormulaInj`), rejected per PLT-12 / KIT-16; synthetic bank accounts (`CH93-0000-0000-0000-1234-5`) and SSNs (`999-00-1234`) to prove review-view masking.
+4. **Decimal Out-of-Bounds & Boundary Numbers**: Zero price (`0.0000`), min 4-decimal price (`0.0001`), upper boundary price (`99999999.9999`), negative price (`-15.5000`), boundary negative price (`-0.0001`), non-numeric price (`TWENTY_BUCKS`), excess decimal places (> 4 decimal digits: `12.34567`).
+5. **Currency Violations**: Non-standard currency codes (`US`, `123`), missing currency values, and whitespace-padded currency (`  USD  `).
+6. **Tax Rate Violations**: Boundary zero tax (`0.00`), boundary maximum tax (`100.00`), negative tax percentage (`-5.00`), boundary negative tax (`-0.01`), percentage overflow (`125.00%`), boundary overflow (`100.01%`), and non-numeric strings (`EIGHTEEN_PCT`).
+7. **Referential Integrity Failures**: Products referencing unregistered category codes (`NON_EXISTENT_CAT`); stock balances referencing unknown SKUs (`UNKNOWN-PRODUCT-999`, `UNKNOWN-PRODUCT-888`) or unknown warehouse codes (`WH-UNKNOWN`, `DEPOT-99`).
+8. **Negative Stock Levels & Boundary Quantities**: Zero stock balance (`0.0000`), min decimal stock (`0.0001`), upper boundary stock (`99999999.9999`), negative inventory stock quantity (`-50.0000`), and boundary negative stock (`-0.0001`), violating domain rule BR-ERP1-02.
+9. **Multi-Warehouse Violations**: Attempts to register secondary facilities (`WH-02`, `WH-03`, `DEPOT-NORTH`), violating BR-ERP1-03 / FR-ERP1-05.
+10. **Security & Formula Injection Payloads**: Text containing spreadsheet formula execution prefixes (`=cmd|' /C calc'!A0`, `+12345FormulaInj`, `@SUM(1,2)FormulaInj`, `-999FormulaInj`, `\tTabFormulaInj`), rejected per PLT-12 / KIT-16; synthetic bank accounts (`CH93-0000-0000-0000-1234-5`) and SSNs (`999-00-1234`) to prove review-view masking.
+11. **International UTF-8 Characters**: Accented French names (`Écrou Hexagonal Zingué M10`), German with umlauts and diameter symbol (`Schraube M8 Edelstahl Rostfrei Ø8mm`), Spanish with Greek Omega (`Resistencia Térmica 10kΩ`), Japanese Kanji/Katakana (`高精度リニアガイド 500mm`), and accented category codes/names (`MÉC` / `Mécanique & Automatismes`).
+12. **Date Format Variants & Ambiguity**: Valid ISO-8601 timestamps (`2026-04-01`, `2026-04-01T08:00:00Z`), ambiguous date formats (`04/05/2026`, `01-04-2026` rejected with `AMBIGUOUS_DATE_FORMAT`), non-existent calendar dates (`2026-02-30` rejected with `INVALID_DATE`), and invalid date strings (`invalid-calendar-date`).
 
 ### 20.3 Reconciliation Equation & Defect Distributions
 
@@ -696,10 +698,10 @@ $$\text{unaccounted} = 0$$
 #### Reconciliation Summary
 | Metric | Value | Meaning |
 |---|---|---|
-| **Total Source Rows** | `79` | Total records in `dirty-data-v1.csv` |
-| **Accepted** | `39` | Valid rows ready for target ingestion |
-| **Rejected** | `36` | Rows failing validation, format, or invariant rules |
-| **Review** | `4` | Candidate duplicates held for operator review |
+| **Total Source Rows** | `131` | Total records in `dirty-data-v1.csv` |
+| **Accepted** | `69` | Valid rows ready for target ingestion |
+| **Rejected** | `55` | Rows failing validation, format, or invariant rules |
+| **Review** | `7` | Candidate duplicates held for operator review |
 | **Skipped** | `0` | Skipped records (none in V1) |
 | **Unaccounted** | `0` | Zero orphan or unclassified rows |
 | **Is Balanced?** | **`true`** | Mathematical balance achieved |
@@ -707,11 +709,11 @@ $$\text{unaccounted} = 0$$
 #### Breakdown by Entity Record Type
 | Record Type | Total | Accepted | Rejected | Review | Skipped | Pass Rate |
 |---|---|---|---|---|---|---|
-| **`category`** | 10 | 6 | 3 | 1 | 0 | 60.0% |
-| **`warehouse`** | 4 | 1 | 3 | 0 | 0 | 25.0% |
-| **`product`** | 39 | 16 | 21 | 2 | 0 | 41.0% |
-| **`stock_level`** | 26 | 16 | 9 | 1 | 0 | 61.5% |
-| **Total** | **79** | **39** | **36** | **4** | **0** | **49.4%** |
+| **`category`** | 15 | 8 | 5 | 2 | 0 | 53.3% |
+| **`warehouse`** | 6 | 1 | 5 | 0 | 0 | 16.7% |
+| **`product`** | 65 | 35 | 27 | 3 | 0 | 53.8% |
+| **`stock_level`** | 45 | 25 | 18 | 2 | 0 | 55.6% |
+| **Total** | **131** | **69** | **55** | **7** | **0** | **52.7%** |
 
 #### Defect Distribution by Reason Code
 | Reason Code | Count | Failure Condition / Description | Doc Reference |
@@ -719,36 +721,42 @@ $$\text{unaccounted} = 0$$
 | `CATEGORY_CODE_REQUIRED` | 1 | Category code is missing or whitespace | FR-ERP1-03 |
 | `CATEGORY_NAME_REQUIRED` | 1 | Category name is missing or whitespace | FR-ERP1-03 |
 | `CATEGORY_CODE_TOO_LONG` | 1 | Category code exceeds 64 characters | FR-ERP1-03 |
-| `DUPLICATE_CATEGORY_CODE_REVIEW` | 1 | Category code already registered in batch | FR-ERP1-03 |
+| `DUPLICATE_CATEGORY_CODE_REVIEW` | 2 | Category code already registered in batch | FR-ERP1-03 |
+| `FORMULA_INJECTION_DETECTED` | 9 | Cell starts with formula prefix (=, +, -, @, \t, \r) | PLT-12 / KIT-16 |
+| `MULTIPLE_WAREHOUSES_REJECTED` | 4 | Secondary warehouse attempted (WH-02, WH-03, DEPOT) | FR-ERP1-05 / BR-ERP1-03 |
 | `WAREHOUSE_CODE_REQUIRED` | 1 | Warehouse code is missing or whitespace | FR-ERP1-05 |
 | `WAREHOUSE_NAME_REQUIRED` | 1 | Warehouse name is missing or whitespace | FR-ERP1-05 |
-| `MULTIPLE_WAREHOUSES_REJECTED` | 2 | Secondary warehouse attempted (WH-02, WH-03) | FR-ERP1-05 / BR-ERP1-03 |
+| `DUPLICATE_SKU_REVIEW` | 3 | Normalized SKU already exists in catalog or batch | BR-ERP1-01 |
 | `PRODUCT_NAME_REQUIRED` | 1 | Product name is missing or whitespace | FR-ERP1-01 |
 | `SKU_REQUIRED` | 1 | SKU natural key is missing | FR-ERP1-01 / BR-ERP1-01 |
-| `DUPLICATE_SKU_REVIEW` | 2 | Normalized SKU already exists in catalog or batch | BR-ERP1-01 |
 | `UNIT_OF_MEASURE_REQUIRED` | 1 | Unit of measure is missing | FR-ERP1-04 |
 | `INVALID_UNIT_OF_MEASURE` | 3 | Unit not in approved list (gallons, inches, pallets) | FR-ERP1-04 |
 | `PRICE_REQUIRED` | 1 | Selling price is missing | FR-ERP1-02 |
-| `NEGATIVE_PRICE` | 1 | Selling price is negative (< 0.0000) | FR-ERP1-02 / BR-ERP1-01 |
+| `NEGATIVE_PRICE` | 2 | Selling price is negative (< 0.0000) | FR-ERP1-02 / BR-ERP1-01 |
 | `INVALID_PRICE_FORMAT` | 1 | Non-numeric price string | FR-ERP1-02 |
-| `EXCESS_DECIMAL_PLACES` | 3 | Decimal value exceeds 4 decimal places (price or stock) | SDS §4.7 |
+| `EXCESS_DECIMAL_PLACES` | 2 | Decimal value exceeds 4 decimal places (price or stock) | SDS §4.7 |
 | `CURRENCY_REQUIRED` | 1 | Currency is missing | FR-ERP1-02 |
 | `INVALID_CURRENCY` | 2 | Currency not 3-letter ISO-4217 uppercase code | FR-ERP1-02 |
-| `NEGATIVE_TAX_RATE` | 1 | Tax percentage is negative (< 0.00) | FR-ERP1-02 |
-| `TAX_RATE_OUT_OF_RANGE` | 1 | Tax percentage exceeds 100.00% | FR-ERP1-02 |
+| `NEGATIVE_TAX_RATE` | 2 | Tax percentage is negative (< 0.00) | FR-ERP1-02 |
+| `TAX_RATE_OUT_OF_RANGE` | 2 | Tax percentage exceeds 100.00% | FR-ERP1-02 |
 | `INVALID_TAX_RATE_FORMAT` | 1 | Non-numeric tax rate representation | FR-ERP1-02 |
 | `CATEGORY_NOT_FOUND` | 1 | Referenced category not found in registry | FR-ERP1-03 |
 | `INVALID_EMAIL_FORMAT` | 1 | Email does not match RFC-5322 regex | RL-02 |
 | `INVALID_PHONE_FORMAT` | 1 | Phone does not match international pattern | RL-02 |
-| `FORMULA_INJECTION_DETECTED` | 2 | Cell starts with formula prefix (=, +) | PLT-12 / KIT-16 |
+| `DUPLICATE_STOCK_LEVEL_REVIEW` | 2 | Repeated opening stock for product/warehouse | FR-ERP1-06 / DR-6 |
+| `NEGATIVE_STOCK` | 3 | Inventory quantity is negative (< 0.0000) | BR-ERP1-02 / FR-ERP1-06 |
+| `PRODUCT_NOT_FOUND` | 3 | Referenced SKU not found in catalog | FR-ERP1-06 |
 | `PRODUCT_REQUIRED` | 2 | Stock record missing SKU reference | FR-ERP1-06 |
-| `PRODUCT_NOT_FOUND` | 2 | Referenced SKU not found in catalog | FR-ERP1-06 |
-| `WAREHOUSE_REQUIRED` | 1 | Stock record missing warehouse code | FR-ERP1-05 |
-| `WAREHOUSE_NOT_FOUND` | 1 | Stock record references unknown warehouse | FR-ERP1-05 |
-| `QUANTITY_REQUIRED` | 1 | Stock quantity is missing | FR-ERP1-06 |
-| `NEGATIVE_STOCK` | 2 | Inventory quantity is negative (< 0.0000) | BR-ERP1-02 / FR-ERP1-06 |
+| `WAREHOUSE_NOT_FOUND` | 2 | Stock record references unknown warehouse | FR-ERP1-05 |
+| `WAREHOUSE_REQUIRED` | 3 | Stock record missing warehouse code | FR-ERP1-05 |
 | `INVALID_QUANTITY_FORMAT` | 1 | Non-numeric stock quantity string | FR-ERP1-06 |
-| `DUPLICATE_STOCK_LEVEL_REVIEW` | 1 | Repeated opening stock for product/warehouse | FR-ERP1-06 / DR-6 |
+| `QUANTITY_REQUIRED` | 3 | Stock quantity is missing | FR-ERP1-06 |
+| `AMBIGUOUS_DATE_FORMAT` | 2 | Ambiguous date format (MM/DD/YYYY or DD-MM-YYYY) | FR-ERP1-06 / SDS §4.7 |
+| `INVALID_DATE` | 2 | Date is not a valid calendar date | FR-ERP1-06 |
+
+### 20.4 Per-Row Manifest Documentation
+
+In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json) includes a comprehensive `rows` mapping documenting the expected terminal outcome and failure reason codes for every individual source record from `R001` through `R131`. Every row is verified by automated regression test suites to reproduce identical outcomes across repeated runs.
 
 ---
 

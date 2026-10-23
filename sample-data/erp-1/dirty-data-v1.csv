@@ -1,80 +1,132 @@
-record_type,source_id,code,name,sku,category_code,unit_of_measure,price,currency,tax_rate,warehouse_code,quantity,is_default,notification_email,contact_phone,supplier_bank_account,employee_ssn,source_system
-category,CAT-001,GEN,General Hardware,,,,,,,,,,,
-category,CAT-002,ELEC,Electronics & Sensors,,,,,,,,,,,
-category,CAT-003,CHEM,Industrial Chemicals,,,,,,,,,,,
-category,CAT-004,RAW,Raw Materials & Metals,,,,,,,,,,,
-category,CAT-005,PKG,Packaging & Shipping Supplies,,,,,,,,,,,
-category,CAT-006,TOOLS,Hand & Power Tools,,,,,,,,,,,
-category,CAT-007,,Missing Category Code,,,,,,,,,,,
-category,CAT-008,INVALID_NAME_CAT,,,,,,,,,,,,
-category,CAT-009,CODE_EXCEEDING_SIXTY_FOUR_CHARACTERS_LIMIT_FOR_TESTING_OVERFLOW_FAIL_1234,Category With Long Code,,,,,,,,,,,
-category,CAT-010,GEN,General Hardware Duplicate,,,,,,,,,,,
-warehouse,WH-001,WH-01,Central Distribution Hub,,,,,,,,,true,,,
-warehouse,WH-002,WH-02,Secondary Depot Hub,,,,,,,,,false,,,
-warehouse,WH-003,,Missing Warehouse Code,,,,,,,,true,,,
-warehouse,WH-004,WH-03,,,,,,,,,,true,,,
-product,PRD-001,,Stainless Hex Bolt M8,FAST-BOLT-HEX-001,GEN,pcs,12.5000,USD,0.00,,,,ops@example.com,+1-555-0100,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-002,,Titanium Flange Nut M8,FAST-NUT-FLG-002,GEN,pcs,8.7500,USD,18.00,,,,ops@example.com,+1-555-0101,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-003,,Industrial Copper Wire 10AWG,RAW-COP-WIRE-003,RAW,metre,45.2000,USD,5.00,,,,wire@example.com,+1-555-0102,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-004,,Precision Stepper Motor NEMA23,ELEC-MOT-NEM-004,ELEC,pcs,145.0000,USD,18.00,,,,elec@example.com,+1-555-0103,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-005,,Synthetic Motor Oil 5W30,CHEM-OIL-SYN-005,CHEM,litre,32.0000,EUR,20.00,,,,chem@example.com,+1-555-0104,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-006,,Aluminum Ingot 99.7%,RAW-ALU-ING-006,RAW,kg,28.5000,USD,0.00,,,,raw@example.com,+1-555-0105,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-007,,Silica Gel Desiccant Beads,CHEM-SIL-DES-007,CHEM,g,0.0500,USD,5.00,,,,chem@example.com,+1-555-0106,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-008,,Corrugated Shipping Box 24x18,PKG-BOX-COR-008,PKG,box,6.2500,USD,0.00,,,,pkg@example.com,+1-555-0107,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-009,,Rotary Hammer Drill 800W,TOOL-DRL-ROT-009,TOOLS,pcs,210.0000,USD,18.00,,,,tool@example.com,+1-555-0108,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-010,,Lithium Grease Cartridge 400g,CHEM-LIT-GRS-010,CHEM,pcs,14.5000,EUR,19.00,,,,chem@example.com,+1-555-0109,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-011,,High-Carbon Steel Drill Bit Set,TOOL-BIT-SET-011,TOOLS,box,75.0000,USD,18.00,,,,tool@example.com,+1-555-0110,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-012,,Polyethylene Bubble Wrap 50m,PKG-BUB-WRP-012,PKG,metre,22.0000,USD,0.00,,,,pkg@example.com,+1-555-0111,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-013,,Optical Smoke Detector Sensor,ELEC-SEN-SMK-013,ELEC,pcs,38.9000,USD,12.00,,,,elec@example.com,+1-555-0112,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-014,,Industrial Solvent Acetone,CHEM-ACE-IND-014,CHEM,litre,18.7500,USD,5.00,,,,chem@example.com,+1-555-0113,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-015,,Brass Hex Bar Stock 25mm,RAW-BRS-BAR-015,RAW,kg,19.4000,EUR,19.00,,,,raw@example.com,+1-555-0114,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-016,,Heavy Duty Flange Gasket,SEAL-GSK-FLG-016,PKG,pcs,4.5000,USD,0.00,,,,ops@example.com,+1-555-0115,CH93-0000-0000-0000-1234-5,999-00-1234,SYNTH-ERP1-DIRTY-V1
-product,PRD-017,,Duplicate SKU Bolt,FAST-BOLT-HEX-001,GEN,pcs,12.5000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-018,,Whitespace/Lowercase Duplicate, fast-bolt-hex-001 ,GEN,pcs,12.5000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-019,,,PROD-NO-NAME-019,GEN,pcs,10.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-020,,Missing SKU Item,,GEN,pcs,15.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-021,,Missing UOM Item,PROD-NO-UOM-021,GEN,,15.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-022,,Invalid UOM Gallons,PROD-INV-UOM-022,GEN,gallons,25.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-023,,Invalid UOM Inches,PROD-INV-UOM-023,GEN,inches,5.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-024,,Invalid UOM Pallets,PROD-INV-UOM-024,GEN,pallets,500.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-025,,Missing Price Item,PROD-NO-PRC-025,GEN,pcs,,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-026,,Negative Price Item,PROD-NEG-PRC-026,GEN,pcs,-15.5000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-027,,Non-Numeric Price,PROD-NON-NUM-027,GEN,pcs,TWENTY_BUCKS,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-028,,Excess Decimals Price,PROD-EXC-DEC-028,GEN,pcs,12.34567,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-029,,Missing Currency Item,PROD-NO-CUR-029,GEN,pcs,20.0000,,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-030,,Invalid Currency US,PROD-INV-CUR-030,GEN,pcs,20.0000,US,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-031,,Invalid Currency 123,PROD-INV-CUR-031,GEN,pcs,20.0000,123,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-032,,Negative Tax Rate,PROD-NEG-TAX-032,GEN,pcs,20.0000,USD,-5.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-033,,Tax Rate Over Hundred,PROD-OVR-TAX-033,GEN,pcs,20.0000,USD,125.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-034,,Invalid Tax Format,PROD-INV-TAX-034,GEN,pcs,20.0000,USD,EIGHTEEN_PCT,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-035,,Unregistered Category,PROD-BAD-CAT-035,NON_EXISTENT_CAT,pcs,20.0000,USD,0.00,,,,,,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-036,,Invalid Email Address,PROD-BAD-EML-036,GEN,pcs,20.0000,USD,0.00,,,,invalid-email-address,+1-555-0199,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-037,,Invalid Phone Number,PROD-BAD-PHN-037,GEN,pcs,20.0000,USD,0.00,,,,ops@example.com,phone-not-a-number,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-038,,=cmd|' /C calc'!A0,PROD-CSV-INJ-038,GEN,pcs,20.0000,USD,0.00,,,,ops@example.com,+1-555-0100,,,SYNTH-ERP1-DIRTY-V1
-product,PRD-039,,+12345FormulaInj,PROD-CSV-INJ-039,GEN,pcs,20.0000,USD,0.00,,,,ops@example.com,+1-555-0100,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-001,,,FAST-BOLT-HEX-001,,,,,,WH-01,500.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-002,,,FAST-NUT-FLG-002,,,,,,WH-01,1200.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-003,,,RAW-COP-WIRE-003,,,,,,WH-01,250.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-004,,,ELEC-MOT-NEM-004,,,,,,WH-01,80.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-005,,,CHEM-OIL-SYN-005,,,,,,WH-01,150.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-006,,,RAW-ALU-ING-006,,,,,,WH-01,400.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-007,,,CHEM-SIL-DES-007,,,,,,WH-01,50000.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-008,,,PKG-BOX-COR-008,,,,,,WH-01,350.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-009,,,TOOL-DRL-ROT-009,,,,,,WH-01,25.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-010,,,CHEM-LIT-GRS-010,,,,,,WH-01,95.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-011,,,TOOL-BIT-SET-011,,,,,,WH-01,40.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-012,,,PKG-BUB-WRP-012,,,,,,WH-01,60.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-013,,,ELEC-SEN-SMK-013,,,,,,WH-01,110.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-014,,,CHEM-ACE-IND-014,,,,,,WH-01,75.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-015,,,RAW-BRS-BAR-015,,,,,,WH-01,180.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-016,,,SEAL-GSK-FLG-016,,,,,,WH-01,600.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-017,,,FAST-BOLT-HEX-001,,,,,,WH-01,200.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-018,,,FAST-NUT-FLG-002,,,,,,WH-01,-50.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-019,,,UNKNOWN-PRODUCT-999,,,,,,WH-01,100.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-020,,,,,,,,,,,WH-01,100.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-021,,,FAST-BOLT-HEX-001,,,,,,WH-UNKNOWN,100.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-022,,,FAST-BOLT-HEX-001,,,,,,,,100.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-023,,,FAST-BOLT-HEX-001,,,,,,WH-01,FIFTY_PIECES,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-024,,,FAST-BOLT-HEX-001,,,,,,WH-01,50.12345,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-025,,,FAST-BOLT-HEX-001,,,,,,WH-01,,,,,,,,SYNTH-ERP1-DIRTY-V1
-stock_level,STK-026,,,UNKNOWN-PRODUCT-888,,,,,,WH-01,-20.0000,,,,,,,SYNTH-ERP1-DIRTY-V1
+row_id,record_type,case_tags,source_id,code,name,sku,category_code,unit_of_measure,price,currency,tax_rate,warehouse_code,quantity,as_of_date,is_default,notification_email,contact_phone,supplier_bank_account,employee_ssn,source_system,expect_outcome,expect_reasons
+R001,category,category.code:valid|category.name:valid,CAT-001,GEN,General Hardware,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R002,category,category.code:valid|category.name:valid,CAT-002,ELEC,Electronics & Sensors,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R003,category,category.code:valid|category.name:valid,CAT-003,CHEM,Industrial Chemicals,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R004,category,category.code:valid|category.name:valid,CAT-004,RAW,Raw Materials & Metals,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R005,category,category.code:valid|category.name:valid,CAT-005,PKG,Packaging & Shipping Supplies,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R006,category,category.code:valid|category.name:valid,CAT-006,TOOLS,Hand & Power Tools,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R007,category,category.code:valid|category.name:utf8,CAT-007,MÉC,Mécanique & Automatismes,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R008,category,category.code:whitespace|category.name:whitespace,CAT-008,  SAFETY  ,  Safety & PPE Equipment  ,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R009,category,category.code:null,CAT-009,,Missing Category Code,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,CATEGORY_CODE_REQUIRED
+R010,category,category.name:null,CAT-010,INVALID_NAME_CAT,,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,CATEGORY_NAME_REQUIRED
+R011,category,category.code:too_long,CAT-011,CODE_EXCEEDING_SIXTY_FOUR_CHARACTERS_LIMIT_FOR_TESTING_OVERFLOW_FAIL_1234,Category With Long Code,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,CATEGORY_CODE_TOO_LONG
+R012,category,category.code:duplicate,CAT-012,GEN,General Hardware Duplicate,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_CATEGORY_CODE_REVIEW
+R013,category,category.code:duplicate_whitespace,CAT-013,  gen  ,General Hardware Lowercase Whitespace Duplicate,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_CATEGORY_CODE_REVIEW
+R014,category,category.code:formula_injection,CAT-014,=cmd|' /C calc'!A0,Formula Injection Code Category,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R015,category,category.name:formula_injection,CAT-015,INJ_CAT,+FormulaInjCat,,,,,,,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R016,warehouse,warehouse.code:valid|warehouse.name:valid,WH-001,WH-01,Central Distribution Hub,,,,,,,,,,true,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R017,warehouse,warehouse.code:multiple_rejected,WH-002,WH-02,Secondary Depot Hub,,,,,,,,,,false,,,,,SYNTH-ERP1-DIRTY-V1,rejected,MULTIPLE_WAREHOUSES_REJECTED
+R018,warehouse,warehouse.code:null,WH-003,,Missing Warehouse Code,,,,,,,,,,true,,,,,SYNTH-ERP1-DIRTY-V1,rejected,WAREHOUSE_CODE_REQUIRED
+R019,warehouse,warehouse.name:null,WH-004,WH-03,,,,,,,,,,,true,,,,,SYNTH-ERP1-DIRTY-V1,rejected,WAREHOUSE_NAME_REQUIRED
+R020,warehouse,warehouse.code:multiple_rejected,WH-005,DEPOT-NORTH,Depot North Regional Center,,,,,,,,,,false,,,,,SYNTH-ERP1-DIRTY-V1,rejected,MULTIPLE_WAREHOUSES_REJECTED
+R021,warehouse,warehouse.code:formula_injection,WH-006,=cmd|' /C calc'!A0,Warehouse Formula Injection,,,,,,,,,,true,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R022,product,product.sku:valid|product.price:valid,PRD-001,,Stainless Hex Bolt M8,FAST-BOLT-HEX-001,GEN,pcs,12.5000,USD,0.00,,,,,ops@example.com,+1-555-0100,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R023,product,product.sku:valid|product.tax_rate:valid,PRD-002,,Titanium Flange Nut M8,FAST-NUT-FLG-002,GEN,pcs,8.7500,USD,18.00,,,,,ops@example.com,+1-555-0101,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R024,product,product.uom:metre,PRD-003,,Industrial Copper Wire 10AWG,RAW-COP-WIRE-003,RAW,metre,45.2000,USD,5.00,,,,,wire@example.com,+1-555-0102,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R025,product,product.category:ELEC,PRD-004,,Precision Stepper Motor NEMA23,ELEC-MOT-NEM-004,ELEC,pcs,145.0000,USD,18.00,,,,,elec@example.com,+1-555-0103,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R026,product,product.currency:EUR|product.uom:litre,PRD-005,,Synthetic Motor Oil 5W30,CHEM-OIL-SYN-005,CHEM,litre,32.0000,EUR,20.00,,,,,chem@example.com,+1-555-0104,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R027,product,product.uom:kg,PRD-006,,Aluminum Ingot 99.7%,RAW-ALU-ING-006,RAW,kg,28.5000,USD,0.00,,,,,raw@example.com,+1-555-0105,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R028,product,product.uom:g,PRD-007,,Silica Gel Desiccant Beads,CHEM-SIL-DES-007,CHEM,g,0.0500,USD,5.00,,,,,chem@example.com,+1-555-0106,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R029,product,product.uom:box,PRD-008,,Corrugated Shipping Box 24x18,PKG-BOX-COR-008,PKG,box,6.2500,USD,0.00,,,,,pkg@example.com,+1-555-0107,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R030,product,product.category:TOOLS,PRD-009,,Rotary Hammer Drill 800W,TOOL-DRL-ROT-009,TOOLS,pcs,210.0000,USD,18.00,,,,,tool@example.com,+1-555-0108,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R031,product,product.currency:EUR,PRD-010,,Lithium Grease Cartridge 400g,CHEM-LIT-GRS-010,CHEM,pcs,14.5000,EUR,19.00,,,,,chem@example.com,+1-555-0109,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R032,product,product.category:TOOLS|product.uom:box,PRD-011,,High-Carbon Steel Drill Bit Set,TOOL-BIT-SET-011,TOOLS,box,75.0000,USD,18.00,,,,,tool@example.com,+1-555-0110,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R033,product,product.category:PKG|product.uom:metre,PRD-012,,Polyethylene Bubble Wrap 50m,PKG-BUB-WRP-012,PKG,metre,22.0000,USD,0.00,,,,,pkg@example.com,+1-555-0111,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R034,product,product.category:ELEC,PRD-013,,Optical Smoke Detector Sensor,ELEC-SEN-SMK-013,ELEC,pcs,38.9000,USD,12.00,,,,,elec@example.com,+1-555-0112,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R035,product,product.category:CHEM|product.uom:litre,PRD-014,,Industrial Solvent Acetone,CHEM-ACE-IND-014,CHEM,litre,18.7500,USD,5.00,,,,,chem@example.com,+1-555-0113,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R036,product,product.category:RAW|product.uom:kg,PRD-015,,Brass Hex Bar Stock 25mm,RAW-BRS-BAR-015,RAW,kg,19.4000,EUR,19.00,,,,,raw@example.com,+1-555-0114,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R037,product,product.sensitive_fields:masking,PRD-016,,Heavy Duty Flange Gasket,SEAL-GSK-FLG-016,PKG,pcs,4.5000,USD,0.00,,,,,ops@example.com,+1-555-0115,CH93-0000-0000-0000-1234-5,999-00-1234,SYNTH-ERP1-DIRTY-V1,accepted,
+R038,product,product.name:utf8_german,PRD-017,,Schraube M8 Edelstahl Rostfrei Ø8mm,GER-FAST-SCR-017,GEN,pcs,15.0000,EUR,19.00,,,,,ops@example.com,+1-555-0116,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R039,product,product.name:utf8_french,PRD-018,,Écrou Hexagonal Zingué M10,FRA-FAST-NUT-018,GEN,pcs,11.2000,EUR,20.00,,,,,ops@example.com,+1-555-0117,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R040,product,product.name:utf8_spanish,PRD-019,,Resistencia Térmica 10kΩ,ESP-ELEC-RES-019,ELEC,pcs,2.4500,EUR,21.00,,,,,ops@example.com,+1-555-0118,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R041,product,product.name:utf8_japanese,PRD-020,,高精度リニアガイド 500mm,JPN-MECH-LIN-020,MÉC,pcs,320.0000,USD,0.00,,,,,ops@example.com,+1-555-0119,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R042,product,product.name:whitespace_padded,PRD-021,,  Industrial Heavy-Duty Drill  ,TOOL-DRL-PAD-021,TOOLS,pcs,249.9900,USD,18.00,,,,,ops@example.com,+1-555-0120,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R043,product,product.currency:whitespace_padded,PRD-022,,Padded Currency Tool,TOOL-CUR-PAD-022,TOOLS,pcs,89.0000,  USD  ,18.00,,,,,ops@example.com,+1-555-0121,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R044,product,product.category:whitespace_padded,PRD-023,,Padded Category Hardware,HARD-CAT-PAD-023,  GEN  ,pcs,15.5000,USD,0.00,,,,,ops@example.com,+1-555-0122,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R045,product,product.price:boundary_zero,PRD-024,,Zero Cost Promotional Sample Bolt,PROMO-BOLT-ZERO-024,GEN,pcs,0.0000,USD,0.00,,,,,ops@example.com,+1-555-0123,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R046,product,product.price:boundary_min_decimal,PRD-025,,Minimum Decimal Positive Price Pin,MICRO-PIN-MIN-025,GEN,pcs,0.0001,USD,0.00,,,,,ops@example.com,+1-555-0124,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R047,product,product.price:boundary_upper_decimal,PRD-026,,Upper Boundary Decimal Turbine Rotor,TURB-ROTOR-MAX-026,MÉC,pcs,99999999.9999,USD,0.00,,,,,ops@example.com,+1-555-0125,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R048,product,product.tax_rate:boundary_zero,PRD-027,,Zero Tax Rate Basic Fastener,FAST-TAX-ZERO-027,GEN,pcs,5.0000,USD,0.00,,,,,ops@example.com,+1-555-0126,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R049,product,product.tax_rate:boundary_max,PRD-028,,Hundred Percent Luxury Tax Component,LUX-TAX-MAX-028,ELEC,pcs,500.0000,USD,100.00,,,,,ops@example.com,+1-555-0127,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R050,product,product.currency:GBP,PRD-029,,British Pound Industrial Valve,VALVE-GBP-STD-029,MÉC,pcs,185.5000,GBP,20.00,,,,,ops@example.com,+1-555-0128,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R051,product,product.currency:INR,PRD-030,,Indian Rupee Copper Busbar,BUSBAR-INR-STD-030,RAW,metre,1250.0000,INR,18.00,,,,,ops@example.com,+1-555-0129,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R052,product,product.uom:kg,PRD-031,,Heavy Steel Sheet 2mm,RAW-STEEL-SHT-031,RAW,kg,42.5000,USD,0.00,,,,,ops@example.com,+1-555-0130,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R053,product,product.uom:g,PRD-034,,Micro SMD Capacitor 0402,ELEC-CAP-SMD-034,ELEC,g,0.0200,USD,18.00,,,,,ops@example.com,+1-555-0131,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R054,product,product.uom:litre,PRD-035,,Hydraulic Fluid ISO VG 46,CHEM-HYD-FLU-035,CHEM,litre,48.0000,EUR,19.00,,,,,ops@example.com,+1-555-0132,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R055,product,product.uom:metre,PRD-036,,Fiberglass Braided Sleeving,RAW-FBR-SLV-036,RAW,metre,14.2500,USD,0.00,,,,,ops@example.com,+1-555-0133,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R056,product,product.uom:box,PRD-037,,Bulk Packaging Bubble Pouches,PKG-POUCH-BLK-037,PKG,box,35.0000,USD,0.00,,,,,ops@example.com,+1-555-0134,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R057,product,product.sku:exact_duplicate,PRD-038,,Duplicate SKU Bolt Exact,FAST-BOLT-HEX-001,GEN,pcs,12.5000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_SKU_REVIEW
+R058,product,product.sku:whitespace_lowercase_duplicate,PRD-039,,Duplicate SKU Lowercase Spaces,  fast-bolt-hex-001  ,GEN,pcs,12.5000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_SKU_REVIEW
+R059,product,product.sku:duplicate_nut,PRD-040,,Duplicate Titanium Nut,FAST-NUT-FLG-002,GEN,pcs,8.7500,USD,18.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_SKU_REVIEW
+R060,product,product.name:null,PRD-041,,,PROD-NO-NAME-041,GEN,pcs,10.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,PRODUCT_NAME_REQUIRED
+R061,product,product.sku:null,PRD-042,,Missing SKU Item,,GEN,pcs,15.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,SKU_REQUIRED
+R062,product,product.uom:null,PRD-043,,Missing UOM Item,PROD-NO-UOM-043,GEN,,15.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,UNIT_OF_MEASURE_REQUIRED
+R063,product,product.uom:invalid_gallons,PRD-044,,Invalid UOM Gallons,PROD-INV-UOM-044,GEN,gallons,25.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_UNIT_OF_MEASURE
+R064,product,product.uom:invalid_inches,PRD-045,,Invalid UOM Inches,PROD-INV-UOM-045,GEN,inches,5.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_UNIT_OF_MEASURE
+R065,product,product.uom:invalid_pallets,PRD-046,,Invalid UOM Pallets,PROD-INV-UOM-046,GEN,pallets,500.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_UNIT_OF_MEASURE
+R066,product,product.price:null,PRD-047,,Missing Price Item,PROD-NO-PRC-047,GEN,pcs,,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,PRICE_REQUIRED
+R067,product,product.price:negative,PRD-048,,Negative Price Item,PROD-NEG-PRC-048,GEN,pcs,-15.5000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_PRICE
+R068,product,product.price:boundary_negative,PRD-049,,Boundary Negative Price Item,PROD-NEG-BND-049,GEN,pcs,-0.0001,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_PRICE
+R069,product,product.price:non_numeric,PRD-050,,Non-Numeric Price,PROD-NON-NUM-050,GEN,pcs,TWENTY_BUCKS,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_PRICE_FORMAT
+R070,product,product.price:excess_decimals,PRD-051,,Excess Decimals Price,PROD-EXC-DEC-051,GEN,pcs,12.34567,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,EXCESS_DECIMAL_PLACES
+R071,product,product.currency:null,PRD-052,,Missing Currency Item,PROD-NO-CUR-052,GEN,pcs,20.0000,,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,CURRENCY_REQUIRED
+R072,product,product.currency:invalid_length,PRD-053,,Invalid Currency US,PROD-INV-CUR-053,GEN,pcs,20.0000,US,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_CURRENCY
+R073,product,product.currency:invalid_numeric,PRD-054,,Invalid Currency 123,PROD-INV-CUR-054,GEN,pcs,20.0000,123,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_CURRENCY
+R074,product,product.tax_rate:negative,PRD-055,,Negative Tax Rate,PROD-NEG-TAX-055,GEN,pcs,20.0000,USD,-5.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_TAX_RATE
+R075,product,product.tax_rate:boundary_negative,PRD-056,,Boundary Negative Tax Rate,PROD-NEG-BND-056,GEN,pcs,20.0000,USD,-0.01,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_TAX_RATE
+R076,product,product.tax_rate:over_hundred,PRD-057,,Tax Rate Over Hundred,PROD-OVR-TAX-057,GEN,pcs,20.0000,USD,125.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,TAX_RATE_OUT_OF_RANGE
+R077,product,product.tax_rate:boundary_over_hundred,PRD-058,,Boundary Tax Rate Over Hundred,PROD-OVR-BND-058,GEN,pcs,20.0000,USD,100.01,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,TAX_RATE_OUT_OF_RANGE
+R078,product,product.tax_rate:invalid_format,PRD-059,,Invalid Tax Format,PROD-INV-TAX-059,GEN,pcs,20.0000,USD,EIGHTEEN_PCT,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_TAX_RATE_FORMAT
+R079,product,product.category:foreign_key_missing,PRD-060,,Unregistered Category,PROD-BAD-CAT-060,NON_EXISTENT_CAT,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,CATEGORY_NOT_FOUND
+R080,product,product.email:invalid,PRD-061,,Invalid Email Address,PROD-BAD-EML-061,GEN,pcs,20.0000,USD,0.00,,,,,invalid-email-address,+1-555-0199,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_EMAIL_FORMAT
+R081,product,product.phone:invalid,PRD-062,,Invalid Phone Number,PROD-BAD-PHN-062,GEN,pcs,20.0000,USD,0.00,,,,,ops@example.com,phone-not-a-number,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_PHONE_FORMAT
+R082,product,product.formula_injection:cmd,PRD-063,,=cmd|' /C calc'!A0,PROD-CSV-INJ-063,GEN,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R083,product,product.formula_injection:plus,PRD-064,,+12345FormulaInj,PROD-CSV-INJ-064,GEN,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R084,product,product.formula_injection:at,PRD-065,,"@SUM(1,2)FormulaInj",PROD-CSV-INJ-065,GEN,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R085,product,product.formula_injection:dash,PRD-066,,-999FormulaInj,PROD-CSV-INJ-066,GEN,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R086,product,product.formula_injection:tab,PRD-067,,	TabFormulaInj,PROD-CSV-INJ-067,GEN,pcs,20.0000,USD,0.00,,,,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R087,stock_level,stock.sku:valid|stock.warehouse:valid|stock.date:iso,STK-001,,,FAST-BOLT-HEX-001,,,,,,WH-01,500.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R088,stock_level,stock.sku:valid|stock.date:iso_datetime,STK-002,,,FAST-NUT-FLG-002,,,,,,WH-01,1200.0000,2026-04-01T08:00:00Z,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R089,stock_level,stock.sku:valid|stock.quantity:valid,STK-003,,,RAW-COP-WIRE-003,,,,,,WH-01,250.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R090,stock_level,stock.sku:valid,STK-004,,,ELEC-MOT-NEM-004,,,,,,WH-01,80.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R091,stock_level,stock.sku:valid,STK-005,,,CHEM-OIL-SYN-005,,,,,,WH-01,150.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R092,stock_level,stock.sku:valid,STK-006,,,RAW-ALU-ING-006,,,,,,WH-01,400.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R093,stock_level,stock.sku:valid|stock.quantity:high,STK-007,,,CHEM-SIL-DES-007,,,,,,WH-01,50000.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R094,stock_level,stock.sku:valid,STK-008,,,PKG-BOX-COR-008,,,,,,WH-01,350.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R095,stock_level,stock.sku:valid,STK-009,,,TOOL-DRL-ROT-009,,,,,,WH-01,25.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R096,stock_level,stock.sku:valid,STK-010,,,CHEM-LIT-GRS-010,,,,,,WH-01,95.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R097,stock_level,stock.sku:valid,STK-011,,,TOOL-BIT-SET-011,,,,,,WH-01,40.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R098,stock_level,stock.sku:valid,STK-012,,,PKG-BUB-WRP-012,,,,,,WH-01,60.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R099,stock_level,stock.sku:valid,STK-013,,,ELEC-SEN-SMK-013,,,,,,WH-01,110.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R100,stock_level,stock.sku:valid,STK-014,,,CHEM-ACE-IND-014,,,,,,WH-01,75.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R101,stock_level,stock.sku:valid,STK-015,,,RAW-BRS-BAR-015,,,,,,WH-01,180.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R102,stock_level,stock.sku:valid,STK-016,,,SEAL-GSK-FLG-016,,,,,,WH-01,600.0000,,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R103,stock_level,stock.sku:utf8_german,STK-017,,,GER-FAST-SCR-017,,,,,,WH-01,450.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R104,stock_level,stock.sku:utf8_french,STK-018,,,FRA-FAST-NUT-018,,,,,,WH-01,850.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R105,stock_level,stock.sku:utf8_spanish,STK-019,,,ESP-ELEC-RES-019,,,,,,WH-01,2000.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R106,stock_level,stock.sku:utf8_japanese,STK-020,,,JPN-MECH-LIN-020,,,,,,WH-01,15.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R107,stock_level,stock.quantity:boundary_zero,STK-021,,,PROMO-BOLT-ZERO-024,,,,,,WH-01,0.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R108,stock_level,stock.quantity:boundary_min_decimal,STK-022,,,MICRO-PIN-MIN-025,,,,,,WH-01,0.0001,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R109,stock_level,stock.quantity:boundary_upper_decimal,STK-023,,,TURB-ROTOR-MAX-026,,,,,,WH-01,99999999.9999,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R110,stock_level,stock.warehouse:whitespace_padded,STK-024,,,TOOL-DRL-PAD-021,,,,,,  WH-01  ,30.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R111,stock_level,stock.sku:whitespace_padded,STK-025,,,  TOOL-CUR-PAD-022  ,,,,,,WH-01,15.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,accepted,
+R112,stock_level,stock.sku:duplicate_stock_level,STK-026,,,FAST-BOLT-HEX-001,,,,,,WH-01,200.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_STOCK_LEVEL_REVIEW
+R113,stock_level,stock.sku:duplicate_whitespace_stock,STK-027,,,  fast-bolt-hex-001  ,,,,,,WH-01,50.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,review,DUPLICATE_STOCK_LEVEL_REVIEW
+R114,stock_level,stock.quantity:negative,STK-028,,,FAST-NUT-FLG-002,,,,,,WH-01,-50.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_STOCK
+R115,stock_level,stock.quantity:boundary_negative,STK-029,,,RAW-COP-WIRE-003,,,,,,WH-01,-0.0001,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,NEGATIVE_STOCK
+R116,stock_level,stock.sku:foreign_key_missing,STK-030,,,UNKNOWN-PRODUCT-999,,,,,,WH-01,100.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,PRODUCT_NOT_FOUND
+R117,stock_level,stock.sku:null,STK-031,,,,,,,,,WH-01,100.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,PRODUCT_REQUIRED
+R118,stock_level,stock.warehouse:foreign_key_missing,STK-032,,,FAST-BOLT-HEX-001,,,,,,WH-UNKNOWN,100.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,WAREHOUSE_NOT_FOUND
+R119,stock_level,stock.warehouse:foreign_key_missing,STK-033,,,FAST-BOLT-HEX-001,,,,,,DEPOT-99,100.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,WAREHOUSE_NOT_FOUND
+R120,stock_level,stock.warehouse:null,STK-034,,,FAST-BOLT-HEX-001,,,,,,,100.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,WAREHOUSE_REQUIRED
+R121,stock_level,stock.quantity:non_numeric,STK-035,,,FAST-BOLT-HEX-001,,,,,,WH-01,FIFTY_PIECES,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_QUANTITY_FORMAT
+R122,stock_level,stock.quantity:excess_decimals,STK-036,,,FAST-BOLT-HEX-001,,,,,,WH-01,50.12345,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,EXCESS_DECIMAL_PLACES
+R123,stock_level,stock.quantity:null,STK-037,,,FAST-BOLT-HEX-001,,,,,,WH-01,,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,QUANTITY_REQUIRED
+R124,stock_level,stock.sku:fk_missing_and_neg_stock,STK-038,,,UNKNOWN-PRODUCT-888,,,,,,WH-01,-20.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,"PRODUCT_NOT_FOUND,NEGATIVE_STOCK"
+R125,stock_level,stock.date:ambiguous_slash,STK-039,,,ELEC-MOT-NEM-004,,,,,,WH-01,10.0000,04/05/2026,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,AMBIGUOUS_DATE_FORMAT
+R126,stock_level,stock.date:ambiguous_dash,STK-040,,,CHEM-OIL-SYN-005,,,,,,WH-01,10.0000,01-04-2026,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,AMBIGUOUS_DATE_FORMAT
+R127,stock_level,stock.date:invalid_calendar_feb30,STK-041,,,RAW-ALU-ING-006,,,,,,WH-01,10.0000,2026-02-30,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_DATE
+R128,stock_level,stock.date:invalid_calendar_text,STK-042,,,CHEM-SIL-DES-007,,,,,,WH-01,10.0000,invalid-calendar-date,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,INVALID_DATE
+R129,stock_level,stock.sku:formula_injection,STK-043,,,=cmd|' /C calc'!A0,,,,,,WH-01,10.0000,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,"FORMULA_INJECTION_DETECTED,PRODUCT_NOT_FOUND"
+R130,stock_level,stock.warehouse:null|stock.quantity:null,STK-044,,,PKG-BOX-COR-008,,,,,,,,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,"WAREHOUSE_REQUIRED,QUANTITY_REQUIRED"
+R131,stock_level,stock.all_required_null,STK-045,,,,,,,,,,,2026-04-01,,,,,,SYNTH-ERP1-DIRTY-V1,rejected,"PRODUCT_REQUIRED,WAREHOUSE_REQUIRED,QUANTITY_REQUIRED"

@@ -533,6 +533,14 @@ export const DirtyDataProfileReportSchema = z.object({
     })
   ),
   by_reason_code: z.record(z.number().int().nonnegative()),
+  rows: z
+    .record(
+      z.object({
+        outcome: z.enum(['accepted', 'rejected', 'review', 'skipped']),
+        reasons: z.array(z.string()),
+      })
+    )
+    .optional(),
   generated_at: z.string().datetime(),
 });
 export type DirtyDataProfileReport = z.infer<typeof DirtyDataProfileReportSchema>;

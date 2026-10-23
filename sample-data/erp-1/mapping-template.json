@@ -249,6 +249,12 @@
           "required": true,
           "scale": 4,
           "non_negative": true
+        },
+        {
+          "source": "as_of_date",
+          "target": "as_of_date",
+          "required": false,
+          "iso_8601": true
         }
       ]
     }
