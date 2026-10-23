@@ -707,4 +707,66 @@ components:
           additionalProperties: true
         createdAt: { type: string, format: date-time }
 
+    DataQualityRule:
+      type: object
+      required: [rule_id, version, record_type, field, condition, action, explanation, doc_reference]
+      properties:
+        rule_id: { type: string }
+        version: { type: string }
+        record_type: { type: string, enum: [category, warehouse, product, stock_level, all] }
+        field: { type: string }
+        condition: { type: string }
+        action: { type: string, enum: [normalize, reject, review] }
+        reason_code: { type: string }
+        explanation: { type: string }
+        doc_reference: { type: string }
+
+    ReconciliationSummary:
+      type: object
+      required: [total_source_rows, accepted, rejected, review, skipped, unaccounted, is_balanced]
+      properties:
+        total_source_rows: { type: integer, minimum: 0 }
+        accepted: { type: integer, minimum: 0 }
+        rejected: { type: integer, minimum: 0 }
+        review: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        unaccounted: { type: integer, minimum: 0 }
+        is_balanced: { type: boolean }
+
+    DirtyDataProfileReport:
+      type: object
+      required: [profile_schema_version, rules_version, module, fixture, fixture_sha256, total_rows, reconciliation, by_record_type, by_reason_code, generated_at]
+      properties:
+        profile_schema_version: { type: integer, minimum: 1 }
+        rules_version: { type: string }
+        module: { type: string, enum: [erp1] }
+        fixture: { type: string }
+        fixture_sha256: { type: string }
+        total_rows: { type: integer, minimum: 0 }
+        reconciliation: { $ref: '#/components/schemas/ReconciliationSummary' }
+        by_record_type:
+          type: object
+          additionalProperties:
+            type: object
+            required: [accepted, rejected, review, skipped, total]
+            properties:
+              accepted: { type: integer, minimum: 0 }
+              rejected: { type: integer, minimum: 0 }
+              review: { type: integer, minimum: 0 }
+              skipped: { type: integer, minimum: 0 }
+              total: { type: integer, minimum: 0 }
+        by_reason_code:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        rows:
+          type: object
+          additionalProperties:
+            type: object
+            required: [outcome, reasons]
+            properties:
+              outcome: { type: string, enum: [accepted, rejected, review, skipped] }
+              reasons: { type: array, items: { type: string } }
+        generated_at: { type: string, format: date-time }
+
+
 

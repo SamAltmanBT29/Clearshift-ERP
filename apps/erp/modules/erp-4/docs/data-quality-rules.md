@@ -206,3 +206,23 @@ Cleaning normalizes raw text without mutating source rows:
 | `JRL-027` | 1.0.0 | `department_ref` | reference | reject | `DEPARTMENT_NOT_FOUND` | Referenced department does not exist in ERP-5. |
 | `JRL-030` | 1.0.0 | `parent_source_id` | invariant | review | `PARENT_ENTRY_IN_REVIEW` | Parent journal entry is held for review; line cannot be loaded. |
 | `JRL-031` | 1.0.0 | `parent_source_id` | invariant | reject | `PARENT_ENTRY_REJECTED` | Parent journal entry was rejected; line cannot be loaded. |
+
+---
+
+## 8. Column Profiling Configuration & Expected Result Assertions (Issue #182 / ERP4-26 / KIT-03)
+
+### 8.1 Shared Migration Kit Profiler Integration
+- Uses `@cs/kit` shared column profiler (`packages/kit/src/domain/profiler.ts`) complying with Migration Kit SDS §4.3 (FR-PR-01..04).
+- Computes per-column metrics: total rows, null count, populated count, distinct count, invalid format count, invalid format rate (%), and top 5 most frequent values.
+- Performs deterministic exact duplicate candidate detection across normalized candidate keys.
+- Enforces strict non-destructive profiling: source data remains byte-for-byte identical; verified via immutable SHA-256 (`506eabd2932433b43c4181f84be1298fd5a2a5a3292d601d477885491cf130d1`).
+- Generates formula-safe CSV data health export (`exportProfileReportToCsv`) with OWASP formula injection prefixing (`=`, `+`, `-`, `@`, `\t`, `\r` prefixed with `'`).
+
+### 8.2 Configured Module Rules
+- Rules file: [`apps/erp/modules/erp-4/src/migration/profiling-config.ts`](../src/migration/profiling-config.ts)
+- Test suite: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../tests/migration/profiling.test.ts) (20 automated tests)
+- Endpoints:
+  - `GET /api/v1/erp-finance/migration/profile`: Returns full JSON profile report
+  - `GET /api/v1/erp-finance/migration/profile/export`: Downloads formula-safe CSV Data Health Report
+  - `POST /api/v1/erp-finance/migration/profile`: In-memory non-destructive profiling of arbitrary CSV payload
+- UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx)

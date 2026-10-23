@@ -14,6 +14,7 @@ import { journalEntriesRoutes } from './journal-entries.js';
 import { trialBalanceRoutes } from './trial-balance.js';
 import { openingBalancesRoutes } from './opening-balances.js';
 import { periodsRoutes } from './periods.js';
+import { profilingRoutes } from './profiling.js';
 
 export interface ErpFinanceRoutesOptions {
   financeService: FinanceService;
@@ -29,6 +30,7 @@ export const erpFinanceRoutes: FastifyPluginAsync<ErpFinanceRoutesOptions> = asy
   await fastify.register(trialBalanceRoutes, childOpts);
   await fastify.register(openingBalancesRoutes, childOpts);
   await fastify.register(periodsRoutes, childOpts);
+  await fastify.register(profilingRoutes);
 };
 
 export {
@@ -37,4 +39,5 @@ export {
   trialBalanceRoutes,
   openingBalancesRoutes,
   periodsRoutes,
+  profilingRoutes,
 };
