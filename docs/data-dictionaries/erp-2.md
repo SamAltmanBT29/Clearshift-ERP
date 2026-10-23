@@ -459,3 +459,68 @@ ERP-2 implements high-reliability batch migration loading conforming to the Clea
 
 - In strict compliance with ClearShift Core Rules, compensating rollback sagas are explicitly prohibited in V1 (`ROLLBACK_SAGA_PROHIBITED`).
 - When a batch stops due to excessive failures, ClearShift preserves all durable evidence, target rows, and receipt logs for human inspection and auditable resumption. Under no circumstances are committed business rows or receipts rolled back or deleted.
+
+---
+
+## 13. Search, Filters and Sorting Controls (ERP2-18)
+
+### 13.1 Debounced Search Bar (AC1)
+
+| Parameter | Value |
+|---|---|
+| Component | `SearchBar` (`apps/erp/modules/erp-2/web/src/components/SearchBar.tsx`) |
+| Debounce delay | 300ms from last keystroke |
+| API parameter | `search` (string, max 100 chars) on `VendorListQuery` |
+| PO search | Client-side text match on `po_number` only (API does not support PO search) |
+| Clear behavior | Clicking ✕ fires `onChange('')` immediately (no debounce) |
+| External reset | Internal state syncs when parent `value` prop changes (e.g. Clear All) |
+
+### 13.2 Faceted Filter Sidebar (AC2)
+
+| Facet | Scope | Options | API parameter |
+|---|---|---|---|
+| Currency | Vendors | All, USD, EUR, GBP | Client-side filter (not in API) |
+| Status | Purchase Orders | All, Draft, Sent, Received, Closed | `status` on `PurchaseOrderListQuery` |
+
+- Sidebar is collapsible on mobile (< 768px stacks above content).
+- Radio group selection immediately updates filter state and triggers table reload.
+- "Reset Filters" button clears all facets in the sidebar.
+
+### 13.3 Active Filter Pill Tags (AC3)
+
+| Feature | Behavior |
+|---|---|
+| Pill rendering | One pill per active filter (search, currency, status, vendor_id) |
+| Individual remove | Clicking ✕ on a pill clears that specific filter and resets to page 1 |
+| Clear All | Clicking "Clear All" resets all filters and sort to defaults |
+| Empty state | Component returns `null` when no filters are active |
+
+### 13.4 URL Query State Synchronization
+
+Active filter values are synced to the browser URL using `window.history.replaceState`:
+
+| Tab | URL parameters |
+|---|---|
+| Vendors | `?search=X&currency=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+| Purchase Orders | `?status=X&vendor_id=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+
+- Default values (`page=1`, `pageSize=20`, no sort) are omitted from the URL.
+- Parameters are parsed on mount to restore filter state from shared/bookmarked URLs.
+
+### 13.5 Empty State (AC4)
+
+When a search or filter combination returns zero results and there is no loading or error state, the existing `EmptyState` component is displayed with:
+
+- **Default title**: "No records found"
+- **Default message**: "There are no records matching your current search or filter criteria."
+- Optional action button (e.g. "Clear filters") to reset all filters.
+
+### 13.6 CSS Scoping
+
+All new CSS classes use the `cs-erp2-*` prefix to avoid collision with other modules:
+
+- `cs-erp2-search-*` — Search bar tokens
+- `cs-erp2-pill-*` — Filter pill tags tokens
+- `cs-erp2-faceted-sidebar`, `cs-erp2-sidebar-*`, `cs-erp2-facet-*` — Sidebar tokens
+- `cs-erp2-content-with-sidebar`, `cs-erp2-content-main` — Layout tokens
+

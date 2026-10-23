@@ -1,5 +1,17 @@
+/**
+ * ERP-2 Vendors & Purchasing — Filter Bar Components
+ *
+ * VendorFilterBar: debounced search bar (300ms, AC1) + reset action.
+ * PurchaseOrderFilterBar: status dropdown + reset action.
+ *
+ * @module erp2/web/components/FilterBar
+ */
+
 import React from 'react';
 import type { VendorListQuery, PurchaseOrderListQuery, PurchaseOrderStatus } from '@clearshift/contracts';
+import { SearchBar } from './SearchBar.js';
+
+// ─── Vendor Filter Bar ─────────────────────────────────────────────────────────
 
 interface VendorFilterBarProps {
   filters: VendorListQuery;
@@ -14,31 +26,30 @@ export const VendorFilterBar: React.FC<VendorFilterBarProps> = ({
   onReset,
   isLoading = false,
 }) => {
+  const hasActiveFilters = Boolean(filters.search?.trim());
+
   return (
     <div className="cs-filter-bar" role="search" aria-label="Vendor search and filter controls">
-      <div className="cs-filter-group">
-        <label htmlFor="vendor-search-input" className="cs-filter-label">
-          Search
-        </label>
-        <input
-          id="vendor-search-input"
-          type="search"
-          className="cs-input cs-input-search"
-          placeholder="Search by legal name..."
-          aria-label="Search vendors by legal name"
+      {/* Debounced search — 300ms (AC1) */}
+      <div className="cs-filter-group cs-filter-group--search">
+        <SearchBar
           value={filters.search || ''}
-          onChange={(e) => onFilterChange({ search: e.target.value })}
+          onChange={(debouncedVal) => onFilterChange({ search: debouncedVal })}
+          placeholder="Search vendors by name, tax number..."
           disabled={isLoading}
+          debounceMs={300}
+          inputId="erp2-vendor-search-input"
+          ariaLabel="Search vendors"
         />
       </div>
 
-      <div className="cs-filter-group" style={{ alignSelf: 'flex-end' }}>
+      <div className="cs-filter-group" style={{ alignSelf: 'center' }}>
         <button
           type="button"
           className="cs-btn-secondary"
           onClick={onReset}
-          disabled={isLoading || !filters.search}
-          aria-label="Reset filters"
+          disabled={isLoading || !hasActiveFilters}
+          aria-label="Reset vendor filters"
         >
           Reset Filters
         </button>
@@ -46,6 +57,8 @@ export const VendorFilterBar: React.FC<VendorFilterBarProps> = ({
     </div>
   );
 };
+
+// ─── Purchase Order Filter Bar ─────────────────────────────────────────────────
 
 interface PurchaseOrderFilterBarProps {
   filters: PurchaseOrderListQuery;
@@ -62,8 +75,11 @@ export const PurchaseOrderFilterBar: React.FC<PurchaseOrderFilterBarProps> = ({
   onReset,
   isLoading = false,
 }) => {
+  const hasActiveFilters = Boolean(filters.status) || Boolean(filters.vendor_id);
+
   return (
     <div className="cs-filter-bar" role="search" aria-label="Purchase order filter controls">
+      {/* Status filter */}
       <div className="cs-filter-group">
         <label htmlFor="po-status-select" className="cs-filter-label">
           Order Status
@@ -71,7 +87,7 @@ export const PurchaseOrderFilterBar: React.FC<PurchaseOrderFilterBarProps> = ({
         <select
           id="po-status-select"
           className="cs-select"
-          aria-label="Filter by order status"
+          aria-label="Status filter"
           value={filters.status || ''}
           onChange={(e) => {
             const val = e.target.value;
@@ -93,8 +109,8 @@ export const PurchaseOrderFilterBar: React.FC<PurchaseOrderFilterBarProps> = ({
           type="button"
           className="cs-btn-secondary"
           onClick={onReset}
-          disabled={isLoading || (!filters.status && !filters.vendor_id)}
-          aria-label="Reset filters"
+          disabled={isLoading || !hasActiveFilters}
+          aria-label="Reset purchase order filters"
         >
           Reset Filters
         </button>

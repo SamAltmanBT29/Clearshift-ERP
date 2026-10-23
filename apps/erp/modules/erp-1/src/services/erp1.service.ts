@@ -31,6 +31,11 @@ import {
   type Warehouse,
 } from '@clearshift/contracts';
 import {
+  assertSourceIdentityIsComplete,
+  assertValidCurrencyCode,
+  assertValidUnitOfMeasure,
+} from '../domain/relationships.js';
+import {
   Erp1ConflictError,
   Erp1NotFoundError,
   Erp1UnprocessableError,
@@ -152,6 +157,12 @@ export class Erp1Service {
     };
     const requestHash = computeRequestHash(businessPayload);
 
+    assertSourceIdentityIsComplete(sourceSystemOf(input), sourceIdOf(input));
+    assertValidUnitOfMeasure(input.unitOfMeasure);
+    if (input.currency) {
+      assertValidCurrencyCode(input.currency);
+    }
+
     return this.repo.transaction(async (tx) => {
       if (meta.idempotencyKey !== undefined) {
         const replay = await this.replay<Product>(tx, meta.idempotencyKey, requestHash);
@@ -272,6 +283,8 @@ export class Erp1Service {
     const meta = importMeta(input);
     const businessPayload = { name: input.name, code: input.code };
     const requestHash = computeRequestHash(businessPayload);
+
+    assertSourceIdentityIsComplete(sourceSystemOf(input), sourceIdOf(input));
 
     return this.repo.transaction(async (tx) => {
       if (meta.idempotencyKey !== undefined) {

@@ -632,3 +632,319 @@
     gap: var(--space-3);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ERP2-18: Search, Filter & Sidebar Controls
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Two-column content layout (sidebar + main) ── */
+.cs-erp2-content-with-sidebar {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-4) 0;
+}
+
+.cs-erp2-content-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ── Debounced Search Bar ── */
+.cs-erp2-search-container {
+  display: flex;
+  align-items: center;
+}
+
+.cs-erp2-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+}
+
+.cs-erp2-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  font-size: 14px;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+.cs-erp2-search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-5) var(--space-2) calc(var(--space-3) * 2.8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cs-erp2-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb, 99 102 241) / 0.2);
+}
+
+.cs-erp2-search-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cs-erp2-search-clear-btn {
+  position: absolute;
+  right: var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.cs-erp2-search-clear-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+}
+
+.cs-erp2-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Active Filter Pill Tags ── */
+.cs-erp2-active-pills-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.cs-erp2-active-pills-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cs-erp2-pills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-erp2-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-accent-muted, #ede9fe);
+  border: 1px solid var(--color-accent-border, #c4b5fd);
+  border-radius: 9999px;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+}
+
+.cs-erp2-pill-text {
+  color: var(--color-text-primary);
+}
+
+.cs-erp2-pill-tag {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.cs-erp2-pill-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 9999px;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.cs-erp2-pill-remove-btn:hover:not(:disabled) {
+  background: var(--color-danger-muted, #fee2e2);
+  color: var(--color-danger, #dc2626);
+}
+
+.cs-erp2-btn-clear-all {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 2px var(--space-2);
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.cs-erp2-btn-clear-all:hover:not(:disabled) {
+  border-color: var(--color-danger, #dc2626);
+  color: var(--color-danger, #dc2626);
+}
+
+/* ── Faceted Filter Sidebar ── */
+.cs-erp2-faceted-sidebar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.cs-erp2-faceted-sidebar.is-collapsed {
+  width: 40px;
+  overflow: hidden;
+  padding: var(--space-2);
+}
+
+.cs-erp2-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp2-sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.cs-erp2-sidebar-toggle-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding: 2px 5px;
+  transition: border-color 0.15s;
+}
+
+.cs-erp2-sidebar-toggle-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.cs-erp2-sidebar-reset-container {
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp2-btn-reset-filters {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: var(--space-1) var(--space-2);
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.cs-erp2-btn-reset-filters:hover:not(:disabled) {
+  border-color: var(--color-danger, #dc2626);
+  color: var(--color-danger, #dc2626);
+}
+
+.cs-erp2-facet-group {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cs-erp2-facet-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cs-erp2-facet-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.cs-erp2-facet-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-erp2-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  transition: color 0.1s;
+}
+
+.cs-erp2-radio-option:hover {
+  color: var(--color-accent);
+}
+
+.cs-erp2-radio-option input[type='radio'] {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* ── Responsive: stack sidebar above on narrow screens ── */
+@media (max-width: 768px) {
+  .cs-erp2-content-with-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-erp2-faceted-sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .cs-erp2-search-wrapper {
+    max-width: 100%;
+  }
+}
+
+/* ── Filter bar group that wraps search ── */
+.cs-filter-group--search {
+  flex: 1;
+}
+
