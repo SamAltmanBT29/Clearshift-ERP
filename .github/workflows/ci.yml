@@ -1,0 +1,36 @@
+name: CI Security & Quality Gates
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  security-and-quality:
+    name: 🛡️ Security, Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies (clean install)
+        run: npm ci || npm install
+
+      - name: Run Secret & Security Scanner (PLT-12)
+        run: npm run security:scan
+
+      - name: TypeScript Typecheck
+        run: npm run typecheck
+
+      - name: Code Quality & ESLint
+        run: npm run lint
+
+      - name: Run Vitest Unit & Integration Tests
+        run: npm test

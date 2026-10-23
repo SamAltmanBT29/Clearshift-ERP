@@ -3,7 +3,8 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "strict": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
@@ -46,6 +47,7 @@
   },
   "include": [
     "apps/**/*.ts",
+    "apps/erp/modules/erp-5/web/**/*.tsx",
     "packages/**/*.ts"
   ],
   "exclude": [

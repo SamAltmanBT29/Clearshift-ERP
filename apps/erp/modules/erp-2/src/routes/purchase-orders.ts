@@ -1,16 +1,23 @@
 /**
- * ERP-2 Purchase Order Route Handlers
+ * ERP-2 Purchase Orders Routes
  *
  * Implements:
- *   - GET /api/v1/erp-vendors/purchase-orders
- *   - GET /api/v1/erp-vendors/purchase-orders/:id
- *   - POST /api/v1/erp-vendors/purchase-orders
- *   - PATCH /api/v1/erp-vendors/purchase-orders/:id (status transition only)
+ *   - GET /purchase-orders (list with vendor/status filters, bounded paging)
+ *   - GET /purchase-orders/:id (retrieve PO with line items)
+ *   - POST /purchase-orders (create PO with lines, server-side calculated totals, ERP-1 product validation)
+ *   - PATCH /purchase-orders/:id (allowed status transition only: Draft -> Sent -> Received -> Closed)
+ *
+ * Security:
+ *   - RBAC route guards via requireRoles()
+ *   - EdDSA/Ed25519 JWT verification via Fastify auth hook
+ *   - Domain invariant validation (BR-ERP2-01, FR-ERP2-04, FR-ERP2-05)
+ *   - Audit logging of mutations to platform.audit
  *
  * @module erp2/routes/purchase-orders
  */
 
-import { FastifyPluginAsync } from 'fastify';
+import { randomUUID } from 'node:crypto';
+import type { FastifyPluginAsync } from 'fastify';
 import {
   PurchaseOrderListQuerySchema,
   CreatePurchaseOrderRequestSchema,
@@ -19,17 +26,20 @@ import {
 } from '@clearshift/contracts';
 import { ERP2_ENDPOINT_ROLES } from '../policies/rbac.js';
 import { requireRoles } from '../plugins/auth.js';
+import type { Erp2Service } from '../services/erp2.service.js';
 import type { PurchaseOrderService } from '../services/purchase-order.service.js';
 
 export interface PurchaseOrderRoutesOptions {
-  purchaseOrderService: PurchaseOrderService;
+  erp2Service?: Erp2Service;
+  purchaseOrderService?: PurchaseOrderService;
 }
 
 export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions> = async (
   fastify,
-  options
+  opts
 ) => {
-  const { purchaseOrderService } = options;
+  const service = opts.erp2Service;
+  const poService = opts.purchaseOrderService;
 
   // 1. GET /purchase-orders — list/filter POs
   fastify.get(
@@ -38,9 +48,37 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       preHandler: [fastify.authenticate, requireRoles(ERP2_ENDPOINT_ROLES.LIST_PURCHASE_ORDERS)],
     },
     async (request, reply) => {
-      const query = PurchaseOrderListQuerySchema.parse(request.query);
-      const result = await purchaseOrderService.listPurchaseOrders(query);
-      return reply.status(200).send(result);
+      const parsed = PurchaseOrderListQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        const correlationId =
+          (request.headers['x-correlation-id'] as string | undefined) ??
+          (request.headers['x-request-id'] as string | undefined) ??
+          randomUUID();
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.issues[0]?.message ?? 'Invalid query parameters',
+          details: parsed.error.issues,
+          correlation_id: correlationId,
+        });
+      }
+
+      if (poService) {
+        const result = await poService.listPurchaseOrders(parsed.data);
+        return reply.status(200).send(result);
+      }
+
+      const { purchaseOrders, total } = await service!.listPurchaseOrders(parsed.data);
+      const totalPages = Math.ceil(total / parsed.data.pageSize) || 1;
+
+      return reply.status(200).send({
+        items: purchaseOrders,
+        total,
+        page: parsed.data.page,
+        pageSize: parsed.data.pageSize,
+        totalPages,
+      });
     }
   );
 
@@ -52,21 +90,67 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      UuidSchema.parse(id);
+      const validUuid = UuidSchema.safeParse(id);
+      if (!validUuid.success) {
+        const correlationId =
+          (request.headers['x-correlation-id'] as string | undefined) ??
+          (request.headers['x-request-id'] as string | undefined) ??
+          randomUUID();
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'INVALID_UUID',
+          message: 'Purchase Order ID must be a valid UUID v4',
+          details: [],
+          correlation_id: correlationId,
+        });
+      }
 
-      const po = await purchaseOrderService.getPurchaseOrderById(id);
+      if (poService) {
+        const po = await poService.getPurchaseOrderById(id);
+        return reply.status(200).send(po);
+      }
+
+      const po = await service!.getPurchaseOrderById(id);
       return reply.status(200).send(po);
     }
   );
 
-  // 3. POST /purchase-orders — create PO with lines
+  // 3. POST /purchase-orders — create PO
   fastify.post(
     '/purchase-orders',
     {
       preHandler: [fastify.authenticate, requireRoles(ERP2_ENDPOINT_ROLES.CREATE_PURCHASE_ORDER)],
     },
     async (request, reply) => {
-      const body = CreatePurchaseOrderRequestSchema.parse(request.body);
+      const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
+
+      const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+      const bodyToValidate = {
+        ...rawBody,
+        idempotency_key: idempotencyHeader || rawBody['idempotency_key'],
+      };
+
+      const parsed = CreatePurchaseOrderRequestSchema.safeParse(bodyToValidate);
+      if (!parsed.success) {
+        const correlationId =
+          (request.headers['x-correlation-id'] as string | undefined) ??
+          (request.headers['x-request-id'] as string | undefined) ??
+          randomUUID();
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.issues[0]?.message ?? 'Invalid purchase order data',
+          details: parsed.error.issues.map((i) => ({
+            field: i.path.join('.'),
+            message: i.message,
+            code: i.code,
+          })),
+          correlation_id: correlationId,
+        });
+      }
+
       const actor = request.user?.sub || 'system';
       const correlationId =
         (request as any).correlationId ??
@@ -74,15 +158,32 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
           ? request.headers['x-correlation-id']
           : undefined);
 
-      const created = await purchaseOrderService.createPurchaseOrder(body, {
-        actor,
-        correlationId,
-      });
-      return reply.status(201).send(created);
+      if (poService) {
+        const created = await poService.createPurchaseOrder(parsed.data, { actor, correlationId });
+        return reply.status(201).send(created);
+      }
+
+      // If batch_id and idempotency_key are present, execute via atomic import dual-write
+      if (parsed.data.batch_id && parsed.data.idempotency_key && service) {
+        const importRes = await service.importRow({
+          batch_id: parsed.data.batch_id,
+          source_row: parsed.data.source_row ?? 0,
+          source_system: (parsed.data as any).source_system ?? null,
+          source_id: (parsed.data as any).source_id ?? null,
+          idempotency_key: parsed.data.idempotency_key,
+          entity: 'purchase_order',
+          record: parsed.data as unknown as Record<string, unknown>,
+        });
+        const po = await service.getPurchaseOrderById(importRes.target_id);
+        return reply.status(importRes.prior_result ? 200 : 201).send(po);
+      }
+
+      const po = await service!.createPurchaseOrder(parsed.data);
+      return reply.status(201).send(po);
     }
   );
 
-  // 4. PATCH /purchase-orders/:id — allowed status transition only
+  // 4. PATCH /purchase-orders/:id — allowed status transitions only
   fastify.patch(
     '/purchase-orders/:id',
     {
@@ -93,9 +194,38 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
     },
     async (request, reply) => {
       const { id } = request.params as { id: string };
-      UuidSchema.parse(id);
+      const validUuid = UuidSchema.safeParse(id);
+      if (!validUuid.success) {
+        const correlationId =
+          (request.headers['x-correlation-id'] as string | undefined) ??
+          (request.headers['x-request-id'] as string | undefined) ??
+          randomUUID();
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'INVALID_UUID',
+          message: 'Purchase Order ID must be a valid UUID v4',
+          details: [],
+          correlation_id: correlationId,
+        });
+      }
 
-      const body = UpdatePurchaseOrderStatusRequestSchema.parse(request.body);
+      const parsed = UpdatePurchaseOrderStatusRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        const correlationId =
+          (request.headers['x-correlation-id'] as string | undefined) ??
+          (request.headers['x-request-id'] as string | undefined) ??
+          randomUUID();
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.issues[0]?.message ?? 'Invalid status transition request',
+          details: parsed.error.issues,
+          correlation_id: correlationId,
+        });
+      }
+
       const actor = request.user?.sub || 'system';
       const correlationId =
         (request as any).correlationId ??
@@ -103,11 +233,15 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
           ? request.headers['x-correlation-id']
           : undefined);
 
-      const updated = await purchaseOrderService.updatePurchaseOrderStatus(
-        id,
-        body.status,
-        { actor, correlationId }
-      );
+      if (poService) {
+        const updated = await poService.updatePurchaseOrderStatus(id, parsed.data.status, {
+          actor,
+          correlationId,
+        });
+        return reply.status(200).send(updated);
+      }
+
+      const updated = await service!.updatePurchaseOrderStatus(id, parsed.data.status);
       return reply.status(200).send(updated);
     }
   );
