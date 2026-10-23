@@ -66,3 +66,5 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     </div>
   );
 };
+
+export { InvoiceFilterBar } from './InvoiceFilterBar.js';

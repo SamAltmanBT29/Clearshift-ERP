@@ -11,7 +11,7 @@ interface SkeletonTableProps {
  */
 export const SkeletonTable: React.FC<SkeletonTableProps> = ({ columns = 6, rows = 6 }) => {
   return (
-    <div className="cs-table-card" role="status" aria-label="Loading sales orders data">
+    <div className="cs-table-card" role="status" aria-label="Loading sales orders data" aria-busy="true">
       <table className="cs-table" aria-hidden="true">
         <thead>
           <tr>

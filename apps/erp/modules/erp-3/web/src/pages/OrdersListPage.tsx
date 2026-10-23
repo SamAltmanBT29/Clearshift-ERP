@@ -8,7 +8,7 @@ import type {
 import { fetchSalesOrders, fetchInvoices } from '../api/erp-3.js';
 import { OrdersTable } from '../components/OrdersTable.js';
 import { InvoicesTable } from '../components/InvoicesTable.js';
-import { FilterBar } from '../components/FilterBar.js';
+import { FilterBar, InvoiceFilterBar } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable } from '../components/StateViews.js';
 
 export const OrdersListPage: React.FC = () => {
@@ -146,6 +146,13 @@ export const OrdersListPage: React.FC = () => {
         </main>
       ) : (
         <main>
+          <InvoiceFilterBar
+            filters={invoiceFilters}
+            onFilterChange={(updated) => setInvoiceFilters((prev) => ({ ...prev, ...updated, page: 1 }))}
+            onReset={() => setInvoiceFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
+            isLoading={isInvoicesLoading}
+          />
+
           {invoicesError ? (
             <ErrorState
               title="Failed to Load Invoices"

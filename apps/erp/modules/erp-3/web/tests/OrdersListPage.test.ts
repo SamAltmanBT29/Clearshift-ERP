@@ -67,17 +67,17 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
       expect(result.items[0]?.orderNumber).toBe('SO-1001');
     });
 
-    it('asserts that changing search or filter resets page to 1', () => {
-      const initialFilters = { page: 3, pageSize: 20, search: '', status: undefined };
-      const updatedSearch = 'SO-999';
-      const newFilters = {
-        ...initialFilters,
-        search: updatedSearch,
-        page: 1, // Acceptance criterion: resets to page 1
-      };
+    it('formats query string properly with pagination and search parameters', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ items: [], total: 0, page: 1, pageSize: 50, totalPages: 0 }),
+      });
 
-      expect(newFilters.page).toBe(1);
-      expect(newFilters.search).toBe('SO-999');
+      await fetchSalesOrders({ page: 1, pageSize: 50, search: 'GID-CUST-001', status: 'invoiced' });
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/v1/erp-orders/sales-orders?page=1&pageSize=50&search=GID-CUST-001&status=invoiced',
+        expect.anything()
+      );
     });
 
     it('handles API errors gracefully with ApiError envelope', async () => {
@@ -130,8 +130,10 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
   });
 
   describe('Domain Invariants: ERP-3 Sales Orders & Invoices', () => {
-    it('asserts BR-ERP3-03: Every order has a valid customer Golden ID', () => {
+    it('asserts BR-ERP3-03: Every order has a valid customer Golden ID (case-insensitive)', () => {
       expect(CustomerGoldenIdSchema.safeParse('gid-cust-001').success).toBe(true);
+      expect(CustomerGoldenIdSchema.safeParse('GID-CUST-001').success).toBe(true);
+      expect(CustomerGoldenIdSchema.safeParse('Gid-12345').success).toBe(true);
       expect(CustomerGoldenIdSchema.safeParse('gid-12345').success).toBe(true);
       expect(CustomerGoldenIdSchema.safeParse('').success).toBe(false);
       expect(CustomerGoldenIdSchema.safeParse('regular-user-id').success).toBe(false);

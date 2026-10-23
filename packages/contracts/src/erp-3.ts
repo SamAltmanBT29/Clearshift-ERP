@@ -45,7 +45,7 @@ export const OrdersMoneyAmount = z
 export const CustomerGoldenIdSchema = z
   .string()
   .min(1, 'Customer Golden ID cannot be empty')
-  .regex(/^gid-[a-zA-Z0-9_-]+$/, 'Customer Golden ID must follow the gid-<identifier> format');
+  .regex(/^gid-[a-zA-Z0-9_-]+$/i, 'Customer Golden ID must follow the gid-<identifier> format');
 
 /** Sales Order Status: Open -> Invoiced -> Closed */
 export const SalesOrderStatusEnum = z.enum(['open', 'invoiced', 'closed']);
