@@ -682,3 +682,12 @@ When the server returns an HTTP 400 Bad Request:
 - **Modal Closure**: On successful API response, `isOpen` transitions to `false` and the form resets.
 - **Cache Prepending**: In `VendorsListPage`, the newly returned entity is immediately prepended to local table state (`setVendors((prev) => [created, ...prev])`) and the total counter is incremented by 1 without requiring a full page refresh.
 - **Confirmation Toast**: An accessible notification banner (`.cs-erp2-toast-banner`) announces the creation outcome with an explicit close button.
+
+## 17. Design Artifacts (ERP2-24 / Issue #140)
+
+Gate G1 design artifacts, kept in `apps/erp/modules/erp-2/docs/`:
+
+- [Field-level data dictionary](../../apps/erp/modules/erp-2/docs/field-level-data-dictionary.md): every column with type, nullability, constraint, rule and example, plus the SQL-vs-Drizzle drift register
+- [ERD](../../apps/erp/modules/erp-2/docs/erd.md): keys and master-data ownership boundaries
+- [Traceability matrix](../../apps/erp/modules/erp-2/docs/traceability-matrix.md): Must requirements mapped to automated tests
+- [Dirty Data Pack plan](../../apps/erp/modules/erp-2/docs/dirty-data-pack-plan.md): synthetic edge-case scenarios and expected defect distribution
