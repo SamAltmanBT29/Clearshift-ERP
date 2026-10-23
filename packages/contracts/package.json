@@ -11,6 +11,9 @@
     "./events": "./src/events.ts",
     "./erp-1": "./src/erp-1.ts",
     "./erp-2": "./src/erp-2.ts",
+    "./erp-3": "./src/erp-3.ts",
+    "./erp-3-mock": "./src/erp-3-mock.ts",
+    "./erp-3-events": "./src/erp-3-events.ts",
     "./erp-4": "./src/erp-4.ts",
     "./erp-4-mock": "./src/erp-4-mock.ts",
     "./erp-4-events": "./src/erp-4-events.ts",
@@ -19,6 +22,9 @@
     "./golden-id": "./src/golden-id.ts",
     "./import-target": "./src/import-target.ts",
     "./openapi": "./openapi"
+  },
+  "scripts": {
+    "lint:openapi": "npx --yes @stoplight/spectral-cli@6.11.0 lint --ruleset ../../.spectral.yaml --fail-severity=warn openapi/erp-3.yaml"
   },
   "dependencies": {
     "zod": "^3.24.0"

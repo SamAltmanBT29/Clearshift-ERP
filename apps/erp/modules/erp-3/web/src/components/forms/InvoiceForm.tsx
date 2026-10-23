@@ -1,38 +1,79 @@
 import React, { useState } from 'react';
-import type { CreateInvoiceInput } from '@clearshift/contracts';
+import type { CreateInvoiceInput, SalesOrder } from '@clearshift/contracts';
+import { CustomerGoldenIdSchema, OrdersUuid } from '@clearshift/contracts';
 
 export interface InvoiceFormProps {
-  initialValues?: Partial<CreateInvoiceInput>;
+  initialValues?: Partial<CreateInvoiceInput> & { notes?: string };
+  sourceOrder?: SalesOrder | null;
   onSubmit: (data: CreateInvoiceInput) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
   apiError?: string | null;
 }
 
+const DEFAULT_FALLBACK_CUSTOMER_ID = '55555555-0003-4000-8000-000000000001';
+const DEFAULT_FALLBACK_PRODUCT_ID = '11111111-0001-4000-8000-000000000001';
+
 export const InvoiceForm: React.FC<InvoiceFormProps> = ({
   initialValues,
+  sourceOrder = null,
   onSubmit,
   onCancel,
   isLoading = false,
   apiError = null,
 }) => {
-  const [orderId, setOrderId] = useState(initialValues?.orderId || '');
+  const [orderId, setOrderId] = useState(
+    initialValues?.order_id !== undefined
+      ? initialValues.order_id || ''
+      : sourceOrder?.id || ''
+  );
+  const [customerGoldenId, setCustomerGoldenId] = useState(
+    initialValues?.customer_golden_id ||
+      sourceOrder?.customer_golden_id ||
+      DEFAULT_FALLBACK_CUSTOMER_ID
+  );
+  const [currency, setCurrency] = useState(
+    initialValues?.currency || sourceOrder?.currency || 'USD'
+  );
   const [invoiceDate, setInvoiceDate] = useState(
-    initialValues?.invoiceDate || new Date().toISOString().split('T')[0] || ''
+    initialValues?.invoice_date || new Date().toISOString().split('T')[0] || ''
   );
   // Default due date to +30 days
   const [dueDate, setDueDate] = useState(() => {
-    if (initialValues?.dueDate !== undefined) return initialValues.dueDate;
+    if (initialValues?.due_date !== undefined) return initialValues.due_date;
     const d = new Date();
     d.setDate(d.getDate() + 30);
     return d.toISOString().split('T')[0] || '';
   });
   const [notes, setNotes] = useState(initialValues?.notes || '');
 
+  const [lines] = useState(() => {
+    if (initialValues?.lines && initialValues.lines.length > 0) {
+      return initialValues.lines;
+    }
+    if (sourceOrder?.lines && sourceOrder.lines.length > 0) {
+      return sourceOrder.lines.map((l) => ({
+        product_id: l.product_id,
+        quantity: l.quantity,
+        price: l.price,
+        tax_rate: l.tax_rate,
+      }));
+    }
+    return [
+      {
+        product_id: DEFAULT_FALLBACK_PRODUCT_ID,
+        quantity: '1.0000',
+        price: '100.0000',
+        tax_rate: '10.0000',
+      },
+    ];
+  });
+
   const [errors, setErrors] = useState<{
-    orderId?: string | undefined;
-    invoiceDate?: string | undefined;
-    dueDate?: string | undefined;
+    order_id?: string | undefined;
+    customer_golden_id?: string | undefined;
+    invoice_date?: string | undefined;
+    due_date?: string | undefined;
     general?: string | undefined;
   }>({});
 
@@ -40,18 +81,24 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     const newErrors: typeof errors = {};
     let isValid = true;
 
-    if (!orderId.trim()) {
-      newErrors.orderId = 'Sales Order ID is required';
+    if (!orderId.trim() || !OrdersUuid.safeParse(orderId.trim()).success) {
+      newErrors.order_id = 'Sales Order ID is required and must be a valid UUID';
+      isValid = false;
+    }
+
+    if (!CustomerGoldenIdSchema.safeParse(customerGoldenId.trim()).success) {
+      newErrors.customer_golden_id = 'Customer Golden ID is required and must be a valid UUID';
       isValid = false;
     }
 
     if (!invoiceDate || !/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) {
-      newErrors.invoiceDate = 'Invoice date is required and must be in YYYY-MM-DD format';
+      newErrors.invoice_date = 'Invoice date is required and must be in YYYY-MM-DD format';
       isValid = false;
     }
 
     if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-      newErrors.dueDate = 'Due date is required (FR-ERP3-05: required for overdue status calculation)';
+      newErrors.due_date =
+        'Due date is required (DR-2 / V1_30 §8: mandatory for overdue calculation)';
       isValid = false;
     }
 
@@ -64,10 +111,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
     if (!validate()) return;
 
     await onSubmit({
-      orderId: orderId.trim(),
-      invoiceDate,
-      dueDate,
-      notes: notes.trim() || undefined,
+      order_id: orderId.trim(),
+      customer_golden_id: customerGoldenId.trim(),
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      currency: currency.toUpperCase(),
+      lines,
     });
   };
 
@@ -93,25 +142,52 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             <input
               id="invoice-order-id"
               type="text"
-              className={`cs-input ${errors.orderId ? 'cs-input-error' : ''}`}
-              placeholder="e.g. so-001 or UUID"
+              className={`cs-input ${errors.order_id ? 'cs-input-error' : ''}`}
+              placeholder="e.g. aaaaaaaa-0003-4000-8000-000000000001"
               value={orderId}
               onChange={(e) => {
                 setOrderId(e.target.value);
-                if (errors.orderId) setErrors((prev) => ({ ...prev, orderId: undefined }));
+                if (errors.order_id) setErrors((prev) => ({ ...prev, order_id: undefined }));
               }}
               disabled={isLoading}
-              aria-invalid={!!errors.orderId}
-              aria-describedby={errors.orderId ? 'invoice-order-id-err' : 'invoice-order-id-help'}
+              aria-invalid={!!errors.order_id}
+              aria-describedby={errors.order_id ? 'invoice-order-id-err' : 'invoice-order-id-help'}
               required
             />
-            {errors.orderId ? (
+            {errors.order_id ? (
               <span id="invoice-order-id-err" className="cs-field-error" role="alert">
-                {errors.orderId}
+                {errors.order_id}
               </span>
             ) : (
               <span id="invoice-order-id-help" className="cs-field-helper">
-                Reference to the sales order being invoiced (one invoice per order in V1)
+                UUID reference to the sales order being invoiced
+              </span>
+            )}
+          </div>
+
+          <div className="cs-form-field">
+            <label htmlFor="invoice-customer-gid" className="cs-form-label">
+              Customer Golden ID <span className="cs-required-marker">*</span>
+            </label>
+            <input
+              id="invoice-customer-gid"
+              type="text"
+              className={`cs-input ${errors.customer_golden_id ? 'cs-input-error' : ''}`}
+              placeholder="e.g. 55555555-0003-4000-8000-000000000001"
+              value={customerGoldenId}
+              onChange={(e) => {
+                setCustomerGoldenId(e.target.value);
+                if (errors.customer_golden_id) {
+                  setErrors((prev) => ({ ...prev, customer_golden_id: undefined }));
+                }
+              }}
+              disabled={isLoading}
+              aria-invalid={!!errors.customer_golden_id}
+              required
+            />
+            {errors.customer_golden_id && (
+              <span className="cs-field-error" role="alert">
+                {errors.customer_golden_id}
               </span>
             )}
           </div>
@@ -123,20 +199,22 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             <input
               id="invoice-date"
               type="date"
-              className={`cs-input ${errors.invoiceDate ? 'cs-input-error' : ''}`}
+              className={`cs-input ${errors.invoice_date ? 'cs-input-error' : ''}`}
               value={invoiceDate}
               onChange={(e) => {
                 setInvoiceDate(e.target.value);
-                if (errors.invoiceDate) setErrors((prev) => ({ ...prev, invoiceDate: undefined }));
+                if (errors.invoice_date) {
+                  setErrors((prev) => ({ ...prev, invoice_date: undefined }));
+                }
               }}
               disabled={isLoading}
-              aria-invalid={!!errors.invoiceDate}
-              aria-describedby={errors.invoiceDate ? 'invoice-date-err' : undefined}
+              aria-invalid={!!errors.invoice_date}
+              aria-describedby={errors.invoice_date ? 'invoice-date-err' : undefined}
               required
             />
-            {errors.invoiceDate && (
+            {errors.invoice_date && (
               <span id="invoice-date-err" className="cs-field-error" role="alert">
-                {errors.invoiceDate}
+                {errors.invoice_date}
               </span>
             )}
           </div>
@@ -148,26 +226,44 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({
             <input
               id="invoice-due-date"
               type="date"
-              className={`cs-input ${errors.dueDate ? 'cs-input-error' : ''}`}
+              className={`cs-input ${errors.due_date ? 'cs-input-error' : ''}`}
               value={dueDate}
               onChange={(e) => {
                 setDueDate(e.target.value);
-                if (errors.dueDate) setErrors((prev) => ({ ...prev, dueDate: undefined }));
+                if (errors.due_date) setErrors((prev) => ({ ...prev, due_date: undefined }));
               }}
               disabled={isLoading}
-              aria-invalid={!!errors.dueDate}
-              aria-describedby={errors.dueDate ? 'invoice-due-date-err' : 'invoice-due-date-help'}
+              aria-invalid={!!errors.due_date}
+              aria-describedby={errors.due_date ? 'invoice-due-date-err' : 'invoice-due-date-help'}
               required
             />
-            {errors.dueDate ? (
+            {errors.due_date ? (
               <span id="invoice-due-date-err" className="cs-field-error" role="alert">
-                {errors.dueDate}
+                {errors.due_date}
               </span>
             ) : (
               <span id="invoice-due-date-help" className="cs-field-helper">
-                Required in V1: Status derives to Overdue when UTC calendar date &gt; due date
+                Required in V1 (DR-2): Status derives to Overdue when UTC calendar date &gt; due date
               </span>
             )}
+          </div>
+
+          <div className="cs-form-field">
+            <label htmlFor="invoice-currency" className="cs-form-label">
+              Currency
+            </label>
+            <select
+              id="invoice-currency"
+              className="cs-select"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              disabled={isLoading}
+            >
+              <option value="USD">USD - US Dollar</option>
+              <option value="EUR">EUR - Euro</option>
+              <option value="GBP">GBP - British Pound</option>
+              <option value="INR">INR - Indian Rupee</option>
+            </select>
           </div>
         </div>
 
