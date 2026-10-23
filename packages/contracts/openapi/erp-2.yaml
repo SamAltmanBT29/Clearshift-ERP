@@ -319,6 +319,38 @@ paths:
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
+  /import/batch:
+    post:
+      operationId: importBatch
+      tags: [Migration Import]
+      summary: Batch import rows via ERP2-11 loadBatch interface with per-row idempotency and optional UPSERT
+      description: |
+        Processes up to 500 rows sequentially through the ERP-2 target adapter.
+        Each row has its own stable idempotency key. A data-validation failure on
+        one row does NOT abort subsequent rows (error isolation). Infrastructure
+        failures propagate as HTTP 5xx and are retryable. Dry-run semantics are
+        enforced by the service layer.
+
+        When `upsert=true`, rows whose natural key (tax_number for vendors) already
+        exists in the target will be updated and linked with `kind=linked`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportBatchRequest"
+      responses:
+        "200":
+          description: Batch processed — returns per-row outcomes and aggregate totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoadBatchResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
 components:
   schemas:
     PurchaseOrderStatus:
@@ -743,6 +775,104 @@ components:
         created_at:
           type: string
           format: date-time
+
+    ImportBatchRequest:
+      type: object
+      required:
+        - batch_id
+        - entity
+        - rows
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+          description: Stable UUID identifying this overall migration batch
+        entity:
+          type: string
+          enum: [vendor, purchase_order]
+        upsert:
+          type: boolean
+          default: false
+          description: When true, rows whose natural key already exists will be updated and linked (kind=linked)
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/BatchRowInput"
+
+    BatchRowInput:
+      type: object
+      required:
+        - source_row
+        - idempotency_key
+        - record
+      properties:
+        source_row:
+          type: integer
+          minimum: 0
+          description: 0-based row position in the source file
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        record:
+          type: object
+          description: Cleaned source data mapped to target domain shape
+
+    LoadBatchResult:
+      type: object
+      required:
+        - batchId
+        - total
+        - loaded
+        - rejected
+        - rows
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        total:
+          type: integer
+        loaded:
+          type: integer
+        rejected:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoadBatchRowResult"
+
+    LoadBatchRowResult:
+      type: object
+      required:
+        - sourceRow
+        - idempotencyKey
+        - outcome
+      properties:
+        sourceRow:
+          type: integer
+        idempotencyKey:
+          type: string
+        outcome:
+          type: string
+          enum: [loaded, rejected]
+        result:
+          type: object
+          nullable: true
+          description: Present when outcome=loaded
+        error:
+          type: object
+          nullable: true
+          description: Present when outcome=rejected
 
     ApiError:
       type: object
