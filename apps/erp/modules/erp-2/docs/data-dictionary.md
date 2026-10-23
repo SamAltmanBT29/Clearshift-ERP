@@ -249,3 +249,47 @@ erDiagram
 | **DR-ERP2-01: Intra-module FKs only (Decision C7)** | SDS lists `product_id` in `erp2_po_lines`. Sibling module `erp1` owns `erp1_products`. | Cross-schema foreign keys create hard deployment coupling and violate module boundaries. | `product_id` is a UUID column validated logically via ERP-1 contract; no DB FK. |
 | **DR-ERP2-02: Server-side bank masking (FR-ERP2-06)** | Client may submit raw bank details. | Security requires bank numbers to never be stored or displayed in plain text to viewers. | Stored as `bank_masked` formatted as `XXXX-XXXX-7890`; raw details withheld from API serialization. |
 | **DR-ERP2-03: Server-side total calculation (FR-ERP2-05)** | Clients might submit inaccurate totals. | Prevents accounting discrepancies between lines and header. | Server recalculates `line_total = quantity * price` and `total = sum(line_totals)`. |
+
+---
+
+## 11. Conventions, Status Machine & Error Envelope
+
+### Conventions
+- Money: `NUMERIC(18,2)`, never floating point. Quantity: `NUMERIC(12,2)`. API transports both as decimal **strings** (`"215.75"`).
+- Rounding: each `line_total = ROUND_HALF_UP(quantity x price, 2)` (decimal.js); order `total` = sum of the rounded line totals. Computed server-side only; a client-supplied `total` is ignored.
+- Currency: ISO-4217 code on vendor and purchase order. No FX conversion in V1.
+- Bank details: write-only. Input `bank_details`, stored/returned as `bank_masked` = `XXXX-XXXX-<last 4 digits>`. The raw value is never stored or returned.
+- No cross-module foreign keys: `po_lines.product_id` is validated against ERP-1 through the `ReferenceResolver` (`exists('product', id)`), not by a database FK (Decision C7).
+
+### Status Machine (FR-ERP2-04)
+| From | Allowed next |
+|---|---|
+| Draft | Sent |
+| Sent | Received |
+| Received | Closed |
+| Closed | (terminal) |
+
+Backwards moves, skips and cancellation are rejected with HTTP 422 `INVALID_STATUS_TRANSITION`. `Received` does not change inventory (goods receipts are V2).
+
+### Error Envelope
+`{ statusCode, error, code, message, details[], correlation_id }`. Codes: `VALIDATION_ERROR` 400, `INVALID_UUID` 400, `UNAUTHORIZED` 401, `NOT_FOUND` 404, `DUPLICATE_TAX_NUMBER` / `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` 409, domain codes 422, `INTERNAL_SERVER_ERROR` 500 (message masked).
+
+---
+
+## 12. QA Evidence (ERP2-10)
+
+| Layer | Location |
+|---|---|
+| Domain unit tests | `apps/erp/modules/erp-2/tests/domain/` |
+| Fastify injection tests (every endpoint, auth, validation, idempotency) | `apps/erp/modules/erp-2/tests/api/`, `apps/erp/modules/erp-2/tests/migration/` |
+| DB constraint and transaction tests (real PostgreSQL, needs `DATABASE_URL`) | `apps/erp/modules/erp-2/tests/db/constraints.test.ts` |
+| OpenAPI vs implemented routes | `apps/erp/modules/erp-2/tests/contract/openapi-parity.test.ts` |
+| Deterministic seed (public API only, idempotent) | `sample-data/erp-2/seed.ts`, `apps/erp/modules/erp-2/tests/seed/` |
+| Scripted V1 demo journey | `apps/erp/modules/erp-2/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-2-v1.md` |
+| Runbook and known defects | `apps/erp/modules/erp-2/README.md` |
+
+Notes:
+- Vendor search matches name and tax number, case-insensitively.
+- Purchase order header and lines are written in one transaction.
+- The public API accepts prices with up to 2 decimals. `line_total = round_half_up(quantity x price, 2)` and the order total is the sum of the line totals.
+- Open defects and their issue links are tracked in the README "Known defects" table.
