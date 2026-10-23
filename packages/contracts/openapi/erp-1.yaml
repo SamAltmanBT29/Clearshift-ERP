@@ -380,6 +380,8 @@ components:
           type: string
           pattern: '^\d+(\.\d{1,2})?$'
           example: "0.00"
+        notificationEmail: { type: string, format: email, nullable: true }
+        contactPhone: { type: string, nullable: true }
         sourceSystem: { type: string, nullable: true }
         sourceId: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
@@ -396,6 +398,8 @@ components:
         price: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
         currency: { $ref: '#/components/schemas/Currency' }
         taxRate: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,2})?$' }, { type: number, minimum: 0 }], default: "0.00" }
+        notificationEmail: { type: string, format: email, description: "Optional supplier or alert notification email address" }
+        contactPhone: { type: string, pattern: '^\+?[0-9\s\-()]{7,20}$', description: "Optional supplier contact phone number" }
         sourceSystem: { type: string, minLength: 1, maxLength: 64 }
         sourceId: { type: string, minLength: 1, maxLength: 128 }
 

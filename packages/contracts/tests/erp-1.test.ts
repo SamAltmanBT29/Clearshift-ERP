@@ -85,6 +85,38 @@ describe('ERP-1 Products & Inventory contracts', () => {
       ).toBe(false);
     });
 
+    it('validates email format and phone numbers when provided', () => {
+      const base = {
+        name: 'Synthetic Widget',
+        sku: 'WDG-001',
+        unitOfMeasure: 'pcs',
+        currency: 'USD',
+        price: '19.99',
+      };
+
+      // Valid email and phone
+      const valid = CreateProductInputSchema.safeParse({
+        ...base,
+        notificationEmail: 'supplier@example.com',
+        contactPhone: '+1-555-019-2834',
+      });
+      expect(valid.success).toBe(true);
+
+      // Invalid email
+      const invalidEmail = CreateProductInputSchema.safeParse({
+        ...base,
+        notificationEmail: 'invalid-email-address',
+      });
+      expect(invalidEmail.success).toBe(false);
+
+      // Invalid phone
+      const invalidPhone = CreateProductInputSchema.safeParse({
+        ...base,
+        contactPhone: 'bad-phone',
+      });
+      expect(invalidPhone.success).toBe(false);
+    });
+
     it('normalizes stock quantities to four decimal places', () => {
       const parsed = SetOpeningStockInputSchema.parse({
         productId: PRODUCT_ID,
