@@ -261,3 +261,28 @@ Notes:
 - Purchase order header and lines are written in one transaction.
 - The public API accepts prices with up to 2 decimals. `line_total = round_half_up(quantity x price, 2)` and the order total is the sum of the line totals.
 - Open defects and their issue links are tracked in the README "Known defects" table.
+
+---
+
+## 9. Primary Module List Screen Specification (ERP2-04 / Issue #19)
+
+### 9.1 Overview & Architecture
+
+The primary list screen for ERP-2 Vendors & Purchasing is delivered as a production vertical slice connecting React/TypeScript web components to the Fastify `/api/v1/erp-vendors` REST API.
+
+| Aspect | Implementation Details |
+|---|---|
+| **Location** | `apps/erp/modules/erp-2/web/src/pages/VendorsListPage.tsx` |
+| **API Client** | `apps/erp/modules/erp-2/web/src/api/erp-2.ts` (`fetchVendors`, `fetchPurchaseOrders`) |
+| **Components** | `VendorsTable.tsx`, `PurchaseOrdersTable.tsx`, `FilterBar.tsx`, `StateViews.tsx` |
+| **Styling** | `apps/erp/modules/erp-2/web/src/theme.css` (Minimal White Theme using `:root` CSS variables) |
+| **Preview** | `apps/erp/modules/erp-2/web/preview.html` |
+| **Tests** | `apps/erp/modules/erp-2/web/tests/VendorsListPage.test.tsx` (RTL) & `VendorsListPage.test.ts` (Domain) |
+
+### 9.2 UI State Lifecycle
+
+1. **Loading State**: `SkeletonTable` with shimmer effect, accessible `role="status"` and `aria-busy="true"`.
+2. **Empty State**: `EmptyState` component displaying contextual zero-data messages when 0 records match the query.
+3. **Error State**: `ErrorState` component with `role="alert"` and a recoverable "Try Again" retry button.
+4. **Access Denied State**: `AccessDeniedState` component rendered on HTTP 403 Forbidden responses.
+5. **Pagination**: Bounded server-side pagination with "Previous" / "Next" buttons and active page indicator. Any filter or search change immediately resets pagination to page 1.

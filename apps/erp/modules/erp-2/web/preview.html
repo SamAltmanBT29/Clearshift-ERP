@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearShift ERP-2 — Vendors & Purchasing Preview</title>
+  <style>
+    /* ClearShift ERP-2 Minimal White Theme & Component Tokens */
+    :root {
+      --color-background: #ffffff;
+      --color-surface: #f9fafb;
+      --color-surface-hover: #f3f4f6;
+      --color-text: #111827;
+      --color-text-muted: #6b7280;
+      --color-text-subtle: #9ca3af;
+
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --border-focus: #2563eb;
+
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-primary-text: #ffffff;
+
+      --color-success: #166534;
+      --color-success-bg: #dcfce7;
+      --color-success-border: #bbf7d0;
+
+      --color-warning: #92400e;
+      --color-warning-bg: #fef3c7;
+      --color-warning-border: #fde68a;
+
+      --color-error: #991b1b;
+      --color-error-bg: #fee2e2;
+      --color-error-border: #fecaca;
+
+      --color-info: #1e40af;
+      --color-info-bg: #dbeafe;
+      --color-info-border: #bfdbfe;
+
+      --color-draft: #374151;
+      --color-draft-bg: #f3f4f6;
+      --color-draft-border: #e5e7eb;
+
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background-color: var(--color-background);
+      color: var(--color-text);
+      line-height: 1.5;
+    }
+
+    .cs-module-root {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: var(--space-6);
+    }
+
+    .cs-page-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .cs-page-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-text);
+      margin: 0 0 var(--space-2) 0;
+    }
+
+    .cs-page-description {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      margin: 0;
+    }
+
+    .cs-tabs-container {
+      display: flex;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-6);
+    }
+
+    .cs-tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: var(--space-3) var(--space-4);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .cs-tab-btn.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .cs-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      align-items: center;
+      background: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .cs-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .cs-filter-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .cs-input, .cs-select {
+      height: 36px;
+      padding: 0 var(--space-3);
+      font-size: 14px;
+      font-family: var(--font-sans);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+
+    .cs-input:focus, .cs-select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 1px var(--border-focus);
+    }
+
+    .cs-btn-secondary {
+      height: 36px;
+      padding: 0 var(--space-3);
+      background: var(--color-background);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .cs-table-card {
+      background: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .cs-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .cs-table th {
+      background: var(--color-surface);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-table td {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-cell-mono { font-family: var(--font-mono); }
+    .cs-cell-masked { font-family: var(--font-mono); color: var(--color-text-muted); }
+    .cs-cell-number { text-align: right; font-family: var(--font-mono); }
+
+    .cs-badge {
+      display: inline-flex;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .cs-badge-draft { background: var(--color-draft-bg); color: var(--color-draft); border-color: var(--color-draft-border); }
+    .cs-badge-sent { background: var(--color-info-bg); color: var(--color-info); border-color: var(--color-info-border); }
+    .cs-badge-received { background: var(--color-warning-bg); color: var(--color-warning); border-color: var(--color-warning-border); }
+    .cs-badge-closed { background: var(--color-success-bg); color: var(--color-success); border-color: var(--color-success-border); }
+
+    .cs-pagination-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-surface);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="cs-module-root">
+    <header class="cs-page-header">
+      <h1 class="cs-page-title">Vendors & Purchasing</h1>
+      <p class="cs-page-description">
+        Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
+      </p>
+    </header>
+
+    <nav class="cs-tabs-container" aria-label="Vendors and purchase order views">
+      <button type="button" class="cs-tab-btn active" id="tab-vendors" onclick="switchTab('vendors')">
+        Vendors (2)
+      </button>
+      <button type="button" class="cs-tab-btn" id="tab-orders" onclick="switchTab('orders')">
+        Purchase Orders (2)
+      </button>
+    </nav>
+
+    <!-- Vendors View -->
+    <div id="view-vendors">
+      <div class="cs-filter-bar">
+        <div class="cs-filter-group">
+          <label for="search-input" class="cs-filter-label">Search</label>
+          <input id="search-input" type="search" class="cs-input" style="min-width: 260px;" placeholder="Search by legal name..." />
+        </div>
+        <div class="cs-filter-group" style="align-self: flex-end;">
+          <button type="button" class="cs-btn-secondary">Reset Filters</button>
+        </div>
+      </div>
+
+      <div class="cs-table-card">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th>Vendor Name</th>
+              <th>Tax Number</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Currency</th>
+              <th>Bank Account</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Acme Industrial Supplies LLC</strong></td>
+              <td class="cs-cell-mono">US-EIN-123456789</td>
+              <td>procurement@acme-industrial.com</td>
+              <td>+1-555-0199</td>
+              <td class="cs-cell-mono">USD</td>
+              <td class="cs-cell-masked">XXXX-XXXX-7890</td>
+              <td>Chicago, United States</td>
+            </tr>
+            <tr>
+              <td><strong>Global Fasteners & Metals Corp</strong></td>
+              <td class="cs-cell-mono">US-EIN-987654321</td>
+              <td>sales@globalfasteners.com</td>
+              <td>+1-555-0244</td>
+              <td class="cs-cell-mono">USD</td>
+              <td class="cs-cell-masked">XXXX-XXXX-4321</td>
+              <td>Detroit, United States</td>
+            </tr>
+          </tbody>
+        </table>
+        <footer class="cs-pagination-bar">
+          <div>Showing <strong>1</strong>–<strong>2</strong> of <strong>2</strong> vendors</div>
+          <div>Page 1 of 1</div>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Purchase Orders View -->
+    <div id="view-orders" style="display: none;">
+      <div class="cs-filter-bar">
+        <div class="cs-filter-group">
+          <label for="status-filter" class="cs-filter-label">Order Status</label>
+          <select id="status-filter" class="cs-select">
+            <option value="">All Statuses</option>
+            <option value="Draft">Draft</option>
+            <option value="Sent">Sent</option>
+            <option value="Received">Received</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+        <div class="cs-filter-group" style="align-self: flex-end;">
+          <button type="button" class="cs-btn-secondary">Reset Filters</button>
+        </div>
+      </div>
+
+      <div class="cs-table-card">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th>PO Number</th>
+              <th>Vendor ID</th>
+              <th>Order Date</th>
+              <th>Status</th>
+              <th>Currency</th>
+              <th class="cs-cell-number">Order Total</th>
+              <th>Lines</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong class="cs-cell-mono">PO-2026-0001</strong></td>
+              <td class="cs-cell-mono">00000000…0001</td>
+              <td>2026-10-23</td>
+              <td><span class="cs-badge cs-badge-draft">Draft</span></td>
+              <td class="cs-cell-mono">USD</td>
+              <td class="cs-cell-number"><strong>1,250.00</strong></td>
+              <td><span class="cs-badge cs-badge-draft">2 lines</span></td>
+            </tr>
+            <tr>
+              <td><strong class="cs-cell-mono">PO-2026-0002</strong></td>
+              <td class="cs-cell-mono">00000000…0001</td>
+              <td>2026-10-22</td>
+              <td><span class="cs-badge cs-badge-sent">Sent</span></td>
+              <td class="cs-cell-mono">USD</td>
+              <td class="cs-cell-number"><strong>4,720.50</strong></td>
+              <td><span class="cs-badge cs-badge-draft">4 lines</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <footer class="cs-pagination-bar">
+          <div>Showing <strong>1</strong>–<strong>2</strong> of <strong>2</strong> purchase orders</div>
+          <div>Page 1 of 1</div>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.getElementById('view-vendors').style.display = tab === 'vendors' ? 'block' : 'none';
+      document.getElementById('view-orders').style.display = tab === 'orders' ? 'block' : 'none';
+      document.getElementById('tab-vendors').className = 'cs-tab-btn ' + (tab === 'vendors' ? 'active' : '');
+      document.getElementById('tab-orders').className = 'cs-tab-btn ' + (tab === 'orders' ? 'active' : '');
+    }
+  </script>
+</body>
+</html>
