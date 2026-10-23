@@ -1,0 +1,512 @@
+{
+  "by_reason_code": {
+    "CURRENCY_REQUIRED": 1,
+    "CUSTOMER_GOLDEN_ID_REQUIRED": 1,
+    "CUSTOMER_MISMATCH": 1,
+    "CUSTOMER_NOT_FOUND": 1,
+    "DUPLICATE_INVOICE_NUMBER_REVIEW": 1,
+    "DUPLICATE_ORDER_NUMBER_REVIEW": 1,
+    "DUPLICATE_PAYMENT_REVIEW": 1,
+    "FORMULA_INJECTION_DETECTED": 3,
+    "INVALID_CURRENCY": 1,
+    "INVALID_CUSTOMER_GOLDEN_ID": 1,
+    "INVALID_DATE": 1,
+    "INVALID_DUE_DATE": 1,
+    "INVALID_ORDER_NUMBER_FORMAT": 1,
+    "INVALID_PAYMENT_METHOD": 1,
+    "INVALID_STATUS": 1,
+    "INVOICE_NOT_FOUND": 1,
+    "INVOICE_NUMBER_REQUIRED": 1,
+    "LINE_REJECTED": 3,
+    "MULTIPLE_PAYMENTS_REJECTED": 1,
+    "NEGATIVE_OR_ZERO_PAYMENT": 1,
+    "NEGATIVE_OR_ZERO_QUANTITY": 2,
+    "NEGATIVE_UNIT_PRICE": 1,
+    "NO_LINES": 17,
+    "ORDER_ALREADY_INVOICED": 2,
+    "ORDER_DATE_REQUIRED": 1,
+    "ORDER_NUMBER_REQUIRED": 1,
+    "ORDER_NUMBER_TOO_LONG": 1,
+    "ORPHAN_LINE": 2,
+    "OVERPAYMENT_REJECTED": 1,
+    "PARENT_ORDER_IN_REVIEW": 1,
+    "PARENT_ORDER_REJECTED": 1,
+    "PARTIAL_PAYMENT_NOT_ALLOWED": 1,
+    "PRODUCT_ID_REQUIRED": 1,
+    "TAX_RATE_OUT_OF_RANGE": 1
+  },
+  "by_record_type": {
+    "invoice": {
+      "accepted": 4,
+      "rejected": 6,
+      "review": 1,
+      "skipped": 0,
+      "total": 11
+    },
+    "invoice_line": {
+      "accepted": 2,
+      "rejected": 1,
+      "review": 0,
+      "skipped": 0,
+      "total": 3
+    },
+    "payment": {
+      "accepted": 3,
+      "rejected": 7,
+      "review": 1,
+      "skipped": 0,
+      "total": 11
+    },
+    "sales_order": {
+      "accepted": 4,
+      "rejected": 16,
+      "review": 1,
+      "skipped": 0,
+      "total": 21
+    },
+    "so_line": {
+      "accepted": 6,
+      "rejected": 7,
+      "review": 1,
+      "skipped": 0,
+      "total": 14
+    }
+  },
+  "by_rule_id": {
+    "INL-020": 1,
+    "INV-002": 1,
+    "INV-007": 4,
+    "INV-025": 1,
+    "INV-028": 2,
+    "INV-029": 1,
+    "INV-030": 1,
+    "INV-050": 1,
+    "PAY-020": 1,
+    "PAY-023": 1,
+    "PAY-024": 1,
+    "PAY-025": 1,
+    "PAY-026": 1,
+    "PAY-027": 1,
+    "PAY-030": 1,
+    "PAY-050": 1,
+    "SO-002": 1,
+    "SO-003": 1,
+    "SO-004": 1,
+    "SO-005": 1,
+    "SO-006": 13,
+    "SO-020": 1,
+    "SO-021": 1,
+    "SO-022": 1,
+    "SO-023": 1,
+    "SO-024": 1,
+    "SO-025": 1,
+    "SO-026": 1,
+    "SO-030": 1,
+    "SO-040": 3,
+    "SO-050": 1,
+    "SOL-003": 1,
+    "SOL-020": 1,
+    "SOL-024": 2,
+    "SOL-026": 1,
+    "SOL-028": 1,
+    "SOL-040": 1,
+    "SOL-041": 1
+  },
+  "fixture": {
+    "by_record_type": {
+      "invoice": 11,
+      "invoice_line": 3,
+      "payment": 11,
+      "sales_order": 21,
+      "so_line": 14
+    },
+    "file": "sample-data/erp-3/dirty-data-v1.csv",
+    "row_count": 60,
+    "schema_version": 1,
+    "sha256": "d09217dfbc4cb334e39c894556b7749c584cdf9f1acc47e7685282d87cca333a"
+  },
+  "module": "erp3",
+  "normalizations": {
+    "INV-010": 1,
+    "SO-010": 1,
+    "SO-011": 1,
+    "SO-012": 1
+  },
+  "profile_schema_version": 1,
+  "reconciliation": {
+    "accepted": 19,
+    "is_balanced": true,
+    "rejected": 37,
+    "review": 4,
+    "skipped": 0,
+    "total_source_rows": 60,
+    "unaccounted": 0
+  },
+  "rows": {
+    "R001": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R002": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R003": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R004": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R005": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R006": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R007": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R008": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R009": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R010": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R011": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_NUMBER_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R012": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_ORDER_NUMBER_FORMAT",
+        "NO_LINES"
+      ]
+    },
+    "R013": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_NUMBER_TOO_LONG",
+        "NO_LINES"
+      ]
+    },
+    "R014": {
+      "outcome": "rejected",
+      "reasons": [
+        "CUSTOMER_GOLDEN_ID_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R015": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CUSTOMER_GOLDEN_ID",
+        "NO_LINES"
+      ]
+    },
+    "R016": {
+      "outcome": "rejected",
+      "reasons": [
+        "CUSTOMER_NOT_FOUND",
+        "NO_LINES"
+      ]
+    },
+    "R017": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_DATE_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R018": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DATE",
+        "NO_LINES"
+      ]
+    },
+    "R019": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_STATUS",
+        "NO_LINES"
+      ]
+    },
+    "R020": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R021": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY",
+        "NO_LINES"
+      ]
+    },
+    "R022": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_ORDER_NUMBER_REVIEW"
+      ]
+    },
+    "R023": {
+      "outcome": "review",
+      "reasons": [
+        "PARENT_ORDER_IN_REVIEW"
+      ]
+    },
+    "R024": {
+      "outcome": "rejected",
+      "reasons": [
+        "NO_LINES"
+      ]
+    },
+    "R025": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED",
+        "NO_LINES"
+      ]
+    },
+    "R026": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R027": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_OR_ZERO_QUANTITY"
+      ]
+    },
+    "R028": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R029": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_ID_REQUIRED"
+      ]
+    },
+    "R030": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ORDER_REJECTED"
+      ]
+    },
+    "R031": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORPHAN_LINE"
+      ]
+    },
+    "R032": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R033": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_OR_ZERO_QUANTITY"
+      ]
+    },
+    "R034": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_UNIT_PRICE"
+      ]
+    },
+    "R035": {
+      "outcome": "rejected",
+      "reasons": [
+        "TAX_RATE_OUT_OF_RANGE"
+      ]
+    },
+    "R036": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R037": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R038": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R039": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R040": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R041": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R042": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVOICE_NUMBER_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R043": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DUE_DATE",
+        "NO_LINES"
+      ]
+    },
+    "R044": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_ALREADY_INVOICED"
+      ]
+    },
+    "R045": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_ALREADY_INVOICED",
+        "CUSTOMER_MISMATCH"
+      ]
+    },
+    "R046": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_INVOICE_NUMBER_REVIEW"
+      ]
+    },
+    "R047": {
+      "outcome": "rejected",
+      "reasons": [
+        "NO_LINES"
+      ]
+    },
+    "R048": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED",
+        "NO_LINES"
+      ]
+    },
+    "R049": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORPHAN_LINE"
+      ]
+    },
+    "R050": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R051": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R052": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R053": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARTIAL_PAYMENT_NOT_ALLOWED"
+      ]
+    },
+    "R054": {
+      "outcome": "rejected",
+      "reasons": [
+        "OVERPAYMENT_REJECTED"
+      ]
+    },
+    "R055": {
+      "outcome": "rejected",
+      "reasons": [
+        "MULTIPLE_PAYMENTS_REJECTED"
+      ]
+    },
+    "R056": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PAYMENT_METHOD"
+      ]
+    },
+    "R057": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVOICE_NOT_FOUND"
+      ]
+    },
+    "R058": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_OR_ZERO_PAYMENT"
+      ]
+    },
+    "R059": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_PAYMENT_REVIEW"
+      ]
+    },
+    "R060": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    }
+  },
+  "rules_version": "1.0.0",
+  "totals_by_currency": {
+    "EUR": {
+      "invoice_count": 1,
+      "invoice_total": "300.0000",
+      "order_count": 1,
+      "order_total": "300.0000",
+      "payment_count": 0,
+      "payment_total": "0.0000"
+    },
+    "INR": {
+      "invoice_count": 2,
+      "invoice_total": "1571.0000",
+      "order_count": 1,
+      "order_total": "926.0000",
+      "payment_count": 2,
+      "payment_total": "1571.0000"
+    },
+    "USD": {
+      "invoice_count": 1,
+      "invoice_total": "655.0000",
+      "order_count": 2,
+      "order_total": "787.0000",
+      "payment_count": 1,
+      "payment_total": "655.0000"
+    }
+  }
+}

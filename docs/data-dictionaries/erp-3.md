@@ -15,13 +15,14 @@ For the contract and mock architecture decision record see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-3 Sales Orders & Invoices (Group 8) |
-| **Issues** | #26 (Data Model), #27 (List/Read API), #28 (Mutation API & Domain Validation), #29 (`[ERP3-04]` List Screen & UI States), #30 (`[ERP3-05]` Create/Edit/Detail Workflow), #31 (Relationships), #150 (`[ERP3-14]` OpenAPI, Event & Mock Contract Package) |
+| **Issues** | #26 (Data Model), #27 (List/Read API), #28 (Mutation API & Domain Validation), #29 (`[ERP3-04]` List Screen & UI States), #30 (`[ERP3-05]` Create/Edit/Detail Workflow), #31 (Relationships), #33 (`[ERP3-08]` Profiling, Cleaning, Mapping & Dirty-Data Pack), #150 (`[ERP3-14]` OpenAPI, Event & Mock Contract Package) |
 | **PostgreSQL Schema** | `erp3` |
 | **API Base** | `/api/v1/erp-orders` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-3.yaml` (OpenAPI 3.1.0) |
 | **TypeScript / Zod Contracts** | `packages/contracts/src/erp-3.ts` (`@clearshift/contracts/erp-3`) |
 | **Domain Event Contracts** | `packages/contracts/src/erp-3-events.ts` (`@clearshift/contracts/erp-3-events`, PLT-04 / PLT-09 transactional envelopes) |
 | **Mock Contract Package** | `packages/contracts/src/erp-3-mock.ts` (`@clearshift/contracts/erp-3-mock`, `createErp3MockServer()`, default port `4013`) |
+| **Data Quality & Profiling (`ERP3-08`)** | [`apps/erp/modules/erp-3/docs/data-quality-rules.md`](../../apps/erp/modules/erp-3/docs/data-quality-rules.md), `sample-data/erp-3/dirty-data-v1.csv`, `sample-data/erp-3/expected-profile.json` |
 | **Logical Tables (SDS §4.7 & Master Spec §5c)** | `erp3_sales_orders`, `erp3_so_lines`, `erp3_invoices`, `erp3_invoice_lines`, `erp3_payments` (plus `erp3.import_receipts` per KIT-08) |
 | **Version** | `1.0.0` (Proposed — Pending Gate G1 Sign-Off) |
 | **Authoritative References** | `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` (Decisions `C1`, `M2`, `H1`, §5c ERD); `V1_30_ISSUE_STANDARDIZATION_PLAN.md` (§7, §8); `SDS_ClearShift_ERP.md` (§3.2, §4.4 `FR-ERP3-01..05`, `BR-ERP3-01..03`, §4.7, §4.8, §4.10 `EV-09`, §4.11); `ADR-002`; `ADR-003`; `ADR-005` |
