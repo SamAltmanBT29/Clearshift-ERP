@@ -25,8 +25,20 @@ import {
   ValidationError,
 } from '../services/erp2.service.js';
 
+import {
+  DEFAULT_CHUNK_SIZE,
+  DEFAULT_FAILURE_THRESHOLD,
+  DEFAULT_MIN_ATTEMPTED_ROWS,
+  DEFAULT_RETRY_CONFIG,
+  chunkArray,
+  shouldHaltBatchExecution,
+  calculateFailureRate,
+  executeWithRetry,
+  assertNoRollbackSaga,
+} from './batch-runner.js';
+
 // ─────────────────────────────────────────────────────────────────────────────
-// loadBatch-specific types (ERP2-11 / KIT-08 §4.3)
+// loadBatch-specific types (ERP2-11, ERP2-13 / KIT-08, KIT-12)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -50,7 +62,7 @@ export interface BatchRowInput<TRow = unknown> {
 /**
  * Options for loadBatch execution.
  * V1: upsert flag enables UPSERT semantics (kind='linked') for known natural keys.
- * Fuzzy matching is strictly out of scope.
+ * ERP2-13: chunking, failure threshold, and bounded retry configuration.
  */
 export interface LoadBatchOptions {
   /**
@@ -58,7 +70,19 @@ export interface LoadBatchOptions {
    * will be updated and linked (kind='linked') rather than rejected.
    * The idempotency key check always precedes any write.
    */
-  upsert?: boolean;
+  upsert?: boolean | undefined;
+  /** Size of chunks to process (default 500). */
+  chunkSize?: number | undefined;
+  /** Failure rate threshold that halts execution (default 0.10 / 10%). */
+  failureThreshold?: number | undefined;
+  /** Minimum attempted rows before threshold checks activate (default 10). */
+  minAttemptedRows?: number | undefined;
+  /** Maximum retry attempts for transient errors (default 3). */
+  maxRetries?: number | undefined;
+  /** Initial retry delay in milliseconds (default 50ms). */
+  initialDelayMs?: number | undefined;
+  /** Exponential backoff multiplier (default 2). */
+  backoffFactor?: number | undefined;
 }
 
 /**
@@ -67,9 +91,11 @@ export interface LoadBatchOptions {
 export interface LoadBatchRowResult {
   sourceRow: number;
   idempotencyKey: string;
-  outcome: 'loaded' | 'rejected';
-  result?: TargetAdapterResult;
-  error?: TargetAdapterError;
+  outcome: 'loaded' | 'rejected' | 'unattempted';
+  attempts?: number | undefined;
+  priorResult?: boolean | undefined;
+  result?: (TargetAdapterResult & { priorResult?: boolean | undefined }) | undefined;
+  error?: TargetAdapterError | undefined;
 }
 
 /**
@@ -77,9 +103,14 @@ export interface LoadBatchRowResult {
  */
 export interface LoadBatchResult {
   batchId: string;
+  status: 'COMPLETED' | 'STOPPED_EXCESSIVE_FAILURES';
   total: number;
+  attempted: number;
   loaded: number;
   rejected: number;
+  unattempted: number;
+  chunksProcessed: number;
+  stoppedReason?: string | null | undefined;
   rows: LoadBatchRowResult[];
 }
 
@@ -156,7 +187,7 @@ export class Erp2TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
     idempotencyKey: string,
     cleanData: TRow,
     options?: LoadBatchOptions
-  ): Promise<Result<TargetAdapterResult, TargetAdapterError>> {
+  ): Promise<Result<TargetAdapterResult & { priorResult?: boolean | undefined }, TargetAdapterError>> {
     try {
       const result = await this.service.importRow({
         batch_id: batchId,
@@ -169,6 +200,7 @@ export class Erp2TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
 
       return ok({
         targetId: result.target_id,
+        priorResult: result.prior_result,
         receipt: {
           batchId: result.receipt.batch_id,
           sourceRow: result.receipt.source_row,
@@ -204,62 +236,144 @@ export class Erp2TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
   }
 
   /**
-   * Loads a batch of rows sequentially, collecting per-row outcomes.
+   * Loads a batch of rows in sequential chunks, collecting per-row outcomes
+   * with bounded exponential retry and immediate halt on excessive failures (ERP2-13).
    *
-   * Design rules (ERP2-11 / V1_30 §11):
-   *   1. Each row is committed independently; a data-validation failure on one row
-   *      does NOT abort subsequent rows (error isolation).
-   *   2. Infrastructure failures (thrown errors that are NOT DomainError/ConflictError/
-   *      ValidationError) propagate immediately — they are transient and retryable.
-   *   3. Dry-run semantics are enforced by the service layer (no writes during preflight).
-   *   4. The stable idempotency key makes every row replay-safe.
+   * Design rules (ERP2-11, ERP2-13 / KIT-08, KIT-12):
+   *   1. Records are processed in bounded chunks of 500 rows (CHUNK_SIZE = 500).
+   *   2. Transient infrastructure failures trigger bounded exponential backoff retries
+   *      without altering or corrupting the stable idempotency key.
+   *   3. Batch execution stops immediately if row failures exceed 10% of attempted rows
+   *      (after a minimum statistical sample of 10 rows).
+   *   4. Already committed rows and receipts remain durable; batch state transitions
+   *      to STOPPED_EXCESSIVE_FAILURES with exact diagnostics.
+   *   5. Compensating rollback sagas and destructive data loss are strictly prohibited in V1.
    *
    * @param batchId     UUID identifying the overall migration batch.
    * @param rows        Array of typed source rows, each with its own idempotency key.
-   * @param options     Batch-level options (e.g. upsert mode).
+   * @param options     Batch-level options (upsert mode, chunk size, threshold overrides).
    */
   async loadBatch(
     batchId: string,
     rows: BatchRowInput<TRow>[],
     options?: LoadBatchOptions
   ): Promise<LoadBatchResult> {
+    assertNoRollbackSaga();
+
+    const chunkSize = options?.chunkSize ?? DEFAULT_CHUNK_SIZE;
+    const threshold = options?.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
+    const minAttempted = options?.minAttemptedRows ?? DEFAULT_MIN_ATTEMPTED_ROWS;
+    const maxRetries = options?.maxRetries ?? DEFAULT_RETRY_CONFIG.maxRetries;
+    const initialDelayMs = options?.initialDelayMs ?? DEFAULT_RETRY_CONFIG.initialDelayMs;
+    const backoffFactor = options?.backoffFactor ?? DEFAULT_RETRY_CONFIG.backoffFactor;
+
+    const chunks = chunkArray(rows, chunkSize);
     const rowResults: LoadBatchRowResult[] = [];
     let loaded = 0;
     let rejected = 0;
+    let unattempted = 0;
+    let chunksProcessed = 0;
+    let halted = false;
+    let stoppedReason: string | null = null;
 
-    for (const row of rows) {
-      const rowResult = await this.importRow(
-        batchId,
-        row.sourceRow,
-        row.idempotencyKey,
-        row.data,
-        options
-      );
+    for (let cIndex = 0; cIndex < chunks.length; cIndex++) {
+      if (halted) {
+        // Record all rows in remaining unexecuted chunks as unattempted
+        for (const row of chunks[cIndex]!) {
+          unattempted++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'unattempted',
+          });
+        }
+        continue;
+      }
 
-      if (rowResult.ok) {
-        loaded++;
-        rowResults.push({
-          sourceRow: row.sourceRow,
-          idempotencyKey: row.idempotencyKey,
-          outcome: 'loaded',
-          result: rowResult.value,
-        });
-      } else {
-        rejected++;
-        rowResults.push({
-          sourceRow: row.sourceRow,
-          idempotencyKey: row.idempotencyKey,
-          outcome: 'rejected',
-          error: rowResult.error,
-        });
+      chunksProcessed++;
+      const currentChunk = chunks[cIndex]!;
+
+      for (let rIndex = 0; rIndex < currentChunk.length; rIndex++) {
+        const row = currentChunk[rIndex]!;
+
+        if (halted) {
+          unattempted++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'unattempted',
+          });
+          continue;
+        }
+
+        // Execute row import with bounded exponential backoff retries for transient failures
+        const { result: rowResult, attempts } = await executeWithRetry(
+          async (_attempt) => {
+            return await this.importRow(
+              batchId,
+              row.sourceRow,
+              row.idempotencyKey,
+              row.data,
+              options
+            );
+          },
+          {
+            maxRetries,
+            initialDelayMs,
+            backoffFactor,
+          }
+        );
+
+        if (rowResult.ok) {
+          loaded++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'loaded',
+            attempts,
+            priorResult: rowResult.value.priorResult,
+            result: rowResult.value,
+          });
+        } else {
+          rejected++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'rejected',
+            attempts,
+            error: rowResult.error,
+          });
+        }
+
+        // Check if failure rate exceeds threshold after this attempted row
+        const attemptedSoFar = loaded + rejected;
+        if (
+          shouldHaltBatchExecution(rejected, attemptedSoFar, {
+            threshold,
+            minAttemptedRows: minAttempted,
+          })
+        ) {
+          halted = true;
+          const ratePercent = (calculateFailureRate(rejected, attemptedSoFar) * 100).toFixed(2);
+          stoppedReason = `Row failure rate ${ratePercent}% (${rejected} failures / ${attemptedSoFar} attempted) exceeded the ${threshold * 100}% threshold. Batch execution stopped immediately.`;
+        }
       }
     }
 
+    const total = rows.length;
+    const attempted = loaded + rejected;
+    const status = halted ? 'STOPPED_EXCESSIVE_FAILURES' : 'COMPLETED';
+
     return {
       batchId,
-      total: rows.length,
+      status,
+      total,
+      attempted,
       loaded,
       rejected,
+      unattempted,
+      chunksProcessed,
+      stoppedReason,
       rows: rowResults,
     };
   }

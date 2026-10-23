@@ -310,3 +310,32 @@ export async function downloadDataHealthCsv(): Promise<string> {
   }
   return await response.text();
 }
+
+export interface CleanDatasetResponse {
+  success: boolean;
+  data: any;
+}
+
+/**
+ * Retrieve cleaned dataset and field-level change audit report.
+ */
+export async function fetchCleanedData(): Promise<any> {
+  const res = await request<CleanDatasetResponse>('/migration/clean');
+  return res.data;
+}
+
+/**
+ * Download formula-safe CSV field-level change audit log.
+ */
+export async function downloadCleanAuditCsv(): Promise<string> {
+  const url = `${API_BASE}/migration/clean/audit/export`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'text/csv',
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, 'CSV_DOWNLOAD_FAILED', 'Failed to download field clean audit CSV');
+  }
+  return await response.text();
+}
