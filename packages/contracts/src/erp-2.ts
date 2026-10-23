@@ -55,12 +55,46 @@ export const PurchaseOrderStatusEnum = z.enum([
 ]);
 export type PurchaseOrderStatus = z.infer<typeof PurchaseOrderStatusEnum>;
 
-export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> = {
+export const ERP2_PURCHASE_ORDER_STATUSES = ['Draft', 'Sent', 'Received', 'Closed'] as const;
+
+export const ERP2_PURCHASE_ORDER_STATUS_TRANSITIONS: Record<
+  PurchaseOrderStatus,
+  readonly PurchaseOrderStatus[]
+> = {
   Draft: ['Sent'],
   Sent: ['Received'],
   Received: ['Closed'],
   Closed: [],
+};
+
+export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> =
+  ERP2_PURCHASE_ORDER_STATUS_TRANSITIONS;
+
+export const ERP2_PURCHASE_ORDER_TERMINAL_STATUSES: readonly PurchaseOrderStatus[] = ['Closed'];
+
+export const ERP2_OPTIONAL_REFERENCE_ABSENT = 'ERP2_OPTIONAL_REFERENCE_ABSENT';
+
+export const ERP2_DOMAIN_RULES = {
+  UNKNOWN_PRODUCT: 'UNKNOWN_PRODUCT',
+  VENDOR_NOT_FOUND: 'VENDOR_NOT_FOUND',
+  DUPLICATE_TAX_NUMBER: 'DUPLICATE_TAX_NUMBER',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  INVALID_PO_STATUS: 'INVALID_PO_STATUS',
+  INVALID_BANK_DETAILS: 'INVALID_BANK_DETAILS',
+  INVALID_CURRENCY_CODE: 'INVALID_CURRENCY_CODE',
+  EMPTY_ORDER_LINES: 'EMPTY_ORDER_LINES',
+  READ_MODEL_INCONSISTENT: 'READ_MODEL_INCONSISTENT',
+  SOURCE_IDENTITY_INCOMPLETE: 'SOURCE_IDENTITY_INCOMPLETE',
+  LINE_PRODUCT_CROSS_MODULE_ERROR: 'LINE_PRODUCT_CROSS_MODULE_ERROR',
+  CURRENCY_MISMATCH: 'CURRENCY_MISMATCH',
 } as const;
+
+export interface Erp2RelationshipWarning {
+  relationship: string;
+  field: string;
+  code: string;
+  message: string;
+}
 
 export function isValidPoStatusTransition(from: string, to: string): boolean {
   const norm = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -145,7 +179,6 @@ export const VENDOR_DOMAIN_RULES = {
   IDEMPOTENCY_CONFLICT: 'ERP2_IDEMPOTENCY_CONFLICT',
 } as const;
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Vendor Schemas
 // GET /api/v1/erp-vendors/vendors
@@ -205,6 +238,8 @@ export const UpdateVendorRequestSchema = z.object({
   country: z.string().max(64).optional().nullable(),
   bank_details: z.string().min(4).max(64).optional().nullable(),
   currency: CurrencyCode.optional(),
+  source_system: z.string().max(64).optional().nullable(),
+  source_id: z.string().max(128).optional().nullable(),
 });
 export type UpdateVendorRequest = z.infer<typeof UpdateVendorRequestSchema>;
 export const PatchVendorRequestSchema = UpdateVendorRequestSchema;
