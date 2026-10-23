@@ -1,54 +1,85 @@
 openapi: "3.1.0"
 
 info:
-  title: ClearShift ERP — Sales Orders & Invoices API (ERP-3)
+  title: ClearShift ERP — Sales Orders & Invoices API
   description: |
-    **ERP-3 Sales Orders and Invoices module** — public REST contract.
+    **ERP-3 Sales Orders & Invoices module** — public REST contract.
 
     Base path: `/api/v1/erp-orders`
 
     Implements:
-    - Sales Orders and Line Items (FR-ERP3-01, BR-ERP3-01..03)
-    - Invoices with Due Date and Overdue status (FR-ERP3-02, FR-ERP3-05)
-    - Payment records and Automatic Paid state transition (FR-ERP3-03, FR-ERP3-04)
+    - Sales Orders with lines (FR-ERP3-01, FR-ERP3-05)
+    - Invoices with lines and status (FR-ERP3-02)
+    - Payment records and auto-Paid transition (FR-ERP3-03, FR-ERP3-04)
+    - Domain invariants: BR-ERP3-01 (line totals = order total), BR-ERP3-02 (tax per line),
+      BR-ERP3-03 (mandatory customer Golden ID)
 
-    Non-negotiables:
-    - Every order requires a valid customer Golden ID (`gid-*`).
-    - Line subtotal and tax are calculated server-side; sum of lines must equal order total.
-    - Tax per line = line amount * product tax rate, rounded to 2 decimal places.
-    - Invoice has a required `due_date`; status is `paid` when sum of payments equals invoice total, `overdue` when unpaid and current UTC date > `due_date`, otherwise `open`.
-    - Amounts are formatted as string-encoded decimals to prevent IEEE-754 floating-point inaccuracies.
+    All amounts are returned as **string-encoded decimals** (numeric strings)
+    to avoid IEEE-754 floating-point rounding. Clients must use a
+    fixed-precision decimal library for arithmetic.
+
+    ⚠️ **Unresolved: DR-1** — SDS §3.2 mandates `numeric(19,4)` monetary storage and
+    Master Architecture Spec Decision `M2` + `@cs/core` `Money` specify `ROUND_HALF_UP` at
+    currency scale (2 dp for INR/USD, stored as `.toFixed(4)`), while SDS §4.4 `BR-ERP3-02`
+    states *"Tax per line = line amount multiplied by the product tax rate, rounded to 2 decimals."*
+    Pending Integration Lead confirmation of whether intermediate `quantity * price` and `tax_amount`
+    round at 2 dp (zero-padded to 4 dp) or 4 dp, the mock uses exact 4-dp arithmetic and returns
+    `422 DR1_ROUNDING_UNRESOLVED` on sub-4-dp fractions.
+
+    All timestamps are ISO 8601 with timezone (UTC).
+    All dates are ISO 8601 date-only strings (YYYY-MM-DD).
+
+    **Endpoint & schema authority note (`CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` Decision `C1`):**
+    - **DR-2 (`due_date`):** Authoritatively mandatory per `V1_30_ISSUE_STANDARDIZATION_PLAN.md` §8
+      (*"due date is mandatory for overdue calculation"*) and Master Spec §5c ERD (`ERP3_INVOICES.due_date`),
+      which supersede its omission from the SDS §4.7 summary table under Decision `C1`.
+    - **DR-3 (Detail routes):** `GET /sales-orders`, `POST /sales-orders`, `GET /invoices`, `POST /invoices`,
+      `POST /payments` are explicitly listed in SDS §4.8.
+      `GET /sales-orders/{id}` and `GET /invoices/{id}` are required by `V1_30_ISSUE_STANDARDIZATION_PLAN.md`
+      §7 Slot 04 (*Detail/read API*) and Master Spec §6.1 / Decision `H1` (*Full authoritative route set derived at G1*),
+      consistent with ERP-1, ERP-2, ERP-4, and ERP-5, but are **NOT explicitly listed in SDS §4.8**.
+      They are included here and in the mock and flagged for Integration Lead Gate G1 sign-off.
+
   version: "1.0.0"
   contact:
-    name: ClearShift Engineering — ERP Group 8
+    name: ClearShift Engineering — ERP Team (Group 8)
   license:
     name: Private
 
 servers:
-  - url: /api/v1/erp-orders
-    description: Local development / gateway relative path
+  - url: http://localhost:3000/api/v1/erp-orders
+    description: Local development server
+  - url: https://api.clearshift.internal/api/v1/erp-orders
+    description: Staging / production
 
 tags:
   - name: Sales Orders
-    description: Sales orders creation, listing, details, and status updates
+    description: Sales order creation and lifecycle management
   - name: Invoices
-    description: Invoices listing, creation, and status tracking
+    description: Invoice creation and status management
   - name: Payments
-    description: Payment recording and reconciliation
+    description: Payment records and invoice settlement
 
+security:
+  - BearerAuth: []
+
+# ────────────────────────────────────────────────────────────────────────────
+# Paths
+# ────────────────────────────────────────────────────────────────────────────
 paths:
+  # ── Sales Orders ────────────────────────────────────────────────────────────
   /sales-orders:
     get:
       operationId: listSalesOrders
       tags: [Sales Orders]
-      summary: List sales orders with bounded paging and filters
+      summary: List sales orders (paged)
       description: |
-        Returns paginated sales orders. Maximum page size is 100.
-        Supports search by order number or customer Golden ID, and status filtering.
+        Returns a paginated list of sales orders.
+        Supports filtering by status, customer_golden_id, currency, and date range.
+        Ordered by `order_date` descending, then `id` ascending as tie-breaker.
       parameters:
         - name: page
           in: query
-          required: false
           schema:
             type: integer
             minimum: 1
@@ -56,187 +87,278 @@ paths:
           description: Page number (1-indexed)
         - name: pageSize
           in: query
-          required: false
           schema:
             type: integer
             minimum: 1
             maximum: 100
             default: 20
-          description: Bounded number of records per page (max 100)
+          description: Page size (hard cap of 100)
         - name: search
           in: query
-          required: false
           schema:
             type: string
-          description: Case-insensitive search on orderNumber or customerGoldenId
+            maxLength: 100
+          description: Case-insensitive search on order_number
         - name: status
           in: query
-          required: false
           schema:
-            type: string
-            enum: [open, invoiced, closed]
-          description: Filter by sales order status
-        - name: customerGoldenId
+            $ref: "#/components/schemas/SalesOrderStatus"
+          description: Filter by order status
+        - name: customer_golden_id
           in: query
-          required: false
           schema:
             type: string
-          description: Filter by exact customer Golden ID
-        - name: currencyCode
+            format: uuid
+          description: Filter by customer Golden ID (UUID)
+        - name: currency
           in: query
-          required: false
           schema:
             type: string
+            pattern: "^[A-Z]{3}$"
+            minLength: 3
             maxLength: 3
+          description: Filter by ISO 4217 currency code
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter orders on or after this date (YYYY-MM-DD)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter orders on or before this date (YYYY-MM-DD)
       responses:
         "200":
-          description: Paginated sales orders list
+          description: Successful response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedSalesOrdersResponse"
+                $ref: "#/components/schemas/SalesOrderListResponse"
         "400":
-          description: Invalid query parameters
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+          $ref: "#/components/responses/ValidationError"
         "401":
-          description: Unauthorized
-        "403":
-          description: Forbidden
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
     post:
       operationId: createSalesOrder
       tags: [Sales Orders]
-      summary: Create a new sales order with line items
+      summary: Create a new sales order
       description: |
-        Validates customer Golden ID, verifies line item tax and totals.
+        Creates a sales order with one or more lines.
+
+        **Domain rules enforced (server-side):**
+        - BR-ERP3-01: Server computes `total` from lines. Client-supplied total is ignored.
+        - BR-ERP3-03: `customer_golden_id` is mandatory; missing → 422.
+        - `order_number` uniqueness: duplicate → 409.
+        - `product_id` must reference a valid ERP-1 product; unknown → 422.
+
+        ⚠️ DR-1: Tax and line total rounding rule not yet confirmed.
+        The mock never rounds: a value not exactly representable at 4 dp
+        returns 422 `DR1_ROUNDING_UNRESOLVED`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateSalesOrderInput"
+              $ref: "#/components/schemas/CreateSalesOrderRequest"
       responses:
         "201":
-          description: Sales order created successfully
+          description: Sales order created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SalesOrder"
         "400":
-          description: Validation error or rule violation (e.g. invalid customer Golden ID or empty lines)
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: |
+            Conflict — `order_number` already exists.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 409
+                error: Conflict
+                code: ORDER_NUMBER_EXISTS
+                message: "A sales order with this order number already exists."
+        "422":
+          description: |
+            Business rule violation — missing customer_golden_id or unknown product reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 422
+                error: Unprocessable Entity
+                code: MISSING_CUSTOMER_GOLDEN_ID
+                message: "Sales order must have a valid customer_golden_id (BR-ERP3-03)."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
+  # ── Sales Order Detail (implied — not in SDS §4.8 table; flagged for confirmation) ──
   /sales-orders/{id}:
     get:
-      operationId: getSalesOrderById
+      operationId: getSalesOrder
       tags: [Sales Orders]
-      summary: Retrieve a single sales order by ID
+      summary: Get a single sales order by ID
+      description: |
+        Returns a sales order with all embedded lines.
+
+        ⚠️ **Note:** This endpoint is implied by the standard V1 CRUD pattern and required
+        by the mock but is NOT explicitly listed in SDS §4.8. Flagged for Integration Lead
+        confirmation before the implementation issue (ERP3-04) is started.
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/IdParam"
       responses:
         "200":
-          description: Sales order retrieved
+          description: Sales order found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SalesOrder"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           description: Sales order not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 404
+                error: Not Found
+                code: ORDER_NOT_FOUND
+                message: "Sales order not found."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
-    patch:
-      operationId: updateSalesOrderStatus
-      tags: [Sales Orders]
-      summary: Update sales order status (allowed transitions only)
-      description: Transitions between Open -> Invoiced -> Closed.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateSalesOrderStatusInput"
-      responses:
-        "200":
-          description: Sales order status updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SalesOrder"
-        "400":
-          description: Invalid status transition
-
+  # ── Invoices ────────────────────────────────────────────────────────────────
   /invoices:
     get:
       operationId: listInvoices
       tags: [Invoices]
-      summary: List invoices with bounded paging and search/filter
+      summary: List invoices (paged)
+      description: |
+        Returns a paginated list of invoices.
+        Supports filtering by status, customer_golden_id, order_id, currency, and date range.
+        Ordered by `invoice_date` descending, then `id` ascending as tie-breaker.
       parameters:
         - name: page
           in: query
-          required: false
           schema:
             type: integer
+            minimum: 1
             default: 1
+          description: Page number (1-indexed)
         - name: pageSize
           in: query
-          required: false
           schema:
             type: integer
+            minimum: 1
             maximum: 100
             default: 20
+          description: Page size (hard cap of 100)
         - name: search
           in: query
-          required: false
           schema:
             type: string
+            maxLength: 100
+          description: Case-insensitive search on invoice_number
         - name: status
           in: query
-          required: false
           schema:
-            type: string
-            enum: [open, paid, overdue]
-        - name: customerGoldenId
+            $ref: "#/components/schemas/InvoiceStatus"
+          description: Filter by invoice status
+        - name: customer_golden_id
           in: query
-          required: false
           schema:
             type: string
+            format: uuid
+          description: Filter by customer Golden ID
+        - name: order_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by source sales order ID
+        - name: currency
+          in: query
+          schema:
+            type: string
+            pattern: "^[A-Z]{3}$"
+            minLength: 3
+            maxLength: 3
+          description: Filter by ISO 4217 currency code
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter invoices on or after this invoice_date (YYYY-MM-DD)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter invoices on or before this invoice_date (YYYY-MM-DD)
       responses:
         "200":
-          description: Paginated invoices list
+          description: Successful response
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedInvoicesResponse"
+                $ref: "#/components/schemas/InvoiceListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
     post:
       operationId: createInvoice
       tags: [Invoices]
-      summary: Create an invoice from an existing sales order
+      summary: Create a new invoice
+      description: |
+        Creates an invoice with one or more lines.
+
+        **Domain rules enforced (server-side):**
+        - `invoice_number` uniqueness: duplicate → 409.
+        - `customer_golden_id` is mandatory.
+        - `due_date` is mandatory (V1_30 plan: required for overdue calculation).
+        - Server computes `total` from lines. Client-supplied total is ignored.
+        - `order_id` if supplied must reference an existing sales order → 422 otherwise.
+
+        ⚠️ DR-1: Tax and line total rounding rule not yet confirmed.
+        The mock never rounds: a value not exactly representable at 4 dp
+        returns 422 `DR1_ROUNDING_UNRESOLVED`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateInvoiceInput"
+              $ref: "#/components/schemas/CreateInvoiceRequest"
       responses:
         "201":
           description: Invoice created
@@ -245,74 +367,99 @@ paths:
               schema:
                 $ref: "#/components/schemas/Invoice"
         "400":
-          description: Validation error
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: |
+            Conflict — `invoice_number` already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 409
+                error: Conflict
+                code: INVOICE_NUMBER_EXISTS
+                message: "An invoice with this invoice number already exists."
+        "422":
+          description: |
+            Business rule violation — unknown order reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
+  # ── Invoice Detail (implied — not in SDS §4.8 table; flagged for confirmation) ──
   /invoices/{id}:
     get:
-      operationId: getInvoiceById
+      operationId: getInvoice
       tags: [Invoices]
-      summary: Retrieve an invoice by ID
+      summary: Get a single invoice by ID
+      description: |
+        Returns an invoice with all embedded lines.
+
+        ⚠️ **Note:** This endpoint is implied by the standard V1 CRUD pattern and required
+        by the mock but is NOT explicitly listed in SDS §4.8. Flagged for Integration Lead
+        confirmation before the implementation issue (ERP3-04) is started.
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: "#/components/parameters/IdParam"
       responses:
         "200":
-          description: Invoice details
+          description: Invoice found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Invoice"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           description: Invoice not found
-
-  /payments:
-    get:
-      operationId: listPayments
-      tags: [Payments]
-      summary: List payments
-      parameters:
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 1
-        - name: pageSize
-          in: query
-          required: false
-          schema:
-            type: integer
-            maximum: 100
-            default: 20
-        - name: invoiceId
-          in: query
-          required: false
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Paginated payments list
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedPaymentsResponse"
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 404
+                error: Not Found
+                code: INVOICE_NOT_FOUND
+                message: "Invoice not found."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
+  # ── Payments ─────────────────────────────────────────────────────────────────
+  /payments:
     post:
       operationId: createPayment
       tags: [Payments]
-      summary: Record a full payment against an invoice
+      summary: Record a payment against an invoice
       description: |
-        V1 accepts one full payment per invoice. When accepted payment equals invoice total,
-        the invoice status automatically transitions to Paid.
+        Records a payment for an invoice.
+
+        **Domain rules enforced (server-side):**
+        - `invoice_id` must reference an existing, non-Paid invoice → 404 / 422.
+        - FR-ERP3-04: When `SUM(payments) >= invoice.total`, the invoice status
+          automatically transitions to `Paid`.
+        - A payment that would push total payments above invoice total is rejected → 422.
+
+        ⚠️ DR-1: Comparison of payment sum to invoice total uses the stored decimal
+        values. Rounding rule for this comparison is not confirmed.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePaymentInput"
+              $ref: "#/components/schemas/CreatePaymentRequest"
       responses:
         "201":
           description: Payment recorded
@@ -321,265 +468,658 @@ paths:
               schema:
                 $ref: "#/components/schemas/Payment"
         "400":
-          description: Validation error or overpayment
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 404
+                error: Not Found
+                code: INVOICE_NOT_FOUND
+                message: "Invoice not found."
+        "422":
+          description: |
+            Business rule violation — invoice already paid or payment exceeds total.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                alreadyPaid:
+                  summary: Invoice already paid
+                  value:
+                    statusCode: 422
+                    error: Unprocessable Entity
+                    code: INVOICE_ALREADY_PAID
+                    message: "Invoice is already paid. No further payments are accepted."
+                exceedsTotal:
+                  summary: Payment exceeds invoice total
+                  value:
+                    statusCode: 422
+                    error: Unprocessable Entity
+                    code: PAYMENT_EXCEEDS_INVOICE_TOTAL
+                    message: "Payment amount would exceed the invoice total."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
+# ────────────────────────────────────────────────────────────────────────────
+# Components
+# ────────────────────────────────────────────────────────────────────────────
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Hub-issued JWT. All endpoints require a valid token.
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Entity UUID primary key
+
+  # ── Schemas ──────────────────────────────────────────────────────────────────
   schemas:
+    # Enums
+    SalesOrderStatus:
+      type: string
+      enum: [Open, Invoiced, Closed]
+      description: |
+        Sales order lifecycle (FR-ERP3-05).
+        Forward-only FSM: Open → Invoiced → Closed.
+
+    InvoiceStatus:
+      type: string
+      enum: [Open, Paid, Overdue]
+      description: |
+        Invoice payment status (FR-ERP3-02).
+        Transitions to Paid automatically when SUM(payments) == total (FR-ERP3-04).
+
+    PaymentMethod:
+      type: string
+      enum: [cash, bank, card]
+      description: Payment method (FR-ERP3-03).
+
+    # ── Sales Order Line ──────────────────────────────────────────────────────
     SalesOrderLine:
       type: object
-      required: [id, productId, quantity, unitPrice, taxRate, taxAmount, lineTotal]
+      required:
+        - id
+        - order_id
+        - product_id
+        - quantity
+        - price
+        - tax_rate
+        - tax_amount
+        - line_total
+        - created_at
       properties:
         id:
           type: string
-        orderId:
+          format: uuid
+        order_id:
           type: string
-        productId:
+          format: uuid
+        product_id:
           type: string
-        productName:
-          type: string
+          format: uuid
+          description: ERP-1 product UUID reference (never stored locally).
         quantity:
-          type: integer
-          minimum: 1
-        unitPrice:
           type: string
-        taxRate:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Quantity as string-encoded non-negative decimal (up to 4 dp).
+        price:
           type: string
-        taxAmount:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Unit price as string-encoded non-negative decimal (up to 4 dp).
+        tax_rate:
           type: string
-        lineTotal:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Tax rate percentage (e.g. "18.0000" = 18%).
+        tax_amount:
           type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: |
+            Server-computed tax amount.
+            ⚠️ DR-1: Rounding rule not yet confirmed by project specification.
+        line_total:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: |
+            Server-computed line total (price × quantity + tax_amount).
+            BR-ERP3-01: SUM(line_total) must equal order.total.
+            ⚠️ DR-1: Rounding rule not yet confirmed.
+        created_at:
+          type: string
+          format: date-time
 
-    CreateSalesOrderLineInput:
+    CreateSalesOrderLineRequest:
       type: object
-      required: [productId, quantity, unitPrice, taxRate]
+      required:
+        - product_id
+        - quantity
+        - price
+        - tax_rate
       properties:
-        productId:
+        product_id:
           type: string
-        productName:
-          type: string
+          format: uuid
         quantity:
-          type: integer
-          minimum: 1
-        unitPrice:
           type: string
-        taxRate:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Must be > 0.
+        price:
           type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        tax_rate:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Tax rate percentage string (e.g. "18.0000").
 
+    # ── Sales Order ───────────────────────────────────────────────────────────
     SalesOrder:
       type: object
-      required: [id, orderNumber, customerGoldenId, orderDate, status, subtotal, taxTotal, total, currencyCode]
+      required:
+        - id
+        - order_number
+        - customer_golden_id
+        - order_date
+        - status
+        - currency
+        - total
+        - lines
+        - created_at
+        - updated_at
       properties:
         id:
           type: string
-        orderNumber:
+          format: uuid
+        order_number:
           type: string
-        customerGoldenId:
+          minLength: 1
+          maxLength: 64
+        customer_golden_id:
           type: string
-        orderDate:
+          format: uuid
+          description: Hub Golden ID UUID (ADR-003). Mandatory per BR-ERP3-03.
+        order_date:
           type: string
           format: date
         status:
+          $ref: "#/components/schemas/SalesOrderStatus"
+        currency:
           type: string
-          enum: [open, invoiced, closed]
-        subtotal:
-          type: string
-        taxTotal:
-          type: string
+          pattern: "^[A-Z]{3}$"
+          minLength: 3
+          maxLength: 3
         total:
           type: string
-        currencyCode:
-          type: string
-        notes:
-          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: |
+            Server-computed total. Equals SUM(line.line_total) per BR-ERP3-01.
+            ⚠️ DR-1: Rounding rule not confirmed.
         lines:
           type: array
           items:
             $ref: "#/components/schemas/SalesOrderLine"
-        createdAt:
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        created_at:
           type: string
-        updatedAt:
+          format: date-time
+        updated_at:
           type: string
+          format: date-time
 
-    PaginatedSalesOrdersResponse:
+    CreateSalesOrderRequest:
       type: object
-      required: [items, page, pageSize, total]
+      required:
+        - customer_golden_id
+        - order_date
+        - currency
+        - lines
       properties:
-        items:
+        order_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: If omitted, server generates a unique number.
+        customer_golden_id:
+          type: string
+          format: uuid
+          description: Mandatory per BR-ERP3-03.
+        order_date:
+          type: string
+          format: date
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          minLength: 3
+          maxLength: 3
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CreateSalesOrderLineRequest"
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        idempotency_key:
+          type: [string, "null"]
+          maxLength: 128
+        batch_id:
+          type: [string, "null"]
+          format: uuid
+        source_row:
+          type: [integer, "null"]
+          minimum: 0
+
+    SalesOrderListResponse:
+      type: object
+      required:
+        - data
+        - total
+        - page
+        - pageSize
+        - totalPages
+      properties:
+        data:
           type: array
           items:
             $ref: "#/components/schemas/SalesOrder"
-        page:
-          type: integer
-        pageSize:
-          type: integer
         total:
           type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
         totalPages:
           type: integer
+          minimum: 0
 
-    CreateSalesOrderInput:
+    # ── Invoice Line ──────────────────────────────────────────────────────────
+    InvoiceLine:
       type: object
-      required: [customerGoldenId, orderDate, lines]
+      required:
+        - id
+        - invoice_id
+        - product_id
+        - quantity
+        - price
+        - tax_rate
+        - tax_amount
+        - line_total
+        - created_at
       properties:
-        customerGoldenId:
+        id:
           type: string
-        orderDate:
+          format: uuid
+        invoice_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        price:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        tax_rate:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        tax_amount:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: ⚠️ DR-1 Rounding rule not confirmed.
+        line_total:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        created_at:
+          type: string
+          format: date-time
+
+    CreateInvoiceLineRequest:
+      type: object
+      required:
+        - product_id
+        - quantity
+        - price
+        - tax_rate
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        price:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+        tax_rate:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+
+    # ── Invoice ───────────────────────────────────────────────────────────────
+    Invoice:
+      type: object
+      required:
+        - id
+        - invoice_number
+        - customer_golden_id
+        - invoice_date
+        - due_date
+        - status
+        - currency
+        - total
+        - lines
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+          minLength: 1
+          maxLength: 64
+        order_id:
+          type: [string, "null"]
+          format: uuid
+          description: Source sales order UUID. Nullable for standalone invoices.
+        customer_golden_id:
+          type: string
+          format: uuid
+        invoice_date:
           type: string
           format: date
-        currencyCode:
+        due_date:
           type: string
-          default: USD
-        notes:
+          format: date
+          description: |
+            Authoritatively mandatory per V1_30_ISSUE_STANDARDIZATION_PLAN.md §8
+            ("due date is mandatory for overdue calculation") and Master Spec §5c ERD
+            (ERP3_INVOICES.due_date), which prevail over SDS §4.7 table omission under Decision C1.
+        status:
+          $ref: "#/components/schemas/InvoiceStatus"
+        currency:
           type: string
+          pattern: "^[A-Z]{3}$"
+          minLength: 3
+          maxLength: 3
+        total:
+          type: string
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: |
+            Server-computed total. ⚠️ DR-1: Rounding rule not confirmed.
         lines:
           type: array
           items:
-            $ref: "#/components/schemas/CreateSalesOrderLineInput"
+            $ref: "#/components/schemas/InvoiceLine"
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
-    UpdateSalesOrderStatusInput:
+    CreateInvoiceRequest:
       type: object
-      required: [status]
+      required:
+        - customer_golden_id
+        - invoice_date
+        - due_date
+        - currency
+        - lines
       properties:
-        status:
+        invoice_number:
           type: string
-          enum: [open, invoiced, closed]
-        reason:
+          minLength: 1
+          maxLength: 64
+        order_id:
+          type: [string, "null"]
+          format: uuid
+        customer_golden_id:
           type: string
-
-    Invoice:
-      type: object
-      required: [id, invoiceNumber, orderId, customerGoldenId, invoiceDate, dueDate, total, status]
-      properties:
-        id:
-          type: string
-        invoiceNumber:
-          type: string
-        orderId:
-          type: string
-        customerGoldenId:
-          type: string
-        invoiceDate:
+          format: uuid
+        invoice_date:
           type: string
           format: date
-        dueDate:
+        due_date:
           type: string
           format: date
-        total:
+          description: Mandatory per V1_30 plan §8 and Master Spec §5c ERD (Decision C1).
+        currency:
           type: string
-        paidAmount:
-          type: string
-        currencyCode:
-          type: string
-        status:
-          type: string
-          enum: [open, paid, overdue]
-        notes:
-          type: string
-        createdAt:
-          type: string
-        updatedAt:
-          type: string
+          pattern: "^[A-Z]{3}$"
+          minLength: 3
+          maxLength: 3
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CreateInvoiceLineRequest"
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        idempotency_key:
+          type: [string, "null"]
+          maxLength: 128
+        batch_id:
+          type: [string, "null"]
+          format: uuid
+        source_row:
+          type: [integer, "null"]
+          minimum: 0
 
-    PaginatedInvoicesResponse:
+    InvoiceListResponse:
       type: object
-      required: [items, page, pageSize, total]
+      required:
+        - data
+        - total
+        - page
+        - pageSize
+        - totalPages
       properties:
-        items:
+        data:
           type: array
           items:
             $ref: "#/components/schemas/Invoice"
-        page:
-          type: integer
-        pageSize:
-          type: integer
         total:
           type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
         totalPages:
           type: integer
+          minimum: 0
 
-    CreateInvoiceInput:
-      type: object
-      required: [orderId, invoiceDate, dueDate]
-      properties:
-        orderId:
-          type: string
-        invoiceDate:
-          type: string
-          format: date
-        dueDate:
-          type: string
-          format: date
-        notes:
-          type: string
-
+    # ── Payment ───────────────────────────────────────────────────────────────
     Payment:
       type: object
-      required: [id, invoiceId, amount, currencyCode, paidAt, method]
+      required:
+        - id
+        - invoice_id
+        - amount
+        - paid_at
+        - method
+        - created_at
       properties:
         id:
           type: string
-        invoiceId:
+          format: uuid
+        invoice_id:
           type: string
+          format: uuid
         amount:
           type: string
-        currencyCode:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Payment amount as string-encoded non-negative decimal (up to 4 dp).
+        paid_at:
           type: string
-        paidAt:
-          type: string
-          format: date
+          format: date-time
         method:
+          $ref: "#/components/schemas/PaymentMethod"
+        created_at:
           type: string
-          enum: [cash, bank, card]
-        reference:
-          type: string
-        createdAt:
-          type: string
+          format: date-time
 
-    PaginatedPaymentsResponse:
+    CreatePaymentRequest:
       type: object
-      required: [items, page, pageSize, total]
+      required:
+        - invoice_id
+        - amount
+        - method
       properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/Payment"
-        page:
-          type: integer
-        pageSize:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
-
-    CreatePaymentInput:
-      type: object
-      required: [invoiceId, amount, paidAt, method]
-      properties:
-        invoiceId:
+        invoice_id:
           type: string
+          format: uuid
         amount:
           type: string
-        paidAt:
+          pattern: "^\\d+(\\.\\d{1,4})?$"
+          description: Must be > 0.
+        paid_at:
           type: string
-          format: date
+          format: date-time
+          description: Defaults to current server time if omitted.
         method:
-          type: string
-          enum: [cash, bank, card]
-        reference:
-          type: string
+          $ref: "#/components/schemas/PaymentMethod"
+        idempotency_key:
+          type: [string, "null"]
+          maxLength: 128
+        batch_id:
+          type: [string, "null"]
+          format: uuid
+        source_row:
+          type: [integer, "null"]
+          minimum: 0
 
-    ErrorEnvelope:
+    # ── Error Envelope (ADR-002 / PLT-04) ─────────────────────────────────────
+    ApiError:
       type: object
-      required: [code, message]
+      required:
+        - statusCode
+        - error
+        - message
       properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+        error:
+          type: string
+          description: HTTP error class (e.g. "Bad Request")
         code:
           type: string
+          description: Machine-readable error code (e.g. ORDER_NOT_FOUND)
         message:
           type: string
+          description: Human-readable error summary
         details:
           type: array
-          items:
-            type: object
+          items: {}
+          description: Optional field-level error details
         correlation_id:
           type: string
+          description: Request correlation ID for tracing
+
+  # ── Responses ─────────────────────────────────────────────────────────────
+  responses:
+    ValidationError:
+      description: |
+        400 Bad Request — Schema or pagination validation failure.
+        code: VALIDATION_ERROR or BAD_REQUEST
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            statusCode: 400
+            error: Bad Request
+            code: VALIDATION_ERROR
+            message: "pageSize cannot exceed 100"
+            details:
+              - field: pageSize
+                message: pageSize cannot exceed 100
+                code: VALUE_OUT_OF_RANGE
+
+    Unauthorized:
+      description: |
+        401 Unauthorized — Missing or invalid JWT.
+        code: UNAUTHORIZED
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            statusCode: 401
+            error: Unauthorized
+            code: UNAUTHORIZED
+            message: "Authentication token is missing or expired."
+
+    Forbidden:
+      description: |
+        403 Forbidden — Authenticated user lacks the required role.
+        code: FORBIDDEN
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            statusCode: 403
+            error: Forbidden
+            code: FORBIDDEN
+            message: "You do not have permission to perform this action."
+
+    InternalError:
+      description: |
+        500 Internal Server Error — Unhandled exception or infrastructure failure.
+        code: INTERNAL_SERVER_ERROR
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            statusCode: 500
+            error: Internal Server Error
+            code: INTERNAL_SERVER_ERROR
+            message: "An unexpected error occurred."

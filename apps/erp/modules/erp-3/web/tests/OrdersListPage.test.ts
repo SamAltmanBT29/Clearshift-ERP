@@ -2,10 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   fetchSalesOrders,
   fetchInvoices,
-  fetchPayments,
-  createSalesOrder,
-  createInvoice,
-  createPayment,
   ApiError,
 } from '../src/api/erp-3.js';
 import {
@@ -15,25 +11,32 @@ import {
   CustomerGoldenIdSchema,
 } from '@clearshift/contracts';
 
+const ORDER_ID_1 = 'aaaaaaaa-0003-4000-8000-000000000001';
+const INVOICE_ID_1 = 'cccccccc-0003-4000-8000-000000000001';
+const CUSTOMER_GOLDEN_ID_1 = '55555555-0003-4000-8000-000000000001';
+
 describe('ERP-3 Frontend API Client & View Logic Suite', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
   describe('fetchSalesOrders() and Query Construction', () => {
-    it('constructs correct query params and returns paginated sales orders', async () => {
+    it('constructs correct canonical query params and returns paginated sales orders', async () => {
       const mockResponse = {
-        items: [
+        data: [
           {
-            id: 'so-1',
-            orderNumber: 'SO-1001',
-            customerGoldenId: 'gid-cust-001',
-            orderDate: '2026-10-23',
-            status: 'open',
-            subtotal: '1000.00',
-            taxTotal: '100.00',
-            total: '1100.00',
-            currencyCode: 'USD',
+            id: ORDER_ID_1,
+            order_number: 'SO-2026-0001',
+            customer_golden_id: CUSTOMER_GOLDEN_ID_1,
+            order_date: '2026-10-23',
+            status: 'Open',
+            currency: 'USD',
+            total: '1100.0000',
+            lines: [],
+            source_system: null,
+            source_id: null,
+            created_at: '2026-10-23T00:00:00.000Z',
+            updated_at: '2026-10-23T00:00:00.000Z',
           },
         ],
         total: 1,
@@ -50,12 +53,12 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
       const result = await fetchSalesOrders({
         page: 1,
         pageSize: 20,
-        search: 'SO-1001',
-        status: 'open',
+        search: 'SO-2026-0001',
+        status: 'Open',
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/erp-orders/sales-orders?page=1&pageSize=20&search=SO-1001&status=open',
+        '/api/v1/erp-orders/sales-orders?page=1&pageSize=20&search=SO-2026-0001&status=Open',
         expect.objectContaining({
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
@@ -64,18 +67,24 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
         })
       );
       expect(result.items.length).toBe(1);
-      expect(result.items[0]?.orderNumber).toBe('SO-1001');
+      expect(result.items[0]?.order_number).toBe('SO-2026-0001');
     });
 
-    it('formats query string properly with pagination and search parameters', async () => {
+    it('formats query string properly with pagination, customer_golden_id, and status parameters', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ items: [], total: 0, page: 1, pageSize: 50, totalPages: 0 }),
+        json: async () => ({ data: [], total: 0, page: 1, pageSize: 50, totalPages: 0 }),
       });
 
-      await fetchSalesOrders({ page: 1, pageSize: 50, search: 'GID-CUST-001', status: 'invoiced' });
+      await fetchSalesOrders({
+        page: 1,
+        pageSize: 50,
+        search: 'SO-2026',
+        status: 'Invoiced',
+        customer_golden_id: CUSTOMER_GOLDEN_ID_1,
+      });
       expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/erp-orders/sales-orders?page=1&pageSize=50&search=GID-CUST-001&status=invoiced',
+        `/api/v1/erp-orders/sales-orders?page=1&pageSize=50&search=SO-2026&status=Invoiced&customer_golden_id=${CUSTOMER_GOLDEN_ID_1}`,
         expect.anything()
       );
     });
@@ -98,18 +107,22 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
   describe('fetchInvoices() and Status Transitions', () => {
     it('constructs query and fetches paginated invoices', async () => {
       const mockResponse = {
-        items: [
+        data: [
           {
-            id: 'inv-1',
-            invoiceNumber: 'INV-2026-001',
-            orderId: 'so-1',
-            customerGoldenId: 'gid-cust-001',
-            invoiceDate: '2026-10-23',
-            dueDate: '2026-11-23',
-            total: '1100.00',
-            paidAmount: '0.00',
-            currencyCode: 'USD',
-            status: 'open',
+            id: INVOICE_ID_1,
+            invoice_number: 'INV-2026-0001',
+            order_id: ORDER_ID_1,
+            customer_golden_id: CUSTOMER_GOLDEN_ID_1,
+            invoice_date: '2026-10-23',
+            due_date: '2026-11-23',
+            status: 'Open',
+            currency: 'USD',
+            total: '1100.0000',
+            lines: [],
+            source_system: null,
+            source_id: null,
+            created_at: '2026-10-23T00:00:00.000Z',
+            updated_at: '2026-10-23T00:00:00.000Z',
           },
         ],
         total: 1,
@@ -123,51 +136,49 @@ describe('ERP-3 Frontend API Client & View Logic Suite', () => {
         json: async () => mockResponse,
       });
 
-      const result = await fetchInvoices({ page: 1, pageSize: 20, status: 'open' });
+      const result = await fetchInvoices({ page: 1, pageSize: 20, status: 'Open' });
       expect(result.items.length).toBe(1);
-      expect(result.items[0]?.status).toBe('open');
+      expect(result.items[0]?.status).toBe('Open');
     });
   });
 
   describe('Domain Invariants: ERP-3 Sales Orders & Invoices', () => {
-    it('asserts BR-ERP3-03: Every order has a valid customer Golden ID (case-insensitive)', () => {
-      expect(CustomerGoldenIdSchema.safeParse('gid-cust-001').success).toBe(true);
-      expect(CustomerGoldenIdSchema.safeParse('GID-CUST-001').success).toBe(true);
-      expect(CustomerGoldenIdSchema.safeParse('Gid-12345').success).toBe(true);
-      expect(CustomerGoldenIdSchema.safeParse('gid-12345').success).toBe(true);
+    it('asserts BR-ERP3-03 & ADR-003: Every order has a valid UUID customer Golden ID and rejects gid-* strings', () => {
+      expect(CustomerGoldenIdSchema.safeParse(CUSTOMER_GOLDEN_ID_1).success).toBe(true);
+      expect(
+        CustomerGoldenIdSchema.safeParse('55555555-0003-4000-8000-000000000002').success
+      ).toBe(true);
       expect(CustomerGoldenIdSchema.safeParse('').success).toBe(false);
+      expect(CustomerGoldenIdSchema.safeParse('gid-cust-001').success).toBe(false);
       expect(CustomerGoldenIdSchema.safeParse('regular-user-id').success).toBe(false);
     });
 
-    it('asserts BR-ERP3-02: Tax per line equals line amount multiplied by product tax rate, rounded to 2 decimals', () => {
-      const result = calculateLineAmounts(10, '12.50', '0.10');
-      expect(result.subtotal).toBe('125.00');
-      expect(result.taxAmount).toBe('12.50');
-      expect(result.lineTotal).toBe('137.50');
+    it('asserts BR-ERP3-02: Tax per line equals line amount multiplied by percentage tax_rate (4-dp canonical format, DR-1 pending)', () => {
+      const result = calculateLineAmounts(10, '12.5000', '10.0000');
+      expect(result.subtotal).toBe('125.0000');
+      expect(result.tax_amount).toBe('12.5000');
+      expect(result.line_total).toBe('137.5000');
     });
 
     it('asserts BR-ERP3-01: Line totals must equal the order total', () => {
-      const lines = [
-        { lineTotal: '137.50' },
-        { lineTotal: '262.50' },
-      ];
-      expect(validateOrderLineTotals(lines, '400.00')).toBe(true);
-      expect(validateOrderLineTotals(lines, '405.00')).toBe(false);
+      const lines = [{ line_total: '137.5000' }, { line_total: '262.5000' }];
+      expect(validateOrderLineTotals(lines, '400.0000')).toBe(true);
+      expect(validateOrderLineTotals(lines, '405.0000')).toBe(false);
     });
 
     it('asserts Invoice status derivation: Paid when full payment equals total', () => {
-      const status = deriveInvoiceStatus('1375.00', '1375.00', '2026-11-23', '2026-10-23');
-      expect(status).toBe('paid');
+      const status = deriveInvoiceStatus('1375.0000', '1375.0000', '2026-11-23', '2026-10-23');
+      expect(status).toBe('Paid');
     });
 
     it('asserts Invoice status derivation: Overdue when current UTC date > due date and unpaid', () => {
-      const status = deriveInvoiceStatus('1375.00', '0.00', '2026-10-15', '2026-10-23');
-      expect(status).toBe('overdue');
+      const status = deriveInvoiceStatus('1375.0000', '0.0000', '2026-10-15', '2026-10-23');
+      expect(status).toBe('Overdue');
     });
 
     it('asserts Invoice status derivation: Open when unpaid but not past due date', () => {
-      const status = deriveInvoiceStatus('1375.00', '0.00', '2026-11-15', '2026-10-23');
-      expect(status).toBe('open');
+      const status = deriveInvoiceStatus('1375.0000', '0.0000', '2026-11-15', '2026-10-23');
+      expect(status).toBe('Open');
     });
   });
 });

@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import type { CreateSalesOrderInput, CreateSalesOrderLineInput } from '@clearshift/contracts';
-import { calculateLineAmounts, CustomerGoldenIdSchema } from '@clearshift/contracts';
+import type { CreateSalesOrderInput } from '@clearshift/contracts';
+import { calculateLineAmounts, CustomerGoldenIdSchema, OrdersUuid } from '@clearshift/contracts';
 
 export interface OrderFormProps {
-  initialValues?: Partial<CreateSalesOrderInput>;
+  initialValues?: Partial<CreateSalesOrderInput> & { notes?: string };
   onSubmit: (data: CreateSalesOrderInput) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
@@ -12,11 +12,11 @@ export interface OrderFormProps {
 
 interface FormLineItem {
   id: string;
-  productId: string;
+  product_id: string;
   productName: string;
-  quantity: number;
-  unitPrice: string;
-  taxRate: string;
+  quantity: string;
+  price: string;
+  tax_rate: string;
 }
 
 export const OrderForm: React.FC<OrderFormProps> = ({
@@ -26,66 +26,77 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   isLoading = false,
   apiError = null,
 }) => {
-  const [customerGoldenId, setCustomerGoldenId] = useState(initialValues?.customerGoldenId || '');
-  const [orderDate, setOrderDate] = useState(
-    initialValues?.orderDate || new Date().toISOString().split('T')[0] || ''
+  const [customerGoldenId, setCustomerGoldenId] = useState(
+    initialValues?.customer_golden_id || ''
   );
-  const [currencyCode, setCurrencyCode] = useState(initialValues?.currencyCode || 'USD');
+  const [orderDate, setOrderDate] = useState(
+    initialValues?.order_date || new Date().toISOString().split('T')[0] || ''
+  );
+  const [currency, setCurrency] = useState(initialValues?.currency || 'USD');
   const [notes, setNotes] = useState(initialValues?.notes || '');
 
   const [lines, setLines] = useState<FormLineItem[]>(() => {
     if (initialValues?.lines && initialValues.lines.length > 0) {
       return initialValues.lines.map((l, idx) => ({
         id: `line-${idx}`,
-        productId: l.productId || '',
-        productName: l.productName || '',
-        quantity: l.quantity || 1,
-        unitPrice: l.unitPrice || '0.00',
-        taxRate: l.taxRate || '0.10',
+        product_id: l.product_id || '',
+        productName: '',
+        quantity: l.quantity || '1',
+        price: l.price || '0.0000',
+        tax_rate: l.tax_rate || '10.0000',
       }));
     }
     return [
       {
         id: 'line-0',
-        productId: '',
+        product_id: '',
         productName: '',
-        quantity: 1,
-        unitPrice: '100.00',
-        taxRate: '0.10',
+        quantity: '1',
+        price: '100.0000',
+        tax_rate: '10.0000',
       },
     ];
   });
 
   const [errors, setErrors] = useState<{
-    customerGoldenId?: string | undefined;
-    orderDate?: string | undefined;
-    lines?: { [key: number]: { productId?: string | undefined; quantity?: string | undefined; unitPrice?: string | undefined; taxRate?: string | undefined } } | undefined;
+    customer_golden_id?: string | undefined;
+    order_date?: string | undefined;
+    lines?: {
+      [key: number]: {
+        product_id?: string | undefined;
+        quantity?: string | undefined;
+        price?: string | undefined;
+        tax_rate?: string | undefined;
+      };
+    } | undefined;
     general?: string | undefined;
   }>({});
 
-  // Compute live line amounts and order totals
+  // Compute live line amounts and order totals via canonical helper (⚠️ DR-1 pending)
   const lineCalculations = useMemo(() => {
     return lines.map((line) => {
-      const qty = Math.max(0, Math.floor(line.quantity || 0));
-      return calculateLineAmounts(qty, line.unitPrice || '0.00', line.taxRate || '0.00');
+      const qty = Number(line.quantity) > 0 ? line.quantity : '0';
+      const price = !isNaN(Number(line.price)) && Number(line.price) >= 0 ? line.price : '0';
+      const rate = !isNaN(Number(line.tax_rate)) && Number(line.tax_rate) >= 0 ? line.tax_rate : '0';
+      return calculateLineAmounts(qty, price, rate);
     });
   }, [lines]);
 
   const orderTotals = useMemo(() => {
-    let subtotalCents = 0;
-    let taxCents = 0;
-    let totalCents = 0;
+    let subtotalNum = 0;
+    let taxNum = 0;
+    let totalNum = 0;
 
     for (const calc of lineCalculations) {
-      subtotalCents += Math.round(parseFloat(calc.subtotal || '0') * 100);
-      taxCents += Math.round(parseFloat(calc.taxAmount || '0') * 100);
-      totalCents += Math.round(parseFloat(calc.lineTotal || '0') * 100);
+      subtotalNum += parseFloat(calc.subtotal || '0');
+      taxNum += parseFloat(calc.tax_amount || '0');
+      totalNum += parseFloat(calc.line_total || '0');
     }
 
     return {
-      subtotal: (subtotalCents / 100).toFixed(2),
-      taxTotal: (taxCents / 100).toFixed(2),
-      total: (totalCents / 100).toFixed(2),
+      subtotal: subtotalNum.toFixed(2),
+      taxTotal: taxNum.toFixed(2),
+      total: totalNum.toFixed(2),
     };
   }, [lineCalculations]);
 
@@ -94,11 +105,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       ...prev,
       {
         id: `line-${Date.now()}`,
-        productId: '',
+        product_id: '',
         productName: '',
-        quantity: 1,
-        unitPrice: '0.00',
-        taxRate: '0.10',
+        quantity: '1',
+        price: '0.0000',
+        tax_rate: '10.0000',
       },
     ]);
   };
@@ -114,14 +125,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     });
   };
 
-  const handleLineChange = (index: number, field: keyof FormLineItem, value: any) => {
+  const handleLineChange = (index: number, field: keyof FormLineItem, value: string) => {
     setLines((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index]!, [field]: value };
       return copy;
     });
 
-    // Clear line error if modified
     if (errors.lines && errors.lines[index]) {
       setErrors((prev) => ({
         ...prev,
@@ -140,16 +150,17 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     const newErrors: typeof errors = {};
     let isValid = true;
 
-    // Customer Golden ID validation
+    // Customer Golden ID validation (ADR-003 UUID)
     const gidResult = CustomerGoldenIdSchema.safeParse(customerGoldenId.trim());
     if (!gidResult.success) {
-      newErrors.customerGoldenId = 'Customer Golden ID is required and must follow the gid-<identifier> format (e.g. gid-cust-001)';
+      newErrors.customer_golden_id =
+        'Customer Golden ID is required and must be a valid UUID (ADR-003)';
       isValid = false;
     }
 
     // Order date validation
     if (!orderDate || !/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
-      newErrors.orderDate = 'Order date is required and must be in YYYY-MM-DD format';
+      newErrors.order_date = 'Order date is required and must be in YYYY-MM-DD format';
       isValid = false;
     }
 
@@ -161,20 +172,20 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       const lineErrors: { [key: number]: any } = {};
       lines.forEach((l, idx) => {
         const itemErr: any = {};
-        if (!l.productId.trim()) {
-          itemErr.productId = 'Product ID is required';
+        if (!OrdersUuid.safeParse(l.product_id.trim()).success) {
+          itemErr.product_id = 'Product ID is required and must be a valid UUID';
           isValid = false;
         }
-        if (!l.quantity || l.quantity < 1 || !Number.isInteger(Number(l.quantity))) {
-          itemErr.quantity = 'Quantity must be a positive integer';
+        if (!l.quantity || isNaN(Number(l.quantity)) || Number(l.quantity) <= 0) {
+          itemErr.quantity = 'Quantity must be greater than zero';
           isValid = false;
         }
-        if (!l.unitPrice || isNaN(Number(l.unitPrice)) || Number(l.unitPrice) < 0) {
-          itemErr.unitPrice = 'Price must be a valid positive decimal';
+        if (l.price === '' || isNaN(Number(l.price)) || Number(l.price) < 0) {
+          itemErr.price = 'Price must be a valid non-negative decimal';
           isValid = false;
         }
-        if (l.taxRate === undefined || isNaN(Number(l.taxRate)) || Number(l.taxRate) < 0) {
-          itemErr.taxRate = 'Tax rate must be a valid non-negative decimal';
+        if (l.tax_rate === '' || isNaN(Number(l.tax_rate)) || Number(l.tax_rate) < 0) {
+          itemErr.tax_rate = 'Tax rate must be a valid non-negative percentage';
           isValid = false;
         }
         if (Object.keys(itemErr).length > 0) {
@@ -195,16 +206,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     if (!validate()) return;
 
     const payload: CreateSalesOrderInput = {
-      customerGoldenId: customerGoldenId.trim(),
-      orderDate,
-      currencyCode: currencyCode.toUpperCase(),
-      notes: notes.trim() || undefined,
+      customer_golden_id: customerGoldenId.trim(),
+      order_date: orderDate,
+      currency: currency.toUpperCase(),
       lines: lines.map((l) => ({
-        productId: l.productId.trim(),
-        productName: l.productName.trim() || undefined,
-        quantity: Math.floor(Number(l.quantity)),
-        unitPrice: Number(l.unitPrice).toFixed(2),
-        taxRate: Number(l.taxRate).toFixed(2),
+        product_id: l.product_id.trim(),
+        quantity: Number(l.quantity).toFixed(4),
+        price: Number(l.price).toFixed(4),
+        tax_rate: Number(l.tax_rate).toFixed(4),
       })),
     };
 
@@ -239,25 +248,29 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <input
               id="order-customer-gid"
               type="text"
-              className={`cs-input ${errors.customerGoldenId ? 'cs-input-error' : ''}`}
-              placeholder="e.g. gid-cust-001"
+              className={`cs-input ${errors.customer_golden_id ? 'cs-input-error' : ''}`}
+              placeholder="e.g. 55555555-0003-4000-8000-000000000001"
               value={customerGoldenId}
               onChange={(e) => {
                 setCustomerGoldenId(e.target.value);
-                if (errors.customerGoldenId) setErrors((prev) => ({ ...prev, customerGoldenId: undefined }));
+                if (errors.customer_golden_id) {
+                  setErrors((prev) => ({ ...prev, customer_golden_id: undefined }));
+                }
               }}
               disabled={isLoading}
-              aria-invalid={!!errors.customerGoldenId}
-              aria-describedby={errors.customerGoldenId ? 'order-customer-gid-err' : 'order-customer-gid-help'}
+              aria-invalid={!!errors.customer_golden_id}
+              aria-describedby={
+                errors.customer_golden_id ? 'order-customer-gid-err' : 'order-customer-gid-help'
+              }
               required
             />
-            {errors.customerGoldenId ? (
+            {errors.customer_golden_id ? (
               <span id="order-customer-gid-err" className="cs-field-error" role="alert">
-                {errors.customerGoldenId}
+                {errors.customer_golden_id}
               </span>
             ) : (
               <span id="order-customer-gid-help" className="cs-field-helper">
-                Hub-verified entity reference (format: gid-&lt;identifier&gt;)
+                Hub-verified customer Golden ID (UUID v4 per ADR-003)
               </span>
             )}
           </div>
@@ -269,20 +282,20 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <input
               id="order-date"
               type="date"
-              className={`cs-input ${errors.orderDate ? 'cs-input-error' : ''}`}
+              className={`cs-input ${errors.order_date ? 'cs-input-error' : ''}`}
               value={orderDate}
               onChange={(e) => {
                 setOrderDate(e.target.value);
-                if (errors.orderDate) setErrors((prev) => ({ ...prev, orderDate: undefined }));
+                if (errors.order_date) setErrors((prev) => ({ ...prev, order_date: undefined }));
               }}
               disabled={isLoading}
-              aria-invalid={!!errors.orderDate}
-              aria-describedby={errors.orderDate ? 'order-date-err' : undefined}
+              aria-invalid={!!errors.order_date}
+              aria-describedby={errors.order_date ? 'order-date-err' : undefined}
               required
             />
-            {errors.orderDate && (
+            {errors.order_date && (
               <span id="order-date-err" className="cs-field-error" role="alert">
-                {errors.orderDate}
+                {errors.order_date}
               </span>
             )}
           </div>
@@ -294,8 +307,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <select
               id="order-currency"
               className="cs-select"
-              value={currencyCode}
-              onChange={(e) => setCurrencyCode(e.target.value)}
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
               disabled={isLoading}
             >
               <option value="USD">USD - US Dollar</option>
@@ -340,11 +353,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
           <table className="cs-table cs-lines-table" aria-label="Order line items">
             <thead>
               <tr>
-                <th style={{ width: '22%' }}>Product ID *</th>
+                <th style={{ width: '22%' }}>Product ID (UUID) *</th>
                 <th style={{ width: '25%' }}>Product Name</th>
                 <th style={{ width: '12%', textAlign: 'right' }}>Qty *</th>
                 <th style={{ width: '14%', textAlign: 'right' }}>Unit Price *</th>
-                <th style={{ width: '12%', textAlign: 'right' }}>Tax Rate</th>
+                <th style={{ width: '12%', textAlign: 'right' }}>Tax Rate (%)</th>
                 <th style={{ width: '15%', textAlign: 'right' }}>Line Total</th>
                 <th style={{ width: '8%', textAlign: 'center' }}>Action</th>
               </tr>
@@ -353,23 +366,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               {lines.map((line, idx) => {
                 const lineErr = errors.lines?.[idx];
                 const calc = lineCalculations[idx];
+                const formattedLineTotal = parseFloat(calc?.line_total || '0').toFixed(2);
 
                 return (
                   <tr key={line.id}>
                     <td>
                       <input
                         type="text"
-                        className={`cs-input cs-input-sm ${lineErr?.productId ? 'cs-input-error' : ''}`}
-                        placeholder="e.g. PROD-101"
-                        value={line.productId}
-                        onChange={(e) => handleLineChange(idx, 'productId', e.target.value)}
+                        className={`cs-input cs-input-sm ${lineErr?.product_id ? 'cs-input-error' : ''}`}
+                        placeholder="e.g. 11111111-0001-4000-8000-000000000001"
+                        value={line.product_id}
+                        onChange={(e) => handleLineChange(idx, 'product_id', e.target.value)}
                         disabled={isLoading}
                         aria-label={`Line ${idx + 1} Product ID`}
                         required
                       />
-                      {lineErr?.productId && (
+                      {lineErr?.product_id && (
                         <span className="cs-field-error-xs" role="alert">
-                          {lineErr.productId}
+                          {lineErr.product_id}
                         </span>
                       )}
                     </td>
@@ -391,7 +405,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                         step="1"
                         className={`cs-input cs-input-sm cs-text-right ${lineErr?.quantity ? 'cs-input-error' : ''}`}
                         value={line.quantity}
-                        onChange={(e) => handleLineChange(idx, 'quantity', parseInt(e.target.value, 10) || 0)}
+                        onChange={(e) => handleLineChange(idx, 'quantity', e.target.value)}
                         disabled={isLoading}
                         aria-label={`Line ${idx + 1} Quantity`}
                         required
@@ -405,38 +419,38 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     <td>
                       <input
                         type="text"
-                        className={`cs-input cs-input-sm cs-text-right ${lineErr?.unitPrice ? 'cs-input-error' : ''}`}
-                        placeholder="0.00"
-                        value={line.unitPrice}
-                        onChange={(e) => handleLineChange(idx, 'unitPrice', e.target.value)}
+                        className={`cs-input cs-input-sm cs-text-right ${lineErr?.price ? 'cs-input-error' : ''}`}
+                        placeholder="0.0000"
+                        value={line.price}
+                        onChange={(e) => handleLineChange(idx, 'price', e.target.value)}
                         disabled={isLoading}
                         aria-label={`Line ${idx + 1} Unit Price`}
                         required
                       />
-                      {lineErr?.unitPrice && (
+                      {lineErr?.price && (
                         <span className="cs-field-error-xs" role="alert">
-                          {lineErr.unitPrice}
+                          {lineErr.price}
                         </span>
                       )}
                     </td>
                     <td>
                       <input
                         type="text"
-                        className={`cs-input cs-input-sm cs-text-right ${lineErr?.taxRate ? 'cs-input-error' : ''}`}
-                        placeholder="0.10"
-                        value={line.taxRate}
-                        onChange={(e) => handleLineChange(idx, 'taxRate', e.target.value)}
+                        className={`cs-input cs-input-sm cs-text-right ${lineErr?.tax_rate ? 'cs-input-error' : ''}`}
+                        placeholder="10.0000"
+                        value={line.tax_rate}
+                        onChange={(e) => handleLineChange(idx, 'tax_rate', e.target.value)}
                         disabled={isLoading}
                         aria-label={`Line ${idx + 1} Tax Rate`}
                       />
-                      {lineErr?.taxRate && (
+                      {lineErr?.tax_rate && (
                         <span className="cs-field-error-xs" role="alert">
-                          {lineErr.taxRate}
+                          {lineErr.tax_rate}
                         </span>
                       )}
                     </td>
                     <td className="cs-mono cs-text-right" style={{ fontWeight: 600 }}>
-                      ${calc?.lineTotal || '0.00'}
+                      ${formattedLineTotal}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <button
@@ -460,15 +474,15 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         <div className="cs-totals-summary-card">
           <div className="cs-totals-row">
             <span>Subtotal:</span>
-            <span className="cs-mono">${orderTotals.subtotal} {currencyCode}</span>
+            <span className="cs-mono">${orderTotals.subtotal} {currency}</span>
           </div>
           <div className="cs-totals-row">
-            <span>Tax (BR-ERP3-02 rounded):</span>
-            <span className="cs-mono">${orderTotals.taxTotal} {currencyCode}</span>
+            <span>Tax (BR-ERP3-02 preview):</span>
+            <span className="cs-mono">${orderTotals.taxTotal} {currency}</span>
           </div>
           <div className="cs-totals-row cs-totals-final">
             <strong>Order Total:</strong>
-            <strong className="cs-mono">${orderTotals.total} {currencyCode}</strong>
+            <strong className="cs-mono">${orderTotals.total} {currency}</strong>
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import React from 'react';
 import type { SalesOrderStatus, SalesOrdersFilterQuery } from '@clearshift/contracts';
 
 interface FilterBarProps {
-  filters: SalesOrdersFilterQuery;
+  filters: Partial<SalesOrdersFilterQuery>;
   onFilterChange: (updated: Partial<SalesOrdersFilterQuery>) => void;
   onReset: () => void;
   isLoading?: boolean;
@@ -24,7 +24,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           id="order-search-input"
           type="text"
           className="cs-input"
-          placeholder="Search by order # or customer Golden ID (e.g. gid-cust-001)..."
+          placeholder="Search by order # or customer Golden ID (UUID)..."
           value={filters.search || ''}
           onChange={(e) => onFilterChange({ search: e.target.value, page: 1 })}
           disabled={isLoading}
@@ -48,9 +48,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           aria-label="Filter by order status"
         >
           <option value="">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="invoiced">Invoiced</option>
-          <option value="closed">Closed</option>
+          <option value="Open">Open</option>
+          <option value="Invoiced">Invoiced</option>
+          <option value="Closed">Closed</option>
         </select>
       </div>
 

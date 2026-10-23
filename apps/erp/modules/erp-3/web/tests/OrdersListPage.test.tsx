@@ -5,38 +5,58 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { OrdersListPage } from '../src/pages/OrdersListPage.js';
 import { OrdersTable } from '../src/components/OrdersTable.js';
 import { InvoicesTable } from '../src/components/InvoicesTable.js';
-import { FilterBar } from '../src/components/FilterBar.js';
-import { InvoiceFilterBar } from '../src/components/InvoiceFilterBar.js';
 import { SkeletonTable, EmptyState, ErrorState, StatusBadge } from '../src/components/StateViews.js';
 import * as api from '../src/api/erp-3.js';
+import type { SalesOrder, Invoice } from '@clearshift/contracts';
 
-const mockOrder = {
-  id: 'so-1',
-  orderNumber: 'SO-1001',
-  customerGoldenId: 'gid-cust-001',
-  orderDate: '2026-10-23',
-  status: 'open' as const,
-  subtotal: '1000.00',
-  taxTotal: '100.00',
-  total: '1100.00',
-  currencyCode: 'USD',
-  createdAt: '2026-10-23T00:00:00Z',
-  updatedAt: '2026-10-23T00:00:00Z',
+const ORDER_ID_1 = 'aaaaaaaa-0003-4000-8000-000000000001';
+const LINE_ID_1 = 'bbbbbbbb-0003-4000-8000-000000000001';
+const INVOICE_ID_1 = 'cccccccc-0003-4000-8000-000000000001';
+const CUSTOMER_GOLDEN_ID_1 = '55555555-0003-4000-8000-000000000001';
+const PRODUCT_ID_1 = '11111111-0001-4000-8000-000000000001';
+
+const mockOrder: SalesOrder = {
+  id: ORDER_ID_1,
+  order_number: 'SO-1001',
+  customer_golden_id: CUSTOMER_GOLDEN_ID_1,
+  order_date: '2026-10-23',
+  status: 'Open',
+  currency: 'USD',
+  total: '1100.0000',
+  lines: [
+    {
+      id: LINE_ID_1,
+      order_id: ORDER_ID_1,
+      product_id: PRODUCT_ID_1,
+      quantity: '10.0000',
+      price: '100.0000',
+      tax_rate: '10.0000',
+      tax_amount: '100.0000',
+      line_total: '1100.0000',
+      created_at: '2026-10-23T00:00:00.000Z',
+    },
+  ],
+  source_system: null,
+  source_id: null,
+  created_at: '2026-10-23T00:00:00.000Z',
+  updated_at: '2026-10-23T00:00:00.000Z',
 };
 
-const mockInvoice = {
-  id: 'inv-1',
-  invoiceNumber: 'INV-2026-001',
-  orderId: 'so-1',
-  customerGoldenId: 'gid-cust-001',
-  invoiceDate: '2026-10-23',
-  dueDate: '2026-11-23',
-  total: '1100.00',
-  paidAmount: '0.00',
-  currencyCode: 'USD',
-  status: 'open' as const,
-  createdAt: '2026-10-23T00:00:00Z',
-  updatedAt: '2026-10-23T00:00:00Z',
+const mockInvoice: Invoice = {
+  id: INVOICE_ID_1,
+  invoice_number: 'INV-2026-001',
+  order_id: ORDER_ID_1,
+  customer_golden_id: CUSTOMER_GOLDEN_ID_1,
+  invoice_date: '2026-10-23',
+  due_date: '2026-11-23',
+  status: 'Open',
+  currency: 'USD',
+  total: '1100.0000',
+  lines: [],
+  source_system: null,
+  source_id: null,
+  created_at: '2026-10-23T00:00:00.000Z',
+  updated_at: '2026-10-23T00:00:00.000Z',
 };
 
 describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () => {
@@ -74,7 +94,7 @@ describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () 
 
       const orderRow = await screen.findByText('SO-1001');
       expect(orderRow).toBeDefined();
-      expect(screen.getByText('gid-cust-001')).toBeDefined();
+      expect(screen.getByText(CUSTOMER_GOLDEN_ID_1)).toBeDefined();
       expect(screen.getByText(/1,100\.00/)).toBeDefined();
     });
   });
@@ -105,7 +125,7 @@ describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () 
       });
     });
 
-    it('selecting status triggers query and resets page to 1', async () => {
+    it('selecting canonical status triggers query and resets page to 1', async () => {
       const fetchSpy = vi.spyOn(api, 'fetchSalesOrders').mockResolvedValue({
         items: [mockOrder],
         total: 1,
@@ -118,12 +138,12 @@ describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () 
       await screen.findByText('SO-1001');
 
       const statusSelect = screen.getByLabelText(/Filter by order status/i);
-      fireEvent.change(statusSelect, { target: { value: 'invoiced' } });
+      fireEvent.change(statusSelect, { target: { value: 'Invoiced' } });
 
       await waitFor(() => {
         expect(fetchSpy).toHaveBeenCalledWith(
           expect.objectContaining({
-            status: 'invoiced',
+            status: 'Invoiced',
             page: 1,
           })
         );
@@ -232,7 +252,7 @@ describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () 
       expect(invoicesSpy).toHaveBeenCalled();
     });
 
-    it('invoices tab provides accessible search, status filter, and reset', async () => {
+    it('invoices tab provides accessible search, canonical status filter, and reset', async () => {
       vi.spyOn(api, 'fetchSalesOrders').mockResolvedValue({
         items: [],
         total: 0,
@@ -270,12 +290,12 @@ describe('ERP-3 OrdersListPage — React Testing Library Integration Tests', () 
 
       // Filter by status
       const invoiceStatus = screen.getByLabelText(/Filter by invoice status/i);
-      fireEvent.change(invoiceStatus, { target: { value: 'paid' } });
+      fireEvent.change(invoiceStatus, { target: { value: 'Paid' } });
 
       await waitFor(() => {
         expect(invoicesSpy).toHaveBeenCalledWith(
           expect.objectContaining({
-            status: 'paid',
+            status: 'Paid',
             page: 1,
           })
         );
@@ -339,21 +359,21 @@ describe('ERP-3 Subcomponent DOM Tests', () => {
   });
 
   describe('StatusBadge', () => {
-    it('renders with appropriate styling classes for order and invoice statuses', () => {
-      const { rerender } = render(<StatusBadge status="open" />);
-      expect(screen.getByText('open')).toBeDefined();
+    it('renders with appropriate styling classes for canonical order and invoice statuses', () => {
+      const { rerender } = render(<StatusBadge status="Open" />);
+      expect(screen.getByText('Open')).toBeDefined();
 
-      rerender(<StatusBadge status="invoiced" />);
-      expect(screen.getByText('invoiced')).toBeDefined();
+      rerender(<StatusBadge status="Invoiced" />);
+      expect(screen.getByText('Invoiced')).toBeDefined();
 
-      rerender(<StatusBadge status="closed" />);
-      expect(screen.getByText('closed')).toBeDefined();
+      rerender(<StatusBadge status="Closed" />);
+      expect(screen.getByText('Closed')).toBeDefined();
 
-      rerender(<StatusBadge status="paid" />);
-      expect(screen.getByText('paid')).toBeDefined();
+      rerender(<StatusBadge status="Paid" />);
+      expect(screen.getByText('Paid')).toBeDefined();
 
-      rerender(<StatusBadge status="overdue" />);
-      expect(screen.getByText('overdue')).toBeDefined();
+      rerender(<StatusBadge status="Overdue" />);
+      expect(screen.getByText('Overdue')).toBeDefined();
     });
   });
 
