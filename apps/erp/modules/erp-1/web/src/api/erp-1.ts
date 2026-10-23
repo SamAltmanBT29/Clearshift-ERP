@@ -19,6 +19,7 @@ import type {
   UnitOfMeasure,
   ProductSortField,
   StockStatusFilter,
+  CreateProductInput,
 } from '@clearshift/contracts';
 
 export const ERP1_API_BASE = '/api/v1/erp-products';
@@ -189,3 +190,14 @@ export async function fetchStock(
   if (warehouseId) params.set('warehouseId', warehouseId);
   return executeRequest<StockLevel>(`/stock?${params.toString()}`);
 }
+
+/**
+ * Create a new product in ERP-1 catalog.
+ */
+export async function createProduct(input: CreateProductInput): Promise<Product> {
+  return executeRequest<Product>('/products', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+

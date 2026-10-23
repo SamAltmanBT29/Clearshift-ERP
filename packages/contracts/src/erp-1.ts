@@ -120,6 +120,8 @@ export const ProductSchema = z.object({
     .string()
     .regex(TaxRatePattern, 'Tax rate must be a valid non-negative decimal percentage')
     .default('0.00'),
+  notificationEmail: z.string().nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
   sourceSystem: z.string().nullable().optional(),
   sourceId: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
@@ -150,6 +152,14 @@ export const CreateProductInputSchema = z.object({
     )
     .default('0.00')
     .optional(),
+  notificationEmail: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().email('Invalid email address format').optional()
+  ),
+  contactPhone: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().regex(/^\+?[0-9\s\-()]{7,20}$/, 'Invalid phone number format').optional()
+  ),
   sourceSystem: z.string().trim().min(1).max(64).optional(),
   sourceId: z.string().trim().min(1).max(128).optional(),
 });

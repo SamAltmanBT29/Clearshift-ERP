@@ -137,6 +137,23 @@
         </select>
         <button id="sort-dir-btn" class="cs-erp1-sort-direction-btn" aria-label="Sort direction">▲ Asc</button>
       </div>
+      <button type="button" class="cs-erp1-btn cs-erp1-btn-primary cs-erp1-add-product-btn" onclick="openCreateModal()">+ New Product</button>
+    </div>
+  </div>
+
+  <!-- Toast Confirmation Banner -->
+  <div id="toast-banner" class="cs-erp1-toast-container" style="display: none;" role="status" aria-live="polite">
+    <div class="cs-alert rounded border p-4 border-[var(--cs-ok)] bg-[var(--cs-ok-bg)]">
+      <div class="flex items-start justify-between">
+        <div class="flex items-start gap-3">
+          <span class="text-base font-bold text-[var(--cs-ok)]" aria-hidden="true">✓</span>
+          <div class="text-sm">
+            <h3 class="font-semibold mb-1 text-[var(--cs-ok)]">Success</h3>
+            <div id="toast-text" class="text-[var(--cs-text)]">Product created successfully.</div>
+          </div>
+        </div>
+        <button type="button" aria-label="Dismiss alert" onclick="document.getElementById('toast-banner').style.display='none'" class="text-sm font-semibold hover:opacity-75 rounded p-1 text-[var(--cs-ok)]">✕</button>
+      </div>
     </div>
   </div>
 
@@ -245,7 +262,7 @@
         <p style="font-size: 0.875rem; color: var(--color-text-muted); max-width: 440px; margin-bottom: 20px;">
           No products have been recorded in the catalog yet. Add your first product to begin tracking inventory and stock levels.
         </p>
-        <button class="state-btn active" style="background-color: var(--color-primary);" onclick="alert('Synthetic Action: Open Add Product Dialog')">Add Product</button>
+        <button type="button" class="state-btn active" style="background-color: var(--color-primary);" onclick="openCreateModal()">Add Product</button>
       </div>
 
       <!-- 4. Filtered Empty State (AC2) -->
@@ -519,6 +536,289 @@
 
     // Initial render
     render();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Product Creation Modal Controller (ERP1-20)
+    // ─────────────────────────────────────────────────────────────────────────
+    const createModal = document.getElementById('preview-create-modal');
+    const modalForm = document.getElementById('preview-create-form');
+    const modalSubmitBtn = document.getElementById('modal-submit-btn');
+    const modalServerAlert = document.getElementById('modal-server-alert');
+    const modalServerAlertMsg = document.getElementById('modal-server-alert-msg');
+    const toastBanner = document.getElementById('toast-banner');
+    const toastText = document.getElementById('toast-text');
+
+    function openCreateModal() {
+      modalForm.reset();
+      clearModalErrors();
+      modalServerAlert.style.display = 'none';
+      modalSubmitBtn.disabled = false;
+      modalSubmitBtn.textContent = 'Create Product';
+      createModal.style.display = 'flex';
+      document.getElementById('modal-field-name').focus();
+    }
+
+    function closeCreateModal() {
+      createModal.style.display = 'none';
+    }
+
+    function clearModalErrors() {
+      document.querySelectorAll('.modal-error-text').forEach(el => {
+        el.textContent = '';
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('.modal-input').forEach(el => {
+        el.removeAttribute('aria-invalid');
+        el.style.borderColor = 'var(--border-strong)';
+      });
+    }
+
+    function setFieldError(fieldId, errorId, message) {
+      const errEl = document.getElementById(errorId);
+      const inputEl = document.getElementById(fieldId);
+      if (errEl && inputEl) {
+        errEl.textContent = '⚠ ' + message;
+        errEl.style.display = 'block';
+        inputEl.setAttribute('aria-invalid', 'true');
+        inputEl.style.borderColor = 'var(--color-error)';
+      }
+    }
+
+    function handleModalSubmit(e) {
+      e.preventDefault();
+      clearModalErrors();
+      modalServerAlert.style.display = 'none';
+
+      const name = document.getElementById('modal-field-name').value.trim();
+      const sku = document.getElementById('modal-field-sku').value.trim();
+      const cat = document.getElementById('modal-field-category').value;
+      const uom = document.getElementById('modal-field-uom').value;
+      const price = document.getElementById('modal-field-price').value.trim();
+      const currency = document.getElementById('modal-field-currency').value.trim().toUpperCase();
+      const taxRate = document.getElementById('modal-field-tax').value.trim();
+      const email = document.getElementById('modal-field-email').value.trim();
+      const phone = document.getElementById('modal-field-phone').value.trim();
+
+      let hasError = false;
+
+      // 1. Required Fields
+      if (!name) {
+        setFieldError('modal-field-name', 'err-name', 'Product name is required');
+        hasError = true;
+      }
+      if (!sku) {
+        setFieldError('modal-field-sku', 'err-sku', 'SKU is required');
+        hasError = true;
+      }
+      if (!uom) {
+        setFieldError('modal-field-uom', 'err-uom', 'Unit of measure is required');
+        hasError = true;
+      }
+      if (!price) {
+        setFieldError('modal-field-price', 'err-price', 'Price is required');
+        hasError = true;
+      } else {
+        const numPrice = Number(price);
+        if (isNaN(numPrice) || !/^\d+(\.\d{1,4})?$/.test(price)) {
+          setFieldError('modal-field-price', 'err-price', 'Price must be a valid non-negative decimal with up to 4 decimal places');
+          hasError = true;
+        } else if (numPrice < 0) {
+          setFieldError('modal-field-price', 'err-price', 'Price must be greater than or equal to 0');
+          hasError = true;
+        }
+      }
+
+      if (!currency) {
+        setFieldError('modal-field-currency', 'err-currency', 'Currency is required');
+        hasError = true;
+      } else if (!/^[A-Z]{3}$/.test(currency)) {
+        setFieldError('modal-field-currency', 'err-currency', 'Currency must be an uppercase 3-letter ISO 4217 code (e.g. USD, EUR)');
+        hasError = true;
+      }
+
+      // 2. Tax Rate Decimal Range
+      if (taxRate) {
+        const numTax = Number(taxRate);
+        if (isNaN(numTax) || !/^\d+(\.\d{1,2})?$/.test(taxRate) || numTax < 0 || numTax > 100) {
+          setFieldError('modal-field-tax', 'err-tax', 'Tax rate must be between 0.00% and 100.00%');
+          hasError = true;
+        }
+      }
+
+      // 3. Email Format
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFieldError('modal-field-email', 'err-email', 'Invalid email address format (e.g. alerts@example.com)');
+        hasError = true;
+      }
+
+      // 4. Phone Number Format
+      if (phone && !/^\+?[0-9\s\-()]{7,20}$/.test(phone)) {
+        setFieldError('modal-field-phone', 'err-phone', 'Invalid phone number format (min 7 digits, e.g. +1-555-019-2834)');
+        hasError = true;
+      }
+
+      if (hasError) return;
+
+      // AC 2: Double submit prevention: disable submit button during inflight request
+      modalSubmitBtn.disabled = true;
+      modalSubmitBtn.textContent = 'Creating...';
+      modalSubmitBtn.setAttribute('aria-busy', 'true');
+
+      // Simulate API network latency (400ms)
+      setTimeout(() => {
+        // Simulate SKU conflict check if user types DUPLICATE
+        if (sku.toUpperCase() === 'DUPLICATE') {
+          modalSubmitBtn.disabled = false;
+          modalSubmitBtn.textContent = 'Create Product';
+          modalSubmitBtn.removeAttribute('aria-busy');
+          setFieldError('modal-field-sku', 'err-sku', 'SKU already exists in catalog');
+          modalServerAlertMsg.textContent = 'Validation error: duplicate SKU detected.';
+          modalServerAlert.style.display = 'block';
+          return;
+        }
+
+        // AC 4: Close modal, update table cache, show confirmation toast
+        const newProduct = {
+          name: name,
+          sku: sku.toUpperCase(),
+          category: cat || 'General',
+          unit: uom,
+          price: Number(price).toFixed(4),
+          tax: taxRate ? Number(taxRate).toFixed(2) : '0.00',
+          stockStatus: 'in_stock',
+          stockBadge: 'In Stock (> 10)',
+        };
+
+        PRODUCTS_DATA.unshift(newProduct);
+        closeCreateModal();
+
+        // Show toast
+        toastText.textContent = `Product "${name}" (${sku.toUpperCase()}) created successfully.`;
+        toastBanner.style.display = 'block';
+
+        // Re-render table with newly prepended product
+        render();
+
+        // Auto-scroll to top of table
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 400);
+    }
+
+    // Escape key closes modal
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && createModal.style.display !== 'none') {
+        closeCreateModal();
+      }
+    });
   </script>
+
+  <!-- Product Creation Modal Dialog (ERP1-20) -->
+  <div id="preview-create-modal" style="display: none; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; padding: var(--space-4); background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);" onclick="if(event.target === this) closeCreateModal();">
+    <div role="dialog" aria-modal="true" aria-labelledby="modal-dialog-title" class="cs-dialog cs-erp1-create-modal" style="width: 100%; max-width: 640px; background-color: var(--color-background); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-6); box-shadow: var(--shadow-lg);" tabindex="-1">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle);">
+        <div>
+          <h2 id="modal-dialog-title" style="font-size: 1.25rem; font-weight: 700; color: var(--color-text); margin: 0;">Create New Product</h2>
+          <p style="font-size: 0.875rem; color: var(--color-text-muted); margin: 4px 0 0 0;">Add a new catalog product with pricing, unit of measure, and inventory tracking.</p>
+        </div>
+        <button type="button" aria-label="Close dialog" onclick="closeCreateModal()" style="background: none; border: none; font-size: 1.25rem; color: var(--color-text-muted); cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);">✕</button>
+      </div>
+
+      <!-- Server Level Error Alert -->
+      <div id="modal-server-alert" class="cs-erp1-form-alert" style="display: none; margin-top: var(--space-4);">
+        <div class="cs-alert rounded border p-4 border-[var(--cs-err)] bg-[var(--cs-err-bg)]" role="alert">
+          <div style="display: flex; align-items: flex-start; gap: 8px;">
+            <span style="font-weight: bold; color: var(--color-error);" aria-hidden="true">✕</span>
+            <div>
+              <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--color-error); margin: 0 0 4px 0;">Validation Error</h3>
+              <p id="modal-server-alert-msg" style="font-size: 0.8125rem; color: var(--color-text); margin: 0;"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form id="preview-create-form" novalidate onsubmit="handleModalSubmit(event)" class="cs-erp1-create-form" style="margin-top: var(--space-4);">
+        <div class="cs-erp1-form-row">
+          <div class="cs-form-field">
+            <label for="modal-field-name" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Product Name <span style="color: var(--color-error);">*</span></label>
+            <input id="modal-field-name" class="modal-input" type="text" placeholder="e.g. Industrial Steel Hex Bolt M8" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-name" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+
+          <div class="cs-form-field">
+            <label for="modal-field-sku" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">SKU <span style="color: var(--color-error);">*</span></label>
+            <input id="modal-field-sku" class="modal-input" type="text" placeholder="e.g. BLT-HEX-001" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-sku" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+        </div>
+
+        <div class="cs-erp1-form-row">
+          <div class="cs-form-field">
+            <label for="modal-field-category" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Category</label>
+            <select id="modal-field-category" class="modal-input" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);">
+              <option value="">Select a category (optional)</option>
+              <option value="Raw Materials">Raw Materials (RAW)</option>
+              <option value="Finished Goods">Finished Goods (FIN)</option>
+              <option value="Packaging">Packaging (PKG)</option>
+            </select>
+          </div>
+
+          <div class="cs-form-field">
+            <label for="modal-field-uom" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Unit of Measure <span style="color: var(--color-error);">*</span></label>
+            <select id="modal-field-uom" class="modal-input" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);">
+              <option value="pcs" selected>Pieces (pcs)</option>
+              <option value="kg">Kilograms (kg)</option>
+              <option value="g">Grams (g)</option>
+              <option value="litre">Litres (litre)</option>
+              <option value="metre">Metres (metre)</option>
+              <option value="box">Boxes (box)</option>
+            </select>
+            <p id="err-uom" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+        </div>
+
+        <div class="cs-erp1-form-row">
+          <div class="cs-form-field">
+            <label for="modal-field-price" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Unit Price ($) <span style="color: var(--color-error);">*</span></label>
+            <input id="modal-field-price" class="modal-input" type="text" inputmode="decimal" placeholder="0.0000" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-price" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+
+          <div class="cs-form-field">
+            <label for="modal-field-currency" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Currency <span style="color: var(--color-error);">*</span></label>
+            <input id="modal-field-currency" class="modal-input" type="text" maxlength="3" value="USD" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-currency" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+        </div>
+
+        <div class="cs-erp1-form-row">
+          <div class="cs-form-field">
+            <label for="modal-field-tax" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Tax Rate (%)</label>
+            <input id="modal-field-tax" class="modal-input" type="text" inputmode="decimal" value="0.00" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-tax" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+        </div>
+
+        <div class="cs-erp1-form-row">
+          <div class="cs-form-field">
+            <label for="modal-field-email" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Notification Email</label>
+            <input id="modal-field-email" class="modal-input" type="email" placeholder="inventory@example.com" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-email" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+
+          <div class="cs-form-field">
+            <label for="modal-field-phone" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px;">Contact Phone</label>
+            <input id="modal-field-phone" class="modal-input" type="tel" placeholder="+1-555-019-2834" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.875rem; background-color: var(--color-surface); color: var(--color-text);" />
+            <p id="err-phone" class="modal-error-text" role="alert" style="display: none; font-size: 0.75rem; color: var(--color-error); margin-top: 4px;"></p>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle);">
+          <button type="button" class="cs-erp1-btn cs-erp1-btn-secondary" onclick="closeCreateModal()">Cancel</button>
+          <button id="modal-submit-btn" type="submit" class="cs-erp1-btn cs-erp1-btn-primary">Create Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>
+
