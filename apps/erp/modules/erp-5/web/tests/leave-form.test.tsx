@@ -302,7 +302,7 @@ describe('ERP-5 leave create, edit and detail screens', () => {
       const back = await screen.findByRole('link', { name: /Back to the leave list/ });
       expect(back.getAttribute('href')).toBe('/erp5/leave');
 
-      const edit = screen.getByRole('link', { name: 'Edit leave record' });
+      const edit = await screen.findByRole('link', { name: 'Edit leave record' });
       expect(edit.getAttribute('href')).toBe(`/erp5/leave/${PENDING_LEAVE.id}/edit`);
     });
   });

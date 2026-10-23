@@ -404,7 +404,7 @@ describe('ERP-5 employee create, edit and detail screens', () => {
       const back = await screen.findByRole('link', { name: /Back to the employee list/ });
       expect(back.getAttribute('href')).toBe('/erp5/employees');
 
-      const edit = screen.getByRole('link', { name: 'Edit employee' });
+      const edit = await screen.findByRole('link', { name: 'Edit employee' });
       expect(edit.getAttribute('href')).toBe(`/erp5/employees/${ASHA.id}/edit`);
     });
 
