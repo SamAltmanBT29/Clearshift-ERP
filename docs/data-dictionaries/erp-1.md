@@ -421,6 +421,63 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 - **400 Validation Error Mapping**: Field-specific error details (`details: [{ field, message }]`) translate directly to input error states and set `aria-invalid="true"`.
 - **403 Permission Gate**: If the user lacks write capabilities, action buttons are disabled and a clear read-only banner is displayed informing the operator that `inventory:write` is required.
 
+---
+
+## 16. Migration Kit Module Metadata Integration (ERP1-22)
+
+**Issue**: [#118](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/118) — `[ERP1-22] ERP-1 Products and Inventory: Module metadata integration with shared Migration Kit wizard`  
+**Implementation**: `packages/kit/src/domain/metadata.ts`, `packages/ui/src/components/MigrationKitWizard.tsx`, `apps/erp/modules/erp-1/src/kit/field-registry.ts`, `apps/erp/modules/erp-1/web/src/kit-metadata.ts`, `apps/erp/modules/erp-1/web/src/pages/ProductImportPage.tsx`.
+
+### 16.1 Architectural Scope & Acceptance Criteria
+
+| Requirement | Implementation Component | Technical Specification | Gate Acceptance |
+|---|---|---|:---:|
+| **AC 1: Module Metadata Registration** | `field-registry.ts`, `kit-metadata.ts`, `MigrationKitRegistry` | Registers ERP-1 target schema metadata across all 4 domain entities (Products, Categories, Warehouses, Stock Levels) into the central `migrationKitRegistry` without duplicating wizard infrastructure (H2). | **Pass** |
+| **AC 2: Dynamic Rendering of Target Fields, Types & Badges** | `MigrationKitWizard.tsx` | Dynamically renders all target fields with human-readable labels, data type badges (`string`, `decimal`, `uuid`, `enum`), allowable enum options (`[pcs, kg, g, litre, metre, box]`), required badges, and governing rule IDs (`BR-ERP1-01`, `FR-ERP1-04`, `RL-01`). | **Pass** |
+| **AC 3: Incompatible Source Type Operator Warnings** | `MigrationKitWizard.tsx`, `checkTypeCompatibility()` | Evaluates source column data types against target field definitions. Flags type mismatches (e.g. mapping `date` or `boolean` to `decimal` price or `enum` unit of measure) with an accessible operator warning banner and row-level alert. | **Pass** |
+| **AC 4: Guard Blocking Unmapped Required Fields** | `MigrationKitWizard.tsx`, `validateFieldMapping()` | Enforces that all required target fields (`name`, `sku`, `unitOfMeasure`, `price`, `currency`) must be mapped before progressing. Renders a missing required fields banner and disables "Proceed to Dry-Run" and "Proceed to Load" actions. | **Pass** |
+
+### 16.2 Entity Target Field Definitions
+
+1. **Products (`erp1_products`)**:
+   - `name`: string, required (FR-ERP1-01, RL-01). Human-readable product name.
+   - `sku`: string, required (FR-ERP1-01, BR-ERP1-01, RL-03). Natural key, unique after normalization.
+   - `categoryId`: uuid, optional (FR-ERP1-03). Single-level category reference.
+   - `unitOfMeasure`: enum, required (FR-ERP1-04). Fixed V1 units: `pcs`, `kg`, `g`, `litre`, `metre`, `box`.
+   - `price`: decimal(19,4), required (FR-ERP1-02, BR-ERP1-01). Non-negative selling price.
+   - `currency`: string(3), required (FR-ERP1-02). ISO-4217 uppercase currency code.
+   - `taxRate`: decimal(5,2), optional (FR-ERP1-02). Non-negative tax percentage.
+   - `notificationEmail`: string, optional (RL-02). Inventory alert contact email.
+   - `contactPhone`: string, optional (RL-02). Supplier contact phone.
+   - `sourceSystem`: string, optional (KIT-08). Original provenance system.
+   - `sourceId`: string, optional (KIT-08). Original legacy primary key.
+
+2. **Categories (`erp1_categories`)**:
+   - `name`: string, required (FR-ERP1-03). Category title.
+   - `code`: string, required (FR-ERP1-03). Unique code.
+
+3. **Warehouses (`erp1_warehouses`)**:
+   - `name`: string, required (FR-ERP1-05). Storage facility title.
+   - `code`: string, required (FR-ERP1-05). Unique warehouse code.
+   - `isDefault`: boolean, optional (FR-ERP1-05). Designates primary facility.
+
+4. **Stock Levels (`erp1_stock_levels`)**:
+   - `productId`: uuid, required (FR-ERP1-06). Reference to product master.
+   - `warehouseId`: uuid, required (FR-ERP1-06). Reference to warehouse.
+   - `quantity`: decimal(19,4), required (FR-ERP1-06, BR-ERP1-02). Non-negative physical stock quantity.
+
+### 16.3 Source-to-Target Type Compatibility Rules
+
+| Target Type | Supported Source Types | Warning Scenarios | Incompatible / Error Scenarios |
+|---|---|---|---|
+| `string` | Any source type | Coerced to string | None |
+| `decimal` / `number` | `number`, `integer`, `float`, `decimal` | `string` / `text` (parsed dynamically) | `date`, `boolean`, `uuid` |
+| `boolean` | `boolean`, `bool` | `string`, `number` (coerced 1/0, true/false) | `date`, `uuid` |
+| `date` | `date`, `datetime`, `timestamp` | `string` (must match ISO-8601 YYYY-MM-DD) | `number`, `boolean`, `uuid` |
+| `enum` | `string`, `text` (exact match) | `string` (warns allowed enum options) | `number`, `date`, `boolean`, `uuid` |
+| `uuid` | `uuid` | `string` (must match RFC-4122 format) | `number`, `date`, `boolean` |
+
+
 
 
 

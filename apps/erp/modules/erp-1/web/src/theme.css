@@ -1415,4 +1415,57 @@
   border-left: 4px solid var(--color-error);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Migration Kit Wizard & Import Styles (ERP1-22 / KIT-14)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-erp1-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+  border: 1px solid var(--border-strong);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.cs-erp1-import-btn:hover {
+  background-color: var(--color-background);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.cs-product-import-page {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.cs-migration-wizard {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-badge-required {
+  background-color: var(--color-error-bg, rgba(239, 68, 68, 0.1));
+  color: var(--color-error, #dc2626);
+  border: 1px solid var(--color-error, #dc2626);
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.cs-badge-optional {
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.cs-badge-type {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--border-subtle);
+  font-family: monospace;
+}
+
+
 

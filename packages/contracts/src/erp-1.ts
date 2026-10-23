@@ -372,4 +372,70 @@ export type PaginatedProductsResponse = z.infer<typeof PaginatedProductsResponse
 export const PaginatedCategoriesResponseSchema = createPaginatedResponseSchema(CategorySchema);
 export type PaginatedCategoriesResponse = z.infer<typeof PaginatedCategoriesResponseSchema>;
 
+/**
+ * Target Field Type Schema for Migration Kit Integration (KIT-14 / ERP1-22).
+ */
+export const TargetFieldTypeSchema = z.enum([
+  'string',
+  'number',
+  'decimal',
+  'boolean',
+  'date',
+  'enum',
+  'uuid',
+]);
+export type TargetFieldType = z.infer<typeof TargetFieldTypeSchema>;
+
+/**
+ * Target Field Definition Schema for Migration Kit Integration.
+ */
+export const TargetFieldDefinitionSchema = z.object({
+  name: z.string().min(1),
+  label: z.string().min(1),
+  type: TargetFieldTypeSchema,
+  required: z.boolean(),
+  description: z.string().optional(),
+  enumOptions: z.array(z.string()).optional(),
+  rules: z.array(z.string()).optional(),
+  example: z.union([z.string(), z.number(), z.boolean()]).optional(),
+});
+export type TargetFieldDefinition = z.infer<typeof TargetFieldDefinitionSchema>;
+
+/**
+ * Target Entity Metadata Schema for Migration Kit Integration.
+ */
+export const TargetEntityMetadataSchema = z.object({
+  entity: z.string().min(1),
+  label: z.string().min(1),
+  module: z.string().min(1),
+  schemaVersion: z.number().int().positive(),
+  targetTable: z.string().min(1),
+  primaryKey: z.string().min(1),
+  naturalKey: z.string().optional(),
+  fields: z.array(TargetFieldDefinitionSchema),
+  mappingDefaults: z.record(z.string()).optional(),
+  validationRules: z
+    .array(
+      z.object({
+        code: z.string(),
+        description: z.string(),
+      })
+    )
+    .optional(),
+});
+export type TargetEntityMetadata = z.infer<typeof TargetEntityMetadataSchema>;
+
+/**
+ * Module Migration Metadata Schema supplied to shared Migration Kit wizard.
+ */
+export const ModuleMigrationMetadataSchema = z.object({
+  moduleId: z.string().min(1),
+  moduleName: z.string().min(1),
+  defaultEntity: z.string().min(1),
+  entities: z.record(TargetEntityMetadataSchema),
+  supportedSourceTypes: z.array(z.string()).optional(),
+});
+export type ModuleMigrationMetadata = z.infer<typeof ModuleMigrationMetadataSchema>;
+
 export { ErrorEnvelopeSchema };
+
