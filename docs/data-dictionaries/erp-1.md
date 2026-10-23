@@ -158,6 +158,37 @@ cannot create a second stock row for the same pair.
 
 ---
 
+---
+
+## 5. `erp1.import_receipts` — Durable Migration Receipts
+
+**Purpose**: Records durable import receipts for idempotent migration loads in a single transaction.
+**Architecture Reference**: Decision C4 & KIT-08
+
+| Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
+|---|---|---|---|---|---|
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
+| `batch_id` | `UUID` | NOT NULL | — | Migration Kit batch UUID | B-tree index |
+| `source_row` | `INTEGER` | NOT NULL | — | 0-indexed row position in source payload | — |
+| `target_id` | `UUID` | NOT NULL | — | UUID of created/updated target record | — |
+| `target_entity` | `VARCHAR(64)` | NOT NULL | `'product'` | Entity name | — |
+| `idempotency_key` | `VARCHAR(255)` | NOT NULL | — | Deterministic unique key | UNIQUE |
+| `source_system` | `VARCHAR(64)` | NULL | — | Originating import system | — |
+| `source_id` | `VARCHAR(128)` | NULL | — | Source record identifier | — |
+| `request_hash` | `VARCHAR(64)` | NOT NULL | `''` | SHA-256 of the canonical request payload; detects key reuse with different data | — |
+| `outcome` | `VARCHAR(16)` | NOT NULL | `'loaded'` | Terminal receipt outcome | — |
+| `response_payload` | `TEXT` | NULL | — | Durable JSON result replayed on an identical retry | — |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | Creation timestamp | — |
+
+**Indexes**:
+- `erp1_import_receipts_idempotency_idx` — UNIQUE on `(idempotency_key)`
+- `erp1_import_receipts_batch_idx` — B-tree on `(batch_id)`
+- `erp1_import_receipts_batch_row_idx` — B-tree on `(batch_id, source_row_index)`
+
+**Migration**: additive columns and the single-default-warehouse partial unique index are applied by `packages/database/migrations/erp1_v2.sql`.
+
+---
+
 ## 6. `erp1.import_receipts` — Durable Migration Receipts
 
 **Purpose**: Durable KIT-08 receipt proving a source row was loaded into a target entity. Written in the same PostgreSQL transaction as the target mutation.

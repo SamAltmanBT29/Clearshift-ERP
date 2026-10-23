@@ -2,11 +2,11 @@
   "name": "@cs/mod-erp1",
   "version": "1.0.0",
   "private": true,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/apps/erp/modules/erp-1/src/index.js",
+  "types": "./dist/apps/erp/modules/erp-1/src/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./public": "./dist/public.js"
+    ".": "./dist/apps/erp/modules/erp-1/src/index.js",
+    "./public": "./dist/apps/erp/modules/erp-1/src/public.js"
   },
   "scripts": {
     "build": "tsc",
