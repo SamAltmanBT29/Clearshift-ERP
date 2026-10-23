@@ -100,7 +100,7 @@ describe('ERP-2 VendorsListPage — React Testing Library Integration Tests', ()
       render(<VendorsListPage />);
       await screen.findByText('Acme Industrial Supplies LLC');
 
-      const searchInput = screen.getByLabelText(/Search vendors by legal name/i);
+      const searchInput = screen.getByLabelText(/Search vendors by name, tax number/i);
       fireEvent.change(searchInput, { target: { value: 'Global' } });
 
       await waitFor(() => {
@@ -125,10 +125,12 @@ describe('ERP-2 VendorsListPage — React Testing Library Integration Tests', ()
       render(<VendorsListPage />);
       await screen.findByText('Acme Industrial Supplies LLC');
 
-      const searchInput = screen.getByLabelText(/Search vendors by legal name/i);
+      const searchInput = screen.getByLabelText(/Search vendors by name, tax number/i);
       fireEvent.change(searchInput, { target: { value: 'Global' } });
 
-      const resetBtn = screen.getByRole('button', { name: /Reset filters/i });
+      // Wait for the 300ms debounce to propagate search value to parent state
+      // so that hasActiveFilters becomes true and the Reset button is enabled.
+      const resetBtn = await screen.findByRole('button', { name: /Reset vendor filters/i });
       fireEvent.click(resetBtn);
 
       await waitFor(() => {
@@ -281,7 +283,7 @@ describe('ERP-2 VendorsListPage — React Testing Library Integration Tests', ()
 
       await screen.findByText('PO-2026-0001');
 
-      const statusSelect = screen.getByLabelText(/Filter by order status/i);
+      const statusSelect = screen.getByLabelText(/Status filter/i);
       fireEvent.change(statusSelect, { target: { value: 'Sent' } });
 
       await waitFor(() => {
