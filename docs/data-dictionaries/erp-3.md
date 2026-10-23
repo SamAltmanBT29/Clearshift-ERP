@@ -253,8 +253,62 @@ All events use the PLT-04 / PLT-09 transactional `EventEnvelopeSchema` (`event_i
 
 ---
 
+## State Machine, Relationships & Read Model Consistency Matrix (`ERP3-06` / Issue #31)
+
+### 1. Sales Order Status Transition Matrix (`FR-ERP3-05`)
+
+| Current Status | Allowed Next Status | Forbidden Next Statuses | Failure Code | Behavior on Same Status (`allowSameStatusNoop: true`) |
+|---|---|---|---|---|
+| `Open` | `Invoiced`, `Closed` (`Invoiced` only when `allowDirectOpenToClosed: false`) | `Open` (when strict forward) | `INVALID_ORDER_STATUS_TRANSITION` (422) | No-op |
+| `Invoiced` | `Closed` | `Open`, `Invoiced` | `INVALID_ORDER_STATUS_TRANSITION` (422) | No-op |
+| `Closed` (Terminal) | *None* | `Open`, `Invoiced`, `Closed` | `INVALID_ORDER_STATUS_TRANSITION` (422) | No-op |
+
+### 2. Invoice Status Transition Matrix (`FR-ERP3-02`, `FR-ERP3-04`)
+
+| Current Status | Allowed Next Status | Forbidden Next Statuses | Failure Code | Trigger / Invariant |
+|---|---|---|---|---|
+| `Open` | `Paid`, `Overdue` | `Open` | `INVALID_INVOICE_STATUS_TRANSITION` (422) | `Paid` on full payment (`amount == total`); `Overdue` when unpaid and `currentUtcDate > due_date` |
+| `Overdue` | `Paid` | `Open`, `Overdue` | `INVALID_INVOICE_STATUS_TRANSITION` (422) | `Paid` when full payment settles an overdue invoice |
+| `Paid` (Terminal) | *None* | `Open`, `Overdue`, `Paid` | `INVALID_INVOICE_STATUS_TRANSITION` / `INVOICE_ALREADY_PAID` (422) | Terminal in V1; no payment reversal or credit notes |
+
+### 3. Intra-Module & Cross-Module Relationship Catalog (`ERP3_RELATIONSHIPS`)
+
+| Relationship Key | Source Entity | Target Entity | Foreign Key | Type | Requirement | On Delete | Validation & Error Code |
+|---|---|---|---|---|---|---|---|
+| `ORDER_CUSTOMER` | `erp3_sales_orders` | `hub_golden_records` | `customer_golden_id` | `cross_module` (`crm-1`) | `required` | `RESTRICT` | UUID per `ADR-003` (`BR-ERP3-03`); verified via `ReferenceResolver.exists("customer", id)` (`422 MISSING_CUSTOMER_GOLDEN_ID` / `CUSTOMER_NOT_FOUND`) |
+| `ORDER_LINES` | `erp3_sales_orders` | `erp3_so_lines` | `order_id` | `intra_module` (`erp-3`) | `required` | `CASCADE` | At least 1 line item (`422 EMPTY_LINES`); `SUM(line_total) == total` (`BR-ERP3-01`) |
+| `ORDER_LINE_PRODUCT` | `erp3_so_lines` | `erp1_products` | `product_id` | `cross_module` (`erp-1`) | `required` | `RESTRICT` | Verified via `ReferenceResolver.exists("product", id)` (`422 PRODUCT_NOT_FOUND`) |
+| `INVOICE_CUSTOMER` | `erp3_invoices` | `hub_golden_records` | `customer_golden_id` | `cross_module` (`crm-1`) | `required` | `RESTRICT` | UUID per `ADR-003`; must match linked order's `customer_golden_id` (`422 CUSTOMER_MISMATCH`) |
+| `INVOICE_ORDER` | `erp3_invoices` | `erp3_sales_orders` | `order_id` | `intra_module` (`erp-3`) | `optional` | `RESTRICT` | When present: must exist (`422 ORDER_REF_NOT_FOUND`), share currency (`422 CURRENCY_MISMATCH`), and satisfy 1:1 V1 invoice constraint (`409 ORDER_ALREADY_INVOICED`). When absent: returns `ERP3_OPTIONAL_REFERENCE_ABSENT` warning and `null` without creating a synthetic order. |
+| `INVOICE_LINES` | `erp3_invoices` | `erp3_invoice_lines` | `invoice_id` | `intra_module` (`erp-3`) | `required` | `CASCADE` | At least 1 line item (`422 EMPTY_LINES`); `SUM(line_total) == total` (`BR-ERP3-01`) |
+| `INVOICE_LINE_PRODUCT` | `erp3_invoice_lines` | `erp1_products` | `product_id` | `cross_module` (`erp-1`) | `required` | `RESTRICT` | Verified via `ReferenceResolver.exists("product", id)` (`422 PRODUCT_NOT_FOUND`) |
+| `PAYMENT_INVOICE` | `erp3_payments` | `erp3_invoices` | `invoice_id` | `intra_module` (`erp-3`) | `required` | `RESTRICT` | Must reference an existing unpaid invoice (`404 INVOICE_NOT_FOUND`, `422 INVOICE_ALREADY_PAID`, `422 PARTIAL_PAYMENT_NOT_ALLOWED`, `422 PAYMENT_EXCEEDS_INVOICE_TOTAL`) |
+
+### 4. Read-Model Consistency Guarantees (`AC-4`)
+1. **Sales Order (`assertSalesOrderReadConsistency`)**:
+   - Mandatory fields (`id`, `order_number`, `customer_golden_id`, `order_date`, `currency`, `total`), valid UUID `customer_golden_id`, valid `SalesOrderStatus`, valid 3-letter uppercase `CurrencyCode`, and complete provenance pair (`source_system` and `source_id` both present or both `null`; `422 SOURCE_IDENTITY_INCOMPLETE` otherwise).
+   - Every line item's `order_id === order.id`, `quantity > 0`, `tax_amount` and `line_total` match `calculateLineAmounts(quantity, price, tax_rate)`, and `SUM(lines.line_total) === order.total`.
+2. **Invoice (`assertInvoiceReadConsistency`)**:
+   - Mandatory fields (`id`, `invoice_number`, `customer_golden_id`, `invoice_date`, `due_date`, `currency`, `total`), `due_date >= invoice_date`, valid `InvoiceStatus`, valid `CurrencyCode`, and complete provenance pair.
+   - Every line item's `invoice_id === invoice.id`, `tax_amount` and `line_total` match `calculateLineAmounts`, and `SUM(lines.line_total) === invoice.total`.
+   - Projected `status` agrees with `deriveInvoiceStatus(invoice.total, totalPaid, invoice.due_date, nowUtcDateString)`.
+3. **Payment (`assertPaymentReadConsistency`)**:
+   - Mandatory fields (`id`, `invoice_id`, `amount`, `paid_at`, `method`), valid `PaymentMethod` (`cash`, `bank`, `card`), `amount > 0`, and when verified against its target invoice, `payment.amount === invoice.total` and `invoice.status === "Paid"`.
+
+### 5. Local Verification Commands
+```bash
+# Run ERP-3 domain rules, relationship matrices, API mutations, and UI tests
+npx vitest run apps/erp/modules/erp-3
+
+# Run shared ERP-3 contract & OpenAPI parity tests
+npx vitest run packages/contracts/tests/erp-3.contract.test.ts packages/contracts/tests/erp-3.openapi.test.ts
+```
+
+---
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
 |---|---|---|---|---|
 | **`1.0.0`** | 2026-10-23 | Gate G1 Baseline (Pending Sign-Off) | Group 8 / Role 2 (Issue #150) & UI Team (#29, #30) | Consolidated OpenAPI 3.1 specification, Zod schemas, domain event contracts, deterministic mock server, field specifications, domain invariants, and UI workflow documentation for ERP-3 Sales Orders & Invoices. |
+| **`1.1.0`** | 2026-10-23 | Issue #28 (`ERP3-03`) & Issue #31 (`ERP3-06`) | Group 8 | Added mutation service, idempotent import receipts, `ERP3_RELATIONSHIPS` catalog, sales order & invoice state transition matrices, provenance/currency consistency guards, failure-safe cross-module reference validation, and read-model consistency assertions. |

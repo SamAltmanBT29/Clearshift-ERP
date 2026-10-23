@@ -1,4 +1,10 @@
-import { erp3Resolver, Erp3ReferenceResolver } from "./public.js";
+import {
+  erp3Resolver,
+  Erp3ReferenceResolver,
+  type SalesOrderPublicSummary,
+  type InvoicePublicSummary,
+  type PaymentPublicSummary,
+} from "./public.js";
 import { buildApp, type AppOptions } from "./app.js";
 import {
   Erp3Service,
@@ -16,9 +22,14 @@ import {
 } from "./services/repository.js";
 import * as domainRules from "./domain/index.js";
 
+export * from "./domain/index.js";
+
 export {
   erp3Resolver,
   Erp3ReferenceResolver,
+  type SalesOrderPublicSummary,
+  type InvoicePublicSummary,
+  type PaymentPublicSummary,
   buildApp,
   type AppOptions,
   Erp3Service,

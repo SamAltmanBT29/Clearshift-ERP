@@ -34,3 +34,16 @@ See the canonical global reference copy at [`docs/data-dictionaries/erp-3.md`](.
 - **`FR-ERP3-05` (Sales Order Status Lifecycle)**: Strictly forward-only `Open` → `Invoiced` → `Closed`. `UpdateSalesOrderStatusRequestSchema` is exported in `erp-3.ts`, but `PATCH /sales-orders/{id}` is not one of the 7 routes in `erp-3.yaml` or `erp-3-mock.ts`.
 - **`DR-3` (Detail Read Routes — Pending Gate G1 Ratification)**: `GET /sales-orders/{id}` and `GET /invoices/{id}` are included per `V1_30_ISSUE_STANDARDIZATION_PLAN.md` §7 Slot 04 and `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` Decision `C1` / `H1`, and flagged for Gate G1 ratification.
 - **Branch Divergence with `origin/main` (`ERP3-04` / `ERP3-05`)**: `feature/150-erp3-contracts` and `origin/main` currently define conflicting `packages/contracts/src/erp-3.ts` and `packages/contracts/openapi/erp-3.yaml` files (`snake_case` vs. `camelCase`, `UUID` vs. `gid-*` `customer_golden_id`, TitleCase vs. lowercase status enums, and full-line `CreateInvoiceRequestSchema` vs. order-only `CreateInvoiceInputSchema`). Code-level reconciliation is required before PR #256 can be safely merged.
+
+## 4. Relationships, State Transitions & Read-Model Consistency (`ERP3-06` / Issue #31)
+
+- **Relationship Catalog (`src/domain/relationships.ts`)**:
+  - `ORDER_CUSTOMER`, `ORDER_LINES`, `ORDER_LINE_PRODUCT`, `INVOICE_CUSTOMER`, `INVOICE_ORDER`, `INVOICE_LINES`, `INVOICE_LINE_PRODUCT`, `PAYMENT_INVOICE`.
+  - Optional links (`invoice.order_id`) use `handleOptionalRelationship` to return `ERP3_OPTIONAL_REFERENCE_ABSENT` warnings and `null` without creating synthetic records.
+  - Provenance fields (`source_system`, `source_id`) are validated as an atomic pair via `assertSourceIdentityIsComplete` (`422 SOURCE_IDENTITY_INCOMPLETE`).
+  - Linked orders and invoices enforce matching ISO 4217 currency codes via `assertOrderInvoiceCurrencyConsistency` (`422 CURRENCY_MISMATCH`).
+- **State Transition Matrices**:
+  - Sales Orders (`assertSalesOrderStatusTransition`): `Open -> Invoiced -> Closed` (and `Open -> Closed` per `ALLOWED_ORDER_STATUS_TRANSITIONS`), `Closed` is terminal (`422 INVALID_ORDER_STATUS_TRANSITION`).
+  - Invoices (`assertInvoiceStatusTransition`): `Open -> Paid | Overdue`, `Overdue -> Paid`, `Paid` is terminal (`422 INVALID_INVOICE_STATUS_TRANSITION`).
+- **Read-Model Consistency (`assertSalesOrderReadConsistency`, `assertInvoiceReadConsistency`, `assertPaymentReadConsistency`)**:
+  - Asserted immediately on every write and read in `Erp3Service` so persisted records and HTTP projections agree on status, links, derived line taxes/totals, and aggregate totals (`422 READ_MODEL_INCONSISTENT`).

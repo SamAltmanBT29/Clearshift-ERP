@@ -80,6 +80,16 @@ export const TaxRateAmount = z
 export const SalesOrderStatusEnum = z.enum(["Open", "Invoiced", "Closed"]);
 export type SalesOrderStatus = z.infer<typeof SalesOrderStatusEnum>;
 
+export const ERP3_SALES_ORDER_STATUSES = [
+  "Open",
+  "Invoiced",
+  "Closed",
+] as const;
+
+export const ERP3_SALES_ORDER_TERMINAL_STATUSES: readonly SalesOrderStatus[] = [
+  "Closed",
+];
+
 /**
  * Invoice status.
  * FR-ERP3-02: Open / Paid / Overdue.
@@ -88,12 +98,20 @@ export type SalesOrderStatus = z.infer<typeof SalesOrderStatusEnum>;
 export const InvoiceStatusEnum = z.enum(["Open", "Paid", "Overdue"]);
 export type InvoiceStatus = z.infer<typeof InvoiceStatusEnum>;
 
+export const ERP3_INVOICE_STATUSES = ["Open", "Paid", "Overdue"] as const;
+
+export const ERP3_INVOICE_TERMINAL_STATUSES: readonly InvoiceStatus[] = [
+  "Paid",
+];
+
 /**
  * Payment method.
  * FR-ERP3-03: cash / bank / card.
  */
 export const PaymentMethodEnum = z.enum(["cash", "bank", "card"]);
 export type PaymentMethod = z.infer<typeof PaymentMethodEnum>;
+
+export const ERP3_PAYMENT_METHODS = ["cash", "bank", "card"] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Common Param Schema
@@ -476,6 +494,7 @@ export const ERP3_RELATIONSHIP_ERROR_CODES = {
   INVOICE_NUMBER_EXISTS: "INVOICE_NUMBER_EXISTS",
   INVOICE_ALREADY_PAID: "INVOICE_ALREADY_PAID",
   INVOICE_LINE_TOTAL_MISMATCH: "INVOICE_LINE_TOTAL_MISMATCH",
+  INVALID_INVOICE_STATUS_TRANSITION: "INVALID_INVOICE_STATUS_TRANSITION",
   // Payment errors
   PAYMENT_NOT_FOUND: "PAYMENT_NOT_FOUND",
   PAYMENT_EXCEEDS_INVOICE_TOTAL: "PAYMENT_EXCEEDS_INVOICE_TOTAL",
@@ -483,14 +502,34 @@ export const ERP3_RELATIONSHIP_ERROR_CODES = {
   PRODUCT_NOT_FOUND: "PRODUCT_NOT_FOUND",
   CUSTOMER_NOT_FOUND: "CUSTOMER_NOT_FOUND",
   ORDER_REF_NOT_FOUND: "ORDER_REF_NOT_FOUND",
+  // Enumeration, Currency & Provenance errors (ERP3-06)
+  INVALID_ORDER_STATUS: "INVALID_ORDER_STATUS",
+  INVALID_INVOICE_STATUS: "INVALID_INVOICE_STATUS",
+  INVALID_PAYMENT_METHOD: "INVALID_PAYMENT_METHOD",
+  INVALID_CURRENCY_CODE: "INVALID_CURRENCY_CODE",
+  CURRENCY_MISMATCH: "CURRENCY_MISMATCH",
+  SOURCE_IDENTITY_INCOMPLETE: "SOURCE_IDENTITY_INCOMPLETE",
+  READ_MODEL_INCONSISTENT: "READ_MODEL_INCONSISTENT",
   // Generic
   INVALID_STATUS_TRANSITION: "INVALID_STATUS_TRANSITION",
   MISSING_REQUIRED_REFERENCE: "MISSING_REQUIRED_REFERENCE",
   INVALID_REFERENCE: "INVALID_REFERENCE",
 } as const;
 
+export const ERP3_DOMAIN_RULES = ERP3_RELATIONSHIP_ERROR_CODES;
+
 export type Erp3RelationshipErrorCode =
   (typeof ERP3_RELATIONSHIP_ERROR_CODES)[keyof typeof ERP3_RELATIONSHIP_ERROR_CODES];
+
+export const ERP3_OPTIONAL_REFERENCE_ABSENT =
+  "ERP3_OPTIONAL_REFERENCE_ABSENT" as const;
+
+export interface Erp3RelationshipWarning {
+  relationship: string;
+  field: string;
+  code: typeof ERP3_OPTIONAL_REFERENCE_ABSENT;
+  message: string;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared Error Response (mirrors ERP-4 ApiErrorSchema)
@@ -571,6 +610,25 @@ export const ALLOWED_ORDER_STATUS_TRANSITIONS: Record<
   Open: ["Invoiced", "Closed"],
   Invoiced: ["Closed"],
   Closed: [],
+};
+
+export const ERP3_SALES_ORDER_STATUS_TRANSITIONS =
+  ALLOWED_ORDER_STATUS_TRANSITIONS;
+
+/**
+ * Forward-only Invoice status transitions (FR-ERP3-02, FR-ERP3-04).
+ * - Open -> Paid (settled on or before due_date)
+ * - Open -> Overdue (unpaid after due_date)
+ * - Overdue -> Paid (settled after due_date)
+ * - Paid -> [] (terminal; V1 has no payment reversal or credit notes)
+ */
+export const ERP3_INVOICE_STATUS_TRANSITIONS: Record<
+  InvoiceStatus,
+  readonly InvoiceStatus[]
+> = {
+  Open: ["Paid", "Overdue"],
+  Overdue: ["Paid"],
+  Paid: [],
 };
 
 const HELPER_SCALE = 10_000n;
