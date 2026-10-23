@@ -146,7 +146,7 @@ For the contract and mock architecture decision record see:
 
 All collection endpoints enforce bounded pagination (`page >= 1`, `pageSize` 1..100, default `20`). All error responses conform to ADR-002 / PLT-04 (`Erp3ApiErrorSchema` / `ErrorEnvelopeSchema`).
 
-> **Note on `UpdateSalesOrderStatusRequestSchema`:** `packages/contracts/src/erp-3.ts` exports `UpdateSalesOrderStatusRequestSchema` (`{ status: SalesOrderStatusEnum }`), but `PATCH /api/v1/erp-orders/sales-orders/{id}` is **not** one of the 7 routes documented in `packages/contracts/openapi/erp-3.yaml` or implemented in `packages/contracts/src/erp-3-mock.ts`.
+All 9 V1 baseline endpoints are documented in `packages/contracts/openapi/erp-3.yaml`:
 
 | Method | Endpoint | Operation ID | Authority Source | Description |
 |---|---|---|---|---|

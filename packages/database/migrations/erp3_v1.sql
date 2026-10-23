@@ -3,6 +3,7 @@
 -- Module:    ERP-3 Sales Orders & Invoices
 -- Version:   v1.0.0
 -- Issue:     #26  [ERP3-01] ERP-3 Sales Orders and Invoices: Schema, Drizzle models and guarded migrations
+--            #35  [ERP3-10] V1 contract, integration, regression tests and team handoff
 --
 -- Design: This migration is GUARDED — idempotent CREATE IF NOT EXISTS / DO
 -- blocks prevent failure on re-run. The migration runner records applied
