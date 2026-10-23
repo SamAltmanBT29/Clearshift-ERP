@@ -505,3 +505,175 @@ export const Erp3ApiErrorSchema = z.object({
   correlation_id: z.string().optional(),
 });
 export type Erp3ApiError = z.infer<typeof Erp3ApiErrorSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical Schema & Type Aliases (for ERP-3 Web / Downstream Consumers)
+// Strictly point to canonical snake_case / UUID / TitleCase schemas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Canonical ISO 4217 currency code schema alias. */
+export const OrdersCurrencyCode = CurrencyCode;
+
+/** Canonical UUID schema alias. */
+export const OrdersUuid = UuidSchema;
+
+/** Canonical monetary amount schema alias (up to 4 dp). */
+export const OrdersMoneyAmount = MoneyAmount;
+
+/**
+ * Customer Golden ID schema (ADR-003).
+ * Strictly validates a canonical UUID v4 reference to hub_golden_records.golden_id.
+ * Non-UUID display strings (such as `gid-*`) are rejected.
+ */
+export const CustomerGoldenIdSchema = UuidSchema;
+
+export const CreateSalesOrderLineInputSchema = CreateSalesOrderLineRequestSchema;
+export type CreateSalesOrderLineInput = CreateSalesOrderLineRequest;
+
+export const CreateSalesOrderInputSchema = CreateSalesOrderRequestSchema;
+export type CreateSalesOrderInput = CreateSalesOrderRequest;
+
+export const UpdateSalesOrderStatusInputSchema =
+  UpdateSalesOrderStatusRequestSchema;
+export type UpdateSalesOrderStatusInput = UpdateSalesOrderStatusRequest;
+
+export const SalesOrdersFilterQuerySchema = SalesOrderListQuerySchema;
+export type SalesOrdersFilterQuery = SalesOrderListQuery;
+
+export const PaginatedSalesOrdersResponseSchema = SalesOrderListResponseSchema;
+export type PaginatedSalesOrdersResponse = SalesOrderListResponse;
+
+export const CreateInvoiceInputSchema = CreateInvoiceRequestSchema;
+export type CreateInvoiceInput = CreateInvoiceRequest;
+
+export const InvoicesFilterQuerySchema = InvoiceListQuerySchema;
+export type InvoicesFilterQuery = InvoiceListQuery;
+
+export const PaginatedInvoicesResponseSchema = InvoiceListResponseSchema;
+export type PaginatedInvoicesResponse = InvoiceListResponse;
+
+export const CreatePaymentInputSchema = CreatePaymentRequestSchema;
+export type CreatePaymentInput = CreatePaymentRequest;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Domain Invariant Calculations & Helpers (Canonical Contract)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Forward-only Sales Order status transitions (FR-ERP3-05).
+ * Open -> Invoiced -> Closed (or Open -> Closed).
+ * ⚠️ Note: PATCH /sales-orders/{id} is not part of the 7-route OpenAPI/mock baseline (DR-3).
+ */
+export const ALLOWED_ORDER_STATUS_TRANSITIONS: Record<
+  SalesOrderStatus,
+  readonly SalesOrderStatus[]
+> = {
+  Open: ["Invoiced", "Closed"],
+  Invoiced: ["Closed"],
+  Closed: [],
+};
+
+const HELPER_SCALE = 10_000n;
+
+function parseScaled4Dp(value: string | number): bigint {
+  const normalized = String(value).trim();
+  const [intPart = "0", fracPart = ""] = normalized.split(".");
+  const sign = intPart.startsWith("-") ? -1n : 1n;
+  const cleanInt = intPart.replace(/^[+-]/, "") || "0";
+  const paddedFrac = (fracPart + "0000").slice(0, 4);
+  return sign * (BigInt(cleanInt) * HELPER_SCALE + BigInt(paddedFrac));
+}
+
+function formatScaled4Dp(scaled: bigint): string {
+  const negative = scaled < 0n;
+  const abs = negative ? -scaled : scaled;
+  const intPart = abs / HELPER_SCALE;
+  const fracPart = (abs % HELPER_SCALE).toString().padStart(4, "0");
+  return `${negative ? "-" : ""}${intPart}.${fracPart}`;
+}
+
+function roundHalfUpDiv(numerator: bigint, denominator: bigint): bigint {
+  const quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  if (remainder * 2n >= denominator) {
+    return quotient + 1n;
+  }
+  return quotient;
+}
+
+/**
+ * Calculates line subtotal, tax_amount, and line_total from canonical inputs:
+ * - `quantity`: positive decimal string or number (up to 4 dp)
+ * - `price`: unit price decimal string (up to 4 dp)
+ * - `tax_rate`: percentage string (e.g. `"18.0000"` = 18%, `"10.0000"` = 10%)
+ *
+ * Returns 4-dp monetary strings (`subtotal`, `tax_amount`, `line_total`).
+ *
+ * ⚠️ DR-1 (Pending Integration Lead Confirmation):
+ * SDS §3.2 mandates `numeric(19,4)` storage while SDS §4.4 `BR-ERP3-02` states
+ * "rounded to 2 decimals". Until DR-1 is ratified, the mock server enforces exact
+ * 4-dp arithmetic (returning `422 DR1_ROUNDING_UNRESOLVED` on sub-4-dp remainders),
+ * whereas this UI/domain helper formats to 4 dp using HALF_UP at 4-dp scale.
+ */
+export function calculateLineAmounts(
+  quantity: string | number,
+  price: string,
+  tax_rate: string,
+): { subtotal: string; tax_amount: string; line_total: string } {
+  const qtyScaled = parseScaled4Dp(quantity);
+  const priceScaled = parseScaled4Dp(price);
+  const rateScaled = parseScaled4Dp(tax_rate);
+
+  const subtotalScaled = roundHalfUpDiv(qtyScaled * priceScaled, HELPER_SCALE);
+  const taxScaled = roundHalfUpDiv(
+    subtotalScaled * rateScaled,
+    HELPER_SCALE * 100n,
+  );
+  const totalScaled = subtotalScaled + taxScaled;
+
+  return {
+    subtotal: formatScaled4Dp(subtotalScaled),
+    tax_amount: formatScaled4Dp(taxScaled),
+    line_total: formatScaled4Dp(totalScaled),
+  };
+}
+
+/**
+ * Validates that `SUM(line.line_total) == orderTotal` at 4-dp precision (BR-ERP3-01).
+ */
+export function validateOrderLineTotals(
+  lines: ReadonlyArray<{ line_total: string }>,
+  orderTotal: string,
+): boolean {
+  const sumScaled = lines.reduce(
+    (acc, line) => acc + parseScaled4Dp(line.line_total),
+    0n,
+  );
+  return sumScaled === parseScaled4Dp(orderTotal);
+}
+
+/**
+ * Derives canonical InvoiceStatus (`"Open" | "Paid" | "Overdue"`) per FR-ERP3-02 / FR-ERP3-04:
+ * - `"Paid"` when `totalPaid >= invoiceTotal` (and `invoiceTotal > 0`)
+ * - `"Overdue"` when unpaid and `nowUtcDateString > dueDate`
+ * - `"Open"` otherwise
+ */
+export function deriveInvoiceStatus(
+  invoiceTotal: string,
+  totalPaid: string,
+  dueDate: string,
+  nowUtcDateString: string = new Date().toISOString().slice(0, 10),
+): InvoiceStatus {
+  const totalScaled = parseScaled4Dp(invoiceTotal);
+  const paidScaled = parseScaled4Dp(totalPaid);
+
+  if (paidScaled >= totalScaled && totalScaled > 0n) {
+    return "Paid";
+  }
+
+  if (nowUtcDateString > dueDate) {
+    return "Overdue";
+  }
+
+  return "Open";
+}

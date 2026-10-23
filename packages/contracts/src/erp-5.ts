@@ -676,6 +676,7 @@ export const HrEmployeeListQuerySchema = HrPaginationQuerySchema.extend({
   search: z.string().trim().min(1).max(120).optional(),
   department_id: HrUuid.optional(),
   sort: z.enum(['name', 'employee_no', 'join_date']).default('name'),
+  sort_dir: z.enum(['asc', 'desc']).default('asc'),
 });
 export type HrEmployeeListQuery = z.infer<typeof HrEmployeeListQuerySchema>;
 
@@ -684,6 +685,7 @@ export const HrDepartmentListQuerySchema = HrPaginationQuerySchema.extend({
   search: z.string().trim().min(1).max(120).optional(),
   parent_id: HrUuid.optional(),
   sort: z.enum(['name', 'code']).default('name'),
+  sort_dir: z.enum(['asc', 'desc']).default('asc'),
 });
 export type HrDepartmentListQuery = z.infer<typeof HrDepartmentListQuerySchema>;
 

@@ -36,6 +36,27 @@ import {
   SalesOrderSchema,
   InvoiceSchema,
   PaymentSchema,
+  SalesOrderListResponseSchema,
+  InvoiceListResponseSchema,
+  UpdateSalesOrderStatusRequestSchema,
+  // Canonical aliases & domain helpers
+  OrdersCurrencyCode,
+  OrdersUuid,
+  OrdersMoneyAmount,
+  CustomerGoldenIdSchema,
+  CreateSalesOrderLineInputSchema,
+  CreateSalesOrderInputSchema,
+  UpdateSalesOrderStatusInputSchema,
+  SalesOrdersFilterQuerySchema,
+  PaginatedSalesOrdersResponseSchema,
+  CreateInvoiceInputSchema,
+  InvoicesFilterQuerySchema,
+  PaginatedInvoicesResponseSchema,
+  CreatePaymentInputSchema,
+  ALLOWED_ORDER_STATUS_TRANSITIONS,
+  calculateLineAmounts,
+  validateOrderLineTotals,
+  deriveInvoiceStatus,
   // Error codes
   ERP3_RELATIONSHIP_ERROR_CODES,
 } from "../src/erp-3.js";
@@ -580,5 +601,84 @@ describe("ERP-3 Relationship Error Codes", () => {
     expect(ERP3_RELATIONSHIP_ERROR_CODES.ORDER_REF_NOT_FOUND).toBe(
       "ORDER_REF_NOT_FOUND",
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("ERP-3 Canonical Aliases & Domain Helpers (Option 2 Strict Contract)", () => {
+  it("aliases point strictly to canonical schemas and reject non-canonical shapes", () => {
+    expect(CreateSalesOrderLineInputSchema).toBe(
+      CreateSalesOrderLineRequestSchema,
+    );
+    expect(CreateSalesOrderInputSchema).toBe(CreateSalesOrderRequestSchema);
+    expect(UpdateSalesOrderStatusInputSchema).toBe(
+      UpdateSalesOrderStatusRequestSchema,
+    );
+    expect(SalesOrdersFilterQuerySchema).toBe(SalesOrderListQuerySchema);
+    expect(PaginatedSalesOrdersResponseSchema).toBe(
+      SalesOrderListResponseSchema,
+    );
+    expect(CreateInvoiceInputSchema).toBe(CreateInvoiceRequestSchema);
+    expect(InvoicesFilterQuerySchema).toBe(InvoiceListQuerySchema);
+    expect(PaginatedInvoicesResponseSchema).toBe(InvoiceListResponseSchema);
+    expect(CreatePaymentInputSchema).toBe(CreatePaymentRequestSchema);
+
+    expect(OrdersCurrencyCode.safeParse("USD").success).toBe(true);
+    expect(OrdersUuid.safeParse(CUSTOMER_ID).success).toBe(true);
+    expect(OrdersMoneyAmount.safeParse("125.0000").success).toBe(true);
+  });
+
+  it("CustomerGoldenIdSchema enforces UUID (ADR-003) and rejects gid-* strings", () => {
+    expect(CustomerGoldenIdSchema.safeParse(CUSTOMER_ID).success).toBe(true);
+    expect(CustomerGoldenIdSchema.safeParse("gid-cust-001").success).toBe(
+      false,
+    );
+    expect(CustomerGoldenIdSchema.safeParse("GID-ACME-001").success).toBe(
+      false,
+    );
+    expect(CustomerGoldenIdSchema.safeParse("").success).toBe(false);
+  });
+
+  it("ALLOWED_ORDER_STATUS_TRANSITIONS uses canonical TitleCase statuses", () => {
+    expect(ALLOWED_ORDER_STATUS_TRANSITIONS.Open).toEqual([
+      "Invoiced",
+      "Closed",
+    ]);
+    expect(ALLOWED_ORDER_STATUS_TRANSITIONS.Invoiced).toEqual(["Closed"]);
+    expect(ALLOWED_ORDER_STATUS_TRANSITIONS.Closed).toEqual([]);
+  });
+
+  it("calculateLineAmounts computes 4-dp subtotal, tax_amount, and line_total from percentage tax_rate", () => {
+    const res = calculateLineAmounts("10", "12.5000", "10.0000");
+    expect(res).toEqual({
+      subtotal: "125.0000",
+      tax_amount: "12.5000",
+      line_total: "137.5000",
+    });
+
+    const resNumQty = calculateLineAmounts(5, "50.00", "10");
+    expect(resNumQty).toEqual({
+      subtotal: "250.0000",
+      tax_amount: "25.0000",
+      line_total: "275.0000",
+    });
+  });
+
+  it("validateOrderLineTotals checks SUM(line.line_total) == orderTotal at 4-dp precision", () => {
+    const lines = [{ line_total: "137.5000" }, { line_total: "262.5000" }];
+    expect(validateOrderLineTotals(lines, "400.0000")).toBe(true);
+    expect(validateOrderLineTotals(lines, "405.0000")).toBe(false);
+  });
+
+  it("deriveInvoiceStatus returns canonical TitleCase InvoiceStatus values", () => {
+    expect(
+      deriveInvoiceStatus("1375.0000", "1375.0000", "2026-11-23", "2026-10-23"),
+    ).toBe("Paid");
+    expect(
+      deriveInvoiceStatus("1375.0000", "0.0000", "2026-10-15", "2026-10-23"),
+    ).toBe("Overdue");
+    expect(
+      deriveInvoiceStatus("1375.0000", "0.0000", "2026-11-15", "2026-10-23"),
+    ).toBe("Open");
   });
 });

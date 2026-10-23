@@ -1,0 +1,379 @@
+{
+  "mapping_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp4",
+  "source_system": "SYNTH-ERP4-DIRTY-V1",
+  "fixture": "sample-data/erp-4/dirty-data-v1.csv",
+  "policy": {
+    "fuzzy_matching": false,
+    "automatic_merge": false,
+    "raw_input_mutation": false,
+    "duplicate_handling": "Exact candidate keys only; later duplicates get outcome review and are never loaded or merged until a human decides.",
+    "balancing_handling": "Double-entry balancing invariant enforced at currency precision (BR-ERP4-01). Sum of debits must equal sum of credits within entry currency.",
+    "currency_handling": "Currency is explicit on every account, opening balance, and journal entry; accepted codes INR, USD, EUR; no FX conversion in V1.",
+    "period_handling": "Posting blocked when accounting period is locked (BR-ERP4-02: closed fiscal month rejects posting).",
+    "opening_balance_handling": "One-time load per account and currency (FR-ERP4-04). Subsequent attempts held for review or rejected.",
+    "idempotency_key": "SYNTH-ERP4-DIRTY-V1:{entity}:{source_id}"
+  },
+  "load_order": [
+    "account",
+    "opening_balance",
+    "journal_entry"
+  ],
+  "reference_fixtures": {
+    "note": "Reference fixtures for fiscal periods and ERP-5 department codes. In production, department existence is resolved through the ReferenceResolver port, never by directly querying ERP-5 tables.",
+    "calendar_periods": [
+      {
+        "period_label": "2026-04",
+        "status": "open"
+      },
+      {
+        "period_label": "2026-05",
+        "status": "open"
+      },
+      {
+        "period_label": "2026-06",
+        "status": "soft_closed"
+      },
+      {
+        "period_label": "2026-01",
+        "status": "locked"
+      }
+    ],
+    "erp5_department_refs": [
+      "DEP-FIN",
+      "DEP-SALES",
+      "DEP-ENG"
+    ]
+  },
+  "entities": {
+    "account": {
+      "record_type": "account",
+      "adapter_entity": "account",
+      "target_table": "erp4.accounts",
+      "api": "POST /api/v1/erp-finance/accounts",
+      "candidate_key": [
+        "code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": [
+            "ACC-005"
+          ]
+        },
+        {
+          "source": "code",
+          "target": "code",
+          "required": true,
+          "rule_ids": [
+            "ACC-001",
+            "ACC-010",
+            "ACC-020",
+            "ACC-021",
+            "ACC-050"
+          ]
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "required": true,
+          "rule_ids": [
+            "ACC-002",
+            "ACC-011",
+            "ACC-022"
+          ]
+        },
+        {
+          "source": "type",
+          "target": "type",
+          "required": true,
+          "rule_ids": [
+            "ACC-003",
+            "ACC-012",
+            "ACC-030"
+          ]
+        },
+        {
+          "source": "currency_code",
+          "target": "currency_code",
+          "required": true,
+          "rule_ids": [
+            "ACC-004",
+            "ACC-013",
+            "ACC-031"
+          ]
+        },
+        {
+          "source": "parent_code",
+          "target": "parent_id",
+          "required": false,
+          "rule_ids": [
+            "ACC-014",
+            "ACC-040",
+            "ACC-041",
+            "ACC-042"
+          ]
+        },
+        {
+          "source": "description",
+          "target": "description",
+          "required": false,
+          "rule_ids": [
+            "ACC-023"
+          ]
+        },
+        {
+          "source": "is_active",
+          "target": "is_active",
+          "required": false,
+          "default": true,
+          "rule_ids": [
+            "ACC-032"
+          ]
+        },
+        {
+          "source": "is_posting_account",
+          "target": "is_posting_account",
+          "required": false,
+          "default": true,
+          "rule_ids": [
+            "ACC-033"
+          ]
+        }
+      ]
+    },
+    "opening_balance": {
+      "record_type": "opening_balance",
+      "adapter_entity": "opening_balance",
+      "target_table": "erp4.opening_balances",
+      "api": "POST /api/v1/erp-finance/opening-balances",
+      "candidate_key": [
+        "code",
+        "currency_code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": [
+            "OPB-001"
+          ]
+        },
+        {
+          "source": "code",
+          "target": "account_id",
+          "required": true,
+          "rule_ids": [
+            "OPB-002",
+            "OPB-010",
+            "OPB-020",
+            "OPB-030"
+          ]
+        },
+        {
+          "source": "currency_code",
+          "target": "currency_code",
+          "required": true,
+          "rule_ids": [
+            "OPB-003",
+            "OPB-011",
+            "OPB-021",
+            "OPB-027",
+            "OPB-030"
+          ]
+        },
+        {
+          "source": "balance_amount",
+          "target": "balance_amount",
+          "required": true,
+          "rule_ids": [
+            "OPB-004",
+            "OPB-012",
+            "OPB-022",
+            "OPB-023",
+            "OPB-024"
+          ]
+        },
+        {
+          "source": "as_of_date",
+          "target": "as_of_date",
+          "required": true,
+          "rule_ids": [
+            "OPB-005",
+            "OPB-013",
+            "OPB-025",
+            "OPB-026"
+          ]
+        },
+        {
+          "source": "description",
+          "target": "source_reference",
+          "required": false
+        }
+      ]
+    },
+    "journal_entry": {
+      "record_type": "journal_entry",
+      "adapter_entity": "journal_entry",
+      "target_table": "erp4.journal_entries",
+      "api": "POST /api/v1/erp-finance/journal-entries",
+      "candidate_key": [
+        "entry_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": [
+            "JRN-001"
+          ]
+        },
+        {
+          "source": "entry_number",
+          "target": "entry_number",
+          "required": true,
+          "rule_ids": [
+            "JRN-002",
+            "JRN-010",
+            "JRN-020",
+            "JRN-030"
+          ]
+        },
+        {
+          "source": "period_label",
+          "target": "period_id",
+          "required": true,
+          "rule_ids": [
+            "JRN-003",
+            "JRN-011",
+            "JRN-021",
+            "JRN-022",
+            "JRN-023"
+          ]
+        },
+        {
+          "source": "posting_date",
+          "target": "posting_date",
+          "required": true,
+          "rule_ids": [
+            "JRN-004",
+            "JRN-012",
+            "JRN-024"
+          ]
+        },
+        {
+          "source": "currency_code",
+          "target": "currency_code",
+          "required": true,
+          "rule_ids": [
+            "JRN-005",
+            "JRN-013",
+            "JRN-025"
+          ]
+        },
+        {
+          "source": "description",
+          "target": "description",
+          "required": true,
+          "rule_ids": [
+            "JRN-006",
+            "JRN-014"
+          ]
+        },
+        {
+          "source": "lines",
+          "target": "lines",
+          "required": true,
+          "rule_ids": [
+            "JRN-040",
+            "JRN-041",
+            "JRN-042",
+            "JRN-043"
+          ]
+        }
+      ]
+    },
+    "journal_line": {
+      "record_type": "journal_line",
+      "adapter_entity": "journal_line",
+      "target_table": "erp4.journal_lines",
+      "parent_entity": "journal_entry",
+      "fields": [
+        {
+          "source": "parent_source_id",
+          "target": "journal_entry_id",
+          "required": true,
+          "rule_ids": [
+            "JRL-001",
+            "JRL-002",
+            "JRL-030",
+            "JRL-031"
+          ]
+        },
+        {
+          "source": "code",
+          "target": "account_id",
+          "required": true,
+          "rule_ids": [
+            "JRL-003",
+            "JRL-004",
+            "JRL-005",
+            "JRL-006",
+            "JRL-010"
+          ]
+        },
+        {
+          "source": "debit_amount",
+          "target": "debit_amount",
+          "required": true,
+          "default": "0.0000",
+          "rule_ids": [
+            "JRL-011",
+            "JRL-020",
+            "JRL-022",
+            "JRL-023",
+            "JRL-024",
+            "JRL-025"
+          ]
+        },
+        {
+          "source": "credit_amount",
+          "target": "credit_amount",
+          "required": true,
+          "default": "0.0000",
+          "rule_ids": [
+            "JRL-012",
+            "JRL-021",
+            "JRL-022",
+            "JRL-023",
+            "JRL-024",
+            "JRL-025"
+          ]
+        },
+        {
+          "source": "line_narration",
+          "target": "line_narration",
+          "required": false,
+          "rule_ids": [
+            "JRL-013",
+            "JRL-026"
+          ]
+        },
+        {
+          "source": "department_ref",
+          "target": "department_ref",
+          "required": false,
+          "rule_ids": [
+            "JRL-014",
+            "JRL-027"
+          ]
+        }
+      ]
+    }
+  }
+}

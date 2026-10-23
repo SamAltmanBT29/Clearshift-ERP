@@ -389,6 +389,10 @@ describe('Shared OpenAPI & Zod Contract Suite (Issue #59 / [PLT-04])', () => {
       }
     });
 
+    it('verifies module OpenAPI spec erp-3.yaml exists', () => {
+      expect(existsSync(resolve(openapiDir, 'erp-3.yaml'))).toBe(true);
+    });
+
     it('verifies module OpenAPI spec erp-4.yaml exists', () => {
       expect(existsSync(resolve(openapiDir, 'erp-4.yaml'))).toBe(true);
     });
