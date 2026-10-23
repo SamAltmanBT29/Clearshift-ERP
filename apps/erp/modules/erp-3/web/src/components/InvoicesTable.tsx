@@ -10,8 +10,8 @@ interface InvoicesTableProps {
   pageSize: number;
   totalPages: number;
   onPageChange: (newPage: number) => void;
-  onRefresh?: () => void;
-  onSelectInvoice?: (invoice: Invoice) => void;
+  onRefresh?: (() => void) | undefined;
+  onSelectInvoice?: ((invoice: Invoice) => void) | undefined;
 }
 
 export const InvoicesTable: React.FC<InvoicesTableProps> = ({
@@ -64,19 +64,19 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
               <tr key={inv.id}>
                 <td>
                   <span className="cs-mono" style={{ fontWeight: 600 }}>
-                    {inv.invoiceNumber}
+                    {inv.invoice_number}
                   </span>
                 </td>
                 <td>
-                  <span className="cs-mono">{inv.orderId}</span>
+                  <span className="cs-mono">{inv.order_id || '—'}</span>
                 </td>
                 <td>
-                  <span className="cs-mono">{inv.customerGoldenId}</span>
+                  <span className="cs-mono">{inv.customer_golden_id}</span>
                 </td>
-                <td>{inv.invoiceDate}</td>
+                <td>{inv.invoice_date}</td>
                 <td>
-                  <span style={inv.status === 'overdue' ? { color: 'var(--color-error)', fontWeight: 600 } : undefined}>
-                    {inv.dueDate}
+                  <span style={inv.status === 'Overdue' ? { color: 'var(--color-error)', fontWeight: 600 } : undefined}>
+                    {inv.due_date}
                   </span>
                 </td>
                 <td>
@@ -88,7 +88,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{' '}
-                    {inv.currencyCode}
+                    {inv.currency}
                   </span>
                 </td>
                 <td style={{ textAlign: 'center' }}>
@@ -97,7 +97,7 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
                     className="cs-btn-secondary"
                     style={{ padding: '2px 8px', fontSize: '12px' }}
                     onClick={() => onSelectInvoice && onSelectInvoice(inv)}
-                    aria-label={`View invoice ${inv.invoiceNumber}`}
+                    aria-label={`View invoice ${inv.invoice_number}`}
                   >
                     View
                   </button>
