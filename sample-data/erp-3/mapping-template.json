@@ -1,0 +1,344 @@
+{
+  "mapping_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp3",
+  "source_system": "SYNTH-ERP3-DIRTY-V1",
+  "fixture": "sample-data/erp-3/dirty-data-v1.csv",
+  "policy": {
+    "fuzzy_matching": false,
+    "automatic_merge": false,
+    "raw_input_mutation": false,
+    "duplicate_handling": "Exact candidate keys only (order_number, invoice_number, payment_number); duplicates route to outcome review and are held for human decision; never merged automatically.",
+    "rounding_policy": "Server-side arithmetic computed at 4-decimal-place precision (BR-ERP3-01, BR-ERP3-02). Intermediate tax calculated as subtotal * tax_rate / 100.",
+    "customer_identity_policy": "Every order and invoice must reference a valid Hub Customer Golden ID (UUID) (BR-ERP3-03 / ADR-003).",
+    "currency_handling": "Currency is explicit on every order, invoice, and payment; accepted ISO 4217 codes USD, EUR, INR; no FX conversion in V1.",
+    "invoicing_policy": "At most one invoice per sales order in V1 (FR-ERP3-02). Invoices have mandatory due_date (>= invoice_date); Overdue status is derived when current UTC calendar date > due_date and unpaid, otherwise Open.",
+    "payment_policy": "V1 accepts exactly one full payment per invoice (amount == invoice.total); partial payments and overpayments are rejected (FR-ERP3-03). Accepted full payment transitions invoice status to Paid automatically (FR-ERP3-04).",
+    "formula_injection_defense": "OWASP formula injection prefixes (=, +, -, @, \\t, \\r) in notes and references are neutralized per PLT-12 / KIT-16.",
+    "idempotency_key": "SYNTH-ERP3-DIRTY-V1:{entity}:{source_id}"
+  },
+  "load_order": [
+    "sales_order",
+    "so_line",
+    "invoice",
+    "invoice_line",
+    "payment"
+  ],
+  "reference_fixtures": {
+    "known_customers": [
+      {
+        "id": "c0000000-0000-4000-8000-000000000001",
+        "name": "Acme Industrial Corporation"
+      },
+      {
+        "id": "c0000000-0000-4000-8000-000000000002",
+        "name": "Global Tech Logistics Ltd"
+      },
+      {
+        "id": "c0000000-0000-4000-8000-000000000003",
+        "name": "Vertex Engineering Services"
+      },
+      {
+        "id": "c0000000-0000-4000-8000-000000000004",
+        "name": "Starlight Media Group"
+      },
+      {
+        "id": "c0000000-0000-4000-8000-000000000005",
+        "name": "Omega Dynamics Inc"
+      }
+    ],
+    "known_products": [
+      {
+        "id": "5eed0000-0000-4000-8000-0000000000a1",
+        "sku": "SKU-IND-SENSOR-A",
+        "name": "Industrial Sensor Model A"
+      },
+      {
+        "id": "5eed0000-0000-4000-8000-0000000000a2",
+        "sku": "SKU-CTRL-BOARD-B",
+        "name": "Controller Board B"
+      },
+      {
+        "id": "5eed0000-0000-4000-8000-0000000000a3",
+        "sku": "SKU-PWR-CABLE-10M",
+        "name": "Power Cable 10m"
+      },
+      {
+        "id": "5eed0000-0000-4000-8000-0000000000a4",
+        "sku": "SKU-MNT-BRACKET",
+        "name": "Mounting Bracket"
+      }
+    ]
+  },
+  "entities": {
+    "sales_order": {
+      "record_type": "sales_order",
+      "target_table": "erp3.sales_orders",
+      "api": "POST /api/v1/erp-orders/sales-orders",
+      "candidate_key": [
+        "order_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": ["SO-001"]
+        },
+        {
+          "source": "order_number",
+          "target": "order_number",
+          "required": true,
+          "rule_ids": ["SO-002", "SO-010", "SO-020", "SO-021", "SO-030"]
+        },
+        {
+          "source": "customer_golden_id",
+          "target": "customer_golden_id",
+          "required": true,
+          "rule_ids": ["SO-003", "SO-022", "SO-023"]
+        },
+        {
+          "source": "order_date",
+          "target": "order_date",
+          "required": true,
+          "rule_ids": ["SO-004", "SO-024"]
+        },
+        {
+          "source": "order_status",
+          "target": "status",
+          "required": false,
+          "default": "Open",
+          "rule_ids": ["SO-012", "SO-025"]
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "required": true,
+          "rule_ids": ["SO-005", "SO-011", "SO-026"]
+        },
+        {
+          "source": "notes",
+          "target": "notes",
+          "required": false,
+          "rule_ids": ["SO-013", "SO-027", "SO-050"]
+        }
+      ]
+    },
+    "so_line": {
+      "record_type": "so_line",
+      "target_table": "erp3.so_lines",
+      "api": "POST /api/v1/erp-orders/sales-orders (lines embedded)",
+      "candidate_key": [
+        "parent_source_id",
+        "line_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": ["SOL-001"]
+        },
+        {
+          "source": "parent_source_id",
+          "target": "order_id",
+          "required": true,
+          "rule_ids": ["SOL-002", "SOL-020", "SOL-040", "SOL-041"]
+        },
+        {
+          "source": "product_id",
+          "target": "product_id",
+          "required": true,
+          "rule_ids": ["SOL-003", "SOL-021", "SOL-022"]
+        },
+        {
+          "source": "line_number",
+          "target": "line_number",
+          "required": true,
+          "rule_ids": ["SOL-029"]
+        },
+        {
+          "source": "description",
+          "target": "description",
+          "required": false,
+          "rule_ids": ["SOL-030"]
+        },
+        {
+          "source": "quantity",
+          "target": "quantity",
+          "required": true,
+          "rule_ids": ["SOL-004", "SOL-010", "SOL-023", "SOL-024"]
+        },
+        {
+          "source": "unit_price",
+          "target": "price",
+          "required": true,
+          "rule_ids": ["SOL-005", "SOL-011", "SOL-025", "SOL-026"]
+        },
+        {
+          "source": "tax_rate",
+          "target": "tax_rate",
+          "required": true,
+          "rule_ids": ["SOL-006", "SOL-012", "SOL-027", "SOL-028"]
+        }
+      ]
+    },
+    "invoice": {
+      "record_type": "invoice",
+      "target_table": "erp3.invoices",
+      "api": "POST /api/v1/erp-orders/invoices",
+      "candidate_key": [
+        "invoice_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": ["INV-001"]
+        },
+        {
+          "source": "parent_source_id",
+          "target": "order_id",
+          "required": false,
+          "rule_ids": ["INV-027", "INV-028", "INV-029"]
+        },
+        {
+          "source": "invoice_number",
+          "target": "invoice_number",
+          "required": true,
+          "rule_ids": ["INV-002", "INV-010", "INV-020", "INV-021", "INV-030"]
+        },
+        {
+          "source": "customer_golden_id",
+          "target": "customer_golden_id",
+          "required": true,
+          "rule_ids": ["INV-003", "INV-022", "INV-023"]
+        },
+        {
+          "source": "invoice_date",
+          "target": "invoice_date",
+          "required": true,
+          "rule_ids": ["INV-004", "INV-024"]
+        },
+        {
+          "source": "due_date",
+          "target": "due_date",
+          "required": true,
+          "rule_ids": ["INV-005", "INV-025"]
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "required": true,
+          "rule_ids": ["INV-006", "INV-011", "INV-026"]
+        },
+        {
+          "source": "notes",
+          "target": "notes",
+          "required": false,
+          "rule_ids": ["INV-050"]
+        }
+      ]
+    },
+    "invoice_line": {
+      "record_type": "invoice_line",
+      "target_table": "erp3.invoice_lines",
+      "api": "POST /api/v1/erp-orders/invoices (lines embedded)",
+      "candidate_key": [
+        "parent_source_id",
+        "line_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": ["INL-001"]
+        },
+        {
+          "source": "parent_source_id",
+          "target": "invoice_id",
+          "required": true,
+          "rule_ids": ["INL-002", "INL-020", "INL-040", "INL-041"]
+        },
+        {
+          "source": "product_id",
+          "target": "product_id",
+          "required": true,
+          "rule_ids": ["INL-003", "INL-021"]
+        },
+        {
+          "source": "quantity",
+          "target": "quantity",
+          "required": true,
+          "rule_ids": ["INL-004", "INL-022"]
+        },
+        {
+          "source": "unit_price",
+          "target": "price",
+          "required": true,
+          "rule_ids": ["INL-005", "INL-023"]
+        },
+        {
+          "source": "tax_rate",
+          "target": "tax_rate",
+          "required": true,
+          "rule_ids": ["INL-006", "INL-024"]
+        }
+      ]
+    },
+    "payment": {
+      "record_type": "payment",
+      "target_table": "erp3.payments",
+      "api": "POST /api/v1/erp-orders/payments",
+      "candidate_key": [
+        "payment_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": ["PAY-001"]
+        },
+        {
+          "source": "parent_source_id",
+          "target": "invoice_id",
+          "required": true,
+          "rule_ids": ["PAY-002", "PAY-020", "PAY-040"]
+        },
+        {
+          "source": "payment_number",
+          "target": "payment_number",
+          "required": false,
+          "rule_ids": ["PAY-011", "PAY-030"]
+        },
+        {
+          "source": "payment_date",
+          "target": "paid_at",
+          "required": true,
+          "rule_ids": ["PAY-003", "PAY-021"]
+        },
+        {
+          "source": "payment_amount",
+          "target": "amount",
+          "required": true,
+          "rule_ids": ["PAY-004", "PAY-022", "PAY-023", "PAY-025", "PAY-026", "PAY-027"]
+        },
+        {
+          "source": "payment_method",
+          "target": "method",
+          "required": true,
+          "rule_ids": ["PAY-005", "PAY-010", "PAY-024"]
+        },
+        {
+          "source": "payment_reference",
+          "target": "reference",
+          "required": false,
+          "rule_ids": ["PAY-050"]
+        }
+      ]
+    }
+  }
+}
