@@ -45,10 +45,10 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({ columns = 6, rows 
 };
 
 interface EmptyStateProps {
-  title?: string;
-  message?: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  title?: string | undefined;
+  message?: string | undefined;
+  actionLabel?: string | undefined;
+  onAction?: (() => void) | undefined;
 }
 
 /**
@@ -77,9 +77,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 };
 
 interface ErrorStateProps {
-  title?: string;
-  message?: string;
-  onRetry?: () => void;
+  title?: string | undefined;
+  message?: string | undefined;
+  onRetry?: (() => void) | undefined;
 }
 
 /**
