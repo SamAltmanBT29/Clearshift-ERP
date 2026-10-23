@@ -835,3 +835,44 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Review Date**: 2026-10-23
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
 - **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests.
+
+---
+
+## 23. Exact Duplicate Key Policy & Human Review Workflow (ERP1-12)
+
+**Issue**: [#108](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/108) — `[ERP1-12] ERP-1 Products and Inventory: Exact duplicate key policy for the module`<br />
+**Governing Architecture**: SDS ClearShift ERP v2.0 §4.2, Gate G3 Criteria, Architecture Decision C7.<br />
+**Implementation**: `apps/erp/modules/erp-1/src/domain/duplicate-policy.ts`, `apps/erp/modules/erp-1/src/routes/duplicates.ts`, `apps/erp/modules/erp-1/web/src/components/DuplicateReviewModal.tsx`, `apps/erp/modules/erp-1/web/src/pages/DuplicateCandidatesPage.tsx`.
+
+### 23.1 Normalized Exact Matching Keys (AC1)
+
+In compliance with ClearShift V1 non-negotiable rules, duplicate detection uses deterministic exact key matching. Fuzzy matching and probabilistic scoring algorithms are strictly forbidden in V1.
+
+| Entity | Primary Natural Key | Normalization Function | Target Transformation |
+|---|---|---|---|
+| **Products (`erp1_products`)** | `sku` | `normalizeSku(sku)` | Trims leading/trailing whitespace, converts to uppercase, preserves standard hyphen/underscore separators. |
+| **Categories (`erp1_categories`)** | `code` | `normalizeCategoryCode(code)` | Trims leading/trailing whitespace, converts to uppercase. |
+
+### 23.2 Deterministic Classification & Ambiguity Handling (AC2, AC3)
+
+- **EXACT_DUPLICATE**: The incoming candidate record matches exactly one existing target record on normalized key equality. Confidence is strictly `1.0`.
+- **AMBIGUOUS_CANDIDATE**: The incoming candidate matches multiple existing target records or contains conflicting keys. Held in human review queue with status `PENDING_REVIEW`.
+- **UNIQUE**: No matching normalized keys exist in target database. Candidate proceeds to normal ingestion.
+- **Prohibition of Fuzzy Auto-Merge**: Automated target-side merge sagas are strictly rejected. Any attempt to invoke automatic merging throws `FUZZY_AUTO_MERGE_FORBIDDEN`.
+
+### 23.3 Authorized Human Review Workflow & Immutable Audit Log (AC4)
+
+1. **Role Authorization**: Merge decisions are restricted to authorized roles: `admin`, `migration_runner`, and `editor`.
+2. **Review Decisions**:
+   - `MERGE`: Combines incoming candidate into target golden record. Requires selection of `kept_id` and `merged_id` (must be distinct UUIDs).
+   - `REJECT`: Rejects incoming candidate record without modifying target master data.
+   - `KEEP_BOTH`: Manual operator override to retain both records with documented business justification.
+3. **Mandatory Documentation**: All decisions require documented rationale of at least 5 characters.
+4. **Immutable Audit Trail**: Recorded via `@cs/core` `AuditService`:
+   - `action`: `merge.decided`
+   - `actor`: Operator user identifier / sub
+   - `actorRole`: Operator role (`admin`, `migration_runner`, `editor`)
+   - `targetEntity`: `erp1.products` or `erp1.categories`
+   - `targetId`: Retained entity UUID (`kept_id`)
+   - `metadata`: `candidateId`, `keptId`, `mergedId`, `decision`, `matchingKey`, `matchingValue`
+   - `reason`: Operator documented review rationale

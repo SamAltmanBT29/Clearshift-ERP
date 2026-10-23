@@ -68,3 +68,14 @@ export class Erp1UnprocessableError extends Erp1ServiceError {
     this.name = 'Erp1UnprocessableError';
   }
 }
+
+export class Erp1ForbiddenError extends Erp1ServiceError {
+  constructor(
+    message: string,
+    details: Erp1ErrorDetail[] = [],
+    code: string = StandardErrorCodes.FORBIDDEN
+  ) {
+    super(403, code, message, details);
+    this.name = 'Erp1ForbiddenError';
+  }
+}
