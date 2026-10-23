@@ -228,7 +228,10 @@ export function buildHrApp(options: HrAppOptions = {}): HrFastifyInstance {
     // 5. Anything else is unexpected. The response never carries a SQL
     //    statement, a stack trace, a secret or a raw row — only a
     //    correlation id the operator can use to find the entry in the log.
-    console.error(`[SERVER ERROR] ${error}`);
+    console.error('[ERP-5] Unexpected internal error', {
+        correlation_id: correlationId,
+        category: 'UNEXPECTED_INTERNAL_ERROR',
+      });
     return envelope(500, {
       code: StandardErrorCodes.INTERNAL_SERVER_ERROR,
       message: 'An unexpected internal error occurred.',
