@@ -835,3 +835,35 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Review Date**: 2026-10-23
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
 - **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests.
+
+---
+
+## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
+
+**Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
+**Contract Reference**: KIT-08 / Decision C4 (`@cs/kit` TargetAdapter port)
+**Implementation**: `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
+
+### 22.1 Architecture & Invariants
+
+1. **In-Process Execution**: The Migration Kit interacts with ERP-1 exclusively in-process through the typed `Erp1TargetAdapter` or via authenticated public HTTP endpoints (`/import`, `/import/batch`). The Kit possesses no direct database write privileges to `erp1.*` tables.
+2. **Atomic Dual-Write**: Business entity creation/linking and durable receipt persistence commit within a single local PostgreSQL transaction (`this.repo.transaction`). Either both succeed or both roll back together.
+3. **Idempotency Invariant**:
+   - Receipt lookup by `idempotency_key` strictly precedes any database write.
+   - Same `idempotency_key` + identical request payload returns HTTP 200 with `prior_result: true` and the existing target record.
+   - Same `idempotency_key` + conflicting request payload returns HTTP 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` with zero database writes.
+4. **Type-Safe UPSERT Semantics**:
+   - When `upsert: true`, incoming rows matching an existing natural key (normalized SKU for `product`, code for `category`) update existing records in-place and produce an import receipt with `kind: 'linked'`.
+   - When `upsert: false`, duplicate natural keys trigger HTTP 409 `SKU_DUPLICATE` rejection.
+5. **Batch Execution & Error Isolation**:
+   - `loadBatch` processes rows in sequential chunks of up to 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
+   - Business rejections (400, 409, 422) are isolated per-row as `rejected` outcomes and do not abort subsequent rows.
+   - Transient infrastructure errors (503, connection reset, PostgreSQL deadlocks) trigger bounded exponential backoff retries without mutating client idempotency keys.
+   - Batch execution safely halts if row failures exceed the 10% threshold (`STOPPED_EXCESSIVE_FAILURES`). No compensating rollback sagas exist in V1.
+
+### 22.2 HTTP Endpoints
+
+| Method | Path | Summary | Success Status | Replay Status |
+|---|---|---|:---:|:---:|
+| `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
+| `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
