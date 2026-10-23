@@ -55,6 +55,97 @@ export const PurchaseOrderStatusEnum = z.enum([
 ]);
 export type PurchaseOrderStatus = z.infer<typeof PurchaseOrderStatusEnum>;
 
+export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> = {
+  Draft: ['Sent'],
+  Sent: ['Received'],
+  Received: ['Closed'],
+  Closed: [],
+} as const;
+
+export function isValidPoStatusTransition(from: string, to: string): boolean {
+  const norm = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  const f = norm(from) as PurchaseOrderStatus;
+  const t = norm(to) as PurchaseOrderStatus;
+  if (f === t) return true;
+  const allowed = ALLOWED_PO_STATUS_TRANSITIONS[f];
+  return allowed ? allowed.includes(t) : false;
+}
+
+export function assertValidPoStatusTransition(from: string, to: string): void {
+  if (!isValidPoStatusTransition(from, to)) {
+    throw new Error(
+      `Invalid purchase order status transition from '${from}' to '${to}'. Allowed transitions: ${
+        ALLOWED_PO_STATUS_TRANSITIONS[(from.charAt(0).toUpperCase() + from.slice(1).toLowerCase()) as PurchaseOrderStatus]?.join(', ') || 'none (terminal state)'
+      }`
+    );
+  }
+}
+
+export function maskBankDetails(raw?: string | null): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (/^XXXX-XXXX-\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const digits = trimmed.replace(/\D/g, '');
+  const last4 = digits.length >= 4 ? digits.slice(-4) : digits.padStart(4, '0');
+  return `XXXX-XXXX-${last4}`;
+}
+
+export function parseToCents(amount: string | number): bigint {
+  const str = String(amount).trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(str)) {
+    throw new Error(`Invalid monetary amount: ${amount}`);
+  }
+  const [whole = '0', fraction = ''] = str.split('.');
+  const paddedFraction = fraction.padEnd(2, '0').slice(0, 2);
+  return BigInt(whole) * 100n + BigInt(paddedFraction);
+}
+
+export function formatFromCents(cents: bigint): string {
+  if (cents < 0n) throw new Error('Monetary amount cannot be negative');
+  const whole = cents / 100n;
+  const fraction = cents % 100n;
+  return `${whole}.${fraction.toString().padStart(2, '0')}`;
+}
+
+export function calculateLineTotal(quantity: string | number, price: string | number): string {
+  const qNum = parseFloat(String(quantity));
+  const pCents = parseToCents(price);
+  if (isNaN(qNum) || qNum <= 0) {
+    throw new Error(`Quantity must be greater than 0: ${quantity}`);
+  }
+  const qScaled = BigInt(Math.round(qNum * 10000));
+  const totalCents = (qScaled * pCents + 5000n) / 10000n;
+  return formatFromCents(totalCents);
+}
+
+export function calculateOrderTotal(
+  lines: Array<{ quantity: string | number; price: string | number; line_total?: string }>
+): string {
+  let sumCents = 0n;
+  for (const line of lines) {
+    const lineTotalStr = line.line_total ?? calculateLineTotal(line.quantity, line.price);
+    sumCents += parseToCents(lineTotalStr);
+  }
+  return formatFromCents(sumCents);
+}
+
+export const VENDOR_DOMAIN_RULES = {
+  PRODUCT_REQUIRED: 'ERP2_PRODUCT_REQUIRED',
+  TAX_NUMBER_DUPLICATE: 'ERP2_TAX_NUMBER_DUPLICATE',
+  PO_NUMBER_DUPLICATE: 'ERP2_PO_NUMBER_DUPLICATE',
+  VENDOR_REQUIRED: 'ERP2_VENDOR_REQUIRED',
+  INVALID_STATUS_TRANSITION: 'ERP2_INVALID_STATUS_TRANSITION',
+  QUANTITY_POSITIVE: 'ERP2_QUANTITY_POSITIVE',
+  PRICE_NON_NEGATIVE: 'ERP2_PRICE_NON_NEGATIVE',
+  BANK_DETAILS_MASKED: 'ERP2_BANK_DETAILS_MASKED',
+  TOTAL_CALCULATION_MISMATCH: 'ERP2_TOTAL_CALCULATION_MISMATCH',
+  PROTECTED_FIELD: 'ERP2_PROTECTED_FIELD',
+  IDEMPOTENCY_CONFLICT: 'ERP2_IDEMPOTENCY_CONFLICT',
+} as const;
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Vendor Schemas
 // GET /api/v1/erp-vendors/vendors
@@ -68,17 +159,17 @@ export const VendorSchema = z.object({
   name: z.string().min(1).max(255),
   tax_number: z.string().min(1).max(64),
   email: z.string().email(),
-  phone: z.string().max(32).nullable(),
-  address_line: z.string().max(255).nullable(),
-  city: z.string().max(100).nullable(),
-  country: z.string().max(64).nullable(),
+  phone: z.string().max(32).nullable().optional(),
+  address_line: z.string().max(255).nullable().optional(),
+  city: z.string().max(100).nullable().optional(),
+  country: z.string().max(64).nullable().optional(),
   bank_masked: z
     .string()
     .regex(/^XXXX-XXXX-\d{4}$/, 'Masked bank format must match XXXX-XXXX-7890')
     .nullable(),
   currency: CurrencyCode.default('USD'),
-  source_system: z.string().max(64).nullable(),
-  source_id: z.string().max(128).nullable(),
+  source_system: z.string().max(64).nullable().optional(),
+  source_id: z.string().max(128).nullable().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
 });
@@ -116,6 +207,8 @@ export const UpdateVendorRequestSchema = z.object({
   currency: CurrencyCode.optional(),
 });
 export type UpdateVendorRequest = z.infer<typeof UpdateVendorRequestSchema>;
+export const PatchVendorRequestSchema = UpdateVendorRequestSchema;
+export type PatchVendorRequest = UpdateVendorRequest;
 
 /** GET /api/v1/erp-vendors/vendors — query params with search and bounded pagination. */
 export const VendorListQuerySchema = z.object({
@@ -208,9 +301,19 @@ export type CreatePurchaseOrderRequest = z.infer<typeof CreatePurchaseOrderReque
 
 /** PATCH /api/v1/erp-vendors/purchase-orders/{id} — request body (allowed status transition only). */
 export const UpdatePurchaseOrderStatusRequestSchema = z.object({
-  status: PurchaseOrderStatusEnum,
+  status: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      const cap = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+      if (['Draft', 'Sent', 'Received', 'Closed'].includes(cap)) {
+        return cap;
+      }
+    }
+    return val;
+  }, PurchaseOrderStatusEnum),
 });
 export type UpdatePurchaseOrderStatusRequest = z.infer<typeof UpdatePurchaseOrderStatusRequestSchema>;
+export const PatchPurchaseOrderStatusRequestSchema = UpdatePurchaseOrderStatusRequestSchema;
+export type PatchPurchaseOrderStatusRequest = UpdatePurchaseOrderStatusRequest;
 
 /** GET /api/v1/erp-vendors/purchase-orders — query params. */
 export const PurchaseOrderListQuerySchema = z.object({
