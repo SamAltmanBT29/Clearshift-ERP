@@ -7,7 +7,7 @@ import type {
   StockStatusFilter,
   ProductListQuery,
 } from '@clearshift/contracts';
-import { PageTitle } from '@cs/ui';
+import { PageTitle, Alert } from '@cs/ui';
 import {
   fetchProducts,
   fetchCategories,
@@ -31,6 +31,7 @@ import {
   ErrorProductsView,
   AccessDeniedProductsView,
 } from '../components/StateViews.js';
+import { ProductCreateModal } from '../components/ProductCreateModal.js';
 
 export interface ProductsListPageProps {
   /** Optional initial filters passed by host shell or router */
@@ -39,6 +40,8 @@ export interface ProductsListPageProps {
   onQueryChange?: ((queryString: string) => void) | undefined;
   /** Optional callback when operator triggers "Add Product" action */
   onCreateProduct?: (() => void) | undefined;
+  /** Optional callback when a product is created successfully */
+  onProductCreated?: ((product: Product) => void) | undefined;
 }
 
 function parseFiltersFromUrl(): Partial<ProductListQuery> {
@@ -102,6 +105,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   initialFilters,
   onQueryChange,
   onCreateProduct,
+  onProductCreated,
 }) => {
   // 1. Initial State Resolution from URL or Props
   const urlFilters = useMemo(() => parseFiltersFromUrl(), []);
@@ -124,6 +128,10 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
 
   // Mobile sidebar drawer state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Creation modal & Confirmation toast state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // 2. Data state
   const [products, setProducts] = useState<ProductWithStock[]>([]);
@@ -287,6 +295,13 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
     setPage(newPage);
   };
 
+  const handleOpenCreateModal = useCallback(() => {
+    setIsCreateModalOpen(true);
+    if (onCreateProduct) {
+      onCreateProduct();
+    }
+  }, [onCreateProduct]);
+
   const hasActiveFilters = Boolean(
     search.trim() ||
       categoryId ||
@@ -324,7 +339,20 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
         subtitle="Search, filter, and manage catalog items, units of measure, and warehouse stock levels (ERP-1)."
       />
 
-      {/* 2. Top Toolbar (Search, Sort, Mobile Filter Toggle) */}
+      {/* Confirmation Toast */}
+      {toastMessage && (
+        <div className="cs-erp1-toast-container" role="status" aria-live="polite">
+          <Alert
+            variant="success"
+            title="Success"
+            onDismiss={() => setToastMessage(null)}
+          >
+            {toastMessage}
+          </Alert>
+        </div>
+      )}
+
+      {/* 2. Top Toolbar (Search, Sort, Mobile Filter Toggle, Add Product) */}
       <div className="cs-erp1-toolbar">
         <div className="cs-erp1-toolbar-search">
           <SearchBar
@@ -350,6 +378,14 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
             onSortChange={handleSortChange}
             disabled={isLoading}
           />
+
+          <button
+            type="button"
+            className="cs-erp1-btn cs-erp1-btn-primary cs-erp1-add-product-btn"
+            onClick={handleOpenCreateModal}
+          >
+            + New Product
+          </button>
         </div>
       </div>
 
@@ -394,7 +430,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
             <EmptyProductsView
               hasActiveFilters={hasActiveFilters}
               onClearFilters={handleClearAll}
-              onCreateProduct={onCreateProduct}
+              onCreateProduct={handleOpenCreateModal}
             />
           ) : (
             <ProductsTable
@@ -417,6 +453,23 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
           )}
         </main>
       </div>
+
+      {/* Product Creation Modal */}
+      <ProductCreateModal
+        isOpen={isCreateModalOpen}
+        categories={categories}
+        onClose={() => setIsCreateModalOpen(false)}
+        onProductCreated={(created) => {
+          // Update table cache
+          setProducts((prev) => [created as ProductWithStock, ...prev]);
+          setTotal((prev) => prev + 1);
+          // Show confirmation toast
+          setToastMessage(`Product "${created.name}" (${created.sku}) created successfully.`);
+          if (onProductCreated) {
+            onProductCreated(created);
+          }
+        }}
+      />
     </div>
   );
 };

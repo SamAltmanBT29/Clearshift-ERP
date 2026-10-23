@@ -3,6 +3,7 @@ import {
   fetchProducts,
   fetchCategories,
   fetchStock,
+  createProduct,
   buildProductQueryParams,
   Erp1ApiError,
   ERP1_API_BASE,
@@ -188,6 +189,87 @@ describe('ERP-1 API Client Tests', () => {
 
       const result = await fetchStock('prod-1');
       expect(result.quantity).toBe('50.0000');
+    });
+  });
+
+  describe('createProduct', () => {
+    it('sends POST request to /products with JSON payload', async () => {
+      const newProductPayload = {
+        name: 'Industrial Valve 2-inch',
+        sku: 'VLV-IND-002',
+        unitOfMeasure: 'pcs' as const,
+        price: '85.5000',
+        currency: 'USD',
+        taxRate: '5.00',
+      };
+
+      const mockCreatedProduct = {
+        id: 'prod-new-1',
+        ...newProductPayload,
+        normalizedSku: 'VLV-IND-002',
+        categoryId: null,
+        sourceSystem: null,
+        sourceId: null,
+        createdAt: '2026-10-23T00:00:00Z',
+        updatedAt: '2026-10-23T00:00:00Z',
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockCreatedProduct,
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const result = await createProduct(newProductPayload);
+      expect(result).toEqual(mockCreatedProduct);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${ERP1_API_BASE}/products`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify(newProductPayload),
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          }),
+        })
+      );
+    });
+
+    it('throws Erp1ApiError with status 400 and details on validation failure', async () => {
+      const errorPayload = {
+        code: 'VALIDATION_ERROR',
+        message: 'Product validation failed',
+        details: [
+          { field: 'sku', message: 'SKU already exists' },
+          { field: 'price', message: 'Price must be greater than or equal to 0' },
+        ],
+      };
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          json: async () => errorPayload,
+        })
+      );
+
+      try {
+        await createProduct({
+          name: 'Bad Product',
+          sku: 'DUPLICATE',
+          unitOfMeasure: 'pcs' as const,
+          price: '-10',
+          currency: 'USD',
+        });
+        expect.fail('Should have thrown Erp1ApiError');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(Erp1ApiError);
+        expect(err.status).toBe(400);
+        expect(err.code).toBe('VALIDATION_ERROR');
+        expect(err.details).toHaveLength(2);
+        expect(err.details[0]?.field).toBe('sku');
+      }
     });
   });
 });

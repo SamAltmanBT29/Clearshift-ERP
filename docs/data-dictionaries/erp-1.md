@@ -23,6 +23,9 @@
 9. [Decision records](#9-decision-records)
 10. [Migration, runbook & verification](#10-migration-runbook--verification)
 11. [Public API contract](#11-public-api-contract)
+12. [Search, filters and sorting controls (ERP1-18)](#12-search-filters-and-sorting-controls-erp1-18)
+13. [Loading, empty, error and access-denied states (ERP1-19)](#13-loading-empty-error-and-access-denied-states-erp1-19)
+14. [Product creation form with field-level validation (ERP1-20)](#14-product-creation-form-with-field-level-validation-erp1-20)
 
 ---
 
@@ -349,5 +352,34 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 1. **Stack Trace Stripping**: Stack traces (`at ...`, `node_modules`, internal filesystem paths) are stripped via `sanitizeErrorMessage` to prevent leakage of internal server details.
 2. **Database Error Masking**: Low-level SQL errors (e.g. syntax errors, connection timeouts, socket disconnects) are mapped to a secure generic message.
 3. **Correlation ID Tracing**: Server error envelopes containing `correlation_id` display a user-friendly reference identifier for support diagnostics without exposing internal logs.
+
+---
+
+## 14. Product Creation Form with Field-Level Validation (ERP1-20)
+
+**Issue**: [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) — `[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/hooks/useProductForm.ts`, `ProductCreateModal.tsx`, `ProductsListPage.tsx`, `api/erp-1.ts`, `theme.css`.
+
+### 14.1 Form Fields, Rules and Acceptance Criteria
+
+| Field | Input Control | Type / Range | Required? | Validation Rule | Error Message |
+|---|---|---|---|---|---|
+| `name` | `<input type="text">` | `string` (trimmed) | **Yes** | Non-empty string | `Product name is required` |
+| `sku` | `<input type="text">` | `string` (trimmed) | **Yes** | Unique SKU; normalized to uppercase | `SKU is required` |
+| `categoryId` | `<select>` | `UUID` (null if unselected) | No | Optional reference to `erp1.categories` | — |
+| `unitOfMeasure` | `<select>` | `enum` | **Yes** | One of `pcs`, `kg`, `g`, `litre`, `metre`, `box` | `Unit of measure is required` |
+| `price` | `<input inputMode="decimal">` | `decimal(19,4)` | **Yes** | `^\d+(\.\d{1,4})?$`, numeric `>= 0` | `Price must be greater than or equal to 0` |
+| `currency` | `<input type="text" maxLength={3}>` | ISO 4217 code | **Yes** | `^[A-Z]{3}$` uppercase code | `Currency must be an uppercase 3-letter ISO 4217 code (e.g. USD, EUR)` |
+| `taxRate` | `<input inputMode="decimal">` | `decimal(5,2)` | No | `^\d+(\.\d{1,2})?$`, range `0.00` to `100.00` | `Tax rate must be between 0.00% and 100.00%` |
+| `notificationEmail` | `<input type="email">` | `email` | No | Valid email format if provided | `Invalid email address format (e.g. alerts@example.com)` |
+| `contactPhone` | `<input type="tel">` | `phone` | No | Valid phone format (`^\+?[0-9\s\-()]{7,20}$`) | `Invalid phone number format (min 7 digits, e.g. +1-555-019-2834)` |
+
+### 14.2 Acceptance Criteria Verification
+
+1. **Client-Side Validation (AC 1)**: `validateProductForm` performs synchronous validation checking all required fields, decimal ranges (`price >= 0`, `0.00 <= taxRate <= 100.00`), email address format, and international phone numbers prior to network submission.
+2. **Double-Submission Prevention (AC 2)**: During in-flight request execution, `isSubmitting` disables the submission button (`disabled={isSubmitting}`, `aria-busy={isSubmitting}`), displays a busy indicator (`Creating...`), and prevents duplicate requests from triggering.
+3. **Server Validation Error Mapping (AC 3)**: When the server returns HTTP 400 with an error envelope containing `details: [{ field, message }]`, errors map directly to the corresponding input fields (`errors[detail.field] = detail.message`). Corresponding form fields render with `role="alert"` and set `aria-invalid="true"`. Both camelCase and snake_case field keys are supported.
+4. **Cache Update, Modal Closure & Confirmation Toast (AC 4)**: Successful submission automatically closes the modal dialog, prepends the new product to the client table cache (`products` list state and incremented `total`), and renders an accessible confirmation toast banner with `role="status"` and `aria-live="polite"` (`Product "[Name]" ([SKU]) created successfully.`).
+
 
 

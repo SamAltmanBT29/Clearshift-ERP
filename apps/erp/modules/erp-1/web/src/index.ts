@@ -9,10 +9,12 @@
 
 export * from './api/erp-1.js';
 export * from './hooks/useDebouncedValue.js';
+export * from './hooks/useProductForm.js';
 export * from './components/SearchBar.js';
 export * from './components/FacetedFilterSidebar.js';
 export * from './components/FilterPillTags.js';
 export * from './components/SortingControls.js';
 export * from './components/ProductsTable.js';
 export * from './components/StateViews.js';
+export * from './components/ProductCreateModal.js';
 export * from './pages/ProductsListPage.js';

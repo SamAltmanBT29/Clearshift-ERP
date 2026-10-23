@@ -898,3 +898,113 @@
   color: var(--color-text-subtle);
   margin: 0;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. Buttons & Product Creation Form Modal (ERP1-20)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-erp1-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cs-erp1-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cs-erp1-btn-primary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.cs-erp1-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.cs-erp1-btn-primary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.cs-erp1-btn-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--border-strong);
+}
+
+.cs-erp1-btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-background);
+  border-color: var(--border-subtle);
+}
+
+.cs-erp1-btn-secondary:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
+.cs-erp1-add-product-btn {
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Create Modal Layout */
+.cs-erp1-create-modal {
+  max-width: 640px !important;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.cs-erp1-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-erp1-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .cs-erp1-form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}
+
+.cs-erp1-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Toast Container */
+.cs-erp1-toast-container {
+  margin-bottom: var(--space-4);
+  animation: cs-erp1-fade-in 0.2s ease-out;
+}
+
+@keyframes cs-erp1-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
