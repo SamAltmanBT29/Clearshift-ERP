@@ -16,6 +16,7 @@ For the canonical, detailed version see:
 | **Mutation API Issue** | #48 — `[ERP5-03] Mutation API and domain validation` |
 | **Relationship Issue** | #51 — `[ERP5-06] Relationships, state transitions and read-model consistency` |
 | **Read API Issue** | #47 — `[ERP5-02] List/read API with bounded paging and OpenAPI contract` |
+| **Authorization Issue** | #191 — `[ERP5-15] Module authorization policy integration` |
 | **PostgreSQL Schema** | `erp5` |
 | **API Base** | `/api/v1/erp-hr` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-5.yaml` |
@@ -24,7 +25,7 @@ For the canonical, detailed version see:
 | **Migration** | `packages/database/migrations/erp5_v1.sql` |
 | **Tables** | `erp5.departments`, `erp5.employees`, `erp5.leave`, `erp5.payroll_totals`, `erp5.import_receipts` |
 | **View** | `erp5.identity_users` — read-only Hub Identity projection (owner: Platform / Hub Identity) |
-| **Version** | V1.3 |
+| **Version** | V1.4 |
 | **SDS Reference** | ClearShift ERP v2.0 §4.6 (FR-ERP5-01..06, BR-ERP5-01..02), §4.7 (ERP-5 tables) |
 
 ## Table Index
@@ -110,6 +111,68 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Identity projection | the read-only Hub Identity projection; empty when the platform has not created it; no credential column; never written by the module |
 | Authorization | the shared `module.read` capability — Viewer, Editor, Analyst and Admin |
 
+## Authorization Policy (ERP5-15)
+
+The module owns **no** role list: every route is bound to a declared policy whose role sets mirror the central matrix of PLT-06 (**default deny**).
+
+| Policy | Roles | Central policy |
+|---|---|---|
+| `hr.employees.read` · `hr.departments.read` · `hr.leave.read` · `hr.payroll.read` · `hr.identity_users.read` | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.employees.create` / `.update` · `hr.departments.create` / `.update` · `hr.leave.create` / `.update` | Editor, Admin | `hr.mutate` |
+| `hr.payroll.load` | **Migration Runner**, Admin | `hr.payroll_bulk` |
+
+| Aspect | Rule |
+|---|---|
+| Authentication | a real access token is verified with the shared Hub verifier (PLT-05) — signature, issuer, audience, expiry; a disabled account is refused. The role set always comes from the verified claims. |
+| Unauthenticated | `401 UNAUTHORIZED` |
+| Insufficient role | `403 FORBIDDEN` — refused **before** the record is loaded, so a forbidden write reveals nothing |
+| Object level | the policy is bound to an entity kind and the identifier is resolved in the table that belongs to the route: a cross-module identifier is `404` and nothing is mutated (DR-14) |
+| Cross-module | the Migration Runner may load a payroll aggregate and nothing else; it never writes into the `erp5` tables directly (Decision C7) |
+| Fields | the raw `salary` never leaves the module; a credential in a payload is `400 HR_CREDENTIALS_FORBIDDEN`; the identity projection carries no credential field and is read-only |
+| Full note | `apps/erp/modules/erp-5/docs/security.md` |
+
+## Collection Screens (ERP5-04)
+
+**Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) —
+`[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192
+**Canonical detail**:
+[`apps/erp/modules/erp-5/docs/data-dictionary.md`](../../apps/erp/modules/erp-5/docs/data-dictionary.md)
+§16
+
+| Aspect | Rule |
+|---|---|
+| Screens | the employee, department, leave, payroll-total and identity-user collections — each reads its own endpoint of the same API base |
+| Columns | every column is a field the contract already returns; the screen adds no field and invents no value |
+| Salary | the employee screen shows `salary_display` only — the raw `salary` is absent from the public projection, so the browser cannot render it |
+| References | the API returns `department_id` / `employee_id`, never a name. The department is resolved through the bounded department collection (at most 100 rows); a department outside that page is shown as a short identifier, never as an invented name |
+| Server-side | the search, the filters, the sort and the page are sent to the API; the browser never narrows, orders or pages a collection |
+| Page reset | a search or a filter change resets the page to the first one; the search term is published after a 300 ms pause |
+| States | loading (a skeleton), no data (an empty state), API failure (a readable message and a retry), permission denied (an access-denied view, never a retry) |
+| Permission-aware actions | the create action is offered only to a session that may write — the question is asked of the shared central matrix of PLT-06, never of a local copy of the role list |
+| Authorization | the server remains the authority; the client matrix only decides whether an action is offered at all |
+
+## Create, Edit and Detail Screens (ERP5-05)
+
+**Issue**: [#50](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/50) —
+`[ERP5-05] ERP-5 HR and Employees: Create/edit/detail workflow and client-side validation`
+**Canonical detail**:
+[`apps/erp/modules/erp-5/docs/data-dictionary.md`](../../apps/erp/modules/erp-5/docs/data-dictionary.md)
+§17
+
+| Aspect | Rule |
+|---|---|
+| Screens | the create, edit and detail screen of the employee, the department and the leave record; every screen links back to the list it belongs to |
+| Validation | the form is handed **the same Zod schema the API validates the payload with** — the message on a field is the contract's message; the server re-validates every payload and stays the authority |
+| Field-level failure | a refused payload shows the API's field detail on that field and **keeps the other values** |
+| Read-only, masked and computed fields | `id`, `created_at`, `updated_at`, `salary_display`, the immutable `currency_code` and the immutable `employee_id` of a leave record have **no control** — they are shown as values, never sent |
+| The patch | an edit sends **only the fields the operator changed**, so a field the API never accepted cannot ride along |
+| The leave state matrix | the status is a transition, not a field: the form offers exactly what `HR_LEAVE_STATUS_TRANSITIONS` allows, and a decided record offers none |
+| The irreversible action | a decision is confirmed once, in plain words, before it is written; cancelling it leaves the record untouched |
+| The payroll aggregate | no form — the V1 API has no `PATCH` for it, so a form could only add an aggregate and never correct one; the Kit owns the bulk path |
+| Full note | `apps/erp/modules/erp-5/web/README.md` |
+
 ## Open Decision Records (V1)
 
 | ID | Decision | Status |
@@ -127,6 +190,8 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | DR-11 | The department/month payroll aggregate is authoritative as loaded and is never recomputed from the employee rows; only the display values are derived | Open — escalated |
 | DR-12 | The cross-module resolver denies every existence check when it has no data source (default deny) instead of confirming every id | Accepted for V1 — maintainer confirmation requested |
 | DR-13 | The ERP-5 list response keeps its published `{data, meta}` shape; harmonising it with the ERP-4 and PLT-04 envelopes is a platform-wide change | Open — escalated to PLT-04 / PLT-14 |
+| DR-14 | The object-level guard enforces **module ownership**, not tenancy — the `erp5` schema has no tenant or owner column, so a multi-tenant dimension is a schema item, not an authorization one | Open — escalated |
+| DR-15 | The Kit's write identity for the master records (closes DR-9): the payroll load follows `hr.payroll_bulk`; the master-record loads keep `hr.mutate` — a Kit service identity or an `hr.employee_bulk` policy is a platform decision | Open — escalated to PLT-06 |
 
 ## Verification
 
@@ -136,4 +201,6 @@ All collection endpoints use bounded pagination (`page` starts at 1, `pageSize` 
 | Live PostgreSQL constraint proofs | `DATABASE_URL_TEST=postgresql://user:pass@localhost:5432/postgres npx vitest run apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` |
 | Mutation API (service + API level) | `npx vitest run apps/erp/modules/erp-5/tests` |
 | Relationships, state transitions and read model | `npx vitest run apps/erp/modules/erp-5/tests/domain apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` |
+| Collection screens (API client, list screens, states) | `npx vitest run apps/erp/modules/erp-5/web` |
+| Create, edit and detail screens (forms, validation, the state matrix) | `npx vitest run apps/erp/modules/erp-5/web` |
 | Migration apply / re-apply | `npm run db:migrate` twice against an empty database |

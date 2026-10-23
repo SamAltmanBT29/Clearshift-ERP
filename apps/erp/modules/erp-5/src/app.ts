@@ -20,14 +20,13 @@
 import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { AppError } from '@cs/kernel';
-import { ROLE_CAPABILITIES } from '@cs/rbac';
-import type { RoleType } from '@cs/identity';
 import {
   HR_DOMAIN_RULES,
   HR_PROTECTED_FIELD_NAMES,
   HR_UNPROCESSABLE_CODES,
   StandardErrorCodes,
 } from '@clearshift/contracts';
+import { authenticateHrToken } from './auth/authenticate.js';
 import { HrDomainError } from './domain/rules.js';
 import { HrServiceError, type HrErrorDetail } from './services/errors.js';
 import { HrService } from './services/hr.service.js';
@@ -40,6 +39,8 @@ export interface HrAppOptions {
   hrService?: HrService | undefined;
   /** When true (the default) a request without a bearer token is rejected. */
   authRequired?: boolean | undefined;
+  /** Resolves whether an account is disabled (the platform owns the state). */
+  isUserDisabled?: ((userId: string) => boolean | Promise<boolean>) | undefined;
 }
 
 /**
@@ -53,9 +54,6 @@ export interface HrErrorEnvelope {
   details: HrErrorDetail[];
   correlation_id: string;
 }
-
-/** Role names of the shared RBAC matrix (Platform owns the list). */
-const SHARED_ROLE_NAMES: readonly string[] = Object.keys(ROLE_CAPABILITIES);
 
 /** Structural shape of a Zod issue — the module does not import `zod`. */
 interface ZodIssueLike {
@@ -163,23 +161,6 @@ export function mapZodIssues(error: ZodErrorLike): {
   };
 }
 
-/**
- * Extracts the roles of a bearer token.
- *
- * The local token format is `Bearer role:<role>` — the same convention the
- * ERP-4 module uses. In production the platform's JWT plugin verifies the
- * token and fills `request.user.roles`; the module only consumes the roles.
- * A role that the shared matrix does not know grants no capability at all.
- */
-export function resolveTokenRoles(token: string): RoleType[] {
-  const match = /role:([a-z_]+)/.exec(token);
-  if (!match || !match[1]) {
-    return [];
-  }
-  const role = match[1];
-  return SHARED_ROLE_NAMES.includes(role) ? [role as RoleType] : [];
-}
-
 export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
   const app = fastify({ logger: false });
 
@@ -268,52 +249,34 @@ export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
   });
 
   // ── Authentication Hook ────────────────────────────────────────────────────
+  // The platform (PLT-05) normally authenticates the request before the
+  // module is mounted. When the module runs standalone — its own test app —
+  // it verifies the Hub access token itself.
   app.addHook('onRequest', async (request, reply) => {
     const correlationId = resolveCorrelationId(request);
     reply.header('x-correlation-id', correlationId);
 
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader) {
-      if (authRequired) {
-        return reply.status(401).send({
-          code: StandardErrorCodes.UNAUTHORIZED,
-          message: 'Missing Authorization header. Bearer token required.',
-          details: [],
-          correlation_id: correlationId,
-        } satisfies HrErrorEnvelope);
-      }
-      request.user = defaultUser();
+    if (request.user) {
+      // Already authenticated by the platform — keep the verified identity.
       return;
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
-      return reply.status(401).send({
-        code: StandardErrorCodes.UNAUTHORIZED,
-        message: 'Invalid Authorization header format. Expected "Bearer <token>".',
-        details: [],
-        correlation_id: correlationId,
-      } satisfies HrErrorEnvelope);
+    try {
+      request.user = await authenticateHrToken(request.headers.authorization, {
+        authRequired,
+        ...(options.isUserDisabled !== undefined && { isUserDisabled: options.isUserDisabled }),
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return reply.status(error.statusCode).send({
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          correlation_id: correlationId,
+        } satisfies HrErrorEnvelope);
+      }
+      throw error;
     }
-
-    const token = authHeader.slice(7).trim();
-    if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
-      return reply.status(401).send({
-        code: StandardErrorCodes.UNAUTHORIZED,
-        message: 'Invalid or expired bearer token.',
-        details: [],
-        correlation_id: correlationId,
-      } satisfies HrErrorEnvelope);
-    }
-
-    request.user = {
-      iss: 'clearshift-erp-local',
-      aud: 'clearshift-erp',
-      sub: 'ffffffff-0001-0001-0001-000000000001',
-      jti: randomUUID(),
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      roles: resolveTokenRoles(token),
-    };
   });
 
   // ── Route Registration ─────────────────────────────────────────────────────
@@ -323,16 +286,4 @@ export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
   });
 
   return app;
-}
-
-/** The system context used when the module runs without a bearer token. */
-function defaultUser() {
-  return {
-    iss: 'clearshift-erp-local',
-    aud: 'clearshift-erp',
-    sub: 'ffffffff-0001-0001-0001-000000000001',
-    jti: randomUUID(),
-    exp: Math.floor(Date.now() / 1000) + 3600,
-    roles: ['admin' as RoleType],
-  };
 }
