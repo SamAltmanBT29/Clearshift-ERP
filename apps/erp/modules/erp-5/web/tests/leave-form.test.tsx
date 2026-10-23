@@ -136,7 +136,7 @@ describe('ERP-5 leave create, edit and detail screens', () => {
 
     it('sends the payload the contract defines, and no status', async () => {
       renderCreate();
-      await findByLabel('Employee');
+      await screen.findByRole('option', { name: new RegExp(EMPLOYEE.employee_no) });
 
       fireEvent.change(byLabel('Employee'), { target: { value: EMPLOYEE.id } });
       fireEvent.change(byLabel('From'), { target: { value: '2026-05-04' } });
@@ -165,7 +165,7 @@ describe('ERP-5 leave create, edit and detail screens', () => {
 
     it('shows the contract’s message for an invalid period, and sends nothing', async () => {
       renderCreate();
-      await findByLabel('Employee');
+      await screen.findByRole('option', { name: new RegExp(EMPLOYEE.employee_no) });
 
       fireEvent.change(byLabel('Employee'), { target: { value: EMPLOYEE.id } });
       fireEvent.change(byLabel('From'), { target: { value: '2026-05-08' } });
