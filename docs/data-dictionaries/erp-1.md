@@ -838,6 +838,46 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 
 ---
 
+## 23. Exact Duplicate Key Policy & Human Review Workflow (ERP1-12)
+
+**Issue**: [#108](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/108) — `[ERP1-12] ERP-1 Products and Inventory: Exact duplicate key policy for the module`<br />
+**Governing Architecture**: SDS ClearShift ERP v2.0 §4.2, Gate G3 Criteria, Architecture Decision C7.<br />
+**Implementation**: `apps/erp/modules/erp-1/src/domain/duplicate-policy.ts`, `apps/erp/modules/erp-1/src/routes/duplicates.ts`, `apps/erp/modules/erp-1/web/src/components/DuplicateReviewModal.tsx`, `apps/erp/modules/erp-1/web/src/pages/DuplicateCandidatesPage.tsx`.
+
+### 23.1 Normalized Exact Matching Keys (AC1)
+
+In compliance with ClearShift V1 non-negotiable rules, duplicate detection uses deterministic exact key matching. Fuzzy matching and probabilistic scoring algorithms are strictly forbidden in V1.
+
+| Entity | Primary Natural Key | Normalization Function | Target Transformation |
+|---|---|---|---|
+| **Products (`erp1_products`)** | `sku` | `normalizeSku(sku)` | Trims leading/trailing whitespace, converts to uppercase, preserves standard hyphen/underscore separators. |
+| **Categories (`erp1_categories`)** | `code` | `normalizeCategoryCode(code)` | Trims leading/trailing whitespace, converts to uppercase. |
+
+### 23.2 Deterministic Classification & Ambiguity Handling (AC2, AC3)
+
+- **EXACT_DUPLICATE**: The incoming candidate record matches exactly one existing target record on normalized key equality. Confidence is strictly `1.0`.
+- **AMBIGUOUS_CANDIDATE**: The incoming candidate matches multiple existing target records or contains conflicting keys. Held in human review queue with status `PENDING_REVIEW`.
+- **UNIQUE**: No matching normalized keys exist in target database. Candidate proceeds to normal ingestion.
+- **Prohibition of Fuzzy Auto-Merge**: Automated target-side merge sagas are strictly rejected. Any attempt to invoke automatic merging throws `FUZZY_AUTO_MERGE_FORBIDDEN`.
+
+### 23.3 Authorized Human Review Workflow & Immutable Audit Log (AC4)
+
+1. **Role Authorization**: Merge decisions are restricted to authorized roles: `admin`, `migration_runner`, and `editor`.
+2. **Review Decisions**:
+   - `MERGE`: Combines incoming candidate into target golden record. Requires selection of `kept_id` and `merged_id` (must be distinct UUIDs).
+   - `REJECT`: Rejects incoming candidate record without modifying target master data.
+   - `KEEP_BOTH`: Manual operator override to retain both records with documented business justification.
+3. **Mandatory Documentation**: All decisions require documented rationale of at least 5 characters.
+4. **Immutable Audit Trail**: Recorded via `@cs/core` `AuditService`:
+   - `action`: `merge.decided`
+   - `actor`: Operator user identifier / sub
+   - `actorRole`: Operator role (`admin`, `migration_runner`, `editor`)
+   - `targetEntity`: `erp1.products` or `erp1.categories`
+   - `targetId`: Retained entity UUID (`kept_id`)
+   - `metadata`: `candidateId`, `keptId`, `mergedId`, `decision`, `matchingKey`, `matchingValue`
+   - `reason`: Operator documented review rationale
+
+---
 ## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
 
 **Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
@@ -870,7 +910,44 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 
 ---
 
-## 24. OpenAPI, Event Contracts, and Mock Package (ERP1-14)
+## 24. Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)
+
+**Issue Reference**: [#109](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/109)<br />
+**Contract Reference**: KIT-12 / Decision C4 (`@cs/kit` batch processing & threshold policy)<br />
+**Implementation**: `apps/erp/modules/erp-1/src/migration/batch-runner.ts`, `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
+
+### 24.1 Chunked Batch Partitioning (AC1)
+
+Load operations enforce chunked batch processing bounded at 500 rows per chunk (`DEFAULT_CHUNK_SIZE = 500`). Multi-thousand row migration jobs are partitioned sequentially without unbound memory growth.
+
+### 24.2 Bounded Exponential Backoff Retry (AC2)
+
+Transient infrastructure failures (HTTP 503/504, PostgreSQL deadlock code `40P01`, connection resets) trigger bounded retries with exponential backoff:
+- `maxRetries`: 3
+- `initialDelayMs`: 50 ms
+- `backoffFactor`: 2.0
+- **Idempotency Key Preservation**: Client-supplied stable idempotency keys and payloads are strictly preserved across all retry attempts. Deterministic domain validation failures (400, 409, 422) fail immediately and are never retried.
+
+### 24.3 10% Failure Rate Stop Threshold Rule (AC3)
+
+Batch execution tracks attempted and rejected row counts. Once attempted rows reach `minAttemptedRows` (default 10), execution halts immediately if:
+$$\text{Failure Rate} = \frac{\text{Rejected Rows}}{\text{Attempted Rows}} > 0.10 \quad (10\%)$$
+
+### 24.4 Durability & STOPPED_EXCESSIVE_FAILURES State Transition (AC4)
+
+When a batch halts due to excessive failures:
+1. All previously committed rows and durable receipts remain persisted in the target database.
+2. The batch status transitions to `STOPPED_EXCESSIVE_FAILURES` with diagnostic reason.
+3. Remaining rows in the batch are marked with outcome `unattempted`.
+4. Replaying the batch after fixing source errors safely replays committed rows with `prior_result: true` without duplication.
+
+### 24.5 Prohibition of Rollback Sagas (AC5)
+
+In compliance with ClearShift V1 non-negotiable architectural rules, compensating rollback sagas are strictly out of scope. System implements stop-safely behavior, preserving durable evidence for operator remediation.
+
+---
+
+## 25. OpenAPI, Event Contracts, and Mock Package (ERP1-14)
 
 **Issue Reference**: [#110](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/110)<br />
 **Contract Reference**: `@clearshift/contracts` (`packages/contracts`)<br />
@@ -878,7 +955,7 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 **Event Contracts**: `packages/contracts/src/erp-1-events.ts`<br />
 **Deterministic Mock Server**: `packages/contracts/src/erp-1-mock.ts`
 
-### 24.1 OpenAPI 3.1 Specification Parity (AC1)
+### 25.1 OpenAPI 3.1 Specification Parity (AC1)
 
 The complete ERP-1 surface is specified in `packages/contracts/openapi/erp-1.yaml` with OpenAPI 3.1.0 compliance:
 - Bounded pagination parameters (`pageSize` default 25, maximum 100).
@@ -886,7 +963,7 @@ The complete ERP-1 surface is specified in `packages/contracts/openapi/erp-1.yam
 - Decimal string formats for all monetary amounts and inventory balances (zero IEEE-754 floating point inaccuracies).
 - Operation definitions for products, categories, warehouses, stock levels, and batch imports.
 
-### 24.2 Domain Event Specifications (AC2)
+### 25.2 Domain Event Specifications (AC2)
 
 All state-changing domain mutations emit transactional event envelopes conforming to the ClearShift Event Envelope Schema (`PLT-04` / `PLT-09`):
 
@@ -902,7 +979,7 @@ All state-changing domain mutations emit transactional event envelopes conformin
 - `erp.purchase_order.received` (from ERP-2): Goods received against purchase order lines, increasing warehouse inventory.
 - `erp.sales_order.fulfilled` (from ERP-3): Goods dispatched against sales orders, decrementing warehouse inventory without breaching the non-negative stock constraint (`BR-ERP1-01`).
 
-### 24.3 Deterministic Mock Server & Fixture Package (AC3)
+### 25.3 Deterministic Mock Server & Fixture Package (AC3)
 
 For dependent teams (ERP-2, ERP-3, CRM-2, Migration Kit), `@clearshift/contracts` exposes:
 ```typescript
