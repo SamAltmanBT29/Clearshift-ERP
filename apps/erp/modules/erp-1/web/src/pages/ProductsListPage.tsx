@@ -32,6 +32,7 @@ import {
   AccessDeniedProductsView,
 } from '../components/StateViews.js';
 import { ProductCreateModal } from '../components/ProductCreateModal.js';
+import { ProductDetailPage } from './ProductDetailPage.js';
 
 export interface ProductsListPageProps {
   /** Optional initial filters passed by host shell or router */
@@ -42,6 +43,10 @@ export interface ProductsListPageProps {
   onCreateProduct?: (() => void) | undefined;
   /** Optional callback when a product is created successfully */
   onProductCreated?: ((product: Product) => void) | undefined;
+  /** Optional callback when a product is selected for detail/edit */
+  onSelectProduct?: ((product: Product) => void) | undefined;
+  /** Optional permissions array for access control */
+  userPermissions?: readonly string[] | undefined;
 }
 
 function parseFiltersFromUrl(): Partial<ProductListQuery> {
@@ -106,6 +111,8 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   onQueryChange,
   onCreateProduct,
   onProductCreated,
+  onSelectProduct,
+  userPermissions,
 }) => {
   // 1. Initial State Resolution from URL or Props
   const urlFilters = useMemo(() => parseFiltersFromUrl(), []);
@@ -132,6 +139,9 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   // Creation modal & Confirmation toast state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Selected product detail view state
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   // 2. Data state
   const [products, setProducts] = useState<ProductWithStock[]>([]);
@@ -331,6 +341,24 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
     sortDirection,
   };
 
+  if (selectedProductId) {
+    const selectedProd = products.find((p) => p.id === selectedProductId) || null;
+    return (
+      <ProductDetailPage
+        productId={selectedProductId}
+        initialProduct={selectedProd}
+        categories={categories}
+        {...(userPermissions ? { userPermissions } : {})}
+        onBack={() => setSelectedProductId(null)}
+        onProductUpdated={(updated) => {
+          setProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? ({ ...p, ...updated } as ProductWithStock) : p))
+          );
+        }}
+      />
+    );
+  }
+
   return (
     <div className="cs-erp1-module-root">
       {/* 1. Header */}
@@ -448,6 +476,12 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
                 const nextDirection =
                   sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc';
                 handleSortChange(column, nextDirection);
+              }}
+              onSelectProduct={(p) => {
+                setSelectedProductId(p.id);
+                if (onSelectProduct) {
+                  onSelectProduct(p);
+                }
               }}
             />
           )}

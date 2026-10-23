@@ -20,6 +20,8 @@ import type {
   ProductSortField,
   StockStatusFilter,
   CreateProductInput,
+  UpdateProductInput,
+  ProductLinkedRecords,
 } from '@clearshift/contracts';
 
 export const ERP1_API_BASE = '/api/v1/erp-products';
@@ -70,6 +72,13 @@ export class Erp1ApiError extends Error {
    */
   public get isNotFound(): boolean {
     return this.status === 404;
+  }
+
+  /**
+   * True when request failed due to concurrent modification or unique constraint conflict (HTTP 409).
+   */
+  public get isConflict(): boolean {
+    return this.status === 409 || this.code === 'CONFLICT' || this.code === 'CONCURRENT_MODIFICATION';
   }
 }
 
@@ -167,7 +176,7 @@ export async function fetchProducts(
 }
 
 /**
- * Fetch categories for faceted filter sidebar.
+ * Fetch categories for faceted filter sidebar and select inputs.
  */
 export async function fetchCategories(
   query: CategoryListQuery = { page: 1, pageSize: 100 }
@@ -199,5 +208,38 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+/**
+ * Fetch a single product by ID.
+ */
+export async function fetchProductById(id: string): Promise<Product> {
+  return executeRequest<Product>(`/products/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Update allowlisted fields on an existing product with optional version concurrency header.
+ */
+export async function updateProduct(
+  id: string,
+  input: UpdateProductInput,
+  options: { version?: string } = {}
+): Promise<Product> {
+  const headers: Record<string, string> = {};
+  if (options.version) {
+    headers['If-Match'] = options.version;
+  }
+  return executeRequest<Product>(`/products/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+    headers,
+  });
+}
+
+/**
+ * Fetch linked records across inventory, ERP-2 purchasing, and ERP-3 sales for a product.
+ */
+export async function fetchProductLinkedRecords(id: string): Promise<ProductLinkedRecords> {
+  return executeRequest<ProductLinkedRecords>(`/products/${encodeURIComponent(id)}/linked-records`);
 }
 

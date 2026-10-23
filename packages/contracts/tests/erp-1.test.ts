@@ -8,6 +8,8 @@ import {
   ProductSchema,
   SetOpeningStockInputSchema,
   UpdateCategoryInputSchema,
+  UpdateProductInputSchema,
+  ProductLinkedRecordsSchema,
 } from '../src/erp-1.js';
 
 const PRODUCT_ID = '00000000-0000-4000-8000-000000000001';
@@ -195,6 +197,103 @@ describe('ERP-1 Products & Inventory contracts', () => {
     });
   });
 
+  describe('Product edit contract (ERP1-21)', () => {
+    it('accepts partial product updates for allowlisted fields', () => {
+      const parsed = UpdateProductInputSchema.parse({
+        name: 'Updated Widget Name',
+        price: '29.99',
+        currency: 'EUR',
+        taxRate: '12.50',
+        unitOfMeasure: 'box',
+        notificationEmail: 'ops@clearshift.internal',
+        contactPhone: '+1-555-888-9999',
+        version: '2026-10-23T12:00:00.000Z',
+      });
+
+      expect(parsed.name).toBe('Updated Widget Name');
+      expect(parsed.price).toBe('29.9900');
+      expect(parsed.currency).toBe('EUR');
+      expect(parsed.taxRate).toBe('12.50');
+      expect(parsed.unitOfMeasure).toBe('box');
+      expect(parsed.notificationEmail).toBe('ops@clearshift.internal');
+      expect(parsed.contactPhone).toBe('+1-555-888-9999');
+      expect(parsed.version).toBe('2026-10-23T12:00:00.000Z');
+    });
+
+    it('rejects invalid email and phone in update payload', () => {
+      expect(
+        UpdateProductInputSchema.safeParse({
+          notificationEmail: 'not-an-email',
+        }).success
+      ).toBe(false);
+
+      expect(
+        UpdateProductInputSchema.safeParse({
+          contactPhone: 'abc',
+        }).success
+      ).toBe(false);
+    });
+
+    it('rejects negative prices in update payload', () => {
+      expect(() =>
+        UpdateProductInputSchema.parse({
+          price: '-10.00',
+        })
+      ).toThrow(/Price must be greater than or equal to 0/);
+    });
+  });
+
+  describe('Product linked records contract (ERP1-21)', () => {
+    it('validates linked stock, purchasing, and sales records', () => {
+      const parsed = ProductLinkedRecordsSchema.parse({
+        productId: PRODUCT_ID,
+        stockLevels: [
+          {
+            warehouseId: '00000000-0000-4000-8000-000000000010',
+            warehouseCode: 'WH-01',
+            warehouseName: 'Central Logistics Hub',
+            quantity: '340.0000',
+            unitOfMeasure: 'pcs',
+            updatedAt: '2026-10-23T08:00:00.000Z',
+          },
+        ],
+        purchaseOrders: [
+          {
+            id: '00000000-0000-4000-8000-000000000020',
+            purchaseOrderId: '00000000-0000-4000-8000-000000000021',
+            poNumber: 'PO-2026-0041',
+            vendorName: 'Apex Precision Supplies',
+            orderDate: '2026-10-15',
+            quantity: '500.0000',
+            unitPrice: '14.5000',
+            currency: 'USD',
+            status: 'received',
+          },
+        ],
+        salesOrders: [
+          {
+            id: '00000000-0000-4000-8000-000000000030',
+            orderId: '00000000-0000-4000-8000-000000000031',
+            orderNumber: 'SO-2026-1089',
+            customerGoldenId: 'CUST-GLD-88219',
+            orderDate: '2026-10-20',
+            quantity: '25.0000',
+            unitPrice: '29.9900',
+            lineTotal: '749.7500',
+            currency: 'USD',
+            status: 'invoiced',
+          },
+        ],
+      });
+
+      expect(parsed.stockLevels).toHaveLength(1);
+      expect(parsed.purchaseOrders).toHaveLength(1);
+      expect(parsed.salesOrders).toHaveLength(1);
+      expect(parsed.purchaseOrders[0]?.poNumber).toBe('PO-2026-0041');
+      expect(parsed.salesOrders[0]?.customerGoldenId).toBe('CUST-GLD-88219');
+    });
+  });
+
   describe('ERP-1 OpenAPI document', () => {
     const content = readFileSync(
       resolve(__dirname, '../openapi/erp-1.yaml'),
@@ -205,6 +304,7 @@ describe('ERP-1 Products & Inventory contracts', () => {
       const requiredPaths = [
         '/api/v1/erp-products/products:',
         '/api/v1/erp-products/products/{id}:',
+        '/api/v1/erp-products/products/{id}/linked-records:',
         '/api/v1/erp-products/categories:',
         '/api/v1/erp-products/categories/{id}:',
         '/api/v1/erp-products/stock:',
@@ -216,6 +316,7 @@ describe('ERP-1 Products & Inventory contracts', () => {
       }
       expect(content).toContain('operationId: updateErp1Category');
       expect(content).toContain('operationId: getErp1Product');
+      expect(content).toContain('operationId: getErp1ProductLinkedRecords');
     });
 
     it('uses the shared flat pagination response instead of an undefined PaginationMeta', () => {

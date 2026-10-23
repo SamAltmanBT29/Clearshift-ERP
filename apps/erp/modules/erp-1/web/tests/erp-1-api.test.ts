@@ -4,6 +4,9 @@ import {
   fetchCategories,
   fetchStock,
   createProduct,
+  fetchProductById,
+  updateProduct,
+  fetchProductLinkedRecords,
   buildProductQueryParams,
   Erp1ApiError,
   ERP1_API_BASE,
@@ -270,6 +273,157 @@ describe('ERP-1 API Client Tests', () => {
         expect(err.details).toHaveLength(2);
         expect(err.details[0]?.field).toBe('sku');
       }
+    });
+  });
+
+  describe('fetchProductById (ERP1-21)', () => {
+    it('fetches a single product by UUID', async () => {
+      const mockProduct = {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Industrial Widget',
+        sku: 'WDG-001',
+        normalizedSku: 'WDG-001',
+        unitOfMeasure: 'pcs',
+        price: '19.9900',
+        currency: 'USD',
+        taxRate: '5.00',
+        createdAt: '2026-10-23T00:00:00Z',
+        updatedAt: '2026-10-23T00:00:00Z',
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockProduct,
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const result = await fetchProductById(mockProduct.id);
+      expect(result).toEqual(mockProduct);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${ERP1_API_BASE}/products/${mockProduct.id}`,
+        expect.anything()
+      );
+    });
+
+    it('throws 404 when product is not found', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          json: async () => ({ code: 'NOT_FOUND', message: 'Product not found' }),
+        })
+      );
+
+      try {
+        await fetchProductById('missing-id');
+        expect.fail('Should have thrown 404');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(Erp1ApiError);
+        expect(err.status).toBe(404);
+        expect(err.isNotFound).toBe(true);
+      }
+    });
+  });
+
+  describe('updateProduct (ERP1-21)', () => {
+    it('sends PATCH request with payload and optional If-Match version header', async () => {
+      const mockUpdated = {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Updated Widget',
+        sku: 'WDG-001',
+        normalizedSku: 'WDG-001',
+        unitOfMeasure: 'box',
+        price: '25.0000',
+        currency: 'USD',
+        taxRate: '5.00',
+        createdAt: '2026-10-23T00:00:00Z',
+        updatedAt: '2026-10-23T01:00:00Z',
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockUpdated,
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const updatePayload = {
+        name: 'Updated Widget',
+        price: '25.0000',
+        unitOfMeasure: 'box' as const,
+      };
+
+      const result = await updateProduct(mockUpdated.id, updatePayload, {
+        version: '2026-10-23T00:00:00Z',
+      });
+
+      expect(result).toEqual(mockUpdated);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${ERP1_API_BASE}/products/${mockUpdated.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify(updatePayload),
+          headers: expect.objectContaining({
+            'If-Match': '2026-10-23T00:00:00Z',
+          }),
+        })
+      );
+    });
+
+    it('identifies 409 concurrent modification conflicts via isConflict getter', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 409,
+          json: async () => ({
+            code: 'CONFLICT',
+            message: 'Concurrent modification conflict: record was updated by another process',
+          }),
+        })
+      );
+
+      try {
+        await updateProduct('prod-1', { name: 'Concurrent Edit' });
+        expect.fail('Should have thrown 409 conflict');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(Erp1ApiError);
+        expect(err.status).toBe(409);
+        expect(err.isConflict).toBe(true);
+      }
+    });
+  });
+
+  describe('fetchProductLinkedRecords (ERP1-21)', () => {
+    it('fetches linked inventory, purchasing, and sales records', async () => {
+      const mockLinked = {
+        productId: '00000000-0000-4000-8000-000000000001',
+        stockLevels: [
+          {
+            warehouseId: 'wh-1',
+            warehouseCode: 'WH-01',
+            warehouseName: 'Main Hub',
+            quantity: '100.0000',
+            unitOfMeasure: 'pcs',
+            updatedAt: '2026-10-23T00:00:00Z',
+          },
+        ],
+        purchaseOrders: [],
+        salesOrders: [],
+      };
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockLinked,
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const result = await fetchProductLinkedRecords('prod-1');
+      expect(result).toEqual(mockLinked);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${ERP1_API_BASE}/products/prod-1/linked-records`,
+        expect.anything()
+      );
     });
   });
 });

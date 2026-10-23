@@ -26,6 +26,7 @@
 12. [Search, filters and sorting controls (ERP1-18)](#12-search-filters-and-sorting-controls-erp1-18)
 13. [Loading, empty, error and access-denied states (ERP1-19)](#13-loading-empty-error-and-access-denied-states-erp1-19)
 14. [Product creation form with field-level validation (ERP1-20)](#14-product-creation-form-with-field-level-validation-erp1-20)
+15. [Detail/edit workflow and linked records (ERP1-21)](#15-detailedit-workflow-and-linked-records-erp1-21)
 
 ---
 
@@ -380,6 +381,46 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 2. **Double-Submission Prevention (AC 2)**: During in-flight request execution, `isSubmitting` disables the submission button (`disabled={isSubmitting}`, `aria-busy={isSubmitting}`), displays a busy indicator (`Creating...`), and prevents duplicate requests from triggering.
 3. **Server Validation Error Mapping (AC 3)**: When the server returns HTTP 400 with an error envelope containing `details: [{ field, message }]`, errors map directly to the corresponding input fields (`errors[detail.field] = detail.message`). Corresponding form fields render with `role="alert"` and set `aria-invalid="true"`. Both camelCase and snake_case field keys are supported.
 4. **Cache Update, Modal Closure & Confirmation Toast (AC 4)**: Successful submission automatically closes the modal dialog, prepends the new product to the client table cache (`products` list state and incremented `total`), and renders an accessible confirmation toast banner with `role="status"` and `aria-live="polite"` (`Product "[Name]" ([SKU]) created successfully.`).
+
+---
+
+## 15. Detail/Edit Workflow and Linked Records (ERP1-21)
+
+**Issue**: [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) — `[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/pages/ProductDetailPage.tsx`, `ProductAuditPanel.tsx`, `ProductLinkedRecordsTable.tsx`, `ProductEditDrawer.tsx`, `hooks/useProductEditForm.ts`, `api/erp-1.ts`, `theme.css`.
+
+### 15.1 Architectural Scope & Acceptance Criteria
+
+| Requirement | Implementation Component | Technical Specification | Gate Acceptance |
+|---|---|---|:---:|
+| **AC 1: Primary Attributes & Audit Metadata** | `ProductDetailPage.tsx`, `ProductAuditPanel.tsx` | Read-only attribute grid with Name, SKU, Category, UOM, Price, Currency, Tax Rate, Notification Email, Contact Phone; Audit panel with Internal UUID, Normalized SKU, Created At, Updated At, and canonical Golden ID badge. | **Pass** |
+| **AC 2: Inline Edit & Drawer Form Workflows** | `ProductDetailPage.tsx`, `ProductEditDrawer.tsx`, `useProductEditForm.ts` | Allows modifying allowlisted fields (`name`, `categoryId`, `unitOfMeasure`, `price`, `currency`, `taxRate`, `notificationEmail`, `contactPhone`). SKU remains strictly immutable. Permission checking requires `inventory:write` or `products:write`. | **Pass** |
+| **AC 3: Linked Master Records Sub-Tables** | `ProductLinkedRecordsTable.tsx` | Tabbed/stacked sub-tables for: (1) Warehouse inventory stocks with quantities and warehouse codes; (2) ERP-2 Purchasing lines with PO number, supplier vendor, and navigation link `/erp2/purchase-orders/:id`; (3) ERP-3 Sales lines with order number, customer Golden ID, line total, and navigation link `/erp3/orders/:id`. | **Pass** |
+| **AC 4: Concurrent Conflict Handling (HTTP 409)** | `ProductDetailPage.tsx`, `ProductEditDrawer.tsx`, `useProductEditForm.ts` | On HTTP 409 Conflict (e.g. outdated optimistic version timestamp), displays an accessible conflict banner warning of concurrent changes, preventing silent data overwrite and providing a direct "Refresh and Re-apply Changes" CTA button. | **Pass** |
+
+### 15.2 Allowlisted vs. Immutable Attributes
+
+1. **Allowlisted Editable Attributes**:
+   - `name`: Product title / description
+   - `categoryId`: Product category reference
+   - `unitOfMeasure`: One of the 6 fixed V1 units (`pcs`, `kg`, `g`, `litre`, `metre`, `box`)
+   - `price`: Unit price formatted to SDS `decimal(19,4)`
+   - `currency`: ISO 4217 uppercase 3-letter currency code
+   - `taxRate`: Decimal percentage (`0.00` to `100.00`)
+   - `notificationEmail`: Optional contact email
+   - `contactPhone`: Optional contact telephone number
+2. **Strictly Immutable Attributes**:
+   - `sku` & `normalizedSku`: Non-modifiable to preserve relational integrity across barcodes, inventory transactions, and external references (BR-ERP1-01).
+   - `id`: Internal immutable primary key UUID.
+   - `createdAt`: Audit creation timestamp.
+   - `sourceSystem` & `sourceId`: External sync provenance markers.
+
+### 15.3 Concurrency & Error Envelope Mapping
+
+- **409 Conflict Resolution**: When an update request encounters a concurrent modification conflict (`err.status === 409` or `err.code === 'CONFLICT'`), the form flags `isConflict = true`, sets `conflictMessage`, surfaces a warning alert, and prompts the user to refresh the record (`loadProductData()`) to view the latest changes before re-applying updates.
+- **400 Validation Error Mapping**: Field-specific error details (`details: [{ field, message }]`) translate directly to input error states and set `aria-invalid="true"`.
+- **403 Permission Gate**: If the user lacks write capabilities, action buttons are disabled and a clear read-only banner is displayed informing the operator that `inventory:write` is required.
+
 
 
 

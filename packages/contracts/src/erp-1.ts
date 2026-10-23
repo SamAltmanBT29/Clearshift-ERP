@@ -124,6 +124,7 @@ export const ProductSchema = z.object({
   contactPhone: z.string().nullable().optional(),
   sourceSystem: z.string().nullable().optional(),
   sourceId: z.string().nullable().optional(),
+  goldenId: z.string().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -187,8 +188,74 @@ export const UpdateProductInputSchema = z.object({
       normalizeDecimalInput(val, 2, 'Tax rate must be non-negative', ctx)
     )
     .optional(),
+  notificationEmail: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().email('Invalid email address format').optional()
+  ),
+  contactPhone: z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z.string().trim().regex(/^\+?[0-9\s\-()]{7,20}$/, 'Invalid phone number format').optional()
+  ),
+  version: z.string().optional(),
 });
 export type UpdateProductInput = z.infer<typeof UpdateProductInputSchema>;
+
+/**
+ * Linked warehouse stock record for Product detail views.
+ */
+export const ProductWarehouseStockLinkedRecordSchema = z.object({
+  warehouseId: z.string().uuid(),
+  warehouseCode: z.string(),
+  warehouseName: z.string(),
+  quantity: z.string(),
+  unitOfMeasure: UnitOfMeasureSchema,
+  updatedAt: z.string().datetime(),
+});
+export type ProductWarehouseStockLinkedRecord = z.infer<typeof ProductWarehouseStockLinkedRecordSchema>;
+
+/**
+ * Linked ERP-2 Purchase Order line for Product detail views.
+ */
+export const ProductPurchaseLineLinkedRecordSchema = z.object({
+  id: z.string().uuid(),
+  purchaseOrderId: z.string().uuid(),
+  poNumber: z.string(),
+  vendorName: z.string(),
+  orderDate: z.string(),
+  quantity: z.string(),
+  unitPrice: z.string(),
+  currency: CurrencySchema,
+  status: z.string(),
+});
+export type ProductPurchaseLineLinkedRecord = z.infer<typeof ProductPurchaseLineLinkedRecordSchema>;
+
+/**
+ * Linked ERP-3 Sales Order / Invoice line for Product detail views.
+ */
+export const ProductSalesLineLinkedRecordSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  orderNumber: z.string(),
+  customerGoldenId: z.string(),
+  orderDate: z.string(),
+  quantity: z.string(),
+  unitPrice: z.string(),
+  lineTotal: z.string(),
+  currency: CurrencySchema,
+  status: z.string(),
+});
+export type ProductSalesLineLinkedRecord = z.infer<typeof ProductSalesLineLinkedRecordSchema>;
+
+/**
+ * Aggregated linked records for a Product across ERP-1 inventory, ERP-2 purchasing, and ERP-3 sales.
+ */
+export const ProductLinkedRecordsSchema = z.object({
+  productId: z.string().uuid(),
+  stockLevels: z.array(ProductWarehouseStockLinkedRecordSchema),
+  purchaseOrders: z.array(ProductPurchaseLineLinkedRecordSchema),
+  salesOrders: z.array(ProductSalesLineLinkedRecordSchema),
+});
+export type ProductLinkedRecords = z.infer<typeof ProductLinkedRecordsSchema>;
 
 /**
  * Stock Level Schema (FR-ERP1-06, BR-ERP1-02: quantity >= 0).
