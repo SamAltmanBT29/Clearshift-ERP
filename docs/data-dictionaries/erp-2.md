@@ -11,8 +11,8 @@ For the canonical, detailed version see:
 
 | Field | Value |
 |---|---|
-| **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #16: ERP2-01 (Schema & Migrations), #17: ERP2-02 (List/Read API), #18: ERP2-03 (Mutation API), #21: ERP2-06 (Relationships & State Transitions), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed) |
+| **Module** | ERP-2 Vendors and Purchasing (Group 7) |
+| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -243,6 +243,7 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 *Expected Output*: HTTP 200 with `status: "Sent"`. Attempting to transition back to `Draft` returns HTTP 422 `INVALID_STATUS_TRANSITION`.
 
 ---
+
 ## 8. State Machine & Read Model Consistency Matrix (ERP2-06)
 
 ### 8.1 Purchase Order Status Transition Matrix
