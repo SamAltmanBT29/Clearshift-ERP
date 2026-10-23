@@ -459,3 +459,71 @@ ERP-2 implements high-reliability batch migration loading conforming to the Clea
 
 - In strict compliance with ClearShift Core Rules, compensating rollback sagas are explicitly prohibited in V1 (`ROLLBACK_SAGA_PROHIBITED`).
 - When a batch stops due to excessive failures, ClearShift preserves all durable evidence, target rows, and receipt logs for human inspection and auditable resumption. Under no circumstances are committed business rows or receipts rolled back or deleted.
+
+---
+
+## 13. Main Paginated Data Table Specification (ERP2-17 / Gate G2)
+
+### 13.1 Overview & Architecture
+
+ERP-2 provides high-performance, accessible, and responsive collection tables for Vendors and Purchase Orders matching the ClearShift System Design Specification (SDS) §4.3 & §4.9. The implementation consumes shared platform UI tokens (`theme.css` / `@cs/ui`) without duplicate infrastructure.
+
+### 13.2 Stable Column Definitions
+
+All columns strictly match the domain schemas and data dictionary entities:
+
+#### 13.2.1 Vendors Table Columns
+| Column Header | Field Name | Data Type | Sortable | Notes |
+|---|---|---|---|---|
+| Vendor Name | `name` | string | Yes | Bold display; links to vendor detail |
+| Tax Number | `tax_number` | string | Yes | Monospace font (`.cs-cell-mono`) |
+| Email | `email` | string | Yes | Alphanumeric sortable |
+| Phone | `phone` | string | Yes | Displays `—` if null |
+| Currency | `currency` | ISO-4217 | Yes | Monospace font (`.cs-cell-mono`) |
+| Bank Account | `bank_masked` | string | No | Masked server-side (`XXXX-XXXX-7890`); unmasked bank details never sent to frontend |
+| Location | `city, country` | string | Yes | Composite string: `${city}, ${country}` |
+
+#### 13.2.2 Purchase Orders Table Columns
+| Column Header | Field Name | Data Type | Sortable | Notes |
+|---|---|---|---|---|
+| PO Number | `po_number` | string | Yes | Monospace font (`.cs-cell-mono`) |
+| Vendor ID | `vendor_id` | UUID | No | Monospace truncated display `${prefix}…${suffix}` |
+| Order Date | `order_date` | YYYY-MM-DD | Yes | Chronological date sorting |
+| Status | `status` | Enum | Yes | Rendered with status badges (`Draft`, `Sent`, `Received`, `Closed`) |
+| Currency | `currency` | ISO-4217 | Yes | Monospace font (`.cs-cell-mono`) |
+| Order Total | `total` | NUMERIC(18,2) | Yes | Formatted with 2 decimal places; numeric sorting |
+| Lines | `lines` | count | No | Rendered with line count badge |
+
+### 13.3 Server-Side & Query-Bound Pagination
+
+- **Query Parameters**:
+  - `page`: 1-based page number (integer $\ge 1$, default: `1`).
+  - `pageSize`: Bounded items per page (integer $\in [1, 100]$, default: `20`).
+- **Interactive Controls**:
+  - `First page`: Navigates to `page = 1`; disabled when `page <= 1`.
+  - `Previous page`: Decrements page (`page - 1`); disabled when `page <= 1`.
+  - `Page status`: Displays current position `Page {page} of {totalPages}`.
+  - `Next page`: Increments page (`page + 1`); disabled when `page >= totalPages`.
+  - `Last page`: Navigates to `page = totalPages`; disabled when `page >= totalPages`.
+  - `Rows per page selector`: Bounded dropdown with options `10`, `20`, `50`, `100`. Selecting a new size resets `page` to `1`.
+  - `Record range info`: Displays exact window `Showing {startRecord}–{endRecord} of {total} {entity}`.
+- **URL Synchronization**:
+  - Page navigation and page size selections synchronize with the browser's URL query string (`?page=X&pageSize=Y`), supporting bookmarking and back/forward browser navigation.
+
+### 13.4 Predictable Column Header Sorting
+
+- Interactive column headers feature accessible `<button>` triggers with visual indicator icons:
+  - `▲` for ascending sort (`aria-sort="ascending"`).
+  - `▼` for descending sort (`aria-sort="descending"`).
+  - `⇅` for unsorted columns (`aria-sort="none"`).
+- Clicking an active sorted column toggles between `asc` and `desc`. Clicking an inactive column initiates sort with `asc`.
+- Comparators implement predictable natural order:
+  - Alphanumeric strings: case-insensitive `localeCompare` with `{ numeric: true, sensitivity: 'base' }`.
+  - Monetary amounts: numeric decimal comparison on `Number(total)`.
+  - Dates: ISO-8601 chronological comparison.
+
+### 13.5 Performance & Bounded DOM Protection
+
+- Enforcing a maximum page size of 100 records (`pageSize <= 100`) guarantees bounded DOM node counts, preventing rendering degradation and browser frame drops.
+- Tables render skeleton loading placeholders during data fetching to eliminate cumulative layout shifts (CLS).
+
