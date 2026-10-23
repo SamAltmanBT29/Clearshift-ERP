@@ -344,9 +344,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 12. Search, Filters and Sorting Controls (ERP1-18)
+## 12. Search, Filters and Sorting Controls (ERP1-04 / ERP1-18)
 
-**Issue**: [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) — `[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) (`[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/` — API client, faceted sidebar, active filter pills, sorting controls, debounced search, and products list page.
 
 ### 12.1 Query Parameters (`GET /api/v1/erp-products/products`)
@@ -374,9 +374,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 13. Loading, Empty, Error and Access-Denied States (ERP1-19)
+## 13. Loading, Empty, Error and Access-Denied States (ERP1-04 / ERP1-19)
 
-**Issue**: [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) — `[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) (`[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/components/StateViews.tsx`, `ProductsListPage.tsx`, `theme.css`.
 
 ### 13.1 State Specifications & Acceptance Criteria
@@ -397,9 +397,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 14. Product Creation Form with Field-Level Validation (ERP1-20)
+## 14. Product Creation Form with Field-Level Validation (ERP1-05 / ERP1-20)
 
-**Issue**: [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) — `[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) (`[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/hooks/useProductForm.ts`, `ProductCreateModal.tsx`, `ProductsListPage.tsx`, `api/erp-1.ts`, `theme.css`.
 
 ### 14.1 Form Fields, Rules and Acceptance Criteria
@@ -425,9 +425,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 15. Detail/Edit Workflow and Linked Records (ERP1-21)
+## 15. Detail/Edit Workflow and Linked Records (ERP1-05 / ERP1-21)
 
-**Issue**: [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) — `[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) (`[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/pages/ProductDetailPage.tsx`, `ProductAuditPanel.tsx`, `ProductLinkedRecordsTable.tsx`, `ProductEditDrawer.tsx`, `hooks/useProductEditForm.ts`, `api/erp-1.ts`, `theme.css`.
 
 ### 15.1 Architectural Scope & Acceptance Criteria
