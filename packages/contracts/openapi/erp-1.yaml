@@ -459,6 +459,198 @@ paths:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
+  /api/v1/erp-products/duplicates/check:
+    post:
+      operationId: checkErp1Duplicates
+      tags: [ERP-1 Duplicates]
+      summary: Scans candidate records for exact or ambiguous duplicates against the target database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckErp1DuplicatesRequest'
+      responses:
+        '200':
+          description: Duplicate check results with identified candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckErp1DuplicatesResponse'
+        '400':
+          description: Invalid check payload
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates:
+    get:
+      operationId: listErp1DuplicateCandidates
+      tags: [ERP-1 Duplicates]
+      summary: List all held duplicate candidates awaiting human review
+      parameters:
+        - name: entity
+          in: query
+          schema:
+            type: string
+            enum: [product, category]
+      responses:
+        '200':
+          description: List of duplicate candidate records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+                  total:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates/{id}:
+    get:
+      operationId: getErp1DuplicateCandidateById
+      tags: [ERP-1 Duplicates]
+      summary: Retrieve a single duplicate candidate by candidate UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Candidate record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+        '400':
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/duplicates/review:
+    post:
+      operationId: reviewErp1DuplicateCandidate
+      tags: [ERP-1 Duplicates]
+      summary: Submit an authorized human review decision for a held duplicate candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewErp1DuplicateRequest'
+      responses:
+        '200':
+          description: Review decision executed and recorded in immutable audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewErp1DuplicateResponse'
+        '400':
+          description: Invalid review payload or missing rationale
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate or target record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/import:
+    post:
+      operationId: importRow
+      tags: [Migration Import]
+      summary: Import row via KIT-08 target adapter contract with durable receipts
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRowRequest"
+      responses:
+        "201":
+          description: Target row and receipt committed atomically
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "200":
+          description: Idempotent replay of identical prior import
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "400":
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409":
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/import/batch:
+    post:
+      operationId: importBatch
+      tags: [Migration Import]
+      summary: Batch import rows via ERP1-11 loadBatch interface with per-row idempotency and optional UPSERT
+      description: |
+        Processes up to 500 rows sequentially through the ERP-1 target adapter.
+        Each row has its own stable idempotency key. A data-validation failure on
+        one row does NOT abort subsequent rows (error isolation). Infrastructure
+        failures propagate as HTTP 5xx and are retryable. Dry-run semantics are
+        enforced by the service layer.
+
+        When `upsert=true`, rows whose natural key (normalized SKU for products) already
+        exists in the target will be updated and linked with `kind=linked`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportBatchRequest"
+      responses:
+        "200":
+          description: Batch processed — returns per-row outcomes and aggregate totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoadBatchResult"
+        "400":
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -958,8 +1150,30 @@ components:
               reasons: { type: array, items: { type: string } }
         generated_at: { type: string, format: date-time }
 
+    RelationshipWarning:
+      type: object
+      description: |
+        An absent optional relationship. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["category"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["categoryId"]
+        code:
+          type: string
+          enum: [ERP1_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
 
-
+    ImportReceipt:
+      type: object
+      properties:
         id: { type: string, format: uuid }
         batch_id: { type: string, format: uuid }
         source_row: { type: integer, minimum: 0 }
@@ -991,3 +1205,285 @@ components:
             quantity: { oneOf: [{ type: string }, { type: number }] }
         - $ref: '#/components/schemas/ImportProvenance'
       additionalProperties: false
+
+    Erp1DuplicateMatchKind:
+      type: string
+      enum: [EXACT_SKU, EXACT_NAME, EXACT_CATEGORY_CODE, NORMALIZED_EXACT, EXACT, AMBIGUOUS_MULTI_MATCH, AMBIGUOUS]
+
+    Erp1DuplicateCandidateStatus:
+      type: string
+      enum: [PENDING_REVIEW, MERGED, REJECTED, KEPT_BOTH]
+
+    Erp1MergeDecisionType:
+      type: string
+      enum: [MERGE, REJECT, KEEP_BOTH]
+
+    Erp1DuplicateCandidateRecord:
+      type: object
+      required:
+        - candidate_id
+        - entity
+        - match_kind
+        - status
+        - matching_key
+        - matching_value
+        - incoming_record
+        - existing_record
+        - confidence
+        - created_at
+      properties:
+        candidate_id: { type: string, format: uuid }
+        entity: { type: string, enum: [product, category] }
+        match_kind: { $ref: '#/components/schemas/Erp1DuplicateMatchKind' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        matching_key: { type: string }
+        matching_value: { type: string }
+        incoming_record: { type: object }
+        existing_record: { type: object }
+        confidence: { type: number, enum: [1.0] }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decided_by: { type: string, nullable: true }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType', nullable: true }
+        rationale: { type: string, nullable: true }
+
+    CheckErp1DuplicatesRequest:
+      type: object
+      required: [entity, records]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        records:
+          type: array
+          items: { type: object }
+
+    CheckErp1DuplicatesResponse:
+      type: object
+      required: [entity, total_checked, duplicates_found, candidates]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        total_checked: { type: integer }
+        duplicates_found: { type: integer }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/Erp1DuplicateCandidateRecord' }
+
+    ReviewErp1DuplicateRequest:
+      type: object
+      required: [candidate_id, decision, rationale]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        rationale: { type: string, minLength: 5 }
+
+    ReviewErp1DuplicateResponse:
+      type: object
+      required: [candidate_id, decision, status, actor_id, timestamp, audit_record_id]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        actor_id: { type: string }
+        timestamp: { type: string, format: date-time }
+        audit_record_id: { type: string, format: uuid }
+
+    ImportRowRequest:
+      type: object
+      required:
+        - batch_id
+        - source_row
+        - idempotency_key
+        - entity
+        - record
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        source_system:
+          type: string
+          nullable: true
+        source_id:
+          type: string
+          nullable: true
+        idempotency_key:
+          type: string
+        correlation_id:
+          type: string
+          nullable: true
+        entity:
+          type: string
+          enum: [product, category, stock_level]
+        record:
+          type: object
+
+    ImportRowResponse:
+      type: object
+      required:
+        - target_id
+        - target_version
+        - outcome
+        - receipt
+        - prior_result
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        target_version:
+          type: integer
+        outcome:
+          type: string
+          enum: [loaded, rejected, merged, skipped]
+        receipt:
+          $ref: "#/components/schemas/ImportReceiptRecord"
+        prior_result:
+          type: boolean
+
+    ImportReceiptRecord:
+      type: object
+      required:
+        - id
+        - batch_id
+        - source_row
+        - entity
+        - schema_version
+        - idempotency_key
+        - request_hash
+        - target_id
+        - kind
+        - outcome
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+        source_system:
+          type: string
+          nullable: true
+        source_id:
+          type: string
+          nullable: true
+        entity:
+          type: string
+        schema_version:
+          type: integer
+        idempotency_key:
+          type: string
+        request_hash:
+          type: string
+        target_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [created, linked]
+        outcome:
+          type: string
+          enum: [loaded, rejected, merged, skipped]
+        response_payload:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ImportBatchRequest:
+      type: object
+      required:
+        - batch_id
+        - entity
+        - rows
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+          description: Stable UUID identifying this overall migration batch
+        entity:
+          type: string
+          enum: [product, category, stock_level]
+        upsert:
+          type: boolean
+          default: false
+          description: When true, rows whose natural key already exists will be updated and linked (kind=linked)
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/BatchRowInput"
+
+    BatchRowInput:
+      type: object
+      required:
+        - source_row
+        - idempotency_key
+        - record
+      properties:
+        source_row:
+          type: integer
+          minimum: 0
+          description: 0-based row position in the source file
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        record:
+          type: object
+          description: Cleaned source data mapped to target domain shape
+
+    LoadBatchResult:
+      type: object
+      required:
+        - batchId
+        - status
+        - total
+        - attempted
+        - loaded
+        - rejected
+        - unattempted
+        - chunksProcessed
+        - rows
+      properties:
+        batchId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [COMPLETED, STOPPED_EXCESSIVE_FAILURES]
+        total:
+          type: integer
+        attempted:
+          type: integer
+        loaded:
+          type: integer
+        rejected:
+          type: integer
+        unattempted:
+          type: integer
+        chunksProcessed:
+          type: integer
+        stoppedReason:
+          type: string
+          nullable: true
+        rows:
+          type: array
+          items:
+            type: object
