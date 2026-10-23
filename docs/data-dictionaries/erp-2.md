@@ -11,8 +11,8 @@ For the canonical, detailed version see:
 
 | Field | Value |
 |---|---|
-| **Module** | ERP-2 Vendors & Purchasing (Group 7) |
-| **Issue** | #16 — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations` |
+| **Module** | ERP-2 Vendors and Purchasing (Group 7) |
+| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -244,7 +244,34 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 
 ---
 
-## 8. QA Evidence (ERP2-10)
+## 8. State Machine & Read Model Consistency Matrix (ERP2-06)
+
+### 8.1 Purchase Order Status Transition Matrix
+
+| Current Status | Allowed Next Status | Forbidden Next Statuses | Failure Code | Behavior on Same Status |
+|---|---|---|---|---|
+| `Draft` | `Sent` | `Received`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Sent` | `Received` | `Draft`, `Closed` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Received` | `Closed` | `Draft`, `Sent` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+| `Closed` (Terminal) | *None* | `Draft`, `Sent`, `Received` | `INVALID_STATUS_TRANSITION` (422) | No-op (200 OK) |
+
+> **Note on Received Status**: Transitioning to `Received` marks the purchase order as fulfilled from the supplier perspective but does **not** alter warehouse stock levels in V1 (goods receipts and stock ledger adjustments are V2).
+
+### 8.2 Read Model Consistency Guarantees
+1. **Vendor**:
+   - `bank_masked` matches regex `^XXXX-XXXX-\d{4}$` if present.
+   - `source_system` and `source_id` are complete pairs.
+2. **Purchase Order**:
+   - Status is valid enumeration: `Draft`, `Sent`, `Received`, `Closed`.
+   - Every line item's `line_total` equals `round(quantity * price, 2)` using half-up decimal rounding.
+   - The purchase order `total` equals the exact sum of all line totals.
+   - Client and API agree immediately upon mutation commit.
+3. **Optional Link Handling**:
+   - When an optional relationship (e.g. `source_system`/`source_id`, phone) is absent, code `ERP2_OPTIONAL_REFERENCE_ABSENT` is surfaced in warnings and the value remains `null`. No synthetic records are materialized.
+
+---
+
+## 9. QA Evidence (ERP2-10)
 
 | Layer | Location |
 |---|---|
