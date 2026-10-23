@@ -23,6 +23,10 @@
 9. [Decision records](#9-decision-records)
 10. [Migration, runbook & verification](#10-migration-runbook--verification)
 11. [Public API contract](#11-public-api-contract)
+12. [Search, filters and sorting controls (ERP1-18)](#12-search-filters-and-sorting-controls-erp1-18)
+13. [Loading, empty, error and access-denied states (ERP1-19)](#13-loading-empty-error-and-access-denied-states-erp1-19)
+14. [Product creation form with field-level validation (ERP1-20)](#14-product-creation-form-with-field-level-validation-erp1-20)
+15. [Detail/edit workflow and linked records (ERP1-21)](#15-detailedit-workflow-and-linked-records-erp1-21)
 
 ---
 
@@ -296,3 +300,127 @@ Base: `/api/v1/erp-products`
 | POST | `/stock/opening` | Set opening stock idempotently |
 
 Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `packages/contracts/openapi/erp-1.yaml`.
+
+---
+
+## 12. Search, Filters and Sorting Controls (ERP1-18)
+
+**Issue**: [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) — `[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/` — API client, faceted sidebar, active filter pills, sorting controls, debounced search, and products list page.
+
+### 12.1 Query Parameters (`GET /api/v1/erp-products/products`)
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `search` | `string` | No | — | Text search matched against product name and SKU (debounced 300ms on frontend) |
+| `categoryId` | `UUID` | No | — | Filter products by category UUID |
+| `unitOfMeasure` | `enum` | No | — | Filter by fixed V1 unit (`pcs`, `kg`, `g`, `litre`, `metre`, `box`) |
+| `stockStatus` | `enum` | No | `all` | Filter by inventory stock status (`all`, `in_stock`, `low_stock`, `out_of_stock`) |
+| `minPrice` | `decimal` | No | — | Filter products with price >= minPrice (numeric 19,4) |
+| `maxPrice` | `decimal` | No | — | Filter products with price <= maxPrice (numeric 19,4) |
+| `sortBy` | `enum` | No | `name` | Sort field (`name`, `sku`, `price`, `createdAt`, `quantity`) |
+| `sortDirection` | `enum` | No | `asc` | Sort direction (`asc`, `desc`) |
+| `page` | `integer` | No | `1` | 1-based page number (bounded) |
+| `pageSize` | `integer` | No | `25` | Page size capped between 1 and 100 |
+
+### 12.2 UI Operational Logic & Acceptance Criteria
+
+1. **Debounced Search**: The search input debounces keystrokes with a 300ms pause to ensure one API request per word rather than firing per keystroke.
+2. **Faceted Filter Sidebar**: Dedicated faceted sidebar allowing operators to filter by category, unit of measure, stock status, and price range.
+3. **URL Query State Synchronization**: Every faceted filter and search term synchronizes to URL query search params (`?search=...&categoryId=...&unitOfMeasure=...&sortBy=...`), enabling shareable/bookmarkable URLs and browser history navigation.
+4. **Active Filter Pill Tags**: Active filters render as removable pill tags. Clicking the clear button on an individual pill removes that filter, updates the URL query state, and reloads table results; a 'Clear All' button resets all filters simultaneously.
+5. **Stable Empty States**: When search or filter queries return zero matching rows, the interface displays an informative empty state message (`No products match the selected filters or search query`) with a direct action to reset/clear filters.
+
+---
+
+## 13. Loading, Empty, Error and Access-Denied States (ERP1-19)
+
+**Issue**: [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) — `[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/components/StateViews.tsx`, `ProductsListPage.tsx`, `theme.css`.
+
+### 13.1 State Specifications & Acceptance Criteria
+
+| State | Trigger Condition | Presentation | Actions Available | Retry Allowed? |
+|---|---|---|---|---|
+| **Loading** | Initial catalog fetch or parameter filter reload | Animated table skeleton (`role="status"`, `aria-busy="true"`) matching table header/cell shapes | None (busy/pending) | No |
+| **Zero-Data Empty State** | Zero products recorded in the catalog (`total === 0` and no active filters) | Informative card (`📦`) explaining catalog is empty | Primary CTA button: `Add Product` (`onCreateProduct`) | No |
+| **Filtered Empty State** | Active filter or search query returns zero matching records | Informative card (`🔍`) explaining no products match current filters | Primary CTA button: `Clear all filters` | Yes (clears filters) |
+| **API Failure** | HTTP 500, Network failure, or unhandled server error | Accessible alert banner (`role="alert"`), sanitized message, Reference ID | Primary button: `Try Again` (`onRetry`) | Yes |
+| **Access Denied** | HTTP 403 Forbidden or missing `inventory:read` permission | Dedicated access-denied region (`role="region"`), explaining missing capability | Guidance to contact administrator | **No** (never retry on 403) |
+
+### 13.2 Security & Error Sanitization Rules
+
+1. **Stack Trace Stripping**: Stack traces (`at ...`, `node_modules`, internal filesystem paths) are stripped via `sanitizeErrorMessage` to prevent leakage of internal server details.
+2. **Database Error Masking**: Low-level SQL errors (e.g. syntax errors, connection timeouts, socket disconnects) are mapped to a secure generic message.
+3. **Correlation ID Tracing**: Server error envelopes containing `correlation_id` display a user-friendly reference identifier for support diagnostics without exposing internal logs.
+
+---
+
+## 14. Product Creation Form with Field-Level Validation (ERP1-20)
+
+**Issue**: [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) — `[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/hooks/useProductForm.ts`, `ProductCreateModal.tsx`, `ProductsListPage.tsx`, `api/erp-1.ts`, `theme.css`.
+
+### 14.1 Form Fields, Rules and Acceptance Criteria
+
+| Field | Input Control | Type / Range | Required? | Validation Rule | Error Message |
+|---|---|---|---|---|---|
+| `name` | `<input type="text">` | `string` (trimmed) | **Yes** | Non-empty string | `Product name is required` |
+| `sku` | `<input type="text">` | `string` (trimmed) | **Yes** | Unique SKU; normalized to uppercase | `SKU is required` |
+| `categoryId` | `<select>` | `UUID` (null if unselected) | No | Optional reference to `erp1.categories` | — |
+| `unitOfMeasure` | `<select>` | `enum` | **Yes** | One of `pcs`, `kg`, `g`, `litre`, `metre`, `box` | `Unit of measure is required` |
+| `price` | `<input inputMode="decimal">` | `decimal(19,4)` | **Yes** | `^\d+(\.\d{1,4})?$`, numeric `>= 0` | `Price must be greater than or equal to 0` |
+| `currency` | `<input type="text" maxLength={3}>` | ISO 4217 code | **Yes** | `^[A-Z]{3}$` uppercase code | `Currency must be an uppercase 3-letter ISO 4217 code (e.g. USD, EUR)` |
+| `taxRate` | `<input inputMode="decimal">` | `decimal(5,2)` | No | `^\d+(\.\d{1,2})?$`, range `0.00` to `100.00` | `Tax rate must be between 0.00% and 100.00%` |
+| `notificationEmail` | `<input type="email">` | `email` | No | Valid email format if provided | `Invalid email address format (e.g. alerts@example.com)` |
+| `contactPhone` | `<input type="tel">` | `phone` | No | Valid phone format (`^\+?[0-9\s\-()]{7,20}$`) | `Invalid phone number format (min 7 digits, e.g. +1-555-019-2834)` |
+
+### 14.2 Acceptance Criteria Verification
+
+1. **Client-Side Validation (AC 1)**: `validateProductForm` performs synchronous validation checking all required fields, decimal ranges (`price >= 0`, `0.00 <= taxRate <= 100.00`), email address format, and international phone numbers prior to network submission.
+2. **Double-Submission Prevention (AC 2)**: During in-flight request execution, `isSubmitting` disables the submission button (`disabled={isSubmitting}`, `aria-busy={isSubmitting}`), displays a busy indicator (`Creating...`), and prevents duplicate requests from triggering.
+3. **Server Validation Error Mapping (AC 3)**: When the server returns HTTP 400 with an error envelope containing `details: [{ field, message }]`, errors map directly to the corresponding input fields (`errors[detail.field] = detail.message`). Corresponding form fields render with `role="alert"` and set `aria-invalid="true"`. Both camelCase and snake_case field keys are supported.
+4. **Cache Update, Modal Closure & Confirmation Toast (AC 4)**: Successful submission automatically closes the modal dialog, prepends the new product to the client table cache (`products` list state and incremented `total`), and renders an accessible confirmation toast banner with `role="status"` and `aria-live="polite"` (`Product "[Name]" ([SKU]) created successfully.`).
+
+---
+
+## 15. Detail/Edit Workflow and Linked Records (ERP1-21)
+
+**Issue**: [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) — `[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/pages/ProductDetailPage.tsx`, `ProductAuditPanel.tsx`, `ProductLinkedRecordsTable.tsx`, `ProductEditDrawer.tsx`, `hooks/useProductEditForm.ts`, `api/erp-1.ts`, `theme.css`.
+
+### 15.1 Architectural Scope & Acceptance Criteria
+
+| Requirement | Implementation Component | Technical Specification | Gate Acceptance |
+|---|---|---|:---:|
+| **AC 1: Primary Attributes & Audit Metadata** | `ProductDetailPage.tsx`, `ProductAuditPanel.tsx` | Read-only attribute grid with Name, SKU, Category, UOM, Price, Currency, Tax Rate, Notification Email, Contact Phone; Audit panel with Internal UUID, Normalized SKU, Created At, Updated At, and canonical Golden ID badge. | **Pass** |
+| **AC 2: Inline Edit & Drawer Form Workflows** | `ProductDetailPage.tsx`, `ProductEditDrawer.tsx`, `useProductEditForm.ts` | Allows modifying allowlisted fields (`name`, `categoryId`, `unitOfMeasure`, `price`, `currency`, `taxRate`, `notificationEmail`, `contactPhone`). SKU remains strictly immutable. Permission checking requires `inventory:write` or `products:write`. | **Pass** |
+| **AC 3: Linked Master Records Sub-Tables** | `ProductLinkedRecordsTable.tsx` | Tabbed/stacked sub-tables for: (1) Warehouse inventory stocks with quantities and warehouse codes; (2) ERP-2 Purchasing lines with PO number, supplier vendor, and navigation link `/erp2/purchase-orders/:id`; (3) ERP-3 Sales lines with order number, customer Golden ID, line total, and navigation link `/erp3/orders/:id`. | **Pass** |
+| **AC 4: Concurrent Conflict Handling (HTTP 409)** | `ProductDetailPage.tsx`, `ProductEditDrawer.tsx`, `useProductEditForm.ts` | On HTTP 409 Conflict (e.g. outdated optimistic version timestamp), displays an accessible conflict banner warning of concurrent changes, preventing silent data overwrite and providing a direct "Refresh and Re-apply Changes" CTA button. | **Pass** |
+
+### 15.2 Allowlisted vs. Immutable Attributes
+
+1. **Allowlisted Editable Attributes**:
+   - `name`: Product title / description
+   - `categoryId`: Product category reference
+   - `unitOfMeasure`: One of the 6 fixed V1 units (`pcs`, `kg`, `g`, `litre`, `metre`, `box`)
+   - `price`: Unit price formatted to SDS `decimal(19,4)`
+   - `currency`: ISO 4217 uppercase 3-letter currency code
+   - `taxRate`: Decimal percentage (`0.00` to `100.00`)
+   - `notificationEmail`: Optional contact email
+   - `contactPhone`: Optional contact telephone number
+2. **Strictly Immutable Attributes**:
+   - `sku` & `normalizedSku`: Non-modifiable to preserve relational integrity across barcodes, inventory transactions, and external references (BR-ERP1-01).
+   - `id`: Internal immutable primary key UUID.
+   - `createdAt`: Audit creation timestamp.
+   - `sourceSystem` & `sourceId`: External sync provenance markers.
+
+### 15.3 Concurrency & Error Envelope Mapping
+
+- **409 Conflict Resolution**: When an update request encounters a concurrent modification conflict (`err.status === 409` or `err.code === 'CONFLICT'`), the form flags `isConflict = true`, sets `conflictMessage`, surfaces a warning alert, and prompts the user to refresh the record (`loadProductData()`) to view the latest changes before re-applying updates.
+- **400 Validation Error Mapping**: Field-specific error details (`details: [{ field, message }]`) translate directly to input error states and set `aria-invalid="true"`.
+- **403 Permission Gate**: If the user lacks write capabilities, action buttons are disabled and a clear read-only banner is displayed informing the operator that `inventory:write` is required.
+
+
+
+

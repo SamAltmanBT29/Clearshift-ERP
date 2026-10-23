@@ -1,0 +1,1418 @@
+/* ClearShift ERP-1 Products & Inventory Minimal White Theme & Component Tokens */
+:root {
+  --color-background: #ffffff;
+  --color-surface: #f9fafb;
+  --color-surface-hover: #f3f4f6;
+  --color-text: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #9ca3af;
+  
+  --border-subtle: #e5e7eb;
+  --border-strong: #d1d5db;
+  --border-focus: #1d4ed8;
+
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-primary-text: #ffffff;
+
+  --color-success: #166534;
+  --color-success-bg: #dcfce7;
+  --color-success-border: #bbf7d0;
+
+  --color-warning: #92400e;
+  --color-warning-bg: #fef3c7;
+  --color-warning-border: #fde68a;
+
+  --color-error: #b91c1c;
+  --color-error-bg: #fee2e2;
+  --color-error-border: #fecaca;
+
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+/* Base module container */
+.cs-erp1-module-root {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  min-height: 100%;
+  padding: var(--space-6);
+  box-sizing: border-box;
+}
+
+/* Accessibility utility */
+.cs-erp1-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Toolbar (Search, Sort, Mobile Filter Toggle) */
+.cs-erp1-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.cs-erp1-toolbar-search {
+  flex: 1 1 320px;
+  max-width: 560px;
+}
+
+.cs-erp1-search-container {
+  width: 100%;
+}
+
+.cs-erp1-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.cs-erp1-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  font-size: 0.875rem;
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+.cs-erp1-search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-8) var(--space-2) 2.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cs-erp1-search-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
+}
+
+.cs-erp1-search-input:disabled {
+  background-color: var(--color-surface);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.cs-erp1-search-clear-btn {
+  position: absolute;
+  right: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.cs-erp1-search-clear-btn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+/* Sorting controls */
+.cs-erp1-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cs-erp1-mobile-filter-btn {
+  display: none;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.cs-erp1-sort-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp1-sort-field-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp1-sort-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.cs-erp1-sort-select {
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+}
+
+.cs-erp1-sort-select:focus {
+  border-color: var(--border-focus);
+}
+
+.cs-erp1-sort-direction-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cs-erp1-sort-direction-btn:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* Active Filter Pill Tags */
+.cs-erp1-active-pills-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.cs-erp1-active-pills-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-pills-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cs-erp1-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+.cs-erp1-pill-text {
+  font-size: 0.75rem;
+}
+
+.cs-erp1-pill-tag {
+  color: var(--color-primary);
+}
+
+.cs-erp1-pill-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.cs-erp1-pill-remove-btn:hover {
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.cs-erp1-btn-clear-all {
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-error);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.cs-erp1-btn-clear-all:hover {
+  color: #7f1d1d;
+}
+
+/* Two-column layout */
+.cs-erp1-layout-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* Faceted Filter Sidebar */
+.cs-erp1-faceted-sidebar {
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-sidebar-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-erp1-close-mobile-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.cs-erp1-sidebar-reset-container {
+  margin-bottom: var(--space-4);
+}
+
+.cs-erp1-btn-reset-filters {
+  width: 100%;
+  padding: var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cs-erp1-btn-reset-filters:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.cs-erp1-facet-group {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-facet-group:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.cs-erp1-facet-heading {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.cs-erp1-facet-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cs-erp1-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cs-erp1-radio-option input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.cs-erp1-code-badge {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+  font-family: var(--font-mono);
+}
+
+.cs-erp1-price-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cs-erp1-price-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.cs-erp1-price-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cs-erp1-field-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-price-separator {
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-2);
+}
+
+.cs-erp1-input-number {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.cs-erp1-input-number:focus {
+  border-color: var(--border-focus);
+}
+
+.cs-erp1-btn-apply-price {
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary-text);
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cs-erp1-btn-apply-price:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* Results area & Table */
+.cs-erp1-results-container {
+  min-width: 0;
+}
+
+.cs-erp1-table-wrapper {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.cs-erp1-table-responsive {
+  overflow-x: auto;
+}
+
+.cs-erp1-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.cs-erp1-table thead {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-table th {
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.cs-erp1-th-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.cs-erp1-th-sortable:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.cs-erp1-th-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.cs-erp1-content-right {
+  justify-content: flex-end;
+}
+
+.cs-erp1-th-right {
+  text-align: right;
+}
+
+.cs-erp1-sort-header-icon {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+}
+
+.cs-erp1-sort-header-icon.active {
+  color: var(--color-primary);
+}
+
+.cs-erp1-row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color 0.1s ease;
+}
+
+.cs-erp1-row:hover {
+  background-color: var(--color-surface);
+}
+
+.cs-erp1-table td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+.cs-erp1-cell-primary {
+  min-width: 200px;
+}
+
+.cs-erp1-cell-right {
+  text-align: right;
+}
+
+.cs-erp1-product-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cs-erp1-source-meta {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--color-text-subtle);
+}
+
+.cs-erp1-sku-code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  padding: 2px 4px;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.cs-erp1-category-badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-unit-pill {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.cs-erp1-price-amount {
+  font-weight: 600;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.cs-erp1-tax-rate {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-text-muted {
+  color: var(--color-text-subtle);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .cs-erp1-layout-container {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-erp1-mobile-filter-btn {
+    display: block;
+  }
+
+  .cs-erp1-faceted-sidebar {
+    display: none;
+  }
+
+  .cs-erp1-faceted-sidebar.mobile-open {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    border-radius: 0;
+    overflow-y: auto;
+  }
+
+  .cs-erp1-close-mobile-btn {
+    display: block;
+  }
+}
+
+/* ==========================================================================
+   State Views: Skeleton, Empty, Error Banner, Access-Denied (ERP1-19)
+   ========================================================================== */
+
+/* 1. Animated Skeleton Placeholder Table */
+.cs-erp1-skeleton-container {
+  width: 100%;
+}
+
+.cs-erp1-skeleton-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-skeleton-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cs-erp1-skeleton-table th,
+.cs-erp1-skeleton-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.cs-erp1-skeleton-table thead tr {
+  background-color: var(--color-surface);
+}
+
+.cs-erp1-skeleton-cell {
+  height: 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.4) 0%,
+    rgba(229, 231, 235, 0.8) 50%,
+    rgba(229, 231, 235, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: cs-erp1-pulse 1.5s ease-in-out infinite;
+}
+
+.cs-erp1-skeleton-cell.skeleton-header {
+  height: 14px;
+  width: 70%;
+  background-color: rgba(209, 213, 219, 0.6);
+}
+
+@keyframes cs-erp1-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 2. Empty States */
+.cs-erp1-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-2);
+}
+
+.cs-erp1-empty-icon {
+  font-size: 2.25rem;
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.cs-erp1-empty-zero-data {
+  background-color: var(--color-background);
+  border: 2px dashed var(--border-subtle);
+}
+
+/* 3. Error Alert Banner */
+.cs-erp1-error-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.cs-erp1-error-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.cs-erp1-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-error);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cs-erp1-error-content {
+  flex: 1 1 auto;
+}
+
+.cs-erp1-error-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-error);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.cs-erp1-error-message {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cs-erp1-correlation-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: var(--space-2) 0 0 0;
+}
+
+.cs-erp1-correlation-hint code {
+  font-family: var(--font-mono);
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-error-border);
+}
+
+.cs-erp1-retry-btn {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: var(--color-error);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cs-erp1-retry-btn:hover {
+  background-color: #991b1b;
+}
+
+.cs-erp1-retry-btn:focus-visible {
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
+
+/* 4. Access Denied State (403 Forbidden) */
+.cs-erp1-access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-access-denied-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.cs-erp1-access-denied-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.cs-erp1-access-denied-message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 480px;
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.5;
+}
+
+.cs-erp1-access-denied-role-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp1-access-denied-role-hint code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.cs-erp1-access-denied-footer {
+  font-size: 0.8125rem;
+  color: var(--color-text-subtle);
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. Buttons & Product Creation Form Modal (ERP1-20)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-erp1-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cs-erp1-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cs-erp1-btn-primary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.cs-erp1-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.cs-erp1-btn-primary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.cs-erp1-btn-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--border-strong);
+}
+
+.cs-erp1-btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-background);
+  border-color: var(--border-subtle);
+}
+
+.cs-erp1-btn-secondary:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
+.cs-erp1-add-product-btn {
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Create Modal Layout */
+.cs-erp1-create-modal {
+  max-width: 640px !important;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.cs-erp1-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-erp1-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .cs-erp1-form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}
+
+.cs-erp1-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Toast Container */
+.cs-erp1-toast-container {
+  margin-bottom: var(--space-4);
+  animation: cs-erp1-fade-in 0.2s ease-out;
+}
+
+@keyframes cs-erp1-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Product Detail, Audit Panel, Linked Sub-Tables & Edit Drawer Styles (ERP1-21)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-erp1-detail-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.cs-erp1-detail-top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.cs-erp1-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-detail-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cs-erp1-detail-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cs-erp1-sku-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cs-erp1-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp1-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Attributes Card & Grid */
+.cs-erp1-attributes-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-card-header {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-erp1-card-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.cs-erp1-attr-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.cs-erp1-attr-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-attr-value {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+/* Inline Edit Form */
+.cs-erp1-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cs-erp1-inline-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Audit Metadata Panel */
+.cs-erp1-audit-panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-audit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-audit-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cs-erp1-audit-icon {
+  font-size: 1.5rem;
+}
+
+.cs-erp1-audit-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-erp1-audit-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.cs-erp1-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.cs-erp1-audit-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-erp1-audit-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.cs-erp1-audit-value {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.cs-erp1-audit-value-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp1-golden-id {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e40af;
+  background-color: #eff6ff;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #bfdbfe;
+}
+
+.cs-erp1-badge-golden {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.cs-erp1-source-tag {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+/* Linked Entity Records Section */
+.cs-erp1-linked-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cs-erp1-linked-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.cs-erp1-linked-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cs-erp1-linked-icon {
+  font-size: 1.5rem;
+}
+
+.cs-erp1-linked-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-erp1-linked-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.cs-erp1-linked-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.cs-erp1-tab-btn {
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cs-erp1-tab-btn:hover {
+  color: var(--color-text);
+  background-color: var(--color-surface-hover);
+}
+
+.cs-erp1-tab-btn.active {
+  color: var(--color-primary);
+  background-color: var(--color-background);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-linked-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cs-erp1-subtable-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-subtable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp1-subtable-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cs-erp1-badge-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.cs-erp1-module-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.cs-erp1-module-link:hover {
+  text-decoration: underline;
+}
+
+.cs-erp1-link-btn {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cs-erp1-link-btn:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+.cs-erp1-product-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cs-erp1-product-name-link:hover {
+  text-decoration: underline;
+}
+
+.cs-erp1-vendor-name {
+  font-weight: 500;
+}
+
+/* Conflict Banner (409) */
+.cs-erp1-conflict-banner {
+  border-left: 4px solid var(--color-error);
+}
+
+
