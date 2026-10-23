@@ -462,68 +462,65 @@ ERP-2 implements high-reliability batch migration loading conforming to the Clea
 
 ---
 
-## 13. Main Paginated Data Table Specification (ERP2-17 / Gate G2)
+## 13. Search, Filters and Sorting Controls (ERP2-18)
 
-### 13.1 Overview & Architecture
+### 13.1 Debounced Search Bar (AC1)
 
-ERP-2 provides high-performance, accessible, and responsive collection tables for Vendors and Purchase Orders matching the ClearShift System Design Specification (SDS) §4.3 & §4.9. The implementation consumes shared platform UI tokens (`theme.css` / `@cs/ui`) without duplicate infrastructure.
+| Parameter | Value |
+|---|---|
+| Component | `SearchBar` (`apps/erp/modules/erp-2/web/src/components/SearchBar.tsx`) |
+| Debounce delay | 300ms from last keystroke |
+| API parameter | `search` (string, max 100 chars) on `VendorListQuery` |
+| PO search | Client-side text match on `po_number` only (API does not support PO search) |
+| Clear behavior | Clicking ✕ fires `onChange('')` immediately (no debounce) |
+| External reset | Internal state syncs when parent `value` prop changes (e.g. Clear All) |
 
-### 13.2 Stable Column Definitions
+### 13.2 Faceted Filter Sidebar (AC2)
 
-All columns strictly match the domain schemas and data dictionary entities:
+| Facet | Scope | Options | API parameter |
+|---|---|---|---|
+| Currency | Vendors | All, USD, EUR, GBP | Client-side filter (not in API) |
+| Status | Purchase Orders | All, Draft, Sent, Received, Closed | `status` on `PurchaseOrderListQuery` |
 
-#### 13.2.1 Vendors Table Columns
-| Column Header | Field Name | Data Type | Sortable | Notes |
-|---|---|---|---|---|
-| Vendor Name | `name` | string | Yes | Bold display; links to vendor detail |
-| Tax Number | `tax_number` | string | Yes | Monospace font (`.cs-cell-mono`) |
-| Email | `email` | string | Yes | Alphanumeric sortable |
-| Phone | `phone` | string | Yes | Displays `—` if null |
-| Currency | `currency` | ISO-4217 | Yes | Monospace font (`.cs-cell-mono`) |
-| Bank Account | `bank_masked` | string | No | Masked server-side (`XXXX-XXXX-7890`); unmasked bank details never sent to frontend |
-| Location | `city, country` | string | Yes | Composite string: `${city}, ${country}` |
+- Sidebar is collapsible on mobile (< 768px stacks above content).
+- Radio group selection immediately updates filter state and triggers table reload.
+- "Reset Filters" button clears all facets in the sidebar.
 
-#### 13.2.2 Purchase Orders Table Columns
-| Column Header | Field Name | Data Type | Sortable | Notes |
-|---|---|---|---|---|
-| PO Number | `po_number` | string | Yes | Monospace font (`.cs-cell-mono`) |
-| Vendor ID | `vendor_id` | UUID | No | Monospace truncated display `${prefix}…${suffix}` |
-| Order Date | `order_date` | YYYY-MM-DD | Yes | Chronological date sorting |
-| Status | `status` | Enum | Yes | Rendered with status badges (`Draft`, `Sent`, `Received`, `Closed`) |
-| Currency | `currency` | ISO-4217 | Yes | Monospace font (`.cs-cell-mono`) |
-| Order Total | `total` | NUMERIC(18,2) | Yes | Formatted with 2 decimal places; numeric sorting |
-| Lines | `lines` | count | No | Rendered with line count badge |
+### 13.3 Active Filter Pill Tags (AC3)
 
-### 13.3 Server-Side & Query-Bound Pagination
+| Feature | Behavior |
+|---|---|
+| Pill rendering | One pill per active filter (search, currency, status, vendor_id) |
+| Individual remove | Clicking ✕ on a pill clears that specific filter and resets to page 1 |
+| Clear All | Clicking "Clear All" resets all filters and sort to defaults |
+| Empty state | Component returns `null` when no filters are active |
 
-- **Query Parameters**:
-  - `page`: 1-based page number (integer $\ge 1$, default: `1`).
-  - `pageSize`: Bounded items per page (integer $\in [1, 100]$, default: `20`).
-- **Interactive Controls**:
-  - `First page`: Navigates to `page = 1`; disabled when `page <= 1`.
-  - `Previous page`: Decrements page (`page - 1`); disabled when `page <= 1`.
-  - `Page status`: Displays current position `Page {page} of {totalPages}`.
-  - `Next page`: Increments page (`page + 1`); disabled when `page >= totalPages`.
-  - `Last page`: Navigates to `page = totalPages`; disabled when `page >= totalPages`.
-  - `Rows per page selector`: Bounded dropdown with options `10`, `20`, `50`, `100`. Selecting a new size resets `page` to `1`.
-  - `Record range info`: Displays exact window `Showing {startRecord}–{endRecord} of {total} {entity}`.
-- **URL Synchronization**:
-  - Page navigation and page size selections synchronize with the browser's URL query string (`?page=X&pageSize=Y`), supporting bookmarking and back/forward browser navigation.
+### 13.4 URL Query State Synchronization
 
-### 13.4 Predictable Column Header Sorting
+Active filter values are synced to the browser URL using `window.history.replaceState`:
 
-- Interactive column headers feature accessible `<button>` triggers with visual indicator icons:
-  - `▲` for ascending sort (`aria-sort="ascending"`).
-  - `▼` for descending sort (`aria-sort="descending"`).
-  - `⇅` for unsorted columns (`aria-sort="none"`).
-- Clicking an active sorted column toggles between `asc` and `desc`. Clicking an inactive column initiates sort with `asc`.
-- Comparators implement predictable natural order:
-  - Alphanumeric strings: case-insensitive `localeCompare` with `{ numeric: true, sensitivity: 'base' }`.
-  - Monetary amounts: numeric decimal comparison on `Number(total)`.
-  - Dates: ISO-8601 chronological comparison.
+| Tab | URL parameters |
+|---|---|
+| Vendors | `?search=X&currency=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+| Purchase Orders | `?status=X&vendor_id=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
 
-### 13.5 Performance & Bounded DOM Protection
+- Default values (`page=1`, `pageSize=20`, no sort) are omitted from the URL.
+- Parameters are parsed on mount to restore filter state from shared/bookmarked URLs.
 
-- Enforcing a maximum page size of 100 records (`pageSize <= 100`) guarantees bounded DOM node counts, preventing rendering degradation and browser frame drops.
-- Tables render skeleton loading placeholders during data fetching to eliminate cumulative layout shifts (CLS).
+### 13.5 Empty State (AC4)
+
+When a search or filter combination returns zero results and there is no loading or error state, the existing `EmptyState` component is displayed with:
+
+- **Default title**: "No records found"
+- **Default message**: "There are no records matching your current search or filter criteria."
+- Optional action button (e.g. "Clear filters") to reset all filters.
+
+### 13.6 CSS Scoping
+
+All new CSS classes use the `cs-erp2-*` prefix to avoid collision with other modules:
+
+- `cs-erp2-search-*` — Search bar tokens
+- `cs-erp2-pill-*` — Filter pill tags tokens
+- `cs-erp2-faceted-sidebar`, `cs-erp2-sidebar-*`, `cs-erp2-facet-*` — Sidebar tokens
+- `cs-erp2-content-with-sidebar`, `cs-erp2-content-main` — Layout tokens
 

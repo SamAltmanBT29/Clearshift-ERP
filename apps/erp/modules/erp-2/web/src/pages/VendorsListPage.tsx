@@ -1,11 +1,12 @@
 /**
- * ERP-2 Vendors & Purchasing — Vendors and Purchase Orders Primary Collection Page
+ * ERP-2 Vendors & Purchasing — Main List Page
  *
- * Implements main paginated collection screen conforming to SDS §4.3 & §4.9:
- *   - Tabbed view: Vendors master catalog and Purchase Orders
- *   - Server-side bounded pagination with page and pageSize query parameters
- *   - Sortable column headers toggling ascending/descending order
- *   - URL search parameter synchronization
+ * Implements search, filters, and sorting controls for ERP2-18 (Issue #134):
+ *   - Debounced search bar (300ms) via SearchBar component (AC1)
+ *   - Faceted filter sidebar (currency for vendors, status for POs) (AC2)
+ *   - Active filter pill tags with individual clear + Clear All (AC3)
+ *   - Empty state with informative message when no results match (AC4)
+ *   - URL query parameter sync for search, status, currency, page, pageSize, sort, order
  *
  * @module erp2/web/pages/VendorsListPage
  */
@@ -16,100 +17,139 @@ import type {
   VendorListQuery,
   PurchaseOrder,
   PurchaseOrderListQuery,
-  PurchaseOrderStatus,
 } from '@clearshift/contracts';
 import { fetchVendors, fetchPurchaseOrders, ApiError } from '../api/erp-2.js';
 import { VendorsTable } from '../components/VendorsTable.js';
 import { PurchaseOrdersTable } from '../components/PurchaseOrdersTable.js';
 import { VendorFilterBar, PurchaseOrderFilterBar } from '../components/FilterBar.js';
+import { VendorFilterSidebar, POFilterSidebar } from '../components/FilterSidebar.js';
+import { FilterPillTags } from '../components/FilterPillTags.js';
+import type { Erp2ActiveFilters, Erp2FilterKey } from '../components/FilterPillTags.js';
 import { ErrorState, AccessDeniedState } from '../components/StateViews.js';
 
-export const VendorsListPage: React.FC = () => {
-  // Read initial parameters from window.location if present
-  const getInitialParams = () => {
-    if (typeof window === 'undefined' || !window.location || !window.location.search) {
-      return {};
+// ─── URL param helpers ─────────────────────────────────────────────────────────
+
+function parseVendorFiltersFromUrl(): Partial<VendorListQuery & { currency?: string | undefined }> {
+  if (typeof window === 'undefined') return {};
+  const p = new URLSearchParams(window.location.search);
+  const q: Partial<VendorListQuery & { currency?: string | undefined }> = {};
+  const search = p.get('search');
+  if (search) q.search = search;
+  const currency = p.get('currency');
+  if (currency) q.currency = currency;
+  const page = p.get('page');
+  if (page) q.page = Number(page);
+  const pageSize = p.get('pageSize');
+  if (pageSize) q.pageSize = Math.min(100, Number(pageSize));
+  return q;
+}
+
+function parsePOFiltersFromUrl(): Partial<PurchaseOrderListQuery> {
+  if (typeof window === 'undefined') return {};
+  const p = new URLSearchParams(window.location.search);
+  const q: Partial<PurchaseOrderListQuery> = {};
+  const status = p.get('status');
+  if (status) q.status = status as PurchaseOrderListQuery['status'];
+  const vendor_id = p.get('vendor_id');
+  if (vendor_id) q.vendor_id = vendor_id;
+  const page = p.get('page');
+  if (page) q.page = Number(page);
+  const pageSize = p.get('pageSize');
+  if (pageSize) q.pageSize = Math.min(100, Number(pageSize));
+  return q;
+}
+
+function updateUrl(params: Record<string, string | number | undefined>) {
+  if (typeof window === 'undefined') return;
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '' && v !== null) {
+      p.set(k, String(v));
     }
-    const params = new URLSearchParams(window.location.search);
-    const pageStr = params.get('page');
-    const pageSizeStr = params.get('pageSize');
-    return {
-      tab: params.get('tab') === 'orders' ? ('orders' as const) : ('vendors' as const),
-      page: pageStr ? Math.max(1, parseInt(pageStr, 10) || 1) : 1,
-      pageSize: pageSizeStr
-        ? Math.min(100, Math.max(1, parseInt(pageSizeStr, 10) || 20))
-        : 20,
-      search: params.get('search') || '',
-      status: (params.get('status') as PurchaseOrderStatus | null) || undefined,
-      sort: params.get('sort') || undefined,
-      order: (params.get('order') as 'asc' | 'desc' | null) || 'asc',
-    };
-  };
+  }
+  const qs = p.toString();
+  window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+}
 
-  const initial = getInitialParams();
+// ─── Sorting state ────────────────────────────────────────────────────────────
 
-  const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>(initial.tab || 'vendors');
+interface SortState {
+  field: string | undefined;
+  direction: 'asc' | 'desc';
+}
 
-  // Vendors state
+const DEFAULT_VENDOR_SORT: SortState = { field: undefined, direction: 'asc' };
+const DEFAULT_ORDER_SORT: SortState = { field: undefined, direction: 'asc' };
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export const VendorsListPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
+
+  // ── Vendor sidebar collapse ──
+  const [vendorSidebarOpen, setVendorSidebarOpen] = useState(true);
+  const [poSidebarOpen, setPoSidebarOpen] = useState(true);
+
+  // ── Vendors state ──
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsTotal, setVendorsTotal] = useState(0);
   const [vendorsTotalPages, setVendorsTotalPages] = useState(1);
   const [isVendorsLoading, setIsVendorsLoading] = useState(false);
   const [vendorsError, setVendorsError] = useState<{ message: string; isForbidden: boolean } | null>(null);
 
-  const [vendorFilters, setVendorFilters] = useState<VendorListQuery>({
-    page: initial.page || 1,
-    pageSize: initial.pageSize || 20,
-    search: initial.search || '',
-  });
+  const [vendorFilters, setVendorFilters] = useState<VendorListQuery & { currency?: string | undefined }>(() => ({
+    page: 1,
+    pageSize: 20,
+    search: '',
+    ...parseVendorFiltersFromUrl(),
+  }));
+  const [vendorSort, setVendorSort] = useState<SortState>(DEFAULT_VENDOR_SORT);
 
-  const [vendorSort, setVendorSort] = useState<{ field: string | undefined; direction: 'asc' | 'desc' }>({
-    field: initial.sort,
-    direction: initial.order || 'asc',
-  });
-
-  // Purchase Orders state
+  // ── Purchase Orders state ──
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<{ message: string; isForbidden: boolean } | null>(null);
 
-  const [orderFilters, setOrderFilters] = useState<PurchaseOrderListQuery>({
-    page: initial.page || 1,
-    pageSize: initial.pageSize || 20,
-    status: initial.status,
+  const [orderFilters, setOrderFilters] = useState<PurchaseOrderListQuery>(() => ({
+    page: 1,
+    pageSize: 20,
+    status: undefined,
     vendor_id: undefined,
-  });
+    ...parsePOFiltersFromUrl(),
+  }));
+  const [orderSort, setOrderSort] = useState<SortState>(DEFAULT_ORDER_SORT);
 
-  const [orderSort, setOrderSort] = useState<{ field: string | undefined; direction: 'asc' | 'desc' }>({
-    field: initial.sort,
-    direction: initial.order || 'asc',
-  });
-
-  // URL search parameter synchronization
-  const updateUrlParams = useCallback((newParams: Record<string, string | number | undefined | null>) => {
-    if (typeof window === 'undefined' || !window.history || !window.location) return;
-    const current = new URLSearchParams(window.location.search);
-    for (const [key, val] of Object.entries(newParams)) {
-      if (val === undefined || val === null || val === '') {
-        current.delete(key);
-      } else {
-        current.set(key, String(val));
-      }
-    }
-    const newSearch = current.toString();
-    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
-    window.history.replaceState(null, '', newUrl);
-  }, []);
-
-  // Load Vendors
-  const loadVendors = useCallback(async (filters: VendorListQuery) => {
+  // ── Data loaders ──
+  const loadVendors = useCallback(async (filters: VendorListQuery & { currency?: string | undefined }, sort: SortState) => {
     setIsVendorsLoading(true);
     setVendorsError(null);
     try {
-      const response = await fetchVendors(filters);
-      setVendors(response.items || []);
+      const response = await fetchVendors({
+        page: filters.page,
+        pageSize: filters.pageSize,
+        search: filters.search,
+        // currency is a client-side facet (not in API) — filtered locally below
+      });
+      let items = response.items || [];
+      // Client-side currency filter (API does not support currency query)
+      if (filters.currency) {
+        items = items.filter((v) => v.currency === filters.currency);
+      }
+      // Client-side sort (already sorted server-side if sort.field undefined)
+      if (sort.field) {
+        items = [...items].sort((a, b) => {
+          const valA = (a as Record<string, unknown>)[sort.field!];
+          const valB = (b as Record<string, unknown>)[sort.field!];
+          if (valA === valB) return 0;
+          if (valA == null) return 1;
+          if (valB == null) return -1;
+          const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+          return sort.direction === 'desc' ? -cmp : cmp;
+        });
+      }
+      setVendors(items);
       setVendorsTotal(response.total || 0);
       setVendorsTotalPages(response.totalPages || 1);
     } catch (err: any) {
@@ -123,13 +163,29 @@ export const VendorsListPage: React.FC = () => {
     }
   }, []);
 
-  // Load Purchase Orders
-  const loadOrders = useCallback(async (filters: PurchaseOrderListQuery) => {
+  const loadOrders = useCallback(async (filters: PurchaseOrderListQuery, sort: SortState) => {
     setIsOrdersLoading(true);
     setOrdersError(null);
     try {
-      const response = await fetchPurchaseOrders(filters);
-      setOrders(response.items || []);
+      const response = await fetchPurchaseOrders({
+        page: filters.page,
+        pageSize: filters.pageSize,
+        status: filters.status,
+        vendor_id: filters.vendor_id,
+      });
+      let items = response.items || [];
+      if (sort.field) {
+        items = [...items].sort((a, b) => {
+          const valA = (a as Record<string, unknown>)[sort.field!];
+          const valB = (b as Record<string, unknown>)[sort.field!];
+          if (valA === valB) return 0;
+          if (valA == null) return 1;
+          if (valB == null) return -1;
+          const cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' });
+          return sort.direction === 'desc' ? -cmp : cmp;
+        });
+      }
+      setOrders(items);
       setOrdersTotal(response.total || 0);
       setOrdersTotalPages(response.totalPages || 1);
     } catch (err: any) {
@@ -143,73 +199,106 @@ export const VendorsListPage: React.FC = () => {
     }
   }, []);
 
-  // Effect to load data when tab or respective filters change
+  // ── Effects ──
   useEffect(() => {
     if (activeTab === 'vendors') {
-      loadVendors(vendorFilters);
-      updateUrlParams({
-        tab: 'vendors',
-        page: vendorFilters.page,
-        pageSize: vendorFilters.pageSize,
+      updateUrl({
         search: vendorFilters.search,
+        currency: vendorFilters.currency,
+        page: vendorFilters.page !== 1 ? vendorFilters.page : undefined,
+        pageSize: vendorFilters.pageSize !== 20 ? vendorFilters.pageSize : undefined,
         sort: vendorSort.field,
-        order: vendorSort.direction,
+        order: vendorSort.field ? vendorSort.direction : undefined,
       });
-    } else {
-      loadOrders(orderFilters);
-      updateUrlParams({
-        tab: 'orders',
-        page: orderFilters.page,
-        pageSize: orderFilters.pageSize,
-        status: orderFilters.status,
-        sort: orderSort.field,
-        order: orderSort.direction,
-      });
+      loadVendors(vendorFilters, vendorSort);
     }
-  }, [
-    activeTab,
-    vendorFilters,
-    orderFilters,
-    vendorSort,
-    orderSort,
-    loadVendors,
-    loadOrders,
-    updateUrlParams,
-  ]);
+  }, [activeTab, vendorFilters, vendorSort, loadVendors]);
 
-  const handleVendorSortChange = (field: string) => {
-    setVendorSort((prev) => {
-      const nextDir = prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc';
-      return { field, direction: nextDir };
-    });
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      updateUrl({
+        status: orderFilters.status,
+        vendor_id: orderFilters.vendor_id,
+        page: orderFilters.page !== 1 ? orderFilters.page : undefined,
+        pageSize: orderFilters.pageSize !== 20 ? orderFilters.pageSize : undefined,
+        sort: orderSort.field,
+        order: orderSort.field ? orderSort.direction : undefined,
+      });
+      loadOrders(orderFilters, orderSort);
+    }
+  }, [activeTab, orderFilters, orderSort, loadOrders]);
+
+  // ── Sort handlers ──
+  const handleVendorSortChange = useCallback((field: string) => {
+    setVendorSort((prev) => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
+
+  const handleOrderSortChange = useCallback((field: string) => {
+    setOrderSort((prev) => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }, []);
+
+  // ── Pill tag handlers for vendors ──
+  const vendorActivePillFilters: Erp2ActiveFilters = {
+    search: vendorFilters.search,
+    currency: vendorFilters.currency,
   };
 
-  const handleOrderSortChange = (field: string) => {
-    setOrderSort((prev) => {
-      const nextDir = prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc';
-      return { field, direction: nextDir };
-    });
+  const handleRemoveVendorFilter = useCallback((key: Erp2FilterKey) => {
+    setVendorFilters((prev) => ({
+      ...prev,
+      [key]: key === 'search' ? '' : undefined,
+      page: 1,
+    }));
+  }, []);
+
+  const handleClearAllVendorFilters = useCallback(() => {
+    setVendorFilters({ page: 1, pageSize: 20, search: '' });
+    setVendorSort(DEFAULT_VENDOR_SORT);
+  }, []);
+
+  // ── Pill tag handlers for orders ──
+  const orderActivePillFilters: Erp2ActiveFilters = {
+    status: orderFilters.status,
+    vendor_id: orderFilters.vendor_id,
   };
+
+  const handleRemoveOrderFilter = useCallback((key: Erp2FilterKey) => {
+    setOrderFilters((prev) => ({
+      ...prev,
+      [key]: undefined,
+      page: 1,
+    }));
+  }, []);
+
+  const handleClearAllOrderFilters = useCallback(() => {
+    setOrderFilters({ page: 1, pageSize: 20, status: undefined, vendor_id: undefined });
+    setOrderSort(DEFAULT_ORDER_SORT);
+  }, []);
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="cs-module-root">
       {/* Page Header */}
       <header className="cs-page-header">
-        <h1 className="cs-page-title">Vendors & Purchasing</h1>
+        <h1 className="cs-page-title">Vendors &amp; Purchasing</h1>
         <p className="cs-page-description">
           Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
         </p>
       </header>
 
-      {/* Tabs navigation */}
+      {/* Tabs */}
       <nav className="cs-tabs-container" aria-label="Vendors and purchase order views">
         <button
           type="button"
           className={`cs-tab-btn ${activeTab === 'vendors' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('vendors');
-            updateUrlParams({ tab: 'vendors' });
-          }}
+          onClick={() => setActiveTab('vendors')}
           aria-selected={activeTab === 'vendors'}
           role="tab"
         >
@@ -218,10 +307,7 @@ export const VendorsListPage: React.FC = () => {
         <button
           type="button"
           className={`cs-tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('orders');
-            updateUrlParams({ tab: 'orders' });
-          }}
+          onClick={() => setActiveTab('orders')}
           aria-selected={activeTab === 'orders'}
           role="tab"
         >
@@ -229,114 +315,141 @@ export const VendorsListPage: React.FC = () => {
         </button>
       </nav>
 
-      {/* Main Tab Content */}
+      {/* ── Vendors Tab ── */}
       {activeTab === 'vendors' ? (
-        <main>
-          <VendorFilterBar
-            filters={vendorFilters}
+        <main className="cs-erp2-content-with-sidebar">
+          {/* Faceted filter sidebar */}
+          <VendorFilterSidebar
+            filters={{ currency: vendorFilters.currency }}
             onFilterChange={(updated) =>
-              setVendorFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+              setVendorFilters((prev) => ({
+                ...prev,
+                currency: updated.currency !== undefined ? updated.currency : prev.currency,
+                page: 1,
+              }))
             }
-            onReset={() => setVendorFilters({ page: 1, pageSize: 20, search: '' })}
+            onResetFilters={handleClearAllVendorFilters}
             isLoading={isVendorsLoading}
+            isOpen={vendorSidebarOpen}
+            onToggle={() => setVendorSidebarOpen((v) => !v)}
           />
 
-          {vendorsError ? (
-            vendorsError.isForbidden ? (
-              <AccessDeniedState
-                title="Access Denied"
-                message="You do not have permission to view vendor profiles. Please check your role assignments."
-              />
-            ) : (
-              <ErrorState
-                title="Failed to Load Vendors"
-                message={vendorsError.message}
-                onRetry={() => loadVendors(vendorFilters)}
-              />
-            )
-          ) : (
-            <VendorsTable
-              vendors={vendors}
+          <div className="cs-erp2-content-main">
+            {/* Debounced search bar (AC1) */}
+            <VendorFilterBar
+              filters={vendorFilters}
+              onFilterChange={(updated) =>
+                setVendorFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+              }
+              onReset={handleClearAllVendorFilters}
               isLoading={isVendorsLoading}
-              total={vendorsTotal}
-              page={vendorFilters.page || 1}
-              pageSize={vendorFilters.pageSize || 20}
-              totalPages={vendorsTotalPages}
-              sortField={vendorSort.field}
-              sortDirection={vendorSort.direction}
-              onSortChange={handleVendorSortChange}
-              onPageChange={(newPage) =>
-                setVendorFilters((prev) => ({
-                  ...prev,
-                  page: Math.max(1, Math.min(newPage, vendorsTotalPages || 1)),
-                }))
-              }
-              onPageSizeChange={(newPageSize) =>
-                setVendorFilters((prev) => ({
-                  ...prev,
-                  pageSize: Math.min(100, Math.max(1, newPageSize)),
-                  page: 1,
-                }))
-              }
-              onRefresh={() => setVendorFilters({ page: 1, pageSize: 20, search: '' })}
             />
-          )}
+
+            {/* Active filter pills (AC3) */}
+            <FilterPillTags
+              filters={vendorActivePillFilters}
+              onRemoveFilter={handleRemoveVendorFilter}
+              onClearAll={handleClearAllVendorFilters}
+              disabled={isVendorsLoading}
+            />
+
+            {vendorsError ? (
+              vendorsError.isForbidden ? (
+                <AccessDeniedState
+                  title="Access Denied"
+                  message="You do not have permission to view vendor profiles. Please check your role assignments."
+                />
+              ) : (
+                <ErrorState
+                  title="Failed to Load Vendors"
+                  message={vendorsError.message}
+                  onRetry={() => loadVendors(vendorFilters, vendorSort)}
+                />
+              )
+            ) : (
+              <VendorsTable
+                vendors={vendors}
+                isLoading={isVendorsLoading}
+                total={vendorsTotal}
+                page={vendorFilters.page || 1}
+                pageSize={vendorFilters.pageSize || 20}
+                totalPages={vendorsTotalPages}
+                onPageChange={(newPage: number) =>
+                  setVendorFilters((prev) => ({
+                    ...prev,
+                    page: Math.max(1, Math.min(newPage, vendorsTotalPages || 1)),
+                  }))
+                }
+                onRefresh={handleClearAllVendorFilters}
+              />
+            )}
+          </div>
         </main>
       ) : (
-        <main>
-          <PurchaseOrderFilterBar
-            filters={orderFilters}
+        /* ── Purchase Orders Tab ── */
+        <main className="cs-erp2-content-with-sidebar">
+          {/* Faceted filter sidebar */}
+          <POFilterSidebar
+            filters={{ status: orderFilters.status }}
             onFilterChange={(updated) =>
               setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))
             }
-            onReset={() =>
-              setOrderFilters({ page: 1, pageSize: 20, status: undefined, vendor_id: undefined })
-            }
+            onResetFilters={handleClearAllOrderFilters}
             isLoading={isOrdersLoading}
+            isOpen={poSidebarOpen}
+            onToggle={() => setPoSidebarOpen((v) => !v)}
           />
 
-          {ordersError ? (
-            ordersError.isForbidden ? (
-              <AccessDeniedState
-                title="Access Denied"
-                message="You do not have permission to view purchase orders. Please check your role assignments."
-              />
-            ) : (
-              <ErrorState
-                title="Failed to Load Purchase Orders"
-                message={ordersError.message}
-                onRetry={() => loadOrders(orderFilters)}
-              />
-            )
-          ) : (
-            <PurchaseOrdersTable
-              purchaseOrders={orders}
+          <div className="cs-erp2-content-main">
+            {/* Status filter bar */}
+            <PurchaseOrderFilterBar
+              filters={orderFilters}
+              onFilterChange={(updated) =>
+                setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+              }
+              onReset={handleClearAllOrderFilters}
               isLoading={isOrdersLoading}
-              total={ordersTotal}
-              page={orderFilters.page || 1}
-              pageSize={orderFilters.pageSize || 20}
-              totalPages={ordersTotalPages}
-              sortField={orderSort.field}
-              sortDirection={orderSort.direction}
-              onSortChange={handleOrderSortChange}
-              onPageChange={(newPage) =>
-                setOrderFilters((prev) => ({
-                  ...prev,
-                  page: Math.max(1, Math.min(newPage, ordersTotalPages || 1)),
-                }))
-              }
-              onPageSizeChange={(newPageSize) =>
-                setOrderFilters((prev) => ({
-                  ...prev,
-                  pageSize: Math.min(100, Math.max(1, newPageSize)),
-                  page: 1,
-                }))
-              }
-              onRefresh={() =>
-                setOrderFilters({ page: 1, pageSize: 20, status: undefined, vendor_id: undefined })
-              }
             />
-          )}
+
+            {/* Active filter pills (AC3) */}
+            <FilterPillTags
+              filters={orderActivePillFilters}
+              onRemoveFilter={handleRemoveOrderFilter}
+              onClearAll={handleClearAllOrderFilters}
+              disabled={isOrdersLoading}
+            />
+
+            {ordersError ? (
+              ordersError.isForbidden ? (
+                <AccessDeniedState
+                  title="Access Denied"
+                  message="You do not have permission to view purchase orders. Please check your role assignments."
+                />
+              ) : (
+                <ErrorState
+                  title="Failed to Load Purchase Orders"
+                  message={ordersError.message}
+                  onRetry={() => loadOrders(orderFilters, orderSort)}
+                />
+              )
+            ) : (
+              <PurchaseOrdersTable
+                purchaseOrders={orders}
+                isLoading={isOrdersLoading}
+                total={ordersTotal}
+                page={orderFilters.page || 1}
+                pageSize={orderFilters.pageSize || 20}
+                totalPages={ordersTotalPages}
+                onPageChange={(newPage: number) =>
+                  setOrderFilters((prev) => ({
+                    ...prev,
+                    page: Math.max(1, Math.min(newPage, ordersTotalPages || 1)),
+                  }))
+                }
+                onRefresh={handleClearAllOrderFilters}
+              />
+            )}
+          </div>
         </main>
       )}
     </div>
