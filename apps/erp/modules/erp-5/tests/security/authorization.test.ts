@@ -23,6 +23,7 @@ import { signAccessToken, Roles } from '@cs/identity';
 import { buildHrApp } from '../../src/app.js';
 import { HrService } from '../../src/services/hr.service.js';
 import { InMemoryHrRepository } from '../../src/services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import { HR_ROUTE_POLICIES, isPolicySatisfied } from '../../src/policies/permissions.js';
 import {
   FIXTURE_DEPARTMENT_ENGINEERING,
@@ -192,7 +193,8 @@ describe('ERP-5 HR & Employees — authorization policy (PLT-06 / ERP5-15)', () 
 
   beforeEach(() => {
     repository = new InMemoryHrRepository(true);
-    hrService = new HrService(repository);
+    const auditService = new AuditService(new InMemoryAuditRepository());
+    hrService = new HrService(repository, auditService);
     app = buildHrApp({ repository, hrService, authRequired: true });
   });
 
