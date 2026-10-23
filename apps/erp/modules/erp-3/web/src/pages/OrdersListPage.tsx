@@ -9,10 +9,24 @@ import { fetchSalesOrders, fetchInvoices } from '../api/erp-3.js';
 import { OrdersTable } from '../components/OrdersTable.js';
 import { InvoicesTable } from '../components/InvoicesTable.js';
 import { FilterBar, InvoiceFilterBar } from '../components/FilterBar.js';
-import { ErrorState, EmptyState, SkeletonTable } from '../components/StateViews.js';
+import { ErrorState, EmptyState } from '../components/StateViews.js';
+import { OrderCreatePage } from './OrderCreatePage.js';
+import { OrderDetailPage } from './OrderDetailPage.js';
+import { InvoiceCreatePage } from './InvoiceCreatePage.js';
+import { InvoiceDetailPage } from './InvoiceDetailPage.js';
+
+export type OrdersViewMode =
+  | 'list'
+  | 'create-order'
+  | 'order-detail'
+  | 'create-invoice'
+  | 'invoice-detail';
 
 export const OrdersListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>('orders');
+  const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   // Sales Orders state
   const [orders, setOrders] = useState<SalesOrder[]>([]);
@@ -76,21 +90,111 @@ export const OrdersListPage: React.FC = () => {
 
   // Effect to load on filter or tab change
   useEffect(() => {
-    if (activeTab === 'orders') {
-      loadOrders(orderFilters);
-    } else {
-      loadInvoices(invoiceFilters);
+    if (viewMode === 'list') {
+      if (activeTab === 'orders') {
+        loadOrders(orderFilters);
+      } else {
+        loadInvoices(invoiceFilters);
+      }
     }
-  }, [activeTab, orderFilters, invoiceFilters, loadOrders, loadInvoices]);
+  }, [viewMode, activeTab, orderFilters, invoiceFilters, loadOrders, loadInvoices]);
+
+  // View dispatchers
+  if (viewMode === 'create-order') {
+    return (
+      <OrderCreatePage
+        onBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+        onOrderCreated={(created) => {
+          setSelectedOrderId(created.id);
+          setViewMode('order-detail');
+          loadOrders(orderFilters);
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'order-detail' && selectedOrderId) {
+    return (
+      <OrderDetailPage
+        orderId={selectedOrderId}
+        onBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+        onCreateInvoice={(ord) => {
+          setSelectedOrderId(ord.id);
+          setViewMode('create-invoice');
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'create-invoice') {
+    return (
+      <InvoiceCreatePage
+        initialOrderId={selectedOrderId || ''}
+        onBack={() => {
+          setViewMode('list');
+          loadInvoices(invoiceFilters);
+        }}
+        onInvoiceCreated={(created) => {
+          setSelectedInvoiceId(created.id);
+          setViewMode('invoice-detail');
+          loadInvoices(invoiceFilters);
+        }}
+      />
+    );
+  }
+
+  if (viewMode === 'invoice-detail' && selectedInvoiceId) {
+    return (
+      <InvoiceDetailPage
+        invoiceId={selectedInvoiceId}
+        onBack={() => {
+          setViewMode('list');
+          loadInvoices(invoiceFilters);
+        }}
+        onViewOrder={(ordId) => {
+          setSelectedOrderId(ordId);
+          setViewMode('order-detail');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="cs-module-root">
-      {/* Page Header */}
+      {/* Page Header with Action Buttons */}
       <header className="cs-page-header">
-        <h1 className="cs-page-title">Sales Orders & Invoices</h1>
-        <p className="cs-page-description">
-          Manage customer purchase orders, line items, billing invoices, and payment statuses (ERP-3).
-        </p>
+        <div className="cs-header-actions-row">
+          <div>
+            <h1 className="cs-page-title">Sales Orders & Invoices</h1>
+            <p className="cs-page-description">
+              Manage customer purchase orders, line items, billing invoices, and payment statuses (ERP-3).
+            </p>
+          </div>
+          <div className="cs-top-actions">
+            <button
+              type="button"
+              className="cs-btn-primary"
+              onClick={() => setViewMode('create-order')}
+              aria-label="Create new sales order"
+            >
+              + New Sales Order
+            </button>
+            <button
+              type="button"
+              className="cs-btn-secondary"
+              onClick={() => setViewMode('create-invoice')}
+              aria-label="Create new invoice"
+            >
+              + New Invoice
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* Tabs navigation */}
@@ -141,6 +245,10 @@ export const OrdersListPage: React.FC = () => {
               totalPages={ordersTotalPages}
               onPageChange={(newPage) => setOrderFilters((prev) => ({ ...prev, page: newPage }))}
               onRefresh={() => setOrderFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
+              onSelectOrder={(ord) => {
+                setSelectedOrderId(ord.id);
+                setViewMode('order-detail');
+              }}
             />
           )}
         </main>
@@ -169,6 +277,10 @@ export const OrdersListPage: React.FC = () => {
               totalPages={invoicesTotalPages}
               onPageChange={(newPage) => setInvoiceFilters((prev) => ({ ...prev, page: newPage }))}
               onRefresh={() => setInvoiceFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
+              onSelectInvoice={(inv) => {
+                setSelectedInvoiceId(inv.id);
+                setViewMode('invoice-detail');
+              }}
             />
           )}
         </main>
