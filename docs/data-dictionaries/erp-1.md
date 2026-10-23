@@ -33,6 +33,10 @@
 19. [Requirement-to-Test Traceability Matrix (ERP1-24)](#19-requirement-to-test-traceability-matrix-erp1-24)
 20. [Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)](#20-canonical-dirty-data-pack-plan--defect-distribution-erp1-24)
 21. [Gate G1 Review & Design Artifact Sign-Off (ERP1-24)](#21-gate-g1-review--design-artifact-sign-off-erp1-24)
+22. [Public Import Endpoints & Idempotent Ingestion (ERP1-11)](#22-public-import-endpoints--idempotent-ingestion-erp1-11)
+23. [Exact Duplicate Key Matching Policy & Human Review (ERP1-12)](#23-exact-duplicate-key-matching-policy--human-review-erp1-12)
+24. [Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)](#24-idempotent-retry-and-partial-load-stop-behavior-erp1-13)
+25. [Module Authorization and Policy Integration (ERP1-15)](#25-module-authorization-and-policy-integration-erp1-15)
 
 ---
 
@@ -1024,4 +1028,54 @@ const mock = createErp1MockServer();
 - **Author**: Samarth (`Samarth-ITM`)
 - **Role**: Group 6 / Role 4 — Data & QA Lead
 - **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
+---
+
+## 27. Module Authorization and Policy Integration (ERP1-15)
+
+**Issue Reference**: [#111](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/111)<br />
+**Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.8, §7.9, §9.3; PLT-05, PLT-06<br />
+**Implementation**: `apps/erp/modules/erp-1/src/app.ts`, `apps/erp/modules/erp-1/src/routes/guard.ts`
+
+### 27.1 Hub JWT Token Signature & Expiry Validation (AC1)
+
+Every ERP-1 endpoint validates incoming Bearer tokens using `@cs/identity` (`verifyAccessToken`):
+- **Cryptographic Verification**: Ed25519 (EdDSA) asymmetric public key signature validation (`cs-hub-key-v1`).
+- **Standard Token Claims**: Validates `iss` (`clearshift-hub`), `aud` (`clearshift`), `exp` (15-minute token TTL), `sub`, and `roles`.
+- **Default Deny**: Missing `Authorization` header, invalid token format, expired tokens, tampered signatures, or revoked/disabled user accounts (`USER_DISABLED`) immediately return `401 Unauthorized`.
+
+### 27.2 Role Capability Matrix Enforcement (AC2 & AC3)
+
+Authorization consumes the platform RBAC capability matrix (PLT-03):
+
+| Role | Role Identifier | Assigned Capabilities | Permitted Operations | Denied Operations |
+|---|---|---|---|---|
+| **Viewer** | `viewer` | `module.read`, `kit.read`, `control.read` | `GET /products`, `GET /categories`, `GET /stock`, `GET /duplicates/candidates` | All `POST`, `PATCH`, `PUT`, `DELETE` writes (`403 Forbidden`) |
+| **Editor** | `editor` | `module.read`, `module.write`, `kit.read`, `kit.review` | `GET /products`, `POST /products`, `PATCH /products/:id`, `POST /categories`, `PATCH /categories/:id`, `POST /duplicates/review` | Administrative period locks and platform configs |
+| **Migration Runner** | `migration_runner` | `kit.read`, `kit.run` | `POST /import`, `POST /import/batch`, `POST /products` (via `kit.run`), `POST /stock/opening` (via `kit.run`) | Browser UI edits (`PATCH /products/:id` without `module.write`), human duplicate candidate review (`POST /duplicates/review`) |
+| **Analyst** | `analyst` | `module.read`, `kit.read`, `control.read` | Read-only analytics across products, categories, stock levels | All mutation and ingestion operations (`403 Forbidden`) |
+| **Admin** | `admin` | `module.read`, `module.write`, `kit.read`, `kit.review`, `kit.admin`, `control.read`, `hub.admin` | Unrestricted read, write, bulk ingestion, duplicate reviews, and system maintenance | — |
+
+### 27.3 Object-Level Authorization & Boundary Isolation (AC4)
+
+To prevent cross-tenant leakage or unauthorized record hijacking:
+1. **Multi-Tenant Boundary Isolation (`assertTenantAccess`)**:
+   - Compares the requesting user's tenant context (`x-tenant-id` header or JWT claims) against the target entity's tenant context.
+   - Any cross-tenant read or mutation attempt is rejected with `HTTP 403` and error code `OBJECT_ACCESS_DENIED`.
+2. **Cross-User Mutation Safety (`assertObjectMutationAccess`)**:
+   - Records track creating user identity (`created_by` / `created_by_user_id`).
+   - Non-admin callers attempting to mutate or modify records created by another user are rejected with `HTTP 403` and error code `CROSS_USER_MUTATION_FORBIDDEN`.
+   - Administrators retain cross-user management rights within their tenant boundary.
+
+### 27.4 Standard Error Envelope Conformance
+
+All `401 Unauthorized` and `403 Forbidden` responses strictly conform to the standard ClearShift error envelope:
+```json
+{
+  "code": "FORBIDDEN",
+  "message": "Access denied. Required capability: 'module.write'",
+  "details": [],
+  "correlation_id": "12345678-1234-4234-8234-1234567890ab"
+}
+```
 

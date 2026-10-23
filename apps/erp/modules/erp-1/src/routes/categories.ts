@@ -16,7 +16,15 @@ import {
   Erp1IdParamSchema,
   UpdateCategoryInputSchema,
 } from '@clearshift/contracts';
-import { erp1IngestGuard, erp1ReadGuard, erp1WriteGuard } from './guard.js';
+import {
+  assertObjectMutationAccess,
+  assertTenantAccess,
+  erp1IngestGuard,
+  erp1ReadGuard,
+  erp1WriteGuard,
+  registerEntityCreator,
+  registerEntityTenant,
+} from './guard.js';
 import { parseWriteBody } from './parsing.js';
 import type { Erp1RouteOptions } from './types.js';
 
@@ -46,6 +54,7 @@ export const categoriesRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fas
     async (request, reply) => {
       const { id } = Erp1IdParamSchema.parse(request.params);
       const category = await erp1Service.getCategoryById(id);
+      assertTenantAccess(request.user, category, request.headers['x-tenant-id'] as string | undefined);
       return reply.status(200).send(category);
     }
   );
@@ -55,7 +64,15 @@ export const categoriesRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fas
     { preHandler: erp1IngestGuard },
     async (request, reply) => {
       const body = parseWriteBody(CreateCategoryInputSchema, request);
+      const requestTenant = request.headers['x-tenant-id'] as string | undefined;
+      assertTenantAccess(request.user, body as Record<string, unknown>, requestTenant);
       const result = await erp1Service.createCategoryWithIdempotency(body);
+
+      const tenantId = ((body as Record<string, unknown>)['tenant_id'] as string | undefined) ?? requestTenant;
+      if (result.entity?.id) {
+        registerEntityTenant(result.entity.id, tenantId);
+        registerEntityCreator(result.entity.id, request.user?.sub);
+      }
 
       return reply.status(result.priorResult ? 200 : 201).send({
         ...result.entity,
@@ -69,7 +86,12 @@ export const categoriesRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fas
     { preHandler: erp1WriteGuard },
     async (request, reply) => {
       const { id } = Erp1IdParamSchema.parse(request.params);
+      const requestTenant = request.headers['x-tenant-id'] as string | undefined;
+      const existing = await erp1Service.getCategoryById(id);
+      assertObjectMutationAccess(request.user, existing, requestTenant);
+
       const body = UpdateCategoryInputSchema.parse(request.body ?? {});
+      assertTenantAccess(request.user, body as Record<string, unknown>, requestTenant);
       const category = await erp1Service.updateCategory(id, body);
       return reply.status(200).send(category);
     }

@@ -22,6 +22,7 @@ import {
   UuidSchema,
 } from '@clearshift/contracts';
 import type { Erp1Service } from '../services/erp1.service.js';
+import { erp1ReadGuard, erp1ReviewGuard, assertTenantAccess } from './guard.js';
 
 export const duplicateRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = async (
   fastify,
@@ -30,7 +31,10 @@ export const duplicateRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> =
   const service = opts.erp1Service;
 
   // POST /duplicates/check
-  fastify.post('/duplicates/check', async (request, reply) => {
+  fastify.post('/duplicates/check', { preHandler: erp1ReadGuard }, async (request, reply) => {
+    const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+    assertTenantAccess(request.user, rawBody, request.headers['x-tenant-id'] as string | undefined);
+
     const parsed = CheckErp1DuplicatesRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       const correlationId =
@@ -52,7 +56,7 @@ export const duplicateRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> =
   });
 
   // GET /duplicates/candidates
-  fastify.get('/duplicates/candidates', async (request, reply) => {
+  fastify.get('/duplicates/candidates', { preHandler: erp1ReadGuard }, async (request, reply) => {
     const query = request.query as { entity?: 'product' | 'category' | undefined };
     const candidates = await service.getDuplicateCandidates(query.entity);
     return reply.status(200).send({
@@ -62,7 +66,7 @@ export const duplicateRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> =
   });
 
   // GET /duplicates/candidates/:id
-  fastify.get('/duplicates/candidates/:id', async (request, reply) => {
+  fastify.get('/duplicates/candidates/:id', { preHandler: erp1ReadGuard }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const validUuid = UuidSchema.safeParse(id);
     if (!validUuid.success) {
@@ -98,7 +102,10 @@ export const duplicateRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> =
   });
 
   // POST /duplicates/review
-  fastify.post('/duplicates/review', async (request, reply) => {
+  fastify.post('/duplicates/review', { preHandler: erp1ReviewGuard }, async (request, reply) => {
+    const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+    assertTenantAccess(request.user, rawBody, request.headers['x-tenant-id'] as string | undefined);
+
     const parsed = ReviewErp1DuplicateRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       const correlationId =
