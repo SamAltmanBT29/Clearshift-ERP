@@ -21,7 +21,7 @@
  * @module erp5/db/repository
  */
 
-import { and, asc, count, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
   HrDepartment,
@@ -364,12 +364,19 @@ export class DrizzleHrRepository implements HrRepository {
     }
 
     const where = filters.length > 0 ? and(...filters) : undefined;
+    const descSort = query.sort_dir === 'desc';
     const orderBy =
       query.sort === 'employee_no'
-        ? [asc(erp5Employees.employee_no), asc(erp5Employees.id)]
+        ? descSort
+          ? [desc(erp5Employees.employee_no), desc(erp5Employees.id)]
+          : [asc(erp5Employees.employee_no), asc(erp5Employees.id)]
         : query.sort === 'join_date'
-          ? [asc(erp5Employees.join_date), asc(erp5Employees.id)]
-          : [asc(erp5Employees.last_name), asc(erp5Employees.first_name), asc(erp5Employees.id)];
+          ? descSort
+            ? [desc(erp5Employees.join_date), desc(erp5Employees.id)]
+            : [asc(erp5Employees.join_date), asc(erp5Employees.id)]
+          : descSort
+            ? [desc(erp5Employees.last_name), desc(erp5Employees.first_name), desc(erp5Employees.id)]
+            : [asc(erp5Employees.last_name), asc(erp5Employees.first_name), asc(erp5Employees.id)];
 
     const rows = await this.db
       .select()
@@ -402,10 +409,15 @@ export class DrizzleHrRepository implements HrRepository {
     }
 
     const where = filters.length > 0 ? and(...filters) : undefined;
+    const descSort = query.sort_dir === 'desc';
     const orderBy =
       query.sort === 'code'
-        ? [asc(erp5Departments.code), asc(erp5Departments.id)]
-        : [asc(erp5Departments.name), asc(erp5Departments.id)];
+        ? descSort
+          ? [desc(erp5Departments.code), desc(erp5Departments.id)]
+          : [asc(erp5Departments.code), asc(erp5Departments.id)]
+        : descSort
+          ? [desc(erp5Departments.name), desc(erp5Departments.id)]
+          : [asc(erp5Departments.name), asc(erp5Departments.id)];
 
     const rows = await this.db
       .select()
