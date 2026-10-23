@@ -37,6 +37,8 @@ tags:
     description: Purchase order creation, calculations, and status transitions
   - name: Migration Import
     description: Migration Kit target adapter and durable import receipts (KIT-08)
+  - name: Duplicates
+    description: Exact duplicate key matching, candidates queue, and audited human review (KIT-10 / ERP2-12)
 
 paths:
   /vendors:
@@ -350,6 +352,103 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+
+  /duplicates/check:
+    post:
+      operationId: checkDuplicates
+      tags: [Duplicates]
+      summary: Scans candidate records for exact or ambiguous duplicates against the target database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckDuplicatesRequest"
+      responses:
+        "200":
+          description: Duplicate check results with identified candidates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckDuplicatesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /duplicates/candidates:
+    get:
+      operationId: listDuplicateCandidates
+      tags: [Duplicates]
+      summary: List all held duplicate candidates awaiting human review
+      parameters:
+        - name: entity
+          in: query
+          schema:
+            type: string
+            enum: [vendor, purchase_order]
+      responses:
+        "200":
+          description: List of duplicate candidate records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DuplicateCandidateRecord"
+                  total:
+                    type: integer
+
+  /duplicates/candidates/{id}:
+    get:
+      operationId: getDuplicateCandidateById
+      tags: [Duplicates]
+      summary: Retrieve a single duplicate candidate by candidate UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Candidate record details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateCandidateRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /duplicates/review:
+    post:
+      operationId: reviewDuplicateCandidate
+      tags: [Duplicates]
+      summary: Submit an authorized human review decision for a held duplicate candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewDuplicateRequest"
+      responses:
+        "200":
+          description: Review decision executed and recorded in immutable audit log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewDuplicateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   schemas:
@@ -901,9 +1000,166 @@ components:
         correlation_id:
           type: string
 
+    DuplicateMatchKind:
+      type: string
+      enum: [EXACT_TAX_NUMBER, EXACT_EMAIL, EXACT_PO_NUMBER, AMBIGUOUS]
+
+    DuplicateCandidateStatus:
+      type: string
+      enum: [PENDING_REVIEW, MERGED, REJECTED, KEPT_BOTH]
+
+    MergeDecisionType:
+      type: string
+      enum: [MERGE, REJECT, KEEP_BOTH]
+
+    DuplicateCandidateRecord:
+      type: object
+      required:
+        - candidate_id
+        - entity
+        - match_kind
+        - status
+        - matching_key
+        - matching_value
+        - incoming_record
+        - existing_record
+        - confidence
+        - created_at
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        entity:
+          type: string
+          enum: [vendor, purchase_order]
+        match_kind:
+          $ref: "#/components/schemas/DuplicateMatchKind"
+        status:
+          $ref: "#/components/schemas/DuplicateCandidateStatus"
+        matching_key:
+          type: string
+        matching_value:
+          type: string
+        incoming_record:
+          type: object
+        existing_record:
+          type: object
+        confidence:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        decided_by:
+          type: string
+          nullable: true
+        decision:
+          $ref: "#/components/schemas/MergeDecisionType"
+          nullable: true
+        rationale:
+          type: string
+          nullable: true
+
+    CheckDuplicatesRequest:
+      type: object
+      required:
+        - entity
+        - records
+      properties:
+        entity:
+          type: string
+          enum: [vendor, purchase_order]
+        records:
+          type: array
+          items:
+            type: object
+
+    CheckDuplicatesResponse:
+      type: object
+      required:
+        - entity
+        - total_checked
+        - duplicates_found
+        - candidates
+      properties:
+        entity:
+          type: string
+          enum: [vendor, purchase_order]
+        total_checked:
+          type: integer
+        duplicates_found:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicateCandidateRecord"
+
+    ReviewDuplicateRequest:
+      type: object
+      required:
+        - candidate_id
+        - decision
+        - rationale
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        decision:
+          $ref: "#/components/schemas/MergeDecisionType"
+        kept_id:
+          type: string
+          format: uuid
+        merged_id:
+          type: string
+          format: uuid
+        rationale:
+          type: string
+          minLength: 5
+
+    ReviewDuplicateResponse:
+      type: object
+      required:
+        - candidate_id
+        - decision
+        - status
+        - actor_id
+        - timestamp
+        - audit_record_id
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        decision:
+          $ref: "#/components/schemas/MergeDecisionType"
+        status:
+          $ref: "#/components/schemas/DuplicateCandidateStatus"
+        kept_id:
+          type: string
+          format: uuid
+        merged_id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        audit_record_id:
+          type: string
+          format: uuid
+
   responses:
     BadRequest:
       description: Bad Request / Validation Failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: Access Denied / Insufficient Role Permissions
       content:
         application/json:
           schema:

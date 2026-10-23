@@ -30,7 +30,19 @@ import type {
   PurchaseOrderStatus,
   ImportRowRequest,
   ImportRowResponse,
+  CheckDuplicatesRequest,
+  CheckDuplicatesResponse,
+  ReviewDuplicateRequest,
+  ReviewDuplicateResponse,
+  DuplicateCandidateRecord,
 } from '@clearshift/contracts';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
+import {
+  classifyVendorCandidate,
+  classifyPurchaseOrderCandidate,
+  assertNoFuzzyAutoMerge,
+  assertValidHumanMergeDecision,
+} from '../domain/duplicate-policy.js';
 
 /**
  * Extended import row request with optional upsert semantics (ERP2-11).
@@ -54,7 +66,6 @@ import {
   assertSourceIdentityIsComplete,
 } from '../domain/relationships.js';
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Service Options
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +73,7 @@ import {
 export interface Erp2ServiceOptions {
   repository: Erp2Repository;
   referenceResolver?: ReferenceResolver | undefined;
+  auditService?: AuditService | undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +124,15 @@ export class ValidationError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Access denied: insufficient permissions for duplicate review decisions') {
+    super('FORBIDDEN', message, 403, [
+      { code: 'FORBIDDEN', message },
+    ]);
+    this.name = 'ForbiddenError';
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Erp2Service Implementation
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,10 +140,17 @@ export class ValidationError extends AppError {
 export class Erp2Service {
   private readonly repo: Erp2Repository;
   private readonly resolver?: ReferenceResolver | undefined;
+  private readonly auditService: AuditService;
+  private readonly duplicateCandidates = new Map<string, DuplicateCandidateRecord>();
 
   constructor(options: Erp2ServiceOptions) {
     this.repo = options.repository;
     this.resolver = options.referenceResolver;
+    this.auditService = options.auditService ?? new AuditService(new InMemoryAuditRepository());
+  }
+
+  getAuditService(): AuditService {
+    return this.auditService;
   }
 
   // ── Vendors ────────────────────────────────────────────────────────────────
@@ -453,5 +481,246 @@ export class Erp2Service {
         prior_result: false,
       };
     });
+  }
+
+  // ── Exact Duplicate Key Policy & Human Review (ERP2-12 / KIT-10) ────────────
+
+  /**
+   * Directly stores or seeds a duplicate candidate record for human review.
+   */
+  seedDuplicateCandidate(candidate: DuplicateCandidateRecord): void {
+    this.duplicateCandidates.set(candidate.candidate_id, candidate);
+  }
+
+  /**
+   * Retrieves pending or reviewed duplicate candidates.
+   */
+  async getDuplicateCandidates(
+    entity?: 'vendor' | 'purchase_order'
+  ): Promise<DuplicateCandidateRecord[]> {
+    const all = Array.from(this.duplicateCandidates.values());
+    if (!entity) return all;
+    return all.filter((c) => c.entity === entity);
+  }
+
+  /**
+   * Retrieves a duplicate candidate by ID.
+   */
+  async getDuplicateCandidateById(
+    candidateId: string
+  ): Promise<DuplicateCandidateRecord | null> {
+    return this.duplicateCandidates.get(candidateId) ?? null;
+  }
+
+  /**
+   * Checks incoming records against the existing module database for exact or ambiguous duplicates.
+   *
+   * Invariants (AC1, AC2, AC3):
+   *   - Identical normalized keys produce EXACT_DUPLICATE candidates.
+   *   - Conflicting or cross-entity keys produce AMBIGUOUS_CANDIDATE candidates held for human review.
+   *   - Pure exact string matching only; fuzzy scoring is strictly prohibited.
+   */
+  async checkDuplicates(
+    request: CheckDuplicatesRequest
+  ): Promise<CheckDuplicatesResponse> {
+    assertNoFuzzyAutoMerge({ isAutoMerge: false, confidence: 1.0 });
+
+    const foundCandidates: DuplicateCandidateRecord[] = [];
+
+    if (request.entity === 'vendor') {
+      const { vendors: existingVendors } = await this.repo.listVendors({ page: 1, pageSize: 1000 });
+      for (const record of request.records) {
+        const result = classifyVendorCandidate(record, existingVendors);
+        if (result.candidate) {
+          this.duplicateCandidates.set(result.candidate.candidate_id, result.candidate);
+          foundCandidates.push(result.candidate);
+        }
+      }
+    } else if (request.entity === 'purchase_order') {
+      const { purchaseOrders: existingPOs } = await this.repo.listPurchaseOrders({ page: 1, pageSize: 1000 });
+      for (const record of request.records) {
+        const result = classifyPurchaseOrderCandidate(record, existingPOs);
+        if (result.candidate) {
+          this.duplicateCandidates.set(result.candidate.candidate_id, result.candidate);
+          foundCandidates.push(result.candidate);
+        }
+      }
+    } else {
+      throw new ValidationError(`Unsupported entity for duplicate check: '${request.entity}'`, 'entity');
+    }
+
+    return {
+      entity: request.entity,
+      total_checked: request.records.length,
+      duplicates_found: foundCandidates.length,
+      candidates: foundCandidates,
+    };
+  }
+
+  /**
+   * Executes an authorized human review decision on a held duplicate candidate.
+   *
+   * Invariants (AC3, AC4):
+   *   - Requires human authorization (role: admin, migration_runner, or editor).
+   *   - Enforces assertNoFuzzyAutoMerge and assertValidHumanMergeDecision.
+   *   - Records immutable audit log with action "merge.decided", actor ID, timestamp,
+   *     kept ID, and merged ID.
+   */
+  async reviewDuplicateCandidate(
+    request: ReviewDuplicateRequest,
+    operator: { id: string; role?: string | undefined; correlationId?: string | undefined }
+  ): Promise<ReviewDuplicateResponse> {
+    // 1. Role authorization check
+    const allowedRoles = ['admin', 'migration_runner', 'editor', 'system'];
+    if (operator.role && !allowedRoles.includes(operator.role)) {
+      throw new ForbiddenError(
+        `Role '${operator.role}' is not authorized to decide duplicate merges. Required: admin, migration_runner, or editor.`
+      );
+    }
+
+    // 2. Domain validations
+    assertNoFuzzyAutoMerge({ isAutoMerge: false, confidence: 1.0 });
+    assertValidHumanMergeDecision(request);
+
+    // 3. Locate candidate
+    const candidate = this.duplicateCandidates.get(request.candidate_id);
+    if (!candidate) {
+      throw new NotFoundError('Duplicate candidate', request.candidate_id);
+    }
+
+    const correlationId = operator.correlationId ?? randomUUID();
+    let auditRecord;
+
+    if (request.decision === 'MERGE') {
+      const keptId = request.kept_id!;
+      const mergedId = request.merged_id!;
+
+      // Validate target records exist
+      if (candidate.entity === 'vendor') {
+        const keptVendor = await this.repo.getVendorById(keptId);
+        if (!keptVendor) {
+          throw new NotFoundError('Target vendor (kept_id)', keptId);
+        }
+      }
+
+      // Record immutable audit entry (AC4)
+      auditRecord = await this.auditService.log({
+        actor: operator.id,
+        actorRole: operator.role ?? 'migration_runner',
+        action: 'merge.decided',
+        targetEntity: candidate.entity === 'vendor' ? 'erp2.vendors' : 'erp2.purchase_orders',
+        targetId: keptId,
+        correlationId,
+        result: 'success',
+        reason: request.rationale,
+        metadata: {
+          candidateId: candidate.candidate_id,
+          keptId,
+          mergedId,
+          decision: 'MERGE',
+          matchingKey: candidate.matching_key,
+          matchingValue: candidate.matching_value,
+        },
+      });
+
+      const updatedCandidate: DuplicateCandidateRecord = {
+        ...candidate,
+        status: 'MERGED',
+        decision: 'MERGE',
+        decided_at: auditRecord.occurredAt.toISOString(),
+        decided_by: operator.id,
+        rationale: request.rationale,
+      };
+      this.duplicateCandidates.set(candidate.candidate_id, updatedCandidate);
+
+      return {
+        candidate_id: candidate.candidate_id,
+        decision: 'MERGE',
+        status: 'MERGED',
+        kept_id: keptId,
+        merged_id: mergedId,
+        actor_id: operator.id,
+        timestamp: auditRecord.occurredAt.toISOString(),
+        audit_record_id: auditRecord.id,
+      };
+    } else if (request.decision === 'REJECT') {
+      // Record immutable audit entry
+      auditRecord = await this.auditService.log({
+        actor: operator.id,
+        actorRole: operator.role ?? 'migration_runner',
+        action: 'merge.decided',
+        targetEntity: candidate.entity === 'vendor' ? 'erp2.vendors' : 'erp2.purchase_orders',
+        targetId: candidate.candidate_id,
+        correlationId,
+        result: 'success',
+        reason: request.rationale,
+        metadata: {
+          candidateId: candidate.candidate_id,
+          decision: 'REJECT',
+          matchingKey: candidate.matching_key,
+          matchingValue: candidate.matching_value,
+        },
+      });
+
+      const updatedCandidate: DuplicateCandidateRecord = {
+        ...candidate,
+        status: 'REJECTED',
+        decision: 'REJECT',
+        decided_at: auditRecord.occurredAt.toISOString(),
+        decided_by: operator.id,
+        rationale: request.rationale,
+      };
+      this.duplicateCandidates.set(candidate.candidate_id, updatedCandidate);
+
+      return {
+        candidate_id: candidate.candidate_id,
+        decision: 'REJECT',
+        status: 'REJECTED',
+        kept_id: request.kept_id,
+        merged_id: request.merged_id,
+        actor_id: operator.id,
+        timestamp: auditRecord.occurredAt.toISOString(),
+        audit_record_id: auditRecord.id,
+      };
+    } else {
+      // KEEP_BOTH
+      auditRecord = await this.auditService.log({
+        actor: operator.id,
+        actorRole: operator.role ?? 'migration_runner',
+        action: 'merge.decided',
+        targetEntity: candidate.entity === 'vendor' ? 'erp2.vendors' : 'erp2.purchase_orders',
+        targetId: candidate.candidate_id,
+        correlationId,
+        result: 'success',
+        reason: request.rationale,
+        metadata: {
+          candidateId: candidate.candidate_id,
+          decision: 'KEEP_BOTH',
+          matchingKey: candidate.matching_key,
+          matchingValue: candidate.matching_value,
+        },
+      });
+
+      const updatedCandidate: DuplicateCandidateRecord = {
+        ...candidate,
+        status: 'KEPT_BOTH',
+        decision: 'KEEP_BOTH',
+        decided_at: auditRecord.occurredAt.toISOString(),
+        decided_by: operator.id,
+        rationale: request.rationale,
+      };
+      this.duplicateCandidates.set(candidate.candidate_id, updatedCandidate);
+
+      return {
+        candidate_id: candidate.candidate_id,
+        decision: 'KEEP_BOTH',
+        status: 'KEPT_BOTH',
+        kept_id: request.kept_id,
+        merged_id: request.merged_id,
+        actor_id: operator.id,
+        timestamp: auditRecord.occurredAt.toISOString(),
+        audit_record_id: auditRecord.id,
+      };
+    }
   }
 }

@@ -15,6 +15,10 @@ Data dictionary: [`docs/data-dictionary.md`](docs/data-dictionary.md) - contract
 | POST | /purchase-orders | total recomputed server-side; every line product validated via ERP-1 |
 | PATCH | /purchase-orders/{id} | status transition only |
 | POST | /import | Migration Kit row import (KIT-08) |
+| POST | /duplicates/check | Deterministic exact duplicate scanner (ERP2-12 / KIT-10) |
+| GET | /duplicates/candidates | List held duplicate candidates with entity/status filtering |
+| GET | /duplicates/candidates/{id} | Retrieve duplicate candidate details and diffs |
+| POST | /duplicates/review | Human review decision (MERGE, REJECT, KEEP_BOTH) with immutable audit logging |
 
 ## Run the evidence
 ```bash
@@ -51,6 +55,9 @@ npm run db:reset                                                                
 | Bank details never unmasked (`XXXX-XXXX-7890`) | `tests/domain/invariants.test.ts`, `tests/api/list.test.ts`, `tests/seed/seed.test.ts` |
 | NUMERIC(18,2) amounts, ISO currency | `tests/db/constraints.test.ts` |
 | Idempotent import, no direct table writes by Kit | `tests/migration/idempotency.test.ts`, `tests/db/constraints.test.ts` |
+| Normalized exact keys only (`tax_number`, `email`, `po_number`), confidence strictly 1.0 | `tests/domain/duplicate-policy.test.ts`, `tests/api/duplicates.test.ts` |
+| Fuzzy duplicate matching and automated merge sagas prohibited in V1 | `tests/domain/duplicate-policy.test.ts`, `tests/api/duplicates.test.ts` |
+| Human review decisions (`MERGE`, `REJECT`, `KEEP_BOTH`) immutably logged with `merge.decided`, actor ID, timestamp, kept ID, and merged ID | `tests/api/duplicates.test.ts`, `web/tests/duplicate-review.test.tsx` |
 
 ## Known defects (file each as an issue and link it here before closing ERP2-10)
 | # | Sev | Defect | Status |

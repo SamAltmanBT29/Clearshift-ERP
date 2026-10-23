@@ -20,7 +20,7 @@ describe('ERP-2 Web Public Facade', () => {
     expect(erp2Web.ERP2_BASE_PATH).toBe('/erp2');
     expect(erp2Web.HUB_LOGIN_PATH).toBe('/login');
     expect(erp2Web.ERP2_MODULE_LABEL).toBe('Vendors & Purchasing');
-    expect(erp2Web.ERP2_ROUTE_DESCRIPTORS.length).toBe(8);
+    expect(erp2Web.ERP2_ROUTE_DESCRIPTORS.length).toBe(9);
     expect(erp2Web.ERP2_NAV_GROUPS.length).toBe(2);
   });
 
@@ -37,10 +37,11 @@ describe('ERP-2 Web Public Facade', () => {
     expect(erp2Web.ModuleShell).toBeDefined();
     expect(erp2Web.ModuleNav).toBeDefined();
     expect(erp2Web.ModuleBreadcrumbs).toBeDefined();
+    expect(erp2Web.DuplicateReviewModal).toBeDefined();
     expect(erp2Web.ERP2_MAIN_REGION_ID).toBe('erp2-main');
   });
 
-  it('exports all 9 page components', () => {
+  it('exports all 10 page components', () => {
     expect(erp2Web.VendorsListPage).toBeDefined();
     expect(erp2Web.VendorCreatePage).toBeDefined();
     expect(erp2Web.VendorDetailPage).toBeDefined();
@@ -49,6 +50,7 @@ describe('ERP-2 Web Public Facade', () => {
     expect(erp2Web.PurchaseOrderCreatePage).toBeDefined();
     expect(erp2Web.PurchaseOrderDetailPage).toBeDefined();
     expect(erp2Web.ImportReceiptsListPage).toBeDefined();
+    expect(erp2Web.DuplicateCandidatesPage).toBeDefined();
     expect(erp2Web.ModuleNotFoundPage).toBeDefined();
   });
 });

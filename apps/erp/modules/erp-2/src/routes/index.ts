@@ -11,6 +11,7 @@ import type { Erp2Service } from '../services/erp2.service.js';
 import { vendorRoutes } from './vendors.js';
 import { purchaseOrderRoutes } from './purchase-orders.js';
 import { importRoutes } from './import.js';
+import { duplicateRoutes } from './duplicates.js';
 
 export const erpVendorsRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> = async (
   fastify,
@@ -20,6 +21,7 @@ export const erpVendorsRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> 
   await fastify.register(vendorRoutes, childOpts);
   await fastify.register(purchaseOrderRoutes, childOpts);
   await fastify.register(importRoutes, childOpts);
+  await fastify.register(duplicateRoutes, childOpts);
 };
 
-export { vendorRoutes, purchaseOrderRoutes, importRoutes };
+export { vendorRoutes, purchaseOrderRoutes, importRoutes, duplicateRoutes };
