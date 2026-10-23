@@ -1,0 +1,637 @@
+{
+  "accepted_purchase_order_totals": {
+    "PO-SRC-001": "215.75",
+    "PO-SRC-002": "2500.00",
+    "PO-SRC-003": "0.00",
+    "PO-SRC-004": "0.06"
+  },
+  "by_reason_code": {
+    "ADDRESS_TOO_LONG": 1,
+    "AMBIGUOUS_DATE_FORMAT": 1,
+    "AMOUNT_OVERFLOW": 1,
+    "CITY_TOO_LONG": 1,
+    "COUNTRY_TOO_LONG": 1,
+    "CURRENCY_REQUIRED": 2,
+    "DUPLICATE_PO_NUMBER_REVIEW": 1,
+    "DUPLICATE_TAX_NUMBER_REVIEW": 2,
+    "EMAIL_REQUIRED": 1,
+    "EXCESS_DECIMAL_PLACES": 1,
+    "INVALID_BANK_DETAILS_FORMAT": 1,
+    "INVALID_CURRENCY": 2,
+    "INVALID_EMAIL_FORMAT": 1,
+    "INVALID_ORDER_DATE": 1,
+    "INVALID_PHONE_FORMAT": 1,
+    "INVALID_PRICE_FORMAT": 1,
+    "INVALID_PRODUCT_ID_FORMAT": 1,
+    "INVALID_QUANTITY_FORMAT": 1,
+    "INVALID_STATUS": 1,
+    "INVALID_TAX_NUMBER_FORMAT": 1,
+    "LINE_REJECTED": 12,
+    "NAME_TOO_LONG": 1,
+    "NEGATIVE_AMOUNT": 2,
+    "NO_LINES": 2,
+    "ORDER_DATE_REQUIRED": 1,
+    "ORPHAN_LINE": 2,
+    "PARENT_PO_IN_REVIEW": 1,
+    "PARENT_PO_REJECTED": 12,
+    "PO_NUMBER_TOO_LONG": 1,
+    "PRICE_REQUIRED": 1,
+    "PRODUCT_ID_REQUIRED": 1,
+    "QUANTITY_NOT_POSITIVE": 1,
+    "QUANTITY_REQUIRED": 1,
+    "SOURCE_ID_REQUIRED": 2,
+    "STATUS_REQUIRED": 1,
+    "TAX_NUMBER_REQUIRED": 1,
+    "TOTAL_OVERFLOW": 1,
+    "UNKNOWN_PRODUCT": 1,
+    "VENDOR_NAME_REQUIRED": 1,
+    "VENDOR_NOT_FOUND": 1,
+    "VENDOR_REF_REQUIRED": 1,
+    "VENDOR_REJECTED": 1
+  },
+  "by_record_type": {
+    "po_line": {
+      "accepted": 7,
+      "rejected": 26,
+      "review": 1
+    },
+    "purchase_order": {
+      "accepted": 4,
+      "rejected": 26,
+      "review": 1
+    },
+    "vendor": {
+      "accepted": 5,
+      "rejected": 14,
+      "review": 2
+    }
+  },
+  "by_rule_id": {
+    "LIN-002": 1,
+    "LIN-003": 1,
+    "LIN-004": 1,
+    "LIN-030": 1,
+    "LIN-031": 1,
+    "LIN-032": 1,
+    "LIN-033": 2,
+    "LIN-034": 1,
+    "LIN-035": 1,
+    "LIN-036": 1,
+    "LIN-040": 1,
+    "LIN-041": 2,
+    "LIN-042": 12,
+    "LIN-043": 1,
+    "PUR-001": 1,
+    "PUR-002": 1,
+    "PUR-003": 1,
+    "PUR-004": 1,
+    "PUR-005": 1,
+    "PUR-006": 2,
+    "PUR-020": 1,
+    "PUR-030": 1,
+    "PUR-031": 1,
+    "PUR-040": 1,
+    "PUR-041": 1,
+    "PUR-050": 1,
+    "PUR-051": 1,
+    "PUR-060": 1,
+    "PUR-071": 1,
+    "PUR-072": 12,
+    "VND-001": 1,
+    "VND-002": 1,
+    "VND-003": 1,
+    "VND-004": 1,
+    "VND-005": 1,
+    "VND-020": 1,
+    "VND-021": 1,
+    "VND-022": 1,
+    "VND-023": 1,
+    "VND-030": 1,
+    "VND-031": 1,
+    "VND-032": 1,
+    "VND-033": 1,
+    "VND-040": 1,
+    "VND-050": 2
+  },
+  "fixture": {
+    "by_record_type": {
+      "po_line": 34,
+      "purchase_order": 31,
+      "vendor": 21
+    },
+    "file": "sample-data/erp-2/dirty-data-v1.csv",
+    "row_count": 86,
+    "schema_version": 1,
+    "sha256": "754c2740163de9d9ec8e8bdd5deee5cd87a7b4ddac0cde335388f7e7d076b725"
+  },
+  "normalizations": {
+    "LIN-010": 1,
+    "LIN-011": 24,
+    "PUR-010": 1,
+    "PUR-011": 1,
+    "PUR-012": 1,
+    "PUR-013": 1,
+    "PUR-014": 1,
+    "VND-010": 1,
+    "VND-011": 3,
+    "VND-012": 1,
+    "VND-013": 2,
+    "VND-014": 1,
+    "VND-015": 1,
+    "VND-016": 2
+  },
+  "outcomes": {
+    "accepted": 16,
+    "rejected": 66,
+    "review": 4
+  },
+  "profile_schema_version": 1,
+  "rows": {
+    "R001": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R002": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R003": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R004": {
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NAME_REQUIRED"
+      ]
+    },
+    "R005": {
+      "outcome": "rejected",
+      "reasons": [
+        "TAX_NUMBER_REQUIRED"
+      ]
+    },
+    "R006": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_EMAIL_FORMAT"
+      ]
+    },
+    "R007": {
+      "outcome": "rejected",
+      "reasons": [
+        "EMAIL_REQUIRED"
+      ]
+    },
+    "R008": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_TAX_NUMBER_FORMAT"
+      ]
+    },
+    "R009": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PHONE_FORMAT"
+      ]
+    },
+    "R010": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_BANK_DETAILS_FORMAT"
+      ]
+    },
+    "R011": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R012": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R013": {
+      "outcome": "rejected",
+      "reasons": [
+        "COUNTRY_TOO_LONG"
+      ]
+    },
+    "R014": {
+      "outcome": "rejected",
+      "reasons": [
+        "CITY_TOO_LONG"
+      ]
+    },
+    "R015": {
+      "outcome": "rejected",
+      "reasons": [
+        "ADDRESS_TOO_LONG"
+      ]
+    },
+    "R016": {
+      "outcome": "rejected",
+      "reasons": [
+        "NAME_TOO_LONG"
+      ]
+    },
+    "R017": {
+      "outcome": "rejected",
+      "reasons": [
+        "SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R018": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_TAX_NUMBER_REVIEW"
+      ]
+    },
+    "R019": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_TAX_NUMBER_REVIEW"
+      ]
+    },
+    "R020": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R021": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R022": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R023": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R024": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R025": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R026": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R027": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R028": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R029": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R030": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R031": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R032": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R033": {
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_REF_REQUIRED"
+      ]
+    },
+    "R034": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R035": {
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NOT_FOUND"
+      ]
+    },
+    "R036": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R037": {
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_REJECTED"
+      ]
+    },
+    "R038": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R039": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORDER_DATE_REQUIRED"
+      ]
+    },
+    "R040": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R041": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_ORDER_DATE"
+      ]
+    },
+    "R042": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R043": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT"
+      ]
+    },
+    "R044": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R045": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_STATUS"
+      ]
+    },
+    "R046": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R047": {
+      "outcome": "rejected",
+      "reasons": [
+        "STATUS_REQUIRED"
+      ]
+    },
+    "R048": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R049": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R050": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R051": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R052": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R053": {
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NUMBER_TOO_LONG"
+      ]
+    },
+    "R054": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R055": {
+      "outcome": "rejected",
+      "reasons": [
+        "NO_LINES"
+      ]
+    },
+    "R056": {
+      "outcome": "rejected",
+      "reasons": [
+        "NO_LINES",
+        "SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R057": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_PO_NUMBER_REVIEW"
+      ]
+    },
+    "R058": {
+      "outcome": "review",
+      "reasons": [
+        "PARENT_PO_IN_REVIEW"
+      ]
+    },
+    "R059": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R060": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PRODUCT_ID_FORMAT"
+      ]
+    },
+    "R061": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R062": {
+      "outcome": "rejected",
+      "reasons": [
+        "UNKNOWN_PRODUCT"
+      ]
+    },
+    "R063": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R064": {
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_NOT_POSITIVE"
+      ]
+    },
+    "R065": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R066": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_AMOUNT"
+      ]
+    },
+    "R067": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R068": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_AMOUNT"
+      ]
+    },
+    "R069": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R070": {
+      "outcome": "rejected",
+      "reasons": [
+        "EXCESS_DECIMAL_PLACES"
+      ]
+    },
+    "R071": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R072": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PRICE_FORMAT"
+      ]
+    },
+    "R073": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R074": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_ID_REQUIRED"
+      ]
+    },
+    "R075": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R076": {
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_REQUIRED"
+      ]
+    },
+    "R077": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R078": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRICE_REQUIRED"
+      ]
+    },
+    "R079": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R080": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMOUNT_OVERFLOW"
+      ]
+    },
+    "R081": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R082": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_QUANTITY_FORMAT"
+      ]
+    },
+    "R083": {
+      "outcome": "rejected",
+      "reasons": [
+        "TOTAL_OVERFLOW"
+      ]
+    },
+    "R084": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_PO_REJECTED"
+      ]
+    },
+    "R085": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORPHAN_LINE"
+      ]
+    },
+    "R086": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORPHAN_LINE"
+      ]
+    }
+  },
+  "rules_version": "1.0.0"
+}

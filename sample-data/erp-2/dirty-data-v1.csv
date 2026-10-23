@@ -1,0 +1,87 @@
+row_id,record_type,case_tags,source_id,parent_source_id,name,tax_number,email,phone,address_line,city,country,bank_details,currency,po_number,vendor_ref,order_date,status,client_total,product_id,quantity,price,expect_outcome,expect_reasons
+R001,vendor,vendor.source_id:valid|vendor.name:valid|vendor.tax_number:valid|vendor.email:valid|vendor.phone:valid|vendor.address_line:valid|vendor.city:valid|vendor.country:valid|vendor.bank_details:valid|vendor.currency:valid,V-001,,Acme Industrial Supply,TX-ACME-001,procurement@acme.test,+15550100,500 Logistics Parkway,Chicago,USA,98765432101234,USD,,,,,,,,,accepted,
+R002,vendor,vendor.name:valid|vendor.tax_number:valid|vendor.email:valid|vendor.phone:valid|vendor.currency:valid,V-002,,  Beta   Parts  Ltd , tx-beta-002 , Sales@Beta.TEST ,(555) 010-0200,  12 Quay  Road , Leeds , UK ,1234-5678-9012-3456, eur ,,,,,,,,,accepted,
+R003,vendor,vendor.phone:valid|vendor.address_line:valid|vendor.city:valid|vendor.country:valid|vendor.bank_details:valid,V-003,,Minimal Co,TX-MIN-003,ops@minimal.test,,,,,,GBP,,,,,,,,,accepted,
+R004,vendor,vendor.name:invalid,V-004,,,TX-NONAME-004,vendor4@synthetic.test,,,,,,USD,,,,,,,,,rejected,VENDOR_NAME_REQUIRED
+R005,vendor,vendor.tax_number:invalid,V-005,,Synthetic Vendor 5,,vendor5@synthetic.test,,,,,,USD,,,,,,,,,rejected,TAX_NUMBER_REQUIRED
+R006,vendor,vendor.email:invalid,V-006,,Synthetic Vendor 6,TX-BADMAIL-006,not-an-email,,,,,,USD,,,,,,,,,rejected,INVALID_EMAIL_FORMAT
+R007,vendor,vendor.email:invalid,V-007,,Synthetic Vendor 7,TX-NOEMAIL-007,,,,,,,USD,,,,,,,,,rejected,EMAIL_REQUIRED
+R008,vendor,vendor.tax_number:invalid,V-008,,Synthetic Vendor 8,TX BAD#8,vendor8@synthetic.test,,,,,,USD,,,,,,,,,rejected,INVALID_TAX_NUMBER_FORMAT
+R009,vendor,vendor.phone:invalid,V-009,,Synthetic Vendor 9,TX-BADPHONE-009,vendor9@synthetic.test,call me,,,,,USD,,,,,,,,,rejected,INVALID_PHONE_FORMAT
+R010,vendor,vendor.bank_details:invalid,V-010,,Synthetic Vendor 10,TX-BADBANK-010,vendor10@synthetic.test,,,,,12,USD,,,,,,,,,rejected,INVALID_BANK_DETAILS_FORMAT
+R011,vendor,vendor.currency:invalid,V-011,,Synthetic Vendor 11,TX-BADCUR-011,vendor11@synthetic.test,,,,,,XYZ,,,,,,,,,rejected,INVALID_CURRENCY
+R012,vendor,vendor.currency:invalid,V-012,,Synthetic Vendor 12,TX-NOCUR-012,vendor12@synthetic.test,,,,,,,,,,,,,,,rejected,CURRENCY_REQUIRED
+R013,vendor,vendor.country:invalid,V-013,,Synthetic Vendor 13,TX-LONGCTRY-013,vendor13@synthetic.test,,,,CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC,,USD,,,,,,,,,rejected,COUNTRY_TOO_LONG
+R014,vendor,vendor.city:invalid,V-014,,Synthetic Vendor 14,TX-LONGCITY-014,vendor14@synthetic.test,,,CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC,,,USD,,,,,,,,,rejected,CITY_TOO_LONG
+R015,vendor,vendor.address_line:invalid,V-015,,Synthetic Vendor 15,TX-LONGADDR-015,vendor15@synthetic.test,,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,,,,USD,,,,,,,,,rejected,ADDRESS_TOO_LONG
+R016,vendor,vendor.name:invalid,V-016,,NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN,TX-LONGNAME-016,vendor16@synthetic.test,,,,,,USD,,,,,,,,,rejected,NAME_TOO_LONG
+R017,vendor,vendor.source_id:invalid,,,Synthetic Vendor 17,TX-NOSRC-017,vendor17@synthetic.test,,,,,,USD,,,,,,,,,rejected,SOURCE_ID_REQUIRED
+R018,vendor,,V-018,,Acme Industrial Supply Inc, tx-acme-001 ,dup@acme.test,,,,,,USD,,,,,,,,,review,DUPLICATE_TAX_NUMBER_REVIEW
+R019,vendor,,V-019,,Beta Parts Limited,TX-BETA-002,dup@beta.test,,,,,,EUR,,,,,,,,,review,DUPLICATE_TAX_NUMBER_REVIEW
+R020,vendor,,V-020,,Acme Industrial Supply,TX-ACME-01,near@acme.test,,,,,,USD,,,,,,,,,accepted,
+R021,vendor,,V-021,,IBAN Vendor,TX-IBAN-021,iban@synthetic.test,,,,,GB29 XBAR 1234 5678 9999,USD,,,,,,,,,accepted,
+R022,purchase_order,purchase_order.source_id:valid|purchase_order.po_number:valid|purchase_order.vendor_ref:valid|purchase_order.order_date:valid|purchase_order.status:valid|purchase_order.currency:valid|purchase_order.lines:valid,PO-SRC-001,,,,,,,,,,USD,PO-1001,TX-ACME-001,2026-10-01,Draft,9999.99,,,,accepted,
+R023,po_line,po_line.parent_source_id:valid|po_line.product_id:valid|po_line.quantity:valid|po_line.price:valid,,PO-SRC-001,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,10,15.50,accepted,
+R024,po_line,,,PO-SRC-001,,,,,,,,,,,,,,,22222222-2222-2222-2222-222222222222,3,20.25,accepted,
+R025,purchase_order,,PO-SRC-002,,,,,,,,,, eur , po-1002 , tx-beta-002 ,2026/10/02, sent ,,,,,accepted,
+R026,po_line,,,PO-SRC-002,,,,,,,,,,,,,,,CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC,"1,000",2.5,accepted,
+R027,purchase_order,purchase_order.po_number:valid,PO-SRC-003,,,,,,,,,,GBP,,TX-MIN-003,2026-10-03,Received,,,,,accepted,
+R028,po_line,,,PO-SRC-003,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,0,accepted,
+R029,purchase_order,,PO-SRC-004,,,,,,,,,,USD,PO-1004,TX-ACME-001,2026-10-01,Closed,,,,,accepted,
+R030,po_line,,,PO-SRC-004,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,0.05,0.10,accepted,
+R031,po_line,,,PO-SRC-004,,,,,,,,,,,,,,,22222222-2222-2222-2222-222222222222,0.25,0.10,accepted,
+R032,po_line,,,PO-SRC-004,,,,,,,,,,,,,,,cccccccc-cccc-4ccc-8ccc-cccccccccccc,0.15,0.10,accepted,
+R033,purchase_order,purchase_order.vendor_ref:invalid,PO-SRC-005,,,,,,,,,,USD,PO-005,,2026-10-01,Draft,,,,,rejected,VENDOR_REF_REQUIRED
+R034,po_line,,,PO-SRC-005,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R035,purchase_order,purchase_order.vendor_ref:invalid,PO-SRC-006,,,,,,,,,,USD,PO-006,TX-NOPE-999,2026-10-01,Draft,,,,,rejected,VENDOR_NOT_FOUND
+R036,po_line,,,PO-SRC-006,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R037,purchase_order,purchase_order.vendor_ref:invalid,PO-SRC-007,,,,,,,,,,USD,PO-007,TX-BADMAIL-006,2026-10-01,Draft,,,,,rejected,VENDOR_REJECTED
+R038,po_line,,,PO-SRC-007,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R039,purchase_order,purchase_order.order_date:invalid,PO-SRC-008,,,,,,,,,,USD,PO-008,TX-ACME-001,,Draft,,,,,rejected,ORDER_DATE_REQUIRED
+R040,po_line,,,PO-SRC-008,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R041,purchase_order,purchase_order.order_date:invalid,PO-SRC-009,,,,,,,,,,USD,PO-009,TX-ACME-001,2026-02-30,Draft,,,,,rejected,INVALID_ORDER_DATE
+R042,po_line,,,PO-SRC-009,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R043,purchase_order,purchase_order.order_date:invalid,PO-SRC-010,,,,,,,,,,USD,PO-010,TX-ACME-001,03/04/2026,Draft,,,,,rejected,AMBIGUOUS_DATE_FORMAT
+R044,po_line,,,PO-SRC-010,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R045,purchase_order,purchase_order.status:invalid,PO-SRC-011,,,,,,,,,,USD,PO-011,TX-ACME-001,2026-10-01,Cancelled,,,,,rejected,INVALID_STATUS
+R046,po_line,,,PO-SRC-011,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R047,purchase_order,purchase_order.status:invalid,PO-SRC-012,,,,,,,,,,USD,PO-012,TX-ACME-001,2026-10-01,,,,,,rejected,STATUS_REQUIRED
+R048,po_line,,,PO-SRC-012,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R049,purchase_order,purchase_order.currency:invalid,PO-SRC-013,,,,,,,,,,,PO-013,TX-ACME-001,2026-10-01,Draft,,,,,rejected,CURRENCY_REQUIRED
+R050,po_line,,,PO-SRC-013,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R051,purchase_order,purchase_order.currency:invalid,PO-SRC-014,,,,,,,,,,XYZ,PO-014,TX-ACME-001,2026-10-01,Draft,,,,,rejected,INVALID_CURRENCY
+R052,po_line,,,PO-SRC-014,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R053,purchase_order,purchase_order.po_number:invalid,PO-SRC-015,,,,,,,,,,USD,PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP,TX-ACME-001,2026-10-01,Draft,,,,,rejected,PO_NUMBER_TOO_LONG
+R054,po_line,,,PO-SRC-015,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,PARENT_PO_REJECTED
+R055,purchase_order,purchase_order.lines:invalid,PO-SRC-016,,,,,,,,,,USD,PO-016,TX-ACME-001,2026-10-01,Draft,,,,,rejected,NO_LINES
+R056,purchase_order,purchase_order.source_id:invalid,,,,,,,,,,,USD,PO-1017,TX-ACME-001,2026-10-01,Draft,,,,,rejected,NO_LINES|SOURCE_ID_REQUIRED
+R057,purchase_order,,PO-SRC-018,,,,,,,,,,USD,PO-1001,TX-ACME-001,2026-10-01,Draft,,,,,review,DUPLICATE_PO_NUMBER_REVIEW
+R058,po_line,,,PO-SRC-018,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,review,PARENT_PO_IN_REVIEW
+R059,purchase_order,,PO-SRC-019,,,,,,,,,,USD,PO-019,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R060,po_line,po_line.product_id:invalid,,PO-SRC-019,,,,,,,,,,,,,,,not-a-uuid,1,1.00,rejected,INVALID_PRODUCT_ID_FORMAT
+R061,purchase_order,,PO-SRC-020,,,,,,,,,,USD,PO-020,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R062,po_line,,,PO-SRC-020,,,,,,,,,,,,,,,99999999-9999-4999-8999-999999999999,1,1.00,rejected,UNKNOWN_PRODUCT
+R063,purchase_order,,PO-SRC-021,,,,,,,,,,USD,PO-021,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R064,po_line,,,PO-SRC-021,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,0,1.00,rejected,QUANTITY_NOT_POSITIVE
+R065,purchase_order,,PO-SRC-022,,,,,,,,,,USD,PO-022,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R066,po_line,po_line.quantity:invalid,,PO-SRC-022,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,-1,1.00,rejected,NEGATIVE_AMOUNT
+R067,purchase_order,,PO-SRC-023,,,,,,,,,,USD,PO-023,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R068,po_line,po_line.price:invalid,,PO-SRC-023,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,-5.00,rejected,NEGATIVE_AMOUNT
+R069,purchase_order,,PO-SRC-024,,,,,,,,,,USD,PO-024,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R070,po_line,,,PO-SRC-024,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1.234,1.00,rejected,EXCESS_DECIMAL_PLACES
+R071,purchase_order,,PO-SRC-025,,,,,,,,,,USD,PO-025,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R072,po_line,,,PO-SRC-025,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,abc,rejected,INVALID_PRICE_FORMAT
+R073,purchase_order,,PO-SRC-026,,,,,,,,,,USD,PO-026,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R074,po_line,,,PO-SRC-026,,,,,,,,,,,,,,,,1,1.00,rejected,PRODUCT_ID_REQUIRED
+R075,purchase_order,,PO-SRC-027,,,,,,,,,,USD,PO-027,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R076,po_line,,,PO-SRC-027,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,,1.00,rejected,QUANTITY_REQUIRED
+R077,purchase_order,,PO-SRC-028,,,,,,,,,,USD,PO-028,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R078,po_line,,,PO-SRC-028,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,,rejected,PRICE_REQUIRED
+R079,purchase_order,,PO-SRC-029,,,,,,,,,,USD,PO-029,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R080,po_line,,,PO-SRC-029,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,99999999999.00,1.00,rejected,AMOUNT_OVERFLOW
+R081,purchase_order,,PO-SRC-031,,,,,,,,,,USD,PO-031,TX-ACME-001,2026-10-01,Draft,,,,,rejected,LINE_REJECTED
+R082,po_line,,,PO-SRC-031,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,ten,1.00,rejected,INVALID_QUANTITY_FORMAT
+R083,purchase_order,,PO-SRC-030,,,,,,,,,,USD,PO-030,TX-ACME-001,2026-10-01,Draft,,,,,rejected,TOTAL_OVERFLOW
+R084,po_line,,,PO-SRC-030,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,9999999999.99,9999999999999999.99,rejected,PARENT_PO_REJECTED
+R085,po_line,po_line.parent_source_id:invalid,,PO-SRC-NONE,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,ORPHAN_LINE
+R086,po_line,,,,,,,,,,,,,,,,,,11111111-1111-1111-1111-111111111111,1,1.00,rejected,ORPHAN_LINE

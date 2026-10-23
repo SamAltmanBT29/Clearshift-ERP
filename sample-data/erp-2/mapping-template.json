@@ -1,0 +1,291 @@
+{
+  "mapping_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp2",
+  "source_system": "SYNTH-ERP2-DIRTY-V1",
+  "fixture": "sample-data/erp-2/dirty-data-v1.csv",
+  "policy": {
+    "fuzzy_matching": false,
+    "automatic_merge": false,
+    "raw_input_mutation": false,
+    "duplicate_handling": "Exact candidate keys only; later duplicates get outcome review and are never loaded or merged until a human decides.",
+    "total_handling": "client_total is ignored; the server recomputes total from lines with decimal half-up rounding to 2 decimals.",
+    "currency_handling": "Currency is explicit on every vendor and purchase order; accepted codes USD, EUR, GBP; no FX conversion in V1.",
+    "status_handling": "POST /purchase-orders always creates Draft. A clean purchase order whose post_load_status is later in Draft -> Sent -> Received -> Closed is advanced afterwards by forward-only PATCH calls. Cancellation does not exist in V1.",
+    "idempotency_key": "SYNTH-ERP2-DIRTY-V1:{entity}:{source_id}"
+  },
+  "load_order": [
+    "vendor",
+    "purchase_order"
+  ],
+  "reference_fixtures": {
+    "note": "Synthetic stand-in for the ERP-1 product catalogue. Production loads resolve products through the ERP-1 ReferenceResolver, never by reading ERP-1 tables.",
+    "erp1_product_ids": [
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    ]
+  },
+  "entities": {
+    "vendor": {
+      "record_type": "vendor",
+      "adapter_entity": "vendor",
+      "target_table": "erp2.vendors",
+      "api": "POST /api/v1/erp-vendors/import (entity=vendor) or POST /api/v1/erp-vendors/vendors",
+      "candidate_key": [
+        "tax_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "required": true,
+          "rule_ids": [
+            "VND-005"
+          ]
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "required": true,
+          "rule_ids": [
+            "VND-001",
+            "VND-010",
+            "VND-020"
+          ]
+        },
+        {
+          "source": "tax_number",
+          "target": "tax_number",
+          "required": true,
+          "rule_ids": [
+            "VND-002",
+            "VND-011",
+            "VND-030",
+            "VND-050"
+          ]
+        },
+        {
+          "source": "email",
+          "target": "email",
+          "required": true,
+          "rule_ids": [
+            "VND-003",
+            "VND-012",
+            "VND-031"
+          ]
+        },
+        {
+          "source": "phone",
+          "target": "phone",
+          "required": false,
+          "rule_ids": [
+            "VND-013",
+            "VND-032"
+          ]
+        },
+        {
+          "source": "address_line",
+          "target": "address_line",
+          "required": false,
+          "rule_ids": [
+            "VND-015",
+            "VND-021"
+          ]
+        },
+        {
+          "source": "city",
+          "target": "city",
+          "required": false,
+          "rule_ids": [
+            "VND-015",
+            "VND-022"
+          ]
+        },
+        {
+          "source": "country",
+          "target": "country",
+          "required": false,
+          "rule_ids": [
+            "VND-015",
+            "VND-023"
+          ]
+        },
+        {
+          "source": "bank_details",
+          "target": "bank_details",
+          "required": false,
+          "rule_ids": [
+            "VND-016",
+            "VND-033",
+            "VND-060"
+          ],
+          "note": "Sent to the API once; stored and returned only as bank_masked (XXXX-XXXX-1234)."
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "required": true,
+          "rule_ids": [
+            "VND-004",
+            "VND-014",
+            "VND-040"
+          ]
+        }
+      ],
+      "constants": {
+        "source_system": "SYNTH-ERP2-DIRTY-V1"
+      }
+    },
+    "purchase_order": {
+      "record_type": "purchase_order",
+      "adapter_entity": "purchase_order",
+      "target_table": "erp2.purchase_orders",
+      "api": "POST /api/v1/erp-vendors/import (entity=purchase_order) or POST /api/v1/erp-vendors/purchase-orders",
+      "candidate_key": [
+        "po_number"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "(lineage only)",
+          "required": true,
+          "rule_ids": [
+            "PUR-001"
+          ]
+        },
+        {
+          "source": "po_number",
+          "target": "po_number",
+          "required": false,
+          "rule_ids": [
+            "PUR-010",
+            "PUR-020",
+            "PUR-060"
+          ]
+        },
+        {
+          "source": "vendor_ref",
+          "target": "vendor_id",
+          "required": true,
+          "rule_ids": [
+            "PUR-002",
+            "PUR-011",
+            "PUR-050",
+            "PUR-051"
+          ],
+          "note": "vendor_ref is the vendor tax_number; resolved to vendor_id after vendors are loaded."
+        },
+        {
+          "source": "order_date",
+          "target": "order_date",
+          "required": true,
+          "rule_ids": [
+            "PUR-003",
+            "PUR-012",
+            "PUR-030",
+            "PUR-031"
+          ]
+        },
+        {
+          "source": "status",
+          "target": "(post-load PATCH)",
+          "required": true,
+          "rule_ids": [
+            "PUR-004",
+            "PUR-013",
+            "PUR-040"
+          ]
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "required": true,
+          "rule_ids": [
+            "PUR-005",
+            "PUR-014",
+            "PUR-041"
+          ]
+        },
+        {
+          "source": "client_total",
+          "target": "(ignored)",
+          "required": false,
+          "rule_ids": [
+            "PUR-070",
+            "PUR-071"
+          ]
+        }
+      ],
+      "children": "po_line rows whose parent_source_id equals this row's source_id; the order is loaded whole or not at all (PUR-006, PUR-072).",
+      "entity_rule_ids": [
+        "PUR-006",
+        "PUR-071",
+        "PUR-072"
+      ]
+    },
+    "po_line": {
+      "record_type": "po_line",
+      "adapter_entity": "(nested under purchase_order.lines)",
+      "target_table": "erp2.po_lines",
+      "fields": [
+        {
+          "source": "parent_source_id",
+          "target": "po_id",
+          "required": true,
+          "rule_ids": [
+            "LIN-041",
+            "LIN-042",
+            "LIN-043"
+          ]
+        },
+        {
+          "source": "product_id",
+          "target": "product_id",
+          "required": true,
+          "rule_ids": [
+            "LIN-002",
+            "LIN-010",
+            "LIN-030",
+            "LIN-040"
+          ]
+        },
+        {
+          "source": "quantity",
+          "target": "quantity",
+          "required": true,
+          "rule_ids": [
+            "LIN-003",
+            "LIN-011",
+            "LIN-031",
+            "LIN-033",
+            "LIN-034",
+            "LIN-035",
+            "LIN-036"
+          ]
+        },
+        {
+          "source": "price",
+          "target": "price",
+          "required": true,
+          "rule_ids": [
+            "LIN-004",
+            "LIN-011",
+            "LIN-032",
+            "LIN-033",
+            "LIN-034",
+            "LIN-036"
+          ]
+        }
+      ],
+      "derived": [
+        {
+          "target": "line_total",
+          "rule_ids": [
+            "LIN-050"
+          ]
+        }
+      ]
+    }
+  }
+}
