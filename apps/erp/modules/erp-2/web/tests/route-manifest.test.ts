@@ -25,7 +25,7 @@ import {
 
 describe('ERP-2 Route Manifest', () => {
   describe('1. Frozen Route Table & Navigation Hierarchy', () => {
-    it('declares the 8 standard module routes for Vendors, POs, and Import Receipts', () => {
+    it('declares the module routes for Vendors, POs, Import Receipts, and Duplicates', () => {
       const ids = ERP2_ROUTE_DESCRIPTORS.map((d) => d.id);
       expect(ids).toEqual([
         'vendors',
@@ -36,6 +36,7 @@ describe('ERP-2 Route Manifest', () => {
         'purchase-orders-create',
         'purchase-orders-detail',
         'import-receipts',
+        'duplicates',
       ]);
     });
 
@@ -59,7 +60,7 @@ describe('ERP-2 Route Manifest', () => {
     it('erp2NavItems filters out child/detail routes (group: null)', () => {
       const navItems = erp2NavItems();
       const ids = navItems.map((item) => item.id);
-      expect(ids).toEqual(['vendors', 'purchase-orders', 'import-receipts']);
+      expect(ids).toEqual(['vendors', 'purchase-orders', 'import-receipts', 'duplicates']);
       for (const item of navItems) {
         expect(item.group).not.toBeNull();
       }
@@ -70,6 +71,7 @@ describe('ERP-2 Route Manifest', () => {
       expect(erp2RoutePathById('vendors-create')).toBe('/erp2/vendors/new');
       expect(erp2RoutePathById('purchase-orders')).toBe('/erp2/purchase-orders');
       expect(erp2RoutePathById('import-receipts')).toBe('/erp2/import-receipts');
+      expect(erp2RoutePathById('duplicates')).toBe('/erp2/duplicates');
       expect(() => erp2RoutePathById('nonexistent')).toThrowError("Unknown ERP-2 route descriptor: 'nonexistent'");
     });
   });

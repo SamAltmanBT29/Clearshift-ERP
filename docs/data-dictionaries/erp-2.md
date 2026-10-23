@@ -330,6 +330,7 @@ The primary list screen for ERP-2 Vendors & Purchasing is delivered as a product
 | `purchase-orders-create` | `purchase-orders/new` | `/erp2/purchase-orders/new` | New purchase order · ClearShift ERP | *None* | New purchase order | PO creation with product picker |
 | `purchase-orders-detail` | `purchase-orders/:purchaseOrderId` | `/erp2/purchase-orders/:purchaseOrderId` | Purchase order · ClearShift ERP | *None* | Purchase order | PO details, line items & status transitions |
 | `import-receipts` | `import-receipts` | `/erp2/import-receipts` | Import receipts · ClearShift ERP | `integration` | Import receipts | Durable migration receipt audit (KIT-08) |
+| `duplicates` | `duplicates` | `/erp2/duplicates` | Duplicate candidates · ClearShift ERP | `integration` | Duplicate candidates | Exact duplicate candidate review & audited decisions (ERP2-12 / KIT-10) |
 
 ### 10.2 Shell Layout & Accessibility Architecture
 
@@ -343,3 +344,63 @@ The primary list screen for ERP-2 Vendors & Purchasing is delivered as a product
 
 2. **Route Guards & Session State**:
    - `RequireAuth`: Inspects `clearshift.access_token` in `sessionStorage`. Missing or expired tokens redirect to `/login?returnTo=<encodedPath>` preserving the requested URL.
+
+---
+
+## 11. Exact Duplicate Key Policy & Human Review Specification (ERP2-12 / KIT-10)
+
+### 11.1 Overview & Invariants
+
+ERP-2 Vendors & Purchasing enforces a deterministic, exact duplicate matching policy in accordance with ClearShift V1 core invariants:
+1. **Deterministic Matching Only**: Duplicate detection relies strictly on exact normalized string equality (`confidence = 1.0`). Probabilistic scoring, fuzzy string matching (Levenshtein, Jaro-Winkler), and distance metrics are strictly out of scope for V1.
+2. **Strict Prohibition of Fuzzy Auto-Merge**: Automated target-side merge sagas are prohibited in V1. Any duplicate consolidation requires explicit operator review and authorization.
+3. **Ambiguity Handling**: Conflicting key matches across multiple entities (e.g., matching email but differing tax number) are classified as `AMBIGUOUS` and held in the review queue (`PENDING_REVIEW`).
+4. **Immutable Audit Trail**: All human review decisions (`MERGE`, `REJECT`, `KEEP_BOTH`) are recorded synchronously in the shared `AuditService` with action `merge.decided`, actor ID, timestamp, kept ID, and merged ID.
+
+### 11.2 Key Normalization Formulas
+
+| Entity | Field | Normalization Function | Normalization Rule | Example Transformation |
+|---|---|---|---|---|
+| `erp2.vendors` | `tax_number` | `normalizeTaxNumber` | Trim leading/trailing whitespace, uppercase, strip separators `[\s\-._/]` | `"  us-ein-123.456/789  "` $\rightarrow$ `"USEIN123456789"` |
+| `erp2.vendors` | `email` | `normalizeEmail` | Trim leading/trailing whitespace, convert to lowercase | `"  Sales@Acme.COM  "` $\rightarrow$ `"sales@acme.com"` |
+| `erp2.purchase_orders` | `po_number` | `normalizePoNumber` | Trim leading/trailing whitespace, convert to uppercase | `"  po-2026-0001  "` $\rightarrow$ `"PO-2026-0001"` |
+
+### 11.3 Classification Rules
+
+| Classification | Condition | Resulting Action |
+|---|---|---|
+| `UNIQUE` | No normalized key matches any existing target record | Candidate is permitted to import directly without review |
+| `EXACT_DUPLICATE` | Normalized `tax_number` or `email` matches an existing record with complete concordance | Held as duplicate candidate (`status: PENDING_REVIEW`, `confidence: 1.0`) |
+| `AMBIGUOUS_CANDIDATE` | Keys conflict (e.g. tax number matches Vendor A, but email matches Vendor B) or match multiple distinct records | Held in review queue with `match_kind: AMBIGUOUS` for human operator adjudication |
+
+### 11.4 Human Review API Contracts
+
+- `POST /api/v1/erp-vendors/duplicates/check`: Deterministic batch scanner returning identified candidate collisions.
+- `GET /api/v1/erp-vendors/duplicates/candidates`: Retrieves held candidate queue filtered by entity (`vendor`, `purchase_order`) or status.
+- `GET /api/v1/erp-vendors/duplicates/candidates/:id`: Inspects candidate record details, diffs, and matching keys.
+- `POST /api/v1/erp-vendors/duplicates/review`: Submits operator merge decision. Requires role `admin`, `migration_runner`, or `editor`, distinct `kept_id` and `merged_id` for merges, and a minimum 5-character documented rationale.
+
+### 11.5 Audit Log Record Specification
+
+On decision execution, the following immutable audit record is appended via `AuditService`:
+
+```json
+{
+  "action": "merge.decided",
+  "actor": "operator-user-id",
+  "actorRole": "migration_runner",
+  "targetEntity": "erp2.vendors",
+  "targetId": "<kept_id>",
+  "correlationId": "<correlation_id>",
+  "result": "success",
+  "reason": "Confirmed duplicate legal entity; retaining master account.",
+  "metadata": {
+    "candidateId": "<candidate_uuid>",
+    "keptId": "<kept_id>",
+    "mergedId": "<merged_id>",
+    "decision": "MERGE",
+    "matchingKey": "tax_number",
+    "matchingValue": "TX-998877"
+  }
+}
+```
