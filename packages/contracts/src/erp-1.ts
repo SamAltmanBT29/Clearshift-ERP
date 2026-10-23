@@ -482,6 +482,61 @@ export const RejectedRowSchema = z.object({
 });
 export type RejectedRow = z.infer<typeof RejectedRowSchema>;
 
+/**
+ * Data Quality Rule Schema (KIT-17 / ERP1-24)
+ */
+export const DataQualityRuleSchema = z.object({
+  rule_id: z.string().min(1),
+  version: z.string().min(1),
+  record_type: z.enum(['category', 'warehouse', 'product', 'stock_level', 'all']),
+  field: z.string().min(1),
+  condition: z.string().min(1),
+  action: z.enum(['normalize', 'reject', 'review']),
+  reason_code: z.string().optional(),
+  explanation: z.string().min(1),
+  doc_reference: z.string().min(1),
+});
+export type DataQualityRule = z.infer<typeof DataQualityRuleSchema>;
+
+/**
+ * Reconciliation Summary Schema
+ */
+export const ReconciliationSummarySchema = z.object({
+  total_source_rows: z.number().int().nonnegative(),
+  accepted: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  review: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  unaccounted: z.number().int().nonnegative(),
+  is_balanced: z.boolean(),
+});
+export type ReconciliationSummary = z.infer<typeof ReconciliationSummarySchema>;
+
+/**
+ * Dirty Data Profile Report Schema (KIT-17 / ERP1-24)
+ */
+export const DirtyDataProfileReportSchema = z.object({
+  profile_schema_version: z.number().int().positive(),
+  rules_version: z.string().min(1),
+  module: z.literal('erp1'),
+  fixture: z.string().min(1),
+  fixture_sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  total_rows: z.number().int().nonnegative(),
+  reconciliation: ReconciliationSummarySchema,
+  by_record_type: z.record(
+    z.object({
+      accepted: z.number().int().nonnegative(),
+      rejected: z.number().int().nonnegative(),
+      review: z.number().int().nonnegative(),
+      skipped: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+    })
+  ),
+  by_reason_code: z.record(z.number().int().nonnegative()),
+  generated_at: z.string().datetime(),
+});
+export type DirtyDataProfileReport = z.infer<typeof DirtyDataProfileReportSchema>;
+
 export { ErrorEnvelopeSchema };
 
 

@@ -27,6 +27,12 @@
 13. [Loading, empty, error and access-denied states (ERP1-19)](#13-loading-empty-error-and-access-denied-states-erp1-19)
 14. [Product creation form with field-level validation (ERP1-20)](#14-product-creation-form-with-field-level-validation-erp1-20)
 15. [Detail/edit workflow and linked records (ERP1-21)](#15-detailedit-workflow-and-linked-records-erp1-21)
+16. [Migration Kit module metadata integration (ERP1-22)](#16-migration-kit-module-metadata-integration-erp1-22)
+17. [Migration rejection, review, and export context (ERP1-23)](#17-migration-rejection-review-and-export-context-erp1-23)
+18. [Entity-Relationship Diagram (ERD) & Ownership Boundaries (ERP1-24)](#18-entity-relationship-diagram-erd--ownership-boundaries-erp1-24)
+19. [Requirement-to-Test Traceability Matrix (ERP1-24)](#19-requirement-to-test-traceability-matrix-erp1-24)
+20. [Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)](#20-canonical-dirty-data-pack-plan--defect-distribution-erp1-24)
+21. [Gate G1 Review & Design Artifact Sign-Off (ERP1-24)](#21-gate-g1-review--design-artifact-sign-off-erp1-24)
 
 ---
 
@@ -53,13 +59,13 @@
 **Purpose**: Stores one-level product categories for catalog organization.  
 **FR Reference**: FR-ERP1-03 (categories: one level only, name and code)
 
-| Column | PostgreSQL Type | Nullable | Default | Owner | Meaning | Constraints |
-|---|---|---|---|---|---|---|
-| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | ERP-1 | Primary key | PK |
-| `name` | `VARCHAR(255)` | NOT NULL | — | ERP-1 | Human-readable category name | B-tree index |
-| `code` | `VARCHAR(64)` | NOT NULL | — | ERP-1 | Unique category identifier | UNIQUE `erp1_categories_code_idx` |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Row creation timestamp (UTC) | — |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Last modification timestamp (UTC) | Trigger `categories_set_updated_at` |
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `z.string().uuid()` | NOT NULL | `gen_random_uuid()` | Primary Key (PK) | FR-ERP1-03 | `'00000000-0000-4000-8000-000000000001'` |
+| `name` | `VARCHAR(255)` | `z.string().min(1)` | NOT NULL | — | B-tree index | FR-ERP1-03 | `'General Hardware'` |
+| `code` | `VARCHAR(64)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_categories_code_idx` | FR-ERP1-03 | `'GEN'` |
+| `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Audit timestamp | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
+| `updated_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Trigger `categories_set_updated_at` | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes**:
 - `erp1_categories_code_idx` — UNIQUE on `(code)`
@@ -75,14 +81,15 @@
 
 **FR Reference**: FR-ERP1-05 (one warehouse in V1; stock quantity per product)
 
-| Column | PostgreSQL Type | Nullable | Default | Owner | Meaning | Constraints |
-|---|---|---|---|---|---|---|
-| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | ERP-1 | Primary key | PK |
-| `name` | `VARCHAR(255)` | NOT NULL | — | ERP-1 | Warehouse facility name | — |
-| `code` | `VARCHAR(64)` | NOT NULL | — | ERP-1 | Warehouse code (e.g. `WH-01`) | UNIQUE `erp1_warehouses_code_idx` |
-| `is_default` | `BOOLEAN` | NOT NULL | `true` | ERP-1 | Whether this is the operating warehouse | — |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Row creation timestamp (UTC) | — |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Last modification timestamp (UTC) | Trigger `warehouses_set_updated_at` |
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `z.string().uuid()` | NOT NULL | `gen_random_uuid()` | Primary Key (PK) | FR-ERP1-05 | `'00000000-0000-4000-8000-000000000002'` |
+| `name` | `VARCHAR(255)` | `z.string().min(1)` | NOT NULL | — | Human-readable facility title | FR-ERP1-05 | `'Main Warehouse'` |
+| `code` | `VARCHAR(64)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_warehouses_code_idx` | FR-ERP1-05 | `'WH-01'` |
+| `is_default` | `BOOLEAN` | `z.boolean()` | NOT NULL | `true` | Operating facility flag | FR-ERP1-05 | `true` |
+| `(true)` | Constant expr | — | — | — | UNIQUE `erp1_warehouses_single_idx` | BR-ERP1-03 | Max 1 warehouse in V1 |
+| `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Audit timestamp | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
+| `updated_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Trigger `warehouses_set_updated_at` | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes**:
 - `erp1_warehouses_code_idx` — UNIQUE on `(code)`
@@ -97,21 +104,24 @@
 **Purpose**: Master records of items sold and tracked by the organization.  
 **FR/BR Reference**: FR-ERP1-01, FR-ERP1-02, BR-ERP1-01
 
-| Column | PostgreSQL Type | Nullable | Default | Owner | Meaning | Constraints |
-|---|---|---|---|---|---|---|
-| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | ERP-1 | Primary key | PK |
-| `name` | `VARCHAR(255)` | NOT NULL | — | ERP-1 | Product name | B-tree index |
-| `sku` | `VARCHAR(128)` | NOT NULL | — | ERP-1 | Stock Keeping Unit | UNIQUE `erp1_products_sku_idx` (BR-ERP1-01) |
-| `normalized_sku` | `VARCHAR(128)` | NOT NULL | — | ERP-1 | Uppercased/trimmed SKU for exact matching | UNIQUE `erp1_products_normalized_sku_idx` |
-| `category_id` | `UUID` | NULL | — | ERP-1 | Optional category link | FK → `erp1.categories(id)` ON DELETE SET NULL |
-| `unit_of_measure` | `erp1.unit_of_measure` | NOT NULL | — | ERP-1 | `pcs`, `kg`, `g`, `litre`, `metre`, `box` | ENUM (FR-ERP1-04) |
-| `price` | `NUMERIC(19, 4)` | NOT NULL | — | ERP-1 | Sale price in the explicit currency | CHECK `price >= 0`; SDS money precision |
-| `currency` | `VARCHAR(3)` | NOT NULL | — | ERP-1 | Uppercase ISO 4217 currency code | CHECK `currency ~ '^[A-Z]{3}$'`; no implicit default |
-| `tax_rate` | `NUMERIC(5, 2)` | NOT NULL | `0.00` | ERP-1 | Tax rate percentage (e.g. `5.00` for 5%) | CHECK `tax_rate >= 0` |
-| `source_system` | `VARCHAR(64)` | NULL | — | ERP-1 | External migration source system | Composite B-tree index |
-| `source_id` | `VARCHAR(128)` | NULL | — | ERP-1 | External migration source identifier | Composite B-tree index |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Row creation timestamp (UTC) | — |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Last modification timestamp (UTC) | Trigger `products_set_updated_at` |
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `z.string().uuid()` | NOT NULL | `gen_random_uuid()` | Primary Key (PK) | FR-ERP1-01 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
+| `name` | `VARCHAR(255)` | `z.string().min(1)` | NOT NULL | — | B-tree index | FR-ERP1-01 | `'Stainless Steel Hex Bolt M8x50'` |
+| `sku` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_products_sku_idx` | BR-ERP1-01 | `'FAST-BOLT-HEX-001'` |
+| `normalized_sku` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_products_normalized_sku_idx` | BR-ERP1-01 | `'FAST-BOLT-HEX-001'` |
+| `category_id` | `UUID` | `z.string().uuid().nullable()` | NULL | — | FK → `erp1.categories(id)` ON DELETE SET NULL | FR-ERP1-03 | `'00000000-0000-4000-8000-000000000001'` |
+| `unit_of_measure` | `erp1.unit_of_measure` | `enum('pcs','kg','g','litre','metre','box')` | NOT NULL | — | Fixed enum type | FR-ERP1-04 | `'pcs'` |
+| `price` | `NUMERIC(19, 4)` | `z.string().regex(/^\d+(\.\d{1,4})?$/)` | NOT NULL | — | CHECK `price >= 0` | FR-ERP1-02, BR-ERP1-01 | `'12.5000'` |
+| `currency` | `VARCHAR(3)` | `z.string().regex(/^[A-Z]{3}$/)` | NOT NULL | — | CHECK `currency ~ '^[A-Z]{3}$'` | FR-ERP1-02 | `'USD'` |
+| `tax_rate` | `NUMERIC(5, 2)` | `z.string()` | NOT NULL | `0.00` | CHECK `tax_rate >= 0` | FR-ERP1-02 | `'18.00'` |
+| `source_system` | `VARCHAR(64)` | `z.string().nullable()` | NULL | — | Composite B-tree index with `source_id` | KIT-08 / BR-KIT-03 | `'SYNTH-ERP1-DIRTY-V1'` |
+| `source_id` | `VARCHAR(128)` | `z.string().nullable()` | NULL | — | Composite B-tree index with `source_system` | KIT-08 / BR-KIT-03 | `'PRD-001'` |
+| `golden_id` | `VARCHAR(64)` | `z.string().nullable()` | NULL | — | Cross-module golden identifier | ADR-003 | `'GLD-PRD-00001'` |
+| `notification_email` | `VARCHAR(255)` | `z.string().email().nullable()` | NULL | — | RFC-5322 regex validation | RL-02 | `'ops@example.com'` |
+| `contact_phone` | `VARCHAR(32)` | `z.string().nullable()` | NULL | — | International phone regex | RL-02 | `'+1-555-0100'` |
+| `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Audit timestamp | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
+| `updated_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Trigger `products_set_updated_at` | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
 - `erp1_products_sku_idx` — UNIQUE on `(sku)`
@@ -130,13 +140,13 @@
 **Purpose**: Current available inventory stock levels per product and warehouse.  
 **FR/BR Reference**: FR-ERP1-06, BR-ERP1-02 (no negative stock)
 
-| Column | PostgreSQL Type | Nullable | Default | Owner | Meaning | Constraints |
-|---|---|---|---|---|---|---|
-| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | ERP-1 | Primary key | PK |
-| `product_id` | `UUID` | NOT NULL | — | ERP-1 | Product reference | FK → `erp1.products(id)` ON DELETE CASCADE |
-| `warehouse_id` | `UUID` | NOT NULL | — | ERP-1 | Warehouse reference | FK → `erp1.warehouses(id)` ON DELETE CASCADE |
-| `quantity` | `NUMERIC(19, 4)` | NOT NULL | `0.0000` | ERP-1 | Current on-hand quantity | CHECK `quantity >= 0`; SDS quantity precision |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Last stock update timestamp (UTC) | Trigger `stock_levels_set_updated_at` |
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `z.string().uuid()` | NOT NULL | `gen_random_uuid()` | Primary Key (PK) | FR-ERP1-06 | `'7c9e6679-7425-40de-944b-e07fc1f90ae7'` |
+| `product_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | FK → `erp1.products(id)` ON DELETE CASCADE | FR-ERP1-06 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
+| `warehouse_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | FK → `erp1.warehouses(id)` ON DELETE CASCADE | FR-ERP1-06 | `'00000000-0000-4000-8000-000000000002'` |
+| `quantity` | `NUMERIC(19, 4)` | `z.string().regex(/^\d+(\.\d{1,4})?$/)` | NOT NULL | `0.0000` | CHECK `quantity >= 0`, UNIQUE `(product_id, warehouse_id)` | BR-ERP1-02 | `'500.0000'` |
+| `updated_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Trigger `stock_levels_set_updated_at` | PLT-01 | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
 - `erp1_stock_levels_product_warehouse_idx` — UNIQUE on `(product_id, warehouse_id)`
@@ -154,17 +164,17 @@ cannot create a second stock row for the same pair.
 
 **Architecture Reference**: Decision C4 & KIT-08
 
-| Column | PostgreSQL Type | Nullable | Default | Owner | Meaning | Constraints |
-|---|---|---|---|---|---|---|
-| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | ERP-1 | Primary key | PK |
-| `batch_id` | `UUID` | NOT NULL | — | ERP-1 | Migration Kit batch UUID | Part of `erp1_import_receipts_batch_row_idx` |
-| `source_row` | `INTEGER` | NOT NULL | — | ERP-1 | 1-based source row inside the batch | CHECK `source_row >= 1` |
-| `entity` | `VARCHAR(64)` | NOT NULL | — | ERP-1 | Target entity, e.g. `product` or `stock_level` | — |
-| `schema_version` | `INTEGER` | NOT NULL | `1` | ERP-1 | Target schema version of the load | CHECK `schema_version >= 1` |
-| `idempotency_key` | `VARCHAR(128)` | NOT NULL | — | ERP-1 | `sha256(batch_id, source_row, entity, schema_version)` | UNIQUE `erp1_import_receipts_idempotency_key_unique` |
-| `target_id` | `UUID` | NOT NULL | — | ERP-1 | Identifier of the created/linked target row | — |
-| `kind` | `VARCHAR(16)` | NOT NULL | `'created'` | ERP-1 | `created` or `linked` | CHECK `check_erp1_import_receipts_kind_allowed` |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | ERP-1 | Receipt creation timestamp (UTC) | — |
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `z.string().uuid()` | NOT NULL | `gen_random_uuid()` | Primary Key (PK) | KIT-08 / C4 | `'e27a9cf1-3312-4d02-86ee-71a07409249f'` |
+| `batch_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Part of `erp1_import_receipts_batch_row_idx` | KIT-08 | `'11111111-2222-3333-4444-555555555555'` |
+| `source_row` | `INTEGER` | `z.number().int()` | NOT NULL | — | CHECK `source_row >= 1` | KIT-08 | `42` |
+| `entity` | `VARCHAR(64)` | `z.string().min(1)` | NOT NULL | — | Target entity identifier | KIT-08 | `'product'` |
+| `schema_version` | `INTEGER` | `z.number().int()` | NOT NULL | `1` | CHECK `schema_version >= 1` | KIT-08 | `1` |
+| `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
+| `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
+| `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
 - `erp1_import_receipts_idempotency_key_unique` — UNIQUE on `(idempotency_key)`
@@ -527,3 +537,239 @@ Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines 
 - Any cell value starting with `=`, `+`, `-`, `@`, `\t`, or `\r` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
 - Export includes all standardized headers: `"Source Row"`, `"Error Code"`, `"Error Title"`, `"Reason"`, `"Doc Reference"`, `"Resolution"`, `"SKU"`, `"Product Name"`, `"Source ID"`, `"Failed Field"`.
 - Filtering is preserved: exporting with active filters downloads only the matching subset of rejected rows.
+
+---
+
+## 18. Entity-Relationship Diagram (ERD) & Ownership Boundaries (ERP1-24)
+
+**Issue**: [#120](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/120) — `[ERP1-24] ERP-1 Products and Inventory: Data dictionary, ERD, traceability and Dirty Data Pack plan`  
+**Governing Architecture**: SDS ClearShift ERP v2.0 §4.2, §4.7; Master Architecture Spec §5, Decision C4, C7.
+
+### 18.1 Master Data Ownership Boundaries
+
+1. **Authoritative System of Record (SoR)**: ERP-1 is the sole, authoritative master-data owner for product definitions, single-level categories, operating warehouses, and physical stock levels.
+2. **Zero Cross-Schema Database Foreign Keys (Decision C7)**: Cross-module consumers (ERP-2 Vendors & Purchasing, ERP-3 Sales & Invoicing, CRM-2 Quotes) **never** establish direct PostgreSQL foreign keys into schema `erp1`. All cross-module integrity validation occurs at runtime via the `@cs/kernel` `ReferenceResolver` interface or public OpenAPI endpoints.
+3. **Internal Relational Integrity**:
+   - `erp1.products.category_id` references `erp1.categories.id` (`ON DELETE SET NULL`).
+   - `erp1.stock_levels.product_id` references `erp1.products.id` (`ON DELETE CASCADE`).
+   - `erp1.stock_levels.warehouse_id` references `erp1.warehouses.id` (`ON DELETE CASCADE`).
+4. **V1 Single-Warehouse Boundary (BR-ERP1-03 / FR-ERP1-05)**: Enforced via PostgreSQL expression index `UNIQUE ((true))` (`erp1_warehouses_single_idx`). Any attempt to insert a second warehouse is rejected at the database engine level.
+5. **Durable Migration Ingestion (KIT-08 / Decision C4)**: Migration Kit target adapters execute mutations atomically with durable import receipts (`erp1.import_receipts`) inside a single PostgreSQL transaction.
+
+### 18.2 Mermaid Entity-Relationship Diagram
+
+```mermaid
+erDiagram
+    %% ERP-1 Core Schema Boundaries
+    erp1_categories {
+        uuid id PK "gen_random_uuid()"
+        varchar name "NOT NULL, category name"
+        varchar code UK "NOT NULL, unique identifier"
+        timestamptz created_at "NOT NULL, audit creation"
+        timestamptz updated_at "NOT NULL, trigger updated_at"
+    }
+
+    erp1_warehouses {
+        uuid id PK "gen_random_uuid()"
+        varchar name "NOT NULL, facility description"
+        varchar code UK "NOT NULL, unique identifier"
+        boolean is_default "NOT NULL, default true"
+        timestamptz created_at "NOT NULL, audit creation"
+        timestamptz updated_at "NOT NULL, trigger updated_at"
+    }
+
+    erp1_products {
+        uuid id PK "gen_random_uuid()"
+        varchar name "NOT NULL, product name"
+        varchar sku UK "NOT NULL, unique natural key"
+        varchar normalized_sku UK "NOT NULL, unique uppercase/trimmed"
+        uuid category_id FK "NULLABLE, FK to erp1_categories"
+        unit_of_measure unit_of_measure "NOT NULL, enum: pcs,kg,g,litre,metre,box"
+        numeric price "NOT NULL, CHECK price >= 0"
+        varchar currency "NOT NULL, CHECK currency ~ '^[A-Z]{3}$'"
+        numeric tax_rate "NOT NULL, DEFAULT 0.00, CHECK tax_rate >= 0"
+        varchar source_system "NULLABLE, migration provenance"
+        varchar source_id "NULLABLE, legacy primary key"
+        varchar golden_id "NULLABLE, canonical entity ID"
+        varchar notification_email "NULLABLE, alert contact"
+        varchar contact_phone "NULLABLE, vendor phone"
+        timestamptz created_at "NOT NULL, audit creation"
+        timestamptz updated_at "NOT NULL, trigger updated_at"
+    }
+
+    erp1_stock_levels {
+        uuid id PK "gen_random_uuid()"
+        uuid product_id FK "NOT NULL, FK to erp1_products"
+        uuid warehouse_id FK "NOT NULL, FK to erp1_warehouses"
+        numeric quantity "NOT NULL, DEFAULT 0.0000, CHECK quantity >= 0"
+        timestamptz updated_at "NOT NULL, trigger updated_at"
+    }
+
+    erp1_import_receipts {
+        uuid id PK "gen_random_uuid()"
+        uuid batch_id "NOT NULL, migration batch UUID"
+        integer source_row "NOT NULL, CHECK source_row >= 1"
+        varchar entity "NOT NULL, product or stock_level"
+        integer schema_version "NOT NULL, DEFAULT 1"
+        varchar idempotency_key UK "NOT NULL, unique deterministic hash"
+        uuid target_id "NOT NULL, created/linked target row UUID"
+        varchar kind "NOT NULL, CHECK kind IN ('created', 'linked')"
+        timestamptz created_at "NOT NULL, receipt creation"
+    }
+
+    %% ERP-1 Internal Entity Relationships
+    erp1_categories ||--o{ erp1_products : "categorizes (1 to 0..*)"
+    erp1_products ||--o{ erp1_stock_levels : "inventory tracked per warehouse"
+    erp1_warehouses ||--o{ erp1_stock_levels : "holds product stock"
+    erp1_products ||--o{ erp1_import_receipts : "lineage receipt (KIT-08)"
+
+    %% Cross-Module Architectural Boundaries (Runtime Port / API Contract Only)
+    erp2_po_lines }o..|| erp1_products : "references product via ReferenceResolver (Decision C7)"
+    erp3_so_lines }o..|| erp1_products : "references product via ReferenceResolver (Decision C7)"
+    erp3_invoice_lines }o..|| erp1_products : "references product via ReferenceResolver (Decision C7)"
+    crm2_quotes }o..|| erp1_products : "reads product and price via API Contract"
+```
+
+---
+
+## 19. Requirement-to-Test Traceability Matrix (ERP1-24)
+
+Every functional requirement, domain rule, and platform architectural invariant is mapped directly to its automated verification test suites:
+
+| Requirement / Invariant ID | Source Specification | Implementation Mechanism | Automated Verification Test Suite | Gate G1 Status |
+|---|---|---|---|:---:|
+| **FR-ERP1-01** | SDS §4.2 | Product catalog master schema, CRUD endpoints | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/api/products.test.ts` | **Verified** |
+| **FR-ERP1-02** | SDS §4.2, §4.7 | Explicit uppercase ISO 4217 currency, decimal(19,4) price, non-negative tax | `packages/contracts/tests/erp-1.test.ts`<br>`apps/erp/modules/erp-1/tests/api/products.test.ts` | **Verified** |
+| **FR-ERP1-03** | SDS §4.2 | Single-level categories (name & code, no hierarchy) | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/api/categories.test.ts` | **Verified** |
+| **FR-ERP1-04** | SDS §4.2 | Fixed V1 units of measure (`pcs`, `kg`, `g`, `litre`, `metre`, `box`) | `packages/contracts/tests/erp-1.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **FR-ERP1-05** | SDS §4.2 | Exactly one warehouse in V1 (`WH-01`) | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **FR-ERP1-06** | SDS §4.2 | Physical stock quantity tracking per product/warehouse | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/api/stock.test.ts` | **Verified** |
+| **BR-ERP1-01** | SDS §4.2 | SKU uniqueness after uppercase and trim normalization | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **BR-ERP1-02** | SDS §4.2 | Non-negative stock quantity (`quantity >= 0`) | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **BR-ERP1-03** | Master Spec §6.1 | Single warehouse DB invariant (`erp1_warehouses_single_idx`) | `apps/erp/modules/erp-1/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **KIT-08 / C4** | Master Spec §4.1 | Dual-write atomic transaction + durable import receipts | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **BR-KIT-03** | Migration SDS | Raw source input values immutable during profiling/cleaning | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **PLT-12 / KIT-16** | Security Policy | OWASP formula injection neutralization on CSV import/export | `packages/kit/tests/rejection.test.ts`<br>`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts` | **Verified** |
+| **ADR-003** | ADR Catalog | Cross-module Golden ID integration (`GLD-PRD-XXXXX`) | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
+| **ERP1-18** | Issue #114 | Search, faceted filters (Category, UOM, Stock), and sorting | `apps/erp/modules/erp-1/web/tests/ProductsListPage.test.tsx` | **Verified** |
+| **ERP1-19** | Issue #115 | Loading skeletons, zero-data empty, filtered empty, 403 access-denied | `apps/erp/modules/erp-1/web/tests/screen-states.test.tsx` | **Verified** |
+| **ERP1-20** | Issue #116 | Product creation form with field validation & double-submit guard | `apps/erp/modules/erp-1/web/tests/ProductCreateModal.test.tsx` | **Verified** |
+| **ERP1-21** | Issue #117 | Detail/edit drawer workflow, linked records, HTTP 409 conflict handling | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
+| **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
+| **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
+| **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
+
+---
+
+## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)
+
+### 20.1 Plan Overview & Principles
+
+The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove the entire 7-step Migration Kit pipeline (**Extract, Profile, Clean, Map, Load, Validate, Reconcile**) against real-world messiness without utilizing any real customer or employee PII.
+
+- **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../sample-data/erp-1/dirty-data-v1.csv)
+- **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json)
+- **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../sample-data/erp-1/mapping-template.json)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/dirty-data-plan.ts`](../src/migration/dirty-data-plan.ts)
+- **Automated Regression Suite**: [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
+
+### 20.2 Synthetic Edge-Case Scenarios
+
+The Dirty Data Pack exercises 10 distinct failure categories across all 4 entity types:
+1. **Natural Key Duplication**: Exact SKU duplicates (`FAST-BOLT-HEX-001`) and case/whitespace variations (` fast-bolt-hex-001 `). Candidate duplicates receive terminal outcome `review` and are held in the deduplication queue; automatic destructive merges are forbidden.
+2. **Missing Mandatory Fields**: Omitted product name, blank SKU, omitted unit of measure, blank price, missing currency, and blank category code.
+3. **Invalid Enumerations**: Non-standard units of measure (`gallons`, `inches`, `pallets`).
+4. **Decimal Out-of-Bounds**: Negative price (`-15.5000`), non-numeric price (`TWENTY_BUCKS`), excess decimal places (> 4 decimal digits: `12.34567`).
+5. **Currency Violations**: Non-standard currency codes (`US`, `123`) and missing currency values.
+6. **Tax Rate Violations**: Negative tax percentage (`-5.00`), percentage overflow (`125.00%`), and non-numeric strings (`EIGHTEEN_PCT`).
+7. **Referential Integrity Failures**: Products referencing unregistered category codes (`NON_EXISTENT_CAT`); stock balances referencing unknown SKUs (`UNKNOWN-PRODUCT-999`) or unknown warehouse codes (`WH-UNKNOWN`).
+8. **Negative Stock Levels**: Negative inventory stock quantity (`-50.0000`), violating domain rule BR-ERP1-02.
+9. **Multi-Warehouse Violations**: Attempts to register secondary facilities (`WH-02`), violating BR-ERP1-03 / FR-ERP1-05.
+10. **Security & Formula Injection Payloads**: Text containing spreadsheet formula execution prefixes (`=cmd|' /C calc'!A0`, `+12345FormulaInj`), rejected per PLT-12 / KIT-16; synthetic bank accounts (`CH93-0000-0000-0000-1234-5`) and SSNs (`999-00-1234`) to prove review-view masking.
+
+### 20.3 Reconciliation Equation & Defect Distributions
+
+The reconciliation equation guarantees 100% accounting of all source records:
+$$\text{total\_source\_rows} = \text{accepted} + \text{rejected} + \text{review} + \text{skipped}$$
+$$\text{unaccounted} = 0$$
+
+#### Reconciliation Summary
+| Metric | Value | Meaning |
+|---|---|---|
+| **Total Source Rows** | `79` | Total records in `dirty-data-v1.csv` |
+| **Accepted** | `39` | Valid rows ready for target ingestion |
+| **Rejected** | `36` | Rows failing validation, format, or invariant rules |
+| **Review** | `4` | Candidate duplicates held for operator review |
+| **Skipped** | `0` | Skipped records (none in V1) |
+| **Unaccounted** | `0` | Zero orphan or unclassified rows |
+| **Is Balanced?** | **`true`** | Mathematical balance achieved |
+
+#### Breakdown by Entity Record Type
+| Record Type | Total | Accepted | Rejected | Review | Skipped | Pass Rate |
+|---|---|---|---|---|---|---|
+| **`category`** | 10 | 6 | 3 | 1 | 0 | 60.0% |
+| **`warehouse`** | 4 | 1 | 3 | 0 | 0 | 25.0% |
+| **`product`** | 39 | 16 | 21 | 2 | 0 | 41.0% |
+| **`stock_level`** | 26 | 16 | 9 | 1 | 0 | 61.5% |
+| **Total** | **79** | **39** | **36** | **4** | **0** | **49.4%** |
+
+#### Defect Distribution by Reason Code
+| Reason Code | Count | Failure Condition / Description | Doc Reference |
+|---|---|---|---|
+| `CATEGORY_CODE_REQUIRED` | 1 | Category code is missing or whitespace | FR-ERP1-03 |
+| `CATEGORY_NAME_REQUIRED` | 1 | Category name is missing or whitespace | FR-ERP1-03 |
+| `CATEGORY_CODE_TOO_LONG` | 1 | Category code exceeds 64 characters | FR-ERP1-03 |
+| `DUPLICATE_CATEGORY_CODE_REVIEW` | 1 | Category code already registered in batch | FR-ERP1-03 |
+| `WAREHOUSE_CODE_REQUIRED` | 1 | Warehouse code is missing or whitespace | FR-ERP1-05 |
+| `WAREHOUSE_NAME_REQUIRED` | 1 | Warehouse name is missing or whitespace | FR-ERP1-05 |
+| `MULTIPLE_WAREHOUSES_REJECTED` | 2 | Secondary warehouse attempted (WH-02, WH-03) | FR-ERP1-05 / BR-ERP1-03 |
+| `PRODUCT_NAME_REQUIRED` | 1 | Product name is missing or whitespace | FR-ERP1-01 |
+| `SKU_REQUIRED` | 1 | SKU natural key is missing | FR-ERP1-01 / BR-ERP1-01 |
+| `DUPLICATE_SKU_REVIEW` | 2 | Normalized SKU already exists in catalog or batch | BR-ERP1-01 |
+| `UNIT_OF_MEASURE_REQUIRED` | 1 | Unit of measure is missing | FR-ERP1-04 |
+| `INVALID_UNIT_OF_MEASURE` | 3 | Unit not in approved list (gallons, inches, pallets) | FR-ERP1-04 |
+| `PRICE_REQUIRED` | 1 | Selling price is missing | FR-ERP1-02 |
+| `NEGATIVE_PRICE` | 1 | Selling price is negative (< 0.0000) | FR-ERP1-02 / BR-ERP1-01 |
+| `INVALID_PRICE_FORMAT` | 1 | Non-numeric price string | FR-ERP1-02 |
+| `EXCESS_DECIMAL_PLACES` | 3 | Decimal value exceeds 4 decimal places (price or stock) | SDS §4.7 |
+| `CURRENCY_REQUIRED` | 1 | Currency is missing | FR-ERP1-02 |
+| `INVALID_CURRENCY` | 2 | Currency not 3-letter ISO-4217 uppercase code | FR-ERP1-02 |
+| `NEGATIVE_TAX_RATE` | 1 | Tax percentage is negative (< 0.00) | FR-ERP1-02 |
+| `TAX_RATE_OUT_OF_RANGE` | 1 | Tax percentage exceeds 100.00% | FR-ERP1-02 |
+| `INVALID_TAX_RATE_FORMAT` | 1 | Non-numeric tax rate representation | FR-ERP1-02 |
+| `CATEGORY_NOT_FOUND` | 1 | Referenced category not found in registry | FR-ERP1-03 |
+| `INVALID_EMAIL_FORMAT` | 1 | Email does not match RFC-5322 regex | RL-02 |
+| `INVALID_PHONE_FORMAT` | 1 | Phone does not match international pattern | RL-02 |
+| `FORMULA_INJECTION_DETECTED` | 2 | Cell starts with formula prefix (=, +) | PLT-12 / KIT-16 |
+| `PRODUCT_REQUIRED` | 2 | Stock record missing SKU reference | FR-ERP1-06 |
+| `PRODUCT_NOT_FOUND` | 2 | Referenced SKU not found in catalog | FR-ERP1-06 |
+| `WAREHOUSE_REQUIRED` | 1 | Stock record missing warehouse code | FR-ERP1-05 |
+| `WAREHOUSE_NOT_FOUND` | 1 | Stock record references unknown warehouse | FR-ERP1-05 |
+| `QUANTITY_REQUIRED` | 1 | Stock quantity is missing | FR-ERP1-06 |
+| `NEGATIVE_STOCK` | 2 | Inventory quantity is negative (< 0.0000) | BR-ERP1-02 / FR-ERP1-06 |
+| `INVALID_QUANTITY_FORMAT` | 1 | Non-numeric stock quantity string | FR-ERP1-06 |
+| `DUPLICATE_STOCK_LEVEL_REVIEW` | 1 | Repeated opening stock for product/warehouse | FR-ERP1-06 / DR-6 |
+
+---
+
+## 21. Gate G1 Review & Design Artifact Sign-Off (ERP1-24)
+
+### 21.1 Gate G1 Criteria Verification Checklist
+
+| Criterion | Requirement Description | Verification Evidence | Sign-Off |
+|---|---|---|:---:|
+| **1. Data Dictionary** | Field-level definition for all columns: type, nullability, constraints, business rule, example | Sections 2–6, 7, 8 | **Approved** |
+| **2. ER Diagram** | Mermaid ERD showing PKs, FKs, cardinalities, and cross-module boundaries | Section 18 | **Approved** |
+| **3. Traceability Matrix** | Every Must requirement mapped to automated tests with >= 60% domain coverage | Section 19 | **Approved** |
+| **4. Dirty Data Pack Plan** | Committed synthetic fixture (`dirty-data-v1.csv`), manifest, expected profile, and 100% mathematical reconciliation | Section 20, `sample-data/erp-1/` | **Approved** |
+| **5. Platform Reuse (H2)** | Zero duplicate platform infrastructure; consumes `@cs/kit` and `@cs/ui` shared tokens | Issue #118, #119, #120 | **Approved** |
+| **6. Zero Real PII** | 100% synthetic test data fixtures; sensitive field masking verified | Section 17, Section 20 | **Approved** |
+
+### 21.2 Peer Review & Governance Sign-Off Record
+
+- **Module**: ERP-1 Products & Inventory (Group 6)
+- **Module Lead**: Aditya C (Group 6 Lead / Role 4)
+- **Peer Development Group**: Group 7 (ERP-2 Vendors & Purchasing) & Group 9 (ERP-4 Finance & Accounting)
+- **Review Date**: 2026-10-23
+- **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
+- **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests.
