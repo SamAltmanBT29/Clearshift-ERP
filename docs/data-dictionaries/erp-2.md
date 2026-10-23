@@ -1,6 +1,9 @@
-# ERP-2 Vendors & Purchasing — Data Dictionary
+# ERP-2 Vendors & Purchasing — Data Dictionary (Global Reference)
 
-This document is the global reference copy of the data dictionary for ERP-2 Vendors & Purchasing.
+This document is the global-docs copy of the module data dictionary.
+
+For the canonical, detailed version see:
+[`apps/erp/modules/erp-2/docs/data-dictionary.md`](../../apps/erp/modules/erp-2/docs/data-dictionary.md)
 
 ---
 
@@ -9,23 +12,23 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter) |
+| **Issues** | #16: ERP2-01 (Schema & Migrations), #17: ERP2-02 (List/Read API), #18: ERP2-03 (Mutation API), #21: ERP2-06 (Relationships & State Transitions), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
-| **TypeScript Contracts** | `packages/contracts/src/erp-2.ts`, `packages/contracts/src/import-target.ts` |
+| **Zod Contract** | `packages/contracts/src/erp-2.ts` |
+| **Drizzle Model** | `apps/erp/modules/erp-2/db/schema.ts` |
+| **Migration** | `packages/database/migrations/erp2_v1.sql` |
 | **Tables** | `erp2.vendors`, `erp2.purchase_orders`, `erp2.po_lines`, `erp2.import_receipts` |
 | **Version** | V1.0 |
-| **SDS Reference** | ClearShift ERP v2.0 §4.3, §4.7, §4.8, §7.7, FR-ERP2-01..06, BR-ERP2-01 |
-
----
+| **SDS Reference** | ClearShift ERP v2.0 §4.3 (FR-ERP2-01..06, BR-ERP2-01), §4.7 (ERP-2 tables) |
 
 ## Table Index
 
-| Table | Purpose | Key Constraints |
+| Table | Purpose | Key Constraint |
 |---|---|---|
 | `erp2.vendors` | Supplier / vendor master catalog with masked bank details | UNIQUE(`tax_number`), INDEX(`name`) |
-| `erp2.purchase_orders` | Purchase order headers with status lifecycle & total | UNIQUE(`po_number`), FK(`vendor_id` $\rightarrow$ `vendors.id`) |
+| `erp2.purchase_orders` | Purchase order headers with status lifecycle & total | UNIQUE(`po_number`), FK(`vendor_id`$\rightarrow$ `vendors.id`) |
 | `erp2.po_lines` | Line items linked to purchase order and ERP-1 product | FK(`po_id` $\rightarrow$ `purchase_orders.id`), INDEX(`product_id`) |
 | `erp2.import_receipts` | Durable idempotency receipts for migration & integration | UNIQUE(`idempotency_key`), INDEX(`batch_id`, `source_row`) |
 
@@ -84,8 +87,8 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 | `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
 | `po_id` | `UUID` | NOT NULL | — | Owning purchase order | FK $\rightarrow$ `purchase_orders(id)` ON DELETE CASCADE |
 | `product_id` | `UUID` | NOT NULL | — | Product identifier owned by ERP-1 | Logical ref; verified via `ReferenceResolver` |
-| `quantity` | `NUMERIC(12,2)` | NOT NULL | — | Purchased quantity | $> 0` |
-| `price` | `NUMERIC(18,2)` | NOT NULL | — | Unit purchase price | $\ge 0` |
+| `quantity` | `NUMERIC(12,2)` | NOT NULL | — | Purchased quantity | greater than 0 |
+| `price` | `NUMERIC(18,2)` | NOT NULL | — | Unit purchase price | greater than or equal to 0 |
 | `line_total` | `NUMERIC(18,2)` | NOT NULL | — | Server computed: `round(qty * price, 2)` | Decimal half-up rounding |
 
 ---
@@ -118,7 +121,7 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 
 | Method | Endpoint | Description | Constraints / Behaviors |
 |---|---|---|---|
-| `GET` | `/api/v1/erp-vendors/vendors` | List vendors | Paged (`page`, `pageSize <= 100`), search by name, returns `bank_masked` |
+| `GET` | `/api/v1/erp-vendors/vendors` | List vendors | Paged (`page`, `pageSize <= 100`), search by name and tax number (case-insensitive), returns `bank_masked` |
 | `POST` | `/api/v1/erp-vendors/vendors` | Create vendor | Validates tax number uniqueness, masks bank details, optional idempotency key |
 | `GET` | `/api/v1/erp-vendors/vendors/:id` | Get vendor by UUID | Returns single vendor with masked bank details |
 | `PATCH` | `/api/v1/erp-vendors/vendors/:id` | Update vendor | Updates mutable fields; bank details masked server-side |
@@ -135,7 +138,7 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 1. **Bank Details Privacy (FR-ERP2-06)**: Raw bank account numbers are never exposed in any list or detail query response, error message, or log. Serialized representation strictly follows the mask format `XXXX-XXXX-7890`.
 2. **Server-Side Calculated Total (FR-ERP2-05)**: Line total is calculated as `round(quantity * price, 2)` using decimal half-up rounding. The order total is calculated as the sum of line totals. Any client-submitted total is ignored and overwritten.
 3. **Cross-Module Referential Integrity (BR-ERP2-01 / Decision C7)**: Each purchase order line product reference is verified via the `ReferenceResolver` port provided by the kernel. If a product does not exist in ERP-1, the request is rejected with `UNKNOWN_PRODUCT` (HTTP 422).
-4. **Strict State Machine (FR-ERP2-04)**: Status transitions must follow `Draft` $\rightarrow$ `Sent` $\rightarrow$ `Received` $\rightarrow$ `Closed`. Backwards transitions or cancellations are rejected with `INVALID_STATUS_TRANSITION` (HTTP 422). Marking status as `Received` does not alter inventory in V1.
+4. **Strict State Machine (FR-ERP2-04)**: Status transitions must follow `Draft` $\rightarrow$ `Sent` $\rightarrow$ `Received` $\rightarrow$ `Closed`. Backwards transitions or cancellations are rejected with `INVALID_STATUS_TRANSITION`(HTTP 422). Marking status as `Received` does not alter inventory in V1.
 5. **Idempotency & Atomic Dual-Write (KIT-08 / Decision C4)**:
    - Target row mutation and receipt insertion execute inside a single local PostgreSQL transaction.
    - Identical 3x replays produce 1 business row and 1 receipt (HTTP 200/201).
@@ -240,7 +243,6 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 *Expected Output*: HTTP 200 with `status: "Sent"`. Attempting to transition back to `Draft` returns HTTP 422 `INVALID_STATUS_TRANSITION`.
 
 ---
-
 ## 8. State Machine & Read Model Consistency Matrix (ERP2-06)
 
 ### 8.1 Purchase Order Status Transition Matrix
@@ -266,5 +268,22 @@ curl -X PATCH "http://localhost:3000/api/v1/erp-vendors/purchase-orders/00000000
 3. **Optional Link Handling**:
    - When an optional relationship (e.g. `source_system`/`source_id`, phone) is absent, code `ERP2_OPTIONAL_REFERENCE_ABSENT` is surfaced in warnings and the value remains `null`. No synthetic records are materialized.
 
+---
 
+## 9. QA Evidence (ERP2-10)
 
+| Layer | Location |
+|---|---|
+| Domain unit tests | `apps/erp/modules/erp-2/tests/domain/` |
+| Fastify injection tests (every endpoint, auth, validation, idempotency) | `apps/erp/modules/erp-2/tests/api/`, `apps/erp/modules/erp-2/tests/migration/` |
+| DB constraint and transaction tests (real PostgreSQL, needs `DATABASE_URL`) | `apps/erp/modules/erp-2/tests/db/constraints.test.ts` |
+| OpenAPI vs implemented routes | `apps/erp/modules/erp-2/tests/contract/openapi-parity.test.ts` |
+| Deterministic seed (public API only, idempotent) | `sample-data/erp-2/seed.ts`, `apps/erp/modules/erp-2/tests/seed/` |
+| Scripted V1 demo journey | `apps/erp/modules/erp-2/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-2-v1.md` |
+| Runbook and known defects | `apps/erp/modules/erp-2/README.md` |
+
+Notes:
+- Vendor search matches name and tax number, case-insensitively.
+- Purchase order header and lines are written in one transaction.
+- The public API accepts prices with up to 2 decimals. `line_total = round_half_up(quantity x price, 2)` and the order total is the sum of the line totals.
+- Open defects and their issue links are tracked in the README "Known defects" table.

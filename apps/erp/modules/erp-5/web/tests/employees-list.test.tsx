@@ -163,7 +163,8 @@ describe('ERP-5 employee list screen', () => {
       renderScreen();
       await waitFor(() => expect(api.callsTo('/employees')).toHaveLength(1));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
+      const page2Button = await screen.findByRole('button', { name: 'Go to page 2' });
+      fireEvent.click(page2Button);
       await waitFor(() => {
         expect(api.lastCallTo('/employees')?.query.get('page')).toBe('2');
       });
@@ -243,7 +244,8 @@ describe('ERP-5 employee list screen', () => {
       renderScreen();
       await waitFor(() => expect(api.callsTo('/employees')).toHaveLength(1));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
+      const page2Button = await screen.findByRole('button', { name: 'Go to page 2' });
+      fireEvent.click(page2Button);
 
       await waitFor(() => {
         expect(api.lastCallTo('/employees')?.query.get('page')).toBe('2');
