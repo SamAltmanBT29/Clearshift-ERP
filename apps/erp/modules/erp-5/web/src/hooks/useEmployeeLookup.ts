@@ -34,7 +34,7 @@ export interface EmployeeLookup {
 export function useEmployeeLookup(): EmployeeLookup {
   const { items, isLoading } = useHrList<HrEmployeeView, HrEmployeeListQuery>(
     (query, signal) => listEmployees(query, { signal }),
-    { page: 1, pageSize: HR_PAGE_SIZE_MAX, sort: 'name' }
+    { page: 1, pageSize: HR_PAGE_SIZE_MAX, sort: 'name', sort_dir: 'asc' }
   );
 
   const options = useMemo<readonly EmployeeOption[]>(
