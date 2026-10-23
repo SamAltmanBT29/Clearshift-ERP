@@ -49,6 +49,27 @@ export class Erp1ApiError extends Error {
     this.details = details;
     this.correlationId = correlationId;
   }
+
+  /**
+   * True when request was rejected due to lack of permission (HTTP 403 Forbidden).
+   */
+  public get isPermissionDenied(): boolean {
+    return this.status === 403 || this.code === 'FORBIDDEN' || this.code === 'ACCESS_DENIED';
+  }
+
+  /**
+   * True when request was rejected due to unauthenticated session (HTTP 401 Unauthorized).
+   */
+  public get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+
+  /**
+   * True when requested record was not found (HTTP 404).
+   */
+  public get isNotFound(): boolean {
+    return this.status === 404;
+  }
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   fetchProducts,
   fetchCategories,
   buildProductQueryParams,
-  type Erp1ApiError,
+  Erp1ApiError,
 } from '../api/erp-1.js';
 import { SearchBar } from '../components/SearchBar.js';
 import {
@@ -29,6 +29,7 @@ import {
   ProductsLoadingSkeleton,
   EmptyProductsView,
   ErrorProductsView,
+  AccessDeniedProductsView,
 } from '../components/StateViews.js';
 
 export interface ProductsListPageProps {
@@ -36,6 +37,8 @@ export interface ProductsListPageProps {
   initialFilters?: Partial<ProductListQuery> | undefined;
   /** Optional callback when URL query changes */
   onQueryChange?: ((queryString: string) => void) | undefined;
+  /** Optional callback when operator triggers "Add Product" action */
+  onCreateProduct?: (() => void) | undefined;
 }
 
 function parseFiltersFromUrl(): Partial<ProductListQuery> {
@@ -98,6 +101,7 @@ function syncUrlWithFilters(
 export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   initialFilters,
   onQueryChange,
+  onCreateProduct,
 }) => {
   // 1. Initial State Resolution from URL or Props
   const urlFilters = useMemo(() => parseFiltersFromUrl(), []);
@@ -127,7 +131,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   const [total, setTotal] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Erp1ApiError | null>(null);
 
   // Load Categories on mount for facet sidebar
   useEffect(() => {
@@ -176,8 +180,17 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
       setTotal(response.total);
       setTotalPages(response.totalPages || Math.ceil(response.total / (queryToFetch.pageSize || 25)) || 1);
     } catch (err: any) {
-      const apiErr = err as Erp1ApiError;
-      setError(apiErr.message || 'Failed to fetch products from server');
+      if (err instanceof Erp1ApiError) {
+        setError(err);
+      } else {
+        setError(
+          new Erp1ApiError(
+            err?.status || 500,
+            err?.code || 'UNKNOWN_ERROR',
+            err?.message || 'Failed to fetch products from server'
+          )
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -364,9 +377,15 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
 
         {/* Results Area */}
         <main className="cs-erp1-results-container" aria-label="Products list and results">
-          {error ? (
+          {error?.isPermissionDenied ? (
+            <AccessDeniedProductsView
+              message={error.message}
+              requiredCapability="inventory:read"
+            />
+          ) : error ? (
             <ErrorProductsView
-              message={error}
+              error={error}
+              message={error.message}
               onRetry={() => executeFetch(activeQuery)}
             />
           ) : isLoading ? (
@@ -375,6 +394,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
             <EmptyProductsView
               hasActiveFilters={hasActiveFilters}
               onClearFilters={handleClearAll}
+              onCreateProduct={onCreateProduct}
             />
           ) : (
             <ProductsTable

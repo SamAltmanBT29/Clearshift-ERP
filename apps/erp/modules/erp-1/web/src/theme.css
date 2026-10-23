@@ -666,3 +666,235 @@
     display: block;
   }
 }
+
+/* ==========================================================================
+   State Views: Skeleton, Empty, Error Banner, Access-Denied (ERP1-19)
+   ========================================================================== */
+
+/* 1. Animated Skeleton Placeholder Table */
+.cs-erp1-skeleton-container {
+  width: 100%;
+}
+
+.cs-erp1-skeleton-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-skeleton-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cs-erp1-skeleton-table th,
+.cs-erp1-skeleton-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.cs-erp1-skeleton-table thead tr {
+  background-color: var(--color-surface);
+}
+
+.cs-erp1-skeleton-cell {
+  height: 16px;
+  background: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 0.4) 0%,
+    rgba(229, 231, 235, 0.8) 50%,
+    rgba(229, 231, 235, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: cs-erp1-pulse 1.5s ease-in-out infinite;
+}
+
+.cs-erp1-skeleton-cell.skeleton-header {
+  height: 14px;
+  width: 70%;
+  background-color: rgba(209, 213, 219, 0.6);
+}
+
+@keyframes cs-erp1-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 2. Empty States */
+.cs-erp1-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-2);
+}
+
+.cs-erp1-empty-icon {
+  font-size: 2.25rem;
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.cs-erp1-empty-zero-data {
+  background-color: var(--color-background);
+  border: 2px dashed var(--border-subtle);
+}
+
+/* 3. Error Alert Banner */
+.cs-erp1-error-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background-color: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.cs-erp1-error-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.cs-erp1-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-error);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cs-erp1-error-content {
+  flex: 1 1 auto;
+}
+
+.cs-erp1-error-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-error);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.cs-erp1-error-message {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cs-erp1-correlation-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: var(--space-2) 0 0 0;
+}
+
+.cs-erp1-correlation-hint code {
+  font-family: var(--font-mono);
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-error-border);
+}
+
+.cs-erp1-retry-btn {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: var(--color-error);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cs-erp1-retry-btn:hover {
+  background-color: #991b1b;
+}
+
+.cs-erp1-retry-btn:focus-visible {
+  outline: 2px solid var(--color-error);
+  outline-offset: 2px;
+}
+
+/* 4. Access Denied State (403 Forbidden) */
+.cs-erp1-access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-erp1-access-denied-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.cs-erp1-access-denied-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.cs-erp1-access-denied-message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 480px;
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.5;
+}
+
+.cs-erp1-access-denied-role-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp1-access-denied-role-hint code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.cs-erp1-access-denied-footer {
+  font-size: 0.8125rem;
+  color: var(--color-text-subtle);
+  margin: 0;
+}
