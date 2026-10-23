@@ -32,7 +32,7 @@ const BatchRowInputSchema = z.object({
   idempotency_key: z.string().min(1).max(128),
   source_system: z.string().max(64).optional().nullable(),
   source_id: z.string().max(128).optional().nullable(),
-  record: z.record(z.unknown()),
+  record: z.record(z.string(), z.unknown()),
 });
 
 const ImportBatchRequestSchema = z.object({

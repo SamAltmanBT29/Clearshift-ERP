@@ -42,9 +42,9 @@ export interface BatchRowInput<TRow = unknown> {
   /** Cleaned/validated source data mapped to the target domain shape. */
   data: TRow;
   /** Optional: originating system identifier (for traceability). */
-  sourceSystem?: string;
+  sourceSystem?: string | undefined;
   /** Optional: original row identifier from the source system. */
-  sourceId?: string;
+  sourceId?: string | undefined;
 }
 
 /**
