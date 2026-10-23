@@ -38,6 +38,9 @@ export const FinancePolicies = {
   // ── Accounting Periods ─────────────────────────────────────────────────────
   PERIODS_READ: 'finance.periods.read',
   PERIODS_UPDATE: 'finance.periods.update',
+
+  // ── Migration & Profiling (KIT-03 / ERP4-26) ──────────────────────────────
+  MIGRATION_PROFILE_READ: 'finance.migration.profile.read',
 } as const;
 
 export type FinancePolicy = typeof FinancePolicies[keyof typeof FinancePolicies];
@@ -119,6 +122,11 @@ export const FINANCE_ROUTE_POLICIES: Record<
     policy: FinancePolicies.PERIODS_UPDATE,
     allowedRoles: [Roles.ADMIN, 'finance_admin'],
     description: 'Update accounting period state (open/soft_closed/locked)',
+  },
+  [FinancePolicies.MIGRATION_PROFILE_READ]: {
+    policy: FinancePolicies.MIGRATION_PROFILE_READ,
+    allowedRoles: [Roles.VIEWER, Roles.ANALYST, Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN, 'finance_admin', 'auditor'],
+    description: 'Inspect migration column profiling and data health reports',
   },
 };
 
