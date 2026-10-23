@@ -1,0 +1,991 @@
+{
+  "by_reason_code": {
+    "ACCOUNT_CODE_REQUIRED": 2,
+    "ACCOUNT_CODE_TOO_LONG": 1,
+    "ACCOUNT_INACTIVE": 1,
+    "ACCOUNT_NAME_REQUIRED": 1,
+    "ACCOUNT_NAME_TOO_LONG": 1,
+    "ACCOUNT_NOT_FOUND": 2,
+    "ACCOUNT_TYPE_REQUIRED": 1,
+    "AMBIGUOUS_DATE_FORMAT": 1,
+    "AMOUNT_OVERFLOW": 2,
+    "AS_OF_DATE_REQUIRED": 1,
+    "BALANCE_AMOUNT_REQUIRED": 1,
+    "CANNOT_POST_TO_HEADER_ACCOUNT": 1,
+    "CURRENCY_MISMATCH": 3,
+    "CURRENCY_REQUIRED": 3,
+    "CYCLE_DETECTED": 1,
+    "DEPARTMENT_NOT_FOUND": 1,
+    "DESCRIPTION_REQUIRED": 1,
+    "DESCRIPTION_TOO_LONG": 1,
+    "DUPLICATE_ACCOUNT_CODE_REVIEW": 1,
+    "DUPLICATE_ENTRY_NUMBER_REVIEW": 1,
+    "DUPLICATE_OPENING_BALANCE_REVIEW": 1,
+    "ENTRY_NUMBER_REQUIRED": 1,
+    "ENTRY_NUMBER_TOO_LONG": 1,
+    "EXCESS_DECIMAL_PLACES": 2,
+    "INVALID_ACCOUNT_CODE_FORMAT": 1,
+    "INVALID_ACCOUNT_TYPE": 1,
+    "INVALID_BALANCE_AMOUNT": 1,
+    "INVALID_BOOLEAN": 2,
+    "INVALID_CURRENCY": 3,
+    "INVALID_DATE": 1,
+    "INVALID_PERIOD_FORMAT": 1,
+    "INVALID_POSTING_DATE": 1,
+    "LINE_DEBIT_AND_CREDIT": 1,
+    "LINE_NARRATION_TOO_LONG": 1,
+    "LINE_REJECTED": 11,
+    "LINE_ZERO_AMOUNTS": 1,
+    "MINIMUM_LINES_REQUIRED": 1,
+    "NEGATIVE_AMOUNT": 2,
+    "NO_LINES": 2,
+    "ORPHAN_LINE": 1,
+    "PARENT_ACCOUNT_NOT_FOUND": 1,
+    "PARENT_ENTRY_IN_REVIEW": 2,
+    "PARENT_ENTRY_REJECTED": 36,
+    "PARENT_SOURCE_ID_REQUIRED": 3,
+    "PERIOD_LABEL_REQUIRED": 1,
+    "PERIOD_LOCKED": 1,
+    "PERIOD_NOT_FOUND": 1,
+    "POSTING_DATE_REQUIRED": 1,
+    "SOURCE_ID_REQUIRED": 3,
+    "UNBALANCED_JOURNAL_ENTRY": 1
+  },
+  "by_record_type": {
+    "account": {
+      "accepted": 14,
+      "rejected": 16,
+      "review": 1
+    },
+    "journal_entry": {
+      "accepted": 4,
+      "rejected": 26,
+      "review": 1
+    },
+    "journal_line": {
+      "accepted": 9,
+      "rejected": 51,
+      "review": 2
+    },
+    "opening_balance": {
+      "accepted": 5,
+      "rejected": 13,
+      "review": 1
+    }
+  },
+  "by_rule_id": {
+    "ACC-001": 1,
+    "ACC-002": 1,
+    "ACC-003": 1,
+    "ACC-004": 1,
+    "ACC-005": 1,
+    "ACC-020": 1,
+    "ACC-021": 1,
+    "ACC-022": 1,
+    "ACC-023": 1,
+    "ACC-030": 1,
+    "ACC-031": 1,
+    "ACC-032": 1,
+    "ACC-033": 1,
+    "ACC-040": 1,
+    "ACC-041": 1,
+    "ACC-042": 1,
+    "ACC-050": 1,
+    "JRL-001": 3,
+    "JRL-002": 1,
+    "JRL-004": 1,
+    "JRL-005": 1,
+    "JRL-006": 1,
+    "JRL-020": 1,
+    "JRL-021": 1,
+    "JRL-022": 1,
+    "JRL-023": 1,
+    "JRL-024": 1,
+    "JRL-025": 1,
+    "JRL-026": 1,
+    "JRL-027": 1,
+    "JRL-030": 2,
+    "JRL-031": 36,
+    "JRN-001": 1,
+    "JRN-002": 1,
+    "JRN-003": 1,
+    "JRN-004": 1,
+    "JRN-005": 1,
+    "JRN-006": 1,
+    "JRN-020": 1,
+    "JRN-021": 1,
+    "JRN-022": 1,
+    "JRN-023": 1,
+    "JRN-024": 1,
+    "JRN-025": 1,
+    "JRN-030": 1,
+    "JRN-040": 2,
+    "JRN-041": 1,
+    "JRN-042": 1,
+    "JRN-043": 11,
+    "OPB-001": 1,
+    "OPB-002": 1,
+    "OPB-003": 1,
+    "OPB-004": 1,
+    "OPB-005": 1,
+    "OPB-020": 1,
+    "OPB-021": 2,
+    "OPB-022": 1,
+    "OPB-023": 1,
+    "OPB-024": 1,
+    "OPB-025": 1,
+    "OPB-026": 1,
+    "OPB-027": 1,
+    "OPB-030": 1
+  },
+  "fixture": {
+    "by_record_type": {
+      "account": 31,
+      "journal_entry": 31,
+      "journal_line": 62,
+      "opening_balance": 19
+    },
+    "file": "sample-data/erp-4/dirty-data-v1.csv",
+    "row_count": 143,
+    "schema_version": 1,
+    "sha256": "506eabd2932433b43c4181f84be1298fd5a2a5a3292d601d477885491cf130d1"
+  },
+  "normalizations": {
+    "ACC-010": 1,
+    "ACC-011": 1,
+    "ACC-012": 1,
+    "ACC-013": 1,
+    "ACC-014": 1,
+    "JRN-010": 1,
+    "JRN-011": 1,
+    "JRN-012": 1,
+    "JRN-013": 1,
+    "JRN-014": 1,
+    "OPB-010": 1,
+    "OPB-011": 1,
+    "OPB-012": 1,
+    "OPB-013": 1
+  },
+  "rows": {
+    "R001": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R002": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R003": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R004": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R005": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R006": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R007": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R008": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R009": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R010": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R011": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R012": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R013": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R014": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R015": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_CODE_REQUIRED"
+      ]
+    },
+    "R016": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_ACCOUNT_CODE_FORMAT"
+      ]
+    },
+    "R017": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_CODE_TOO_LONG"
+      ]
+    },
+    "R018": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_NAME_REQUIRED"
+      ]
+    },
+    "R019": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_NAME_TOO_LONG"
+      ]
+    },
+    "R020": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_TYPE_REQUIRED"
+      ]
+    },
+    "R021": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_ACCOUNT_TYPE"
+      ]
+    },
+    "R022": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R023": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R024": {
+      "outcome": "rejected",
+      "reasons": [
+        "CYCLE_DETECTED"
+      ]
+    },
+    "R025": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ACCOUNT_NOT_FOUND"
+      ]
+    },
+    "R026": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_MISMATCH"
+      ]
+    },
+    "R027": {
+      "outcome": "rejected",
+      "reasons": [
+        "DESCRIPTION_TOO_LONG"
+      ]
+    },
+    "R028": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_BOOLEAN"
+      ]
+    },
+    "R029": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_BOOLEAN"
+      ]
+    },
+    "R030": {
+      "outcome": "rejected",
+      "reasons": [
+        "SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R031": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_ACCOUNT_CODE_REVIEW"
+      ]
+    },
+    "R032": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R033": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R034": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R035": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R036": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R037": {
+      "outcome": "rejected",
+      "reasons": [
+        "SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R038": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_CODE_REQUIRED"
+      ]
+    },
+    "R039": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_NOT_FOUND"
+      ]
+    },
+    "R040": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R041": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY",
+        "CURRENCY_MISMATCH"
+      ]
+    },
+    "R042": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_MISMATCH"
+      ]
+    },
+    "R043": {
+      "outcome": "rejected",
+      "reasons": [
+        "BALANCE_AMOUNT_REQUIRED"
+      ]
+    },
+    "R044": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_BALANCE_AMOUNT"
+      ]
+    },
+    "R045": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMOUNT_OVERFLOW"
+      ]
+    },
+    "R046": {
+      "outcome": "rejected",
+      "reasons": [
+        "EXCESS_DECIMAL_PLACES"
+      ]
+    },
+    "R047": {
+      "outcome": "rejected",
+      "reasons": [
+        "AS_OF_DATE_REQUIRED"
+      ]
+    },
+    "R048": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DATE"
+      ]
+    },
+    "R049": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT"
+      ]
+    },
+    "R050": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_OPENING_BALANCE_REVIEW"
+      ]
+    },
+    "R051": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R052": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R053": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R054": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R055": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R056": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R057": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R058": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R059": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R060": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R061": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R062": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R063": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R064": {
+      "outcome": "rejected",
+      "reasons": [
+        "SOURCE_ID_REQUIRED",
+        "NO_LINES"
+      ]
+    },
+    "R065": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R066": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_SOURCE_ID_REQUIRED"
+      ]
+    },
+    "R067": {
+      "outcome": "rejected",
+      "reasons": [
+        "ENTRY_NUMBER_REQUIRED"
+      ]
+    },
+    "R068": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R069": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R070": {
+      "outcome": "rejected",
+      "reasons": [
+        "ENTRY_NUMBER_TOO_LONG"
+      ]
+    },
+    "R071": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R072": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R073": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_ENTRY_NUMBER_REVIEW"
+      ]
+    },
+    "R074": {
+      "outcome": "review",
+      "reasons": [
+        "PARENT_ENTRY_IN_REVIEW"
+      ]
+    },
+    "R075": {
+      "outcome": "review",
+      "reasons": [
+        "PARENT_ENTRY_IN_REVIEW"
+      ]
+    },
+    "R076": {
+      "outcome": "rejected",
+      "reasons": [
+        "PERIOD_LABEL_REQUIRED"
+      ]
+    },
+    "R077": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R078": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R079": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PERIOD_FORMAT"
+      ]
+    },
+    "R080": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R081": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R082": {
+      "outcome": "rejected",
+      "reasons": [
+        "PERIOD_LOCKED"
+      ]
+    },
+    "R083": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R084": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R085": {
+      "outcome": "rejected",
+      "reasons": [
+        "PERIOD_NOT_FOUND"
+      ]
+    },
+    "R086": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R087": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R088": {
+      "outcome": "rejected",
+      "reasons": [
+        "POSTING_DATE_REQUIRED"
+      ]
+    },
+    "R089": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R090": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R091": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_POSTING_DATE"
+      ]
+    },
+    "R092": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R093": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R094": {
+      "outcome": "rejected",
+      "reasons": [
+        "DESCRIPTION_REQUIRED"
+      ]
+    },
+    "R095": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R096": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R097": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R098": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R099": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R100": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R101": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R102": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R103": {
+      "outcome": "rejected",
+      "reasons": [
+        "NO_LINES"
+      ]
+    },
+    "R104": {
+      "outcome": "rejected",
+      "reasons": [
+        "MINIMUM_LINES_REQUIRED"
+      ]
+    },
+    "R105": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R106": {
+      "outcome": "rejected",
+      "reasons": [
+        "UNBALANCED_JOURNAL_ENTRY"
+      ]
+    },
+    "R107": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R108": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R109": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R110": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_NOT_FOUND"
+      ]
+    },
+    "R111": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R112": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R113": {
+      "outcome": "rejected",
+      "reasons": [
+        "ACCOUNT_INACTIVE"
+      ]
+    },
+    "R114": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R115": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R116": {
+      "outcome": "rejected",
+      "reasons": [
+        "CANNOT_POST_TO_HEADER_ACCOUNT"
+      ]
+    },
+    "R117": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R118": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R119": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_DEBIT_AND_CREDIT"
+      ]
+    },
+    "R120": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R121": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R122": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_ZERO_AMOUNTS"
+      ]
+    },
+    "R123": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R124": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R125": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_AMOUNT"
+      ]
+    },
+    "R126": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R127": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R128": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R129": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_AMOUNT"
+      ]
+    },
+    "R130": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R131": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMOUNT_OVERFLOW"
+      ]
+    },
+    "R132": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R133": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R134": {
+      "outcome": "rejected",
+      "reasons": [
+        "EXCESS_DECIMAL_PLACES"
+      ]
+    },
+    "R135": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R136": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R137": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_NARRATION_TOO_LONG"
+      ]
+    },
+    "R138": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R139": {
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_REJECTED"
+      ]
+    },
+    "R140": {
+      "outcome": "rejected",
+      "reasons": [
+        "DEPARTMENT_NOT_FOUND"
+      ]
+    },
+    "R141": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_ENTRY_REJECTED"
+      ]
+    },
+    "R142": {
+      "outcome": "rejected",
+      "reasons": [
+        "ORPHAN_LINE"
+      ]
+    },
+    "R143": {
+      "outcome": "rejected",
+      "reasons": [
+        "PARENT_SOURCE_ID_REQUIRED"
+      ]
+    }
+  },
+  "rules_version": "1.0.0",
+  "trial_balance_summary": {
+    "EUR": {
+      "account_count": 2,
+      "difference": "0.00",
+      "is_balanced": true,
+      "total_credit": "800.00",
+      "total_debit": "800.00"
+    },
+    "INR": {
+      "account_count": 6,
+      "difference": "0.00",
+      "is_balanced": true,
+      "total_credit": "6000.00",
+      "total_debit": "6000.00"
+    },
+    "USD": {
+      "account_count": 2,
+      "difference": "0.00",
+      "is_balanced": true,
+      "total_credit": "1250.50",
+      "total_debit": "1250.50"
+    }
+  }
+}
