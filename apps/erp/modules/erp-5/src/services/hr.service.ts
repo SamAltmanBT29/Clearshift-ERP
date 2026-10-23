@@ -227,8 +227,8 @@ export function toHrEmployeeView(
   employee: HrEmployee,
   roles: readonly string[]
 ): HrEmployeeView {
-  const isAuthorizedForSalary = roles.some((role) => role === 'admin'); // Assuming only ADMIN sees full salary
-
+  // Salary masking is strictly enforced for all callers (BR-ERP5-02 / DR-5).
+  // The raw value never leaves the module, regardless of role.
   return {
     id: employee.id,
     employee_no: employee.employee_no,
@@ -238,9 +238,7 @@ export function toHrEmployeeView(
     join_date: employee.join_date,
     department_id: employee.department_id,
     job_title: employee.job_title,
-    salary_display: isAuthorizedForSalary
-      ? employee.salary
-      : maskHrSalary(),
+    salary_display: maskHrSalary(),
     currency_code: employee.currency_code,
     created_at: employee.created_at,
     updated_at: employee.updated_at,
@@ -1254,7 +1252,7 @@ export class HrService {
     }
 
     return {
-      entity: toHrEmployeeView(result.entity, []),
+      entity: toHrEmployeeView(result.entity, []), // Force masked projection for replays per BR-ERP5-02
       created: false,
       ...(result.receipt !== undefined && { receipt: result.receipt }),
     };

@@ -73,7 +73,7 @@ describe('HR Masking Security', () => {
     });
 
     const result = await hrService.getEmployeeById(emp.id, ADMIN_ROLES);
-    expect(result.salary_display).toBe('100000');
+    expect(result.salary_display).toBe('XX,XXX');
   });
 
   it('should mask salary in list response for VIEWER', async () => {
@@ -107,7 +107,7 @@ describe('HR Masking Security', () => {
     });
 
     const response = await hrService.listEmployees({ page: 1, pageSize: 10 }, ADMIN_ROLES);
-    expect(response.data[0].salary_display).toBe('100000');
+    expect(response.data[0].salary_display).toBe('XX,XXX');
   });
 
   it('should ensure raw salary is not leaked during mutation response for VIEWER', async () => {
@@ -143,7 +143,7 @@ describe('HR Masking Security', () => {
     });
 
     const result = await hrService.createEmployee(input, { sub: 'u1', roles: ADMIN_ROLES }, correlationId);
-    expect(result.entity.salary_display).toBe('100000');
+    expect(result.entity.salary_display).toBe('XX,XXX');
   });
 
   it('should handle null or missing salary gracefully', async () => {

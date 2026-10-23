@@ -52,7 +52,7 @@ describe("ERP-5 Idempotent Replay Security", () => {
     const res1 = await createEmployee("role:admin", employeeBody);
     expect(res1.statusCode).toBe(201);
     const data1 = JSON.parse(res1.payload);
-    expect(data1.salary_display).toBe("100000.0000");
+    expect(data1.salary_display).toBe("XX,XXX");
 
     const res2 = await createEmployee("role:editor", employeeBody);
     expect(res2.statusCode).toBe(200);
