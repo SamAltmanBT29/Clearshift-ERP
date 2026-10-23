@@ -5,9 +5,12 @@
 **Module**: ERP-5 HR & Employees (Group 10)
 **Issue**: [#46](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/46) — `[ERP5-01] Schema, Drizzle models and guarded migrations`
 **Mutation API Issue**: [#48](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/48) — `[ERP5-03] Mutation API and domain validation`
+**Relationship Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
+**Read API Issue**: [#47](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/47) — `[ERP5-02] List/read API with bounded paging and OpenAPI contract`
+**Authorization Issue**: [#191](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/191) — `[ERP5-15] Module authorization policy integration`
 **PostgreSQL Schema**: `erp5`
 **API Base**: `/api/v1/erp-hr`
-**Version**: V1.1
+**Version**: V1.4
 
 ---
 
@@ -25,6 +28,11 @@
 10. [Decision records](#10-decision-records)
 11. [Migration & verification](#11-migration--verification)
 12. [Mutation API (ERP5-03)](#12-mutation-api-erp503)
+13. [Relationships, state transitions and read model (ERP5-06)](#13-relationships-state-transitions-and-read-model-erp506)
+14. [Query layer — list and read API (ERP5-02)](#14-query-layer--list-and-read-api-erp502)
+15. [Authorization policy (ERP5-15)](#15-authorization-policy-erp515)
+16. [Collection screens (ERP5-04)](#16-collection-screens-erp504)
+17. [Create, edit and detail screens (ERP5-05)](#17-create-edit-and-detail-screens-erp505)
 
 ---
 
@@ -313,6 +321,47 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 - **Open item**: PLT-06 declares no policy for the **identity the Kit uses to load employee, department and leave rows**. The module grants those writes to any holder of the shared `module.write` capability, which today means Editor and Admin; a platform-issued Kit service identity (or a `hr.employee_bulk` policy) is needed to close the gap. This is escalated to **ERP5-15** (module authorization policy integration) and to the PLT-06 owner.
 - **Status**: open — escalated in PR #226.
 
+### DR-10 — The V1 leave state transition
+
+- **Conflict**: issue #51 (`ERP5-06`) requires "the allowed state transitions" and "state transition tests cover each allowed transition and each forbidden transition", but the leave **request → approve/reject workflow with a log** is `FR-ERP5-10`, which the SDS places in **Part V2** (§5.2) and which issue #51 lists under "Out of Scope: V2/V3-only capability".
+- **Decision**: V1 exposes the **state transition only** — `pending → approved | rejected`; `approved` and `rejected` are **terminal** (a decision is never reversed and a leave is never un-decided); setting the same status again is an idempotent no-op, not an error. It is exposed as `PATCH /api/v1/erp-hr/leave/{id}`. There is **no** request step, **no** approval log and **no** notification — those belong to FR-ERP5-10 in V2. A forbidden transition is answered with `422 HR_INVALID_LEAVE_STATUS_TRANSITION` and the allowed set in the message.
+- **Rationale**: the leave status is the only stateful field of the V1 ERP-5 data model (`erp5.leave.status`; the other three tables have no status column), and FR-ERP5-04 makes it a V1 field. The state matrix is therefore a V1 rule; the *workflow* is not.
+- **Status**: **open** — escalated in PR #231 (ERP5-06). If the maintainer prefers V1 immutability, the endpoint is deleted and the matrix collapses to a single state (the change is confined to one route, one service method and one contract schema).
+
+### DR-11 — The payroll aggregate is authoritative as loaded
+
+- **Conflict**: issue #51 requires that "derived display values and **report totals** are computed from authoritative persisted state". The only ERP-5 report is the department/month payroll aggregate, which would suggest recomputing it from the employee rows (`sum(erp5.employees.salary)`).
+- **Decision**: the module does **not** recompute the amount. The aggregate is the number of the customer's payroll system, loaded through the Migration Kit (FR-ERP5-06: "one number per department, **no personal data**"), and it is authoritative **as loaded**. The module validates it against its own invariants (the department exists, the month label is valid, the amount and headcount are non-negative, one aggregate per department and month) and reads the persisted row back. The **display** values — the department link, the month label, the status and the headcount — are always derived from the persisted rows, never from the request payload.
+- **Rationale**: recomputing the total from the employee rows would (a) replace the source system's number with a different one, (b) make the load order significant — the aggregate could not be loaded before the employees — and (c) put a per-employee sum behind an aggregate that must not carry personal data.
+- **Status**: **open** — escalated in PR #231 (ERP5-06).
+
+### DR-12 — The cross-module resolver denies what it cannot prove
+
+- **Defect found in the ERP5-03 output**: `Erp5ReferenceResolver.exists()` answered "yes" for **every** employee, department and leave id, and `get()` returned a fabricated summary (`EMP-001`, `dept-engineering`). A sibling module or the Kit that resolved a reference through the module facade would therefore have been told that a non-existent record exists, and could have built a dangling reference that only the foreign key would catch — as a `500`, not as a clean `404`.
+- **Decision**: the resolver validates against the `HrRepository` (`createErp5Resolver(repository)`) and **denies every existence check when it has no data source** (default deny, PLT-06's non-negotiable invariant). The facade keeps a repository-less instance for the module definition; the platform bootstrap constructs the repository-backed one once the Drizzle repository of ERP5-02 exists.
+- **Status**: accepted for V1 — flagged for maintainer confirmation in PR #231.
+
+### DR-13 — The ERP-5 list response keeps its published `{data, meta}` shape
+
+- **Conflict**: three collection shapes exist in the repository — the ERP-5 contract published with ERP5-01 (`{data, meta}`, `HrListMetaSchema`), the ERP-4 list API (`{data, total, page, pageSize, totalPages}`) and the **PLT-04** shared factory `createPaginatedResponseSchema` (`{items, page, pageSize, total, totalPages}`). PLT-04's acceptance criterion says "Every shared schema is imported by server routes instead of duplicated ad hoc", which points at the shared factory.
+- **Decision**: ERP-5 keeps the `{data, meta}` shape it published in ERP5-01. The Zod contract (`HrListMetaSchema`, `hrListResponseSchema`) and the OpenAPI (`EmployeeListResponse`, `DepartmentListResponse`, …) already carry it, and no client consumes the endpoint yet, so changing it would churn a published contract for no consumer benefit.
+- **Rationale**: harmonising the three shapes is a **platform-wide** change — it touches ERP-4 and every module contract, and it is owned by PLT-04 / PLT-14, not by a module issue. Doing it inside ERP5-02 would make ERP-5 the first module to migrate and leave the others behind, which is a programme decision rather than a module one.
+- **Status**: open — escalated in PR #232 (ERP5-02). The pagination **rules** (1-based `page`, `pageSize` 1..100, default 25, the allow-listed sort fields, the deterministic `id` tie-breaker) are identical in all three shapes — only the envelope differs.
+
+### DR-14 — The object-level guard enforces module ownership, not tenancy
+
+- **Conflict**: issue #191 requires "object-level authorization guards prevent unauthorized **multi-tenant** or cross-user record mutations". The `erp5` schema has **no** organisation, tenant or owner column — `erp5.employees`, `erp5.departments`, `erp5.leave` and `erp5.payroll_totals` carry no such attribute, and every record belongs to the single organisation the module serves.
+- **Decision**: the object-level guard enforces **module ownership**: the policy is bound to an entity kind, the identifier of a request is always resolved inside the table that belongs to the route, and an identifier that belongs to another module resolves to nothing and is refused with `404`. A forbidden request is refused with `403` before the record is loaded, so a caller that may not write cannot learn whether a record exists. The guard does **not** pretend to implement a tenancy dimension that the schema does not have.
+- **Rationale**: inventing a tenant scope in the API without a tenant column would be a policy the database cannot enforce — the check would live only in the request path and could not be proven. The limitation is stated instead of being approximated.
+- **Status**: open — escalated in PR #239 (ERP5-15). A multi-tenant dimension is a **schema** item (an organisation column on every module table, plus a foreign key to the owning organisation) and belongs to a migration issue, not to an authorization issue.
+
+### DR-15 — The Kit's write identity for the master records (closes DR-9)
+
+- **Conflict**: DR-9 (raised in PR #226 and repeated in PR #231) recorded that the central matrix of PLT-06 declares no policy for the **identity the Migration Kit uses to load employee, department and leave rows**. The Kit loads a payroll aggregate as MIGRATION_RUNNER (`hr.payroll_bulk`), but the master records are `hr.mutate` — Editor and Admin.
+- **Decision**: the module declares the policy it can prove and grants no more: the master-record loads require `hr.mutate` (Editor, Admin) and the payroll load requires `hr.payroll_bulk` (Migration Runner, Admin). The module does **not** invent a Kit-only role, and it does **not** widen `hr.mutate` to the Migration Runner — that would grant the Kit write access to the whole HR master data, which no approved policy asks for.
+- **Rationale**: the gap is a **platform** policy gap, not a module one: the platform must either issue a service identity that holds `module.write` for the Kit, or add an `hr.employee_bulk` policy to the central matrix. Until then the module stays on the declared policy, and the load of a payroll aggregate — the Kit's own job — works.
+- **Status**: open — escalated to the PLT-06 owner and **ERP5-15** in PR #239 (ERP5-15). The payroll half of the gap is closed by this issue; the master-record half needs a platform decision.
+
 
 ---
 
@@ -345,7 +394,8 @@ erp5.import_receipts  ──references──▶  any target entity by id (no FK,
 | `PATCH` | `/api/v1/erp-hr/employees/{id}` | `erp5.employees` | unique `employee_no`, existing department, BR-ERP5-01 against the **stored** dates |
 | `POST` | `/api/v1/erp-hr/departments` | `erp5.departments` | unique `code`, existing parent |
 | `PATCH` | `/api/v1/erp-hr/departments/{id}` | `erp5.departments` | unique `code`, existing parent, no self-parent, acyclic hierarchy |
-| `POST` | `/api/v1/erp-hr/leave` | `erp5.leave` | valid date range, existing employee |
+| `POST` | `/api/v1/erp-hr/leave` | `erp5.leave` | valid date range, existing employee, approved type/status |
+| `PATCH` | `/api/v1/erp-hr/leave/{id}` | `erp5.leave` | the V1 state matrix (§13.3), re-validated date range and type, immutable subject |
 | `POST` | `/api/v1/erp-hr/payroll-totals` | `erp5.payroll_totals` | one aggregate per department/month, existing department, no employee rows |
 
 The list/read endpoints belong to **ERP5-02** (issue #47) and are not implemented here.
@@ -431,3 +481,417 @@ different payload is answered with `409 HR_IDEMPOTENCY_CONFLICT`.
 | `apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | contract | the Zod contract, the stable business-rule codes, the masked response schemas |
 | `apps/erp/modules/erp-5/tests/contracts/erp-5.openapi.test.ts` | contract | every `$ref` resolves, every write route is documented, unknown properties are forbidden |
 | `apps/erp/modules/erp-5/tests/db/schema.integration.test.ts` | database | the PostgreSQL constraints that back the same invariants (live PostgreSQL) |
+
+---
+
+## 13. Relationships, state transitions and read model (ERP5-06)
+
+**Issue**: [#51](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/51) — `[ERP5-06] Relationships, state transitions and read-model consistency`
+**Domain layer**: `apps/erp/modules/erp-5/src/domain/relationships.ts` (pure — no I/O)
+
+### 13.1 Relationship map
+
+| From | To | Cardinality | Rule | Failure |
+|---|---|---|---|---|
+| `employees.department_id` | `departments.id` | exactly one, required | the department must exist | `404 HR_DEPARTMENT_REQUIRED` |
+| `leave.employee_id` | `employees.id` | exactly one, required | the employee must exist | `404 HR_EMPLOYEE_REQUIRED` |
+| `payroll_totals.department_id` | `departments.id` | exactly one, required | the department must exist | `404 HR_DEPARTMENT_REQUIRED` |
+| `departments.parent_id` | `departments.id` | zero or one, **optional** | the parent must exist; no self-parent; no cycle | `404` / `422 HR_DEPARTMENT_SELF_PARENT` / `422 HR_DEPARTMENT_CYCLE` |
+| `employees.(source_system, source_id)` | the source system | zero or one, **optional pair** | both or neither | `400 HR_SOURCE_IDENTITY_INCOMPLETE` / `400 HR_PROTECTED_FIELD` |
+| `identity_users.employee_ref` | `employees.id` | zero or one, **optional, read-only** | the Hub owns the link; ERP-5 never writes it | — |
+
+Every required relationship is validated **before** the mutation, inside the same transaction as the write. A rejected reference therefore leaves **no** partial mutation — the target row is not written and the import receipt is not written.
+
+### 13.2 Optional relationships — the approved warning
+
+An absent **optional** relationship is reported as a warning, never as an invented record:
+
+```json
+{
+  "relationship": "DEPARTMENT_PARENT",
+  "field": "parent_id",
+  "code": "HR_OPTIONAL_REFERENCE_ABSENT",
+  "message": "Optional relationship \"DEPARTMENT_PARENT\" on field \"parent_id\" is absent. No synthetic record was created."
+}
+```
+
+The warning travels in the `warnings` array of the mutation response. A root department therefore reports "this department has no parent" without the module fabricating a parent row.
+
+### 13.3 The leave state matrix
+
+`erp5.leave.status` is the only stateful field of the V1 ERP-5 data model.
+
+| From | To | Allowed | Reason |
+|---|---|---|---|
+| `pending` | `approved` | ✅ | the decision |
+| `pending` | `rejected` | ✅ | the decision |
+| `pending` | `pending` | ✅ (no-op) | idempotent, carries no state change |
+| `approved` | `rejected` | ❌ | a decision is never reversed |
+| `approved` | `pending` | ❌ | a leave is never un-decided |
+| `approved` | `approved` | ✅ (no-op) | idempotent |
+| `rejected` | `approved` | ❌ | a decision is never reversed |
+| `rejected` | `pending` | ❌ | a leave is never un-decided |
+| `rejected` | `rejected` | ✅ (no-op) | idempotent |
+
+A forbidden transition is answered with `422 HR_INVALID_LEAVE_STATUS_TRANSITION`; the message names the allowed set. The request → approve/reject **workflow with a log** (FR-ERP5-10) is a **V2** capability and is not exposed — see [DR-10](#dr-10--the-v1-leave-state-transition).
+
+The recorded subject of a leave — the employee it belongs to — is **immutable**: a leave is a fact about one employee and is never re-parented. `date_from`, `date_to` and `type` stay editable and are re-validated.
+
+### 13.4 Read model
+
+The response of a write is built from the **persisted row**, never from the request payload, and the row is asserted against the read model of its entity before it is returned:
+
+| Entity | Read-model assertion |
+|---|---|
+| employee | the mandatory links are present, `join_date >= birth_date`, the salary is a valid decimal |
+| department | the code is present, the row is not its own parent |
+| leave | the employee link is present, `date_to >= date_from`, the type and the status are approved values |
+| payroll total | the department link is present, the month label is valid, the amount and the headcount are non-negative |
+
+The read model is what makes the UI and the read API agree with the database immediately after a successful write — the status, the links and the derived totals a client sees are the ones the database holds.
+
+### 13.5 Cross-module boundary
+
+`Erp5ReferenceResolver` is the module's published surface for *other* modules and the Migration Kit (Decision C7: cross-module data is read through the owning module's API, never by writing into the `erp5` tables).
+
+| Call | Answer |
+|---|---|
+| `exists('employee', <existing id>)` | `true` |
+| `exists('employee', <unknown id>)` | `false` |
+| `exists('<unknown entity>', <any id>)` | `false` |
+| `get('employee', <unknown id>)` | `null` |
+| `exists(...)` with **no repository** | `false` — default deny (PLT-06) |
+
+The resolver never confirms a record it cannot prove exists — see [DR-12](#dr-12--the-cross-module-resolver-denies-what-it-cannot-prove).
+
+### 13.6 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/tests/domain/relationships.test.ts` | domain | the optional-reference warning, the enumerations, every allowed and forbidden transition, the read model, the source identity |
+| `apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts` | service | the relationship failures with no partial write, the state matrix, the warning, the read-back |
+| `apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` | API | the transitions over HTTP, the error envelope, the resolver, the no-partial-mutation proof |
+
+---
+
+## 14. Query layer — list and read API (ERP5-02)
+
+**Issue**: [#47](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/47) — `[ERP5-02] List/read API with bounded paging and OpenAPI contract`
+**Implementation**: `apps/erp/modules/erp-5/db/repository.ts` — the Drizzle implementation of the `HrRepository` contract
+
+### 14.1 Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/erp-hr/employees` | List employees — search, department filter, allow-listed sort |
+| `GET` | `/api/v1/erp-hr/employees/{id}` | Read one employee (masked projection) |
+| `GET` | `/api/v1/erp-hr/departments` | List departments — search, parent filter, allow-listed sort |
+| `GET` | `/api/v1/erp-hr/departments/{id}` | Read one department |
+| `GET` | `/api/v1/erp-hr/leave` | List leave records — employee, type and status filters |
+| `GET` | `/api/v1/erp-hr/leave/{id}` | Read one leave record |
+| `GET` | `/api/v1/erp-hr/payroll-totals` | List department/month aggregates — month and department filters |
+| `GET` | `/api/v1/erp-hr/payroll-totals/{id}` | Read one aggregate |
+| `GET` | `/api/v1/erp-hr/identity-users` | The read-only Hub Identity projection |
+
+Reads require the shared `module.read` capability (Viewer, Editor, Analyst, Admin).
+
+### 14.2 The paging contract
+
+| Rule | Value |
+|---|---|
+| `page` | 1-based, minimum 1, default 1 |
+| `pageSize` | 1..100, default 25 — a larger request is `400` |
+| Ordering | the allow-listed sort field, then the `id` as the deterministic tie-breaker |
+| Response | `{ data: [...], meta: { page, pageSize, total, totalPages } }` |
+| `totalPages` | `0` for an empty collection |
+
+The allow-listed sort fields are `name` / `employee_no` / `join_date` for the employees and
+`name` / `code` for the departments. A sort field outside the list is `400`.
+
+### 14.3 Server-side, parameterised, bounded
+
+The search and the filter are applied **in the database** — never by string-building SQL.
+The live proof (`tests/db/repository.integration.test.ts`) searches for
+`'; DROP TABLE erp5.employees; --` and shows that it is treated as text: no row matches and
+the table is still there.
+
+No collection is ever returned unbounded: every query carries a `LIMIT` and an `OFFSET`, and
+the `total` is counted with a separate, equally parameterised count query.
+
+### 14.4 The Hub Identity projection
+
+`erp5.identity_users` is a **view** over `platform.hub_users`, owned by the platform. The
+module reads it and never writes it.
+
+- The projection is created by the migration **only when `platform.hub_users` exists**. When
+  it is absent the read degrades to an **empty page** — the HR module stays available.
+- The projection carries no credential, hash, token or refresh-token column; the write
+  privileges are revoked from `PUBLIC` by the migration, and the live proof shows the write
+  refused with SQLSTATE `42501` for an application role.
+- A Hub user without a linked employee is returned with `employee_ref: null` — no employee
+  row is invented for it.
+
+### 14.5 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/tests/api/list.test.ts` | API | paging, search, filters, the sort allow-list, the page-size cap, the empty result, the salary mask, the projection shape, `404` / `400` / `401` / `403` |
+| `apps/erp/modules/erp-5/tests/db/repository.integration.test.ts` | database | the Drizzle write path, the parameterised server-side search, the bounded deterministic pages, the transaction commit and rollback, the read-only projection, the read model (live PostgreSQL) |
+
+---
+
+## 15. Authorization policy (ERP5-15)
+
+**Issue**: [#191](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/191) — `[ERP5-15] Module authorization policy integration`
+**Declaration**: `apps/erp/modules/erp-5/src/policies/permissions.ts` · **Guard**: `src/policies/guard.ts`
+**Security note**: [`apps/erp/modules/erp-5/docs/security.md`](./security.md)
+
+### 15.1 The declared matrix
+
+The module owns **no** role list. Every route is bound to one entry of
+`HR_ROUTE_POLICIES`, and the role sets mirror the central matrix of PLT-06:
+
+| Policy | Entity | Roles | Central policy |
+|---|---|---|---|
+| `hr.employees.read` | employee | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.employees.create` | employee | Editor, Admin | `hr.mutate` |
+| `hr.employees.update` | employee | Editor, Admin | `hr.mutate` |
+| `hr.departments.read` | department | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.departments.create` | department | Editor, Admin | `hr.mutate` |
+| `hr.departments.update` | department | Editor, Admin | `hr.mutate` |
+| `hr.leave.read` | leave | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.leave.create` | leave | Editor, Admin | `hr.mutate` |
+| `hr.leave.update` | leave | Editor, Admin | `hr.mutate` |
+| `hr.payroll.read` | payroll_total | Viewer, Editor, Analyst, Admin | `hr.read` |
+| `hr.payroll.load` | payroll_total | **Migration Runner**, Admin | `hr.payroll_bulk` |
+| `hr.identity_users.read` | identity_user | Viewer, Editor, Analyst, Admin | `hr.read` |
+
+**Invariant: DEFAULT DENY.** A route without a declared policy, an unknown policy or an
+unlisted role is refused with `403`.
+
+The Migration Runner has **no read** access to the HR master data — it may load a payroll
+aggregate (its declared job) and nothing else, and it can never write into the `erp5`
+tables directly (Decision C7).
+
+### 15.2 Authentication
+
+A real access token is verified with the shared Hub verifier of PLT-05 — the EdDSA
+signature, the issuer, the audience and the expiry are all checked, and a disabled account
+is refused. The module never derives a role from an unverified token: the role set always
+comes from the verified claims. When the platform mounts the module, its own
+authentication has already populated `request.user` and the module leaves it untouched.
+
+### 15.3 The object-level guard
+
+The policy is bound to an **entity kind** and the identifier of a request is always
+resolved inside the table that belongs to the route:
+
+| Attempt | Result |
+|---|---|
+| A leave id read as an employee | `404` — it is not an employee |
+| A Hub Identity user id patched as an employee | `404` — it is not an ERP-5 record, and nothing is mutated |
+| A forbidden write of a record that does not exist | `403` — the role is refused before the record is loaded, so nothing is revealed |
+
+ERP-5 has **no tenant and no per-user ownership dimension** in V1 — see
+[DR-14](#dr-14--the-object-level-guard-enforces-module-ownership-not-tenancy).
+
+### 15.4 Test evidence
+
+| Suite | Coverage |
+|---|---|
+| `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | the declared matrix, the route × role matrix (16 routes × 5 roles), the JWT verification (real, forged, tampered, expired, disabled) and the object-level guard |
+| `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | the write authorization per endpoint |
+| `apps/erp/modules/erp-5/tests/api/list.test.ts` | the read authorization per collection |
+
+---
+
+## 16. Collection screens (ERP5-04)
+
+**Issue**: [#49](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) — `[ERP5-04] ERP-5 HR and Employees: List screen, search/filter and stable empty/loading/error states`
+**Implementation**: `apps/erp/modules/erp-5/web/src/` — the API client, the shared list
+machinery and the five collection screens
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192
+
+### 16.1 The screens and the endpoint each one reads
+
+| Screen | Route | Endpoint | Rows |
+|---|---|---|---|
+| Employee list | `/erp5/employees` | `GET /api/v1/erp-hr/employees` | `HrEmployeeView` |
+| Department list | `/erp5/departments` | `GET /api/v1/erp-hr/departments` | `HrDepartment` |
+| Leave record list | `/erp5/leave` | `GET /api/v1/erp-hr/leave` | `HrLeave` |
+| Payroll total list | `/erp5/payroll-totals` | `GET /api/v1/erp-hr/payroll-totals` | `HrPayrollTotal` |
+| Identity user list | `/erp5/identity-users` | `GET /api/v1/erp-hr/identity-users` | `HrIdentityUser` |
+
+### 16.2 The columns each screen shows
+
+Every column is a field the contract already returns. The screen adds no field and
+invents no value.
+
+| Screen | Columns |
+|---|---|
+| Employee list | `employee_no`, `first_name`, `last_name`, `birth_date`, `join_date`, department, `job_title`, `salary_display` + `currency_code`, action |
+| Department list | `code`, `name`, parent department, action |
+| Leave record list | `employee_id`, `date_from`, `date_to`, `type`, `status`, action |
+| Payroll total list | `department_id`, `month`, `total_amount`, `currency_code`, `headcount` |
+| Identity user list | `username`, `roles`, `employee_ref`, `status` |
+
+**The salary column shows `salary_display`, never `salary`.** The raw column is absent
+from the public projection (BR-ERP5-02), so the browser cannot render it even if it
+wanted to. The frontend test asserts the masked values and nothing else.
+
+**The department and the employee references are resolved by identifier.** The API
+returns `department_id` and `employee_id` and never a name. The module reads the bounded
+department collection (at most `HR_PAGE_SIZE_MAX`, 100 rows) to resolve a department to
+its name; a department outside that page is shown as a short identifier, never as an
+invented name. The leave list resolves no employee at all — the employee collection is
+not bounded — so the leave screen links to the employee record and carries the
+identifier.
+
+### 16.3 The server does the filtering, the sorting and the paging
+
+The browser never narrows, orders or pages a collection. The screen sends the search
+term, the filters, the sort field and the page to the API and renders exactly the page
+the API answered.
+
+| Screen | Query parameters it sends |
+|---|---|
+| Employee list | `page`, `pageSize`, `search`, `department_id`, `sort` (`name` / `employee_no` / `join_date`) |
+| Department list | `page`, `pageSize`, `search`, `sort` (`name` / `code`) |
+| Leave record list | `page`, `pageSize`, `type`, `status` |
+| Payroll total list | `page`, `pageSize`, `month`, `department_id` |
+| Identity user list | `page`, `pageSize`, `search` |
+
+A search or a filter change resets the page to the first one. The search term is
+published after a 300 ms pause so that a word is one request, not one request per
+keystroke.
+
+### 16.4 The four states of a collection screen
+
+| State | What the operator sees | Where it comes from |
+|---|---|---|
+| Loading | a skeleton of the table that is coming | `@cs/ui` `SkeletonTable` |
+| No data | an empty state, with a "Clear filters" action when a filter is active | `@cs/ui` `EmptyState` |
+| API failure | a readable message and a **Try again** action | `@cs/ui` `ErrorState` |
+| Permission denied | an **access-denied** view — never a retry button | `PermissionDeniedState` |
+
+The permission-denied state is deliberately not an error state: a refused request is
+not something a retry can fix, and offering one would invite the operator to hammer an
+endpoint that has already refused them. The message is the one the API returned; no
+stack trace, no SQL and no raw row is ever shown.
+
+### 16.5 The permission-aware action
+
+The screen offers the create action only to a session that may write. The question is
+asked of the **shared central matrix** (PLT-06, `packages/core/src/auth/permissions.ts`),
+never of a local copy of the role list. The server remains the authority — the matrix
+only decides whether an action is offered at all.
+
+### 16.6 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/web/tests/employees-list.test.tsx` | UI | the initial load, the search, the filters, the sort, the page reset, the page navigation, the empty result, the API failure and its recovery, the permission-denied state, the permission-aware action, the keyboard and landmark affordances |
+| `apps/erp/modules/erp-5/web/tests/list-screens.test.tsx` | UI | the four remaining screens, their filters, the parent resolution, the aggregate formatting, the read-only projection, the shared states |
+| `apps/erp/modules/erp-5/web/tests/hr-api.test.ts` | unit | the query construction, the session header, the error envelope, the transport failure, the absence of a leak |
+| `apps/erp/modules/erp-5/web/tests/permissions.test.ts` | unit | the role narrowing and the create permission |
+
+---
+
+## 17. Create, edit and detail screens (ERP5-05)
+
+**Issue**: [#50](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/50) — `[ERP5-05] ERP-5 HR and Employees: Create/edit/detail workflow and client-side validation`
+**Implementation**: `apps/erp/modules/erp-5/web/src/components/forms/` and `web/src/pages/`
+**Route registration**: [ERP5-16](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/192) —
+issue #192 · **Collection screens**: [ERP5-04](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/49) —
+issue #49
+
+### 17.1 The screens and the endpoint each one writes
+
+| Screen | Route | Endpoint |
+|---|---|---|
+| Employee create | `/erp5/employees/new` | `POST /api/v1/erp-hr/employees` |
+| Employee edit | `/erp5/employees/{id}/edit` | `PATCH /api/v1/erp-hr/employees/{id}` |
+| Employee detail | `/erp5/employees/{id}` | `GET /api/v1/erp-hr/employees/{id}` |
+| Department create | `/erp5/departments/new` | `POST /api/v1/erp-hr/departments` |
+| Department edit | `/erp5/departments/{id}/edit` | `PATCH /api/v1/erp-hr/departments/{id}` |
+| Department detail | `/erp5/departments/{id}` | `GET /api/v1/erp-hr/departments/{id}` |
+| Leave create | `/erp5/leave/new` | `POST /api/v1/erp-hr/leave` |
+| Leave edit | `/erp5/leave/{id}/edit` | `PATCH /api/v1/erp-hr/leave/{id}` |
+| Leave detail | `/erp5/leave/{id}` | `GET /api/v1/erp-hr/leave/{id}` |
+
+Every screen links back to the list it belongs to, and every detail screen
+links to its edit screen.
+
+**The payroll aggregate has no form.** The V1 API offers `POST
+/api/v1/erp-hr/payroll-totals` but **no `PATCH`**, so a form could only ever
+*add* an aggregate and never correct one, and the unique
+`(department_id, month)` constraint would turn a correction into a conflict.
+The aggregate is loaded by the Migration Kit (ERP5-07 / ERP5-11), which owns
+the bulk path; the read-only payroll list of §16 is the module's V1 screen
+for it.
+
+### 17.2 The validation is the contract's
+
+Each form is handed the **same Zod schema the API validates the payload
+with** — `CreateHrEmployeeRequestSchema`, `UpdateHrLeaveRequestSchema` and so
+on, out of `@clearshift/contracts`. The module never re-states a rule:
+
+| Rule | Where it is asserted |
+|---|---|
+| the employee number is unique and well-formed | the contract's `HrEmployeeNo`; the API refuses a duplicate with `409` |
+| the join date never precedes the birth date (BR-ERP5-01) | the contract's refinement on `CreateHrEmployeeRequestSchema` / `UpdateHrEmployeeRequestSchema` — the browser shows the contract's own message, `join_date must not be before birth_date` |
+| the leave end date never precedes the start date | the contract's refinement — `date_to must not be before date_from` |
+| the leave type and status are enumerations | `LeaveTypeEnum` / `LeaveStatusEnum` |
+| a department code is well-formed | the contract's `HrDepartmentCode` |
+| the salary is a non-negative decimal with at most four decimals | the contract's `HrMoneyAmount` |
+
+The client validation exists so the operator gets a **field-level** answer
+without a round trip. The server re-validates every payload and is the sole
+authority — a form that passes the browser can still be refused with `422`
+and a field detail, and the screen then shows that message on that field
+**without losing the other values**.
+
+### 17.3 The fields the browser may not write
+
+The contract's request schemas are **strict**, so a payload that carries a
+field outside the allow-list is refused with `400 HR_PROTECTED_FIELD`. The
+screens never send such a field, because they have no control for it:
+
+| Field | Why it is not writable | Where it is shown |
+|---|---|---|
+| `id`, `created_at`, `updated_at` | system-maintained | a read-only value on the detail and edit screens |
+| `salary_display` | the masked salary (BR-ERP5-02) — the raw column never leaves the module | a read-only value beside the salary field |
+| `currency_code` | set on create, immutable afterwards | a read-only value on the edit screen, an input on the create screen |
+| `employee_id` of a leave record | a leave is a fact about one employee and is never re-parented | a read-only value on the edit screen |
+| the leave `status` of a **new** record | the server creates a leave as `pending` | a read-only value on the create screen |
+
+An edit sends **only the fields the operator changed**, so a field the API
+never accepted cannot ride along with a legitimate change.
+
+### 17.4 The leave state matrix and the irreversible action
+
+The status of a leave record is a **transition**, not a free field. The form
+offers exactly the transitions `HR_LEAVE_STATUS_TRANSITIONS` allows:
+
+| Current status | Offered | Note |
+|---|---|---|
+| `pending` | `approved`, `rejected` | both are terminal |
+| `approved` | none | the record is decided |
+| `rejected` | none | the record is decided |
+
+A decision is **irreversible** — the V1 matrix has no way back, and a leave is
+never un-decided. The screen therefore confirms the decision once, in plain
+words, before the record is written; cancelling the confirmation leaves the
+record untouched and sends nothing.
+
+### 17.5 Test evidence
+
+| Suite | Level | Coverage |
+|---|---|---|
+| `apps/erp/modules/erp-5/web/tests/employee-form.test.tsx` | UI | the create payload, the contract's field-level messages, the API failure that keeps the other values, the patch of only the changed fields, the protected fields, the masked salary, the detail view, the not-found view |
+| `apps/erp/modules/erp-5/web/tests/department-form.test.tsx` | UI | the create payload, the malformed code, the patch of only the changed fields, the parent cleared with an explicit `null`, the department that is not offered as its own parent |
+| `apps/erp/modules/erp-5/web/tests/leave-form.test.tsx` | UI | the create payload without a status, the invalid period, the immutable employee, the transitions of the state matrix, the confirmation of an irreversible decision, the cancelled confirmation, the decided record |
+| `apps/erp/modules/erp-5/web/tests/hr-form.test.ts` | unit | the empty value that is dropped, the changed fields, the contract failure that sends nothing, the failure that stays on the form |
+| `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | API | the server's own refusal of a protected field and of a duplicate (unchanged) |
+| `apps/erp/modules/erp-5/tests/domain/rules.test.ts` | domain | BR-ERP5-01 and the leave date range (unchanged) |

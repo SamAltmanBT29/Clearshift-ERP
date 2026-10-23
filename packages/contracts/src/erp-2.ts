@@ -1,376 +1,232 @@
 /**
- * ERP-2 Vendors and Purchasing — Public API Contract Types
+ * ERP-2 Vendors & Purchasing — Public API Contract Types
  *
- * These Zod schemas are the single source of truth for:
+ * Single source of truth for:
  *   - Request/response validation (Fastify + Zod)
- *   - OpenAPI 3.1 specification generation
- *   - TypeScript type inference (no duplicate interface drift)
+ *   - OpenAPI spec generation & documentation
+ *   - TypeScript type inference across API, frontend, and tests
  *
  * Module API base: /api/v1/erp-vendors
- * Schema owner: ERP-2 (Group 7).
- * Error envelope: shared { code, message, details, correlation_id } owned by @cs/kernel.
  *
  * Traceability:
- *   - SDS ClearShift ERP v2.0 §4.3 (FR-ERP2-01..06, BR-ERP2-01)
- *   - SDS ClearShift ERP v2.0 §4.7 (erp2_vendors, erp2_purchase_orders, erp2_po_lines)
- *   - Master Architecture Spec §6.1 slot 01, Decision C7 (intra-module FKs only)
+ *   - SDS ClearShift ERP v2.0 §4.3 (FR-ERP2-01..06, BR-ERP2-01), §4.7, §4.8
+ *   - Project Plan §7.7
  *
  * @module contracts/erp-2
  */
 
 import { z } from 'zod';
+import { CurrencyCode, UuidSchema } from './erp-4.js';
+import {
+  ImportReceiptRecordSchema,
+  ImportRowRequestSchema,
+  ImportRowResponseSchema,
+  TargetAdapterErrorSchema,
+} from './import-target.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared primitives
+// Shared Primitives
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** UUID primary key. */
-export const VendorUuid = z.string().uuid('Must be a valid UUID');
-
-/** ISO 4217 currency code — exactly 3 uppercase ASCII letters. */
-export const VendorCurrencyCode = z
-  .string()
-  .length(3)
-  .regex(/^[A-Z]{3}$/, 'Must be a 3-letter ISO 4217 currency code (e.g. INR, USD, EUR)');
-
-/** Calendar date — YYYY-MM-DD. */
-export const VendorIsoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');
-
-/**
- * Monetary amount: non-negative string-encoded decimal with up to 2 decimal places.
- * Used for price, line_total, and purchase order total.
- */
-export const VendorMoneyAmount = z
+/** Monetary amount: string-encoded decimal with up to 2 decimal places. */
+export const MoneyAmount2Dp = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'Amount must be a non-negative decimal with up to 2 decimal places');
 
-/**
- * Quantity: positive string-encoded decimal with up to 4 decimal places, > 0.
- */
-export const VendorQuantity = z
+/** Date format YYYY-MM-DD. */
+export const IsoDateString = z
   .string()
-  .regex(/^(?!0(\.0+)?$)\d+(\.\d{1,4})?$/, 'Quantity must be greater than 0 with up to 4 decimal places');
-
-/** Purchase order number: e.g. "PO-2026-0001". */
-export const PoNumberSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[A-Za-z0-9_-]+$/, 'PO number may contain letters, digits, hyphen and underscore only');
-
-/** Tax number: e.g. "GSTIN-27AAAAA0000A1Z5". */
-export const TaxNumberSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .trim();
-
-/** Bank detail mask format: XXXX-XXXX-7890 (FR-ERP2-06). */
-export const BankMaskedSchema = z
-  .string()
-  .regex(/^XXXX-XXXX-\d{4}$/, 'Bank details must be masked in XXXX-XXXX-7890 format');
-
-/** Default currency applied when not supplied. */
-export const VENDOR_DEFAULT_CURRENCY = 'INR';
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be a date in YYYY-MM-DD format');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lifecycle Enums & Status Machine
+// Enum Schemas
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Purchase Order Status Lifecycle (FR-ERP2-04).
- * Allowed V1 flow: draft -> sent -> received -> closed.
- * Backwards transitions and cancellations are rejected in V1.
+ * Purchase order lifecycle status.
+ * FR-ERP2-04: Draft / Sent / Received / Closed.
+ * Allowed transitions are strictly unidirectional: Draft -> Sent -> Received -> Closed.
  */
 export const PurchaseOrderStatusEnum = z.enum([
-  'draft',
-  'sent',
-  'received',
-  'closed',
+  'Draft',
+  'Sent',
+  'Received',
+  'Closed',
 ]);
 export type PurchaseOrderStatus = z.infer<typeof PurchaseOrderStatusEnum>;
 
-export const ALLOWED_PO_STATUS_TRANSITIONS: Record<PurchaseOrderStatus, readonly PurchaseOrderStatus[]> = {
-  draft: ['sent'],
-  sent: ['received'],
-  received: ['closed'],
-  closed: [],
-} as const;
-
-/**
- * Checks if a status transition is permitted.
- */
-export function isValidPoStatusTransition(
-  from: PurchaseOrderStatus,
-  to: PurchaseOrderStatus
-): boolean {
-  if (from === to) return true;
-  const allowed = ALLOWED_PO_STATUS_TRANSITIONS[from];
-  return allowed ? allowed.includes(to) : false;
-}
-
-/**
- * Asserts that a PO status transition is valid, or throws a domain error.
- */
-export function assertValidPoStatusTransition(
-  from: PurchaseOrderStatus,
-  to: PurchaseOrderStatus
-): void {
-  if (!isValidPoStatusTransition(from, to)) {
-    throw new Error(
-      `Invalid purchase order status transition from '${from}' to '${to}'. Allowed transitions: ${
-        ALLOWED_PO_STATUS_TRANSITIONS[from]?.join(', ') || 'none (terminal state)'
-      }`
-    );
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Bank Details Masking Helper (FR-ERP2-06)
+// Vendor Schemas
+// GET /api/v1/erp-vendors/vendors
+// POST /api/v1/erp-vendors/vendors
+// PATCH /api/v1/erp-vendors/vendors/{id}
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Masks bank details so only the last 4 digits are visible, formatted as XXXX-XXXX-7890.
- * If input is already in XXXX-XXXX-#### format, preserves it.
- * If fewer than 4 digits exist, pads with zeroes.
- */
-export function maskBankDetails(raw: string): string {
-  const trimmed = raw.trim();
-  if (/^XXXX-XXXX-\d{4}$/.test(trimmed)) {
-    return trimmed;
-  }
-  const digits = trimmed.replace(/\D/g, '');
-  const last4 = digits.length >= 4 ? digits.slice(-4) : digits.padStart(4, '0');
-  return `XXXX-XXXX-${last4}`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fixed-Precision Decimal Arithmetic Helpers (FR-ERP2-05)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Parses numeric amount to integer minor units (cents / paise) to prevent IEEE-754 drift.
- */
-export function parseToCents(amount: string | number): bigint {
-  const str = String(amount).trim();
-  if (!/^\d+(\.\d{1,2})?$/.test(str)) {
-    throw new Error(`Invalid monetary amount: ${amount}`);
-  }
-  const [whole = '0', fraction = ''] = str.split('.');
-  const paddedFraction = fraction.padEnd(2, '0').slice(0, 2);
-  return BigInt(whole) * 100n + BigInt(paddedFraction);
-}
-
-/**
- * Formats integer minor units back to 2dp string.
- */
-export function formatFromCents(cents: bigint): string {
-  if (cents < 0n) throw new Error('Monetary amount cannot be negative');
-  const whole = cents / 100n;
-  const fraction = cents % 100n;
-  return `${whole}.${fraction.toString().padStart(2, '0')}`;
-}
-
-/**
- * Computes line_total = quantity * price (FR-ERP2-05).
- * Rounded to 2 decimal places.
- */
-export function calculateLineTotal(quantity: string | number, price: string | number): string {
-  const qNum = parseFloat(String(quantity));
-  const pCents = parseToCents(price);
-  if (isNaN(qNum) || qNum <= 0) {
-    throw new Error(`Quantity must be greater than 0: ${quantity}`);
-  }
-  // Compute using BigInt with 4 decimal places scaling
-  const qScaled = BigInt(Math.round(qNum * 10000));
-  const totalCents = (qScaled * pCents + 5000n) / 10000n;
-  return formatFromCents(totalCents);
-}
-
-/**
- * Computes order total by summing line_totals.
- */
-export function calculateOrderTotal(
-  lines: Array<{ quantity: string | number; price: string | number; line_total?: string }>
-): string {
-  let sumCents = 0n;
-  for (const line of lines) {
-    const lineTotalStr = line.line_total ?? calculateLineTotal(line.quantity, line.price);
-    sumCents += parseToCents(lineTotalStr);
-  }
-  return formatFromCents(sumCents);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Domain Rule Constants & Error Codes
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const VENDOR_DOMAIN_RULES = {
-  /** BR-ERP2-01: Purchase line must reference an existing product */
-  PRODUCT_REQUIRED: 'ERP2_PRODUCT_REQUIRED',
-  /** Tax number must be unique */
-  TAX_NUMBER_DUPLICATE: 'ERP2_TAX_NUMBER_DUPLICATE',
-  /** PO number must be unique */
-  PO_NUMBER_DUPLICATE: 'ERP2_PO_NUMBER_DUPLICATE',
-  /** Vendor reference required */
-  VENDOR_REQUIRED: 'ERP2_VENDOR_REQUIRED',
-  /** Invalid status transition */
-  INVALID_STATUS_TRANSITION: 'ERP2_INVALID_STATUS_TRANSITION',
-  /** Quantity must be greater than zero */
-  QUANTITY_POSITIVE: 'ERP2_QUANTITY_POSITIVE',
-  /** Price cannot be negative */
-  PRICE_NON_NEGATIVE: 'ERP2_PRICE_NON_NEGATIVE',
-  /** Bank details masking invariant */
-  BANK_DETAILS_MASKED: 'ERP2_BANK_DETAILS_MASKED',
-  /** Server-side total calculation mismatch */
-  TOTAL_CALCULATION_MISMATCH: 'ERP2_TOTAL_CALCULATION_MISMATCH',
-  /** Protected system fields cannot be modified */
-  PROTECTED_FIELD: 'ERP2_PROTECTED_FIELD',
-  /** Idempotency key conflict */
-  IDEMPOTENCY_CONFLICT: 'ERP2_IDEMPOTENCY_CONFLICT',
-} as const;
-
-export type VendorDomainRule = (typeof VENDOR_DOMAIN_RULES)[keyof typeof VENDOR_DOMAIN_RULES];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Entity Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Vendor Entity (FR-ERP2-01..02). */
+/** Response shape for a single Vendor record. */
 export const VendorSchema = z.object({
-  id: VendorUuid,
+  id: UuidSchema,
   name: z.string().min(1).max(255),
-  tax_number: TaxNumberSchema,
-  email: z.string().email().nullable().optional(),
-  phone: z.string().max(64).nullable().optional(),
-  address_line: z.string().max(255).nullable().optional(),
-  city: z.string().max(120).nullable().optional(),
-  country: z.string().max(64).nullable().optional(),
-  bank_masked: BankMaskedSchema.nullable().optional(),
-  source_system: z.string().max(64).nullable().optional(),
-  source_id: z.string().max(128).nullable().optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
+  tax_number: z.string().min(1).max(64),
+  email: z.string().email(),
+  phone: z.string().max(32).nullable(),
+  address_line: z.string().max(255).nullable(),
+  city: z.string().max(100).nullable(),
+  country: z.string().max(64).nullable(),
+  bank_masked: z
+    .string()
+    .regex(/^XXXX-XXXX-\d{4}$/, 'Masked bank format must match XXXX-XXXX-7890')
+    .nullable(),
+  currency: CurrencyCode.default('USD'),
+  source_system: z.string().max(64).nullable(),
+  source_id: z.string().max(128).nullable(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
 });
 export type Vendor = z.infer<typeof VendorSchema>;
 
-/** Purchase Order Line Entity (FR-ERP2-03, BR-ERP2-01). */
-export const PurchaseOrderLineSchema = z.object({
-  id: VendorUuid,
-  po_id: VendorUuid,
-  product_id: VendorUuid, // Logical reference to ERP-1 product contract
-  line_number: z.number().int().min(1),
-  quantity: VendorQuantity,
-  price: VendorMoneyAmount,
-  line_total: VendorMoneyAmount,
-  created_at: z.string(),
-  updated_at: z.string(),
+/** POST /api/v1/erp-vendors/vendors — request body. */
+export const CreateVendorRequestSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255),
+  tax_number: z.string().min(1, 'Tax number is required').max(64),
+  email: z.string().email('Valid email is required'),
+  phone: z.string().max(32).optional().nullable(),
+  address_line: z.string().max(255).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  country: z.string().max(64).optional().nullable(),
+  bank_details: z.string().min(4).max(64).optional().nullable(),
+  currency: CurrencyCode.default('USD'),
+  source_system: z.string().max(64).optional().nullable(),
+  source_id: z.string().max(128).optional().nullable(),
+  idempotency_key: z.string().max(128).optional().nullable(),
+  batch_id: UuidSchema.optional().nullable(),
+  source_row: z.number().int().nonnegative().optional().nullable(),
 });
-export type PurchaseOrderLine = z.infer<typeof PurchaseOrderLineSchema>;
-
-/** Purchase Order Entity with embedded Lines (FR-ERP2-03..05). */
-export const PurchaseOrderSchema = z.object({
-  id: VendorUuid,
-  po_number: PoNumberSchema,
-  vendor_id: VendorUuid,
-  order_date: VendorIsoDate,
-  status: PurchaseOrderStatusEnum,
-  currency: VendorCurrencyCode,
-  total: VendorMoneyAmount,
-  notes: z.string().max(1000).nullable().optional(),
-  source_system: z.string().max(64).nullable().optional(),
-  source_id: z.string().max(128).nullable().optional(),
-  lines: z.array(PurchaseOrderLineSchema).optional(),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-export type PurchaseOrder = z.infer<typeof PurchaseOrderSchema>;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Request & Response Schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Create Vendor Request. */
-export const CreateVendorRequestSchema = z
-  .object({
-    name: z.string().min(1, 'Vendor name is required').max(255),
-    tax_number: TaxNumberSchema,
-    email: z.string().email('Invalid email address').nullable().optional(),
-    phone: z.string().max(64).nullable().optional(),
-    address_line: z.string().max(255).nullable().optional(),
-    city: z.string().max(120).nullable().optional(),
-    country: z.string().max(64).nullable().optional(),
-    bank_details: z.string().max(128).optional(), // Raw bank account, masked on save
-    source_system: z.string().max(64).optional(),
-    source_id: z.string().max(128).optional(),
-  })
-  .strict();
 export type CreateVendorRequest = z.infer<typeof CreateVendorRequestSchema>;
 
-/** Patch Vendor Request. */
-export const PatchVendorRequestSchema = z
-  .object({
-    name: z.string().min(1).max(255).optional(),
-    tax_number: TaxNumberSchema.optional(),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().max(64).nullable().optional(),
-    address_line: z.string().max(255).nullable().optional(),
-    city: z.string().max(120).nullable().optional(),
-    country: z.string().max(64).nullable().optional(),
-    bank_details: z.string().max(128).optional(),
-  })
-  .strict();
-export type PatchVendorRequest = z.infer<typeof PatchVendorRequestSchema>;
+/** PATCH /api/v1/erp-vendors/vendors/{id} — request body. */
+export const UpdateVendorRequestSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  tax_number: z.string().min(1).max(64).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().max(32).optional().nullable(),
+  address_line: z.string().max(255).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  country: z.string().max(64).optional().nullable(),
+  bank_details: z.string().min(4).max(64).optional().nullable(),
+  currency: CurrencyCode.optional(),
+});
+export type UpdateVendorRequest = z.infer<typeof UpdateVendorRequestSchema>;
 
-/** Create Purchase Order Line Item Input. */
-export const CreatePoLineInputSchema = z
-  .object({
-    product_id: VendorUuid,
-    quantity: VendorQuantity,
-    price: VendorMoneyAmount,
-  })
-  .strict();
-export type CreatePoLineInput = z.infer<typeof CreatePoLineInputSchema>;
-
-/** Create Purchase Order Request. */
-export const CreatePurchaseOrderRequestSchema = z
-  .object({
-    po_number: PoNumberSchema,
-    vendor_id: VendorUuid,
-    order_date: VendorIsoDate,
-    currency: VendorCurrencyCode.default(VENDOR_DEFAULT_CURRENCY),
-    notes: z.string().max(1000).optional(),
-    lines: z.array(CreatePoLineInputSchema).min(1, 'At least one line item is required'),
-    source_system: z.string().max(64).optional(),
-    source_id: z.string().max(128).optional(),
-  })
-  .strict();
-export type CreatePurchaseOrderRequest = z.infer<typeof CreatePurchaseOrderRequestSchema>;
-
-/** Patch Purchase Order Request (Allowed status transition only in V1). */
-export const PatchPurchaseOrderStatusRequestSchema = z
-  .object({
-    status: PurchaseOrderStatusEnum,
-  })
-  .strict();
-export type PatchPurchaseOrderStatusRequest = z.infer<typeof PatchPurchaseOrderStatusRequestSchema>;
-
-/** Vendor List Query. */
+/** GET /api/v1/erp-vendors/vendors — query params with search and bounded pagination. */
 export const VendorListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1, 'page must be >= 1').default(1),
+  pageSize: z.coerce.number().int().min(1, 'pageSize must be >= 1').max(100, 'pageSize <= 100').default(20),
   search: z.string().max(100).optional(),
 });
 export type VendorListQuery = z.infer<typeof VendorListQuerySchema>;
 
-/** Purchase Order List Query. */
+/** Paginated vendor list response. */
+export const PaginatedVendorsResponseSchema = z.object({
+  items: z.array(VendorSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
+});
+export type PaginatedVendorsResponse = z.infer<typeof PaginatedVendorsResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchase Order Line Schemas
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Single purchase order line response. */
+export const PurchaseOrderLineSchema = z.object({
+  id: UuidSchema,
+  po_id: UuidSchema,
+  product_id: UuidSchema,
+  quantity: MoneyAmount2Dp,
+  price: MoneyAmount2Dp,
+  line_total: MoneyAmount2Dp,
+});
+export type PurchaseOrderLine = z.infer<typeof PurchaseOrderLineSchema>;
+
+/** One line in CreatePurchaseOrderRequest. */
+export const CreatePurchaseOrderLineRequestSchema = z.object({
+  product_id: UuidSchema,
+  quantity: z
+    .union([z.string(), z.number()])
+    .pipe(z.coerce.string())
+    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v) && Number(v) > 0, {
+      message: 'Quantity must be a positive decimal with up to 2 decimal places',
+    }),
+  price: z
+    .union([z.string(), z.number()])
+    .pipe(z.coerce.string())
+    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v) && Number(v) >= 0, {
+      message: 'Price must be a non-negative decimal with up to 2 decimal places',
+    }),
+});
+export type CreatePurchaseOrderLineRequest = z.infer<typeof CreatePurchaseOrderLineRequestSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchase Order Schemas
+// GET /api/v1/erp-vendors/purchase-orders
+// GET /api/v1/erp-vendors/purchase-orders/{id}
+// POST /api/v1/erp-vendors/purchase-orders
+// PATCH /api/v1/erp-vendors/purchase-orders/{id}
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Response shape for a Purchase Order with lines. */
+export const PurchaseOrderSchema = z.object({
+  id: UuidSchema,
+  po_number: z.string().min(1).max(64),
+  vendor_id: UuidSchema,
+  order_date: IsoDateString,
+  status: PurchaseOrderStatusEnum,
+  currency: CurrencyCode,
+  total: MoneyAmount2Dp,
+  lines: z.array(PurchaseOrderLineSchema),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+export type PurchaseOrder = z.infer<typeof PurchaseOrderSchema>;
+
+/** POST /api/v1/erp-vendors/purchase-orders — request body. */
+export const CreatePurchaseOrderRequestSchema = z.object({
+  po_number: z.string().min(1).max(64).optional(),
+  vendor_id: UuidSchema,
+  order_date: IsoDateString,
+  currency: CurrencyCode.default('USD'),
+  lines: z
+    .array(CreatePurchaseOrderLineRequestSchema)
+    .min(1, 'A purchase order must contain at least one line'),
+  idempotency_key: z.string().max(128).optional().nullable(),
+  batch_id: UuidSchema.optional().nullable(),
+  source_row: z.number().int().nonnegative().optional().nullable(),
+});
+export type CreatePurchaseOrderRequest = z.infer<typeof CreatePurchaseOrderRequestSchema>;
+
+/** PATCH /api/v1/erp-vendors/purchase-orders/{id} — request body (allowed status transition only). */
+export const UpdatePurchaseOrderStatusRequestSchema = z.object({
+  status: PurchaseOrderStatusEnum,
+});
+export type UpdatePurchaseOrderStatusRequest = z.infer<typeof UpdatePurchaseOrderStatusRequestSchema>;
+
+/** GET /api/v1/erp-vendors/purchase-orders — query params. */
 export const PurchaseOrderListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  vendor_id: VendorUuid.optional(),
+  vendor_id: UuidSchema.optional(),
   status: PurchaseOrderStatusEnum.optional(),
-  search: z.string().max(100).optional(),
 });
 export type PurchaseOrderListQuery = z.infer<typeof PurchaseOrderListQuerySchema>;
+
+/** Paginated purchase order list response. */
+export const PaginatedPurchaseOrdersResponseSchema = z.object({
+  items: z.array(PurchaseOrderSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalPages: z.number().int().nonnegative(),
+});
+export type PaginatedPurchaseOrdersResponse = z.infer<typeof PaginatedPurchaseOrdersResponseSchema>;

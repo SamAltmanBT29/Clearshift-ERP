@@ -14,6 +14,7 @@ import {
   CreateHrEmployeeRequestSchema,
   UpdateHrEmployeeRequestSchema,
   CreateHrLeaveRequestSchema,
+  UpdateHrLeaveRequestSchema,
   CreateHrDepartmentRequestSchema,
   CreateHrPayrollTotalRequestSchema,
   HrEmployeeListQuerySchema,
@@ -24,7 +25,13 @@ import {
   HrPayrollTotalMutationResponseSchema,
   HrIdParamSchema,
   HrIdentityUserSchema,
+  HrRelationshipWarningSchema,
   HR_DOMAIN_RULES,
+  HR_LEAVE_STATUS_TRANSITIONS,
+  HR_LEAVE_STATUSES,
+  HR_LEAVE_TERMINAL_STATUSES,
+  HR_LEAVE_TYPES,
+  HR_OPTIONAL_REFERENCE_ABSENT,
   HR_UNPROCESSABLE_CODES,
   HR_SALARY_MASK,
   HR_SALARY_HIDDEN,
@@ -484,5 +491,117 @@ describe('Resource id parameter', () => {
 
   it('rejects anything that is not a uuid', () => {
     expect(HrIdParamSchema.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutation contract — relationships and state transitions (issue #51)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Leave update contract (ERP5-06)', () => {
+  it('accepts a status transition request', () => {
+    expect(UpdateHrLeaveRequestSchema.safeParse({ status: 'approved' }).success).toBe(true);
+    expect(UpdateHrLeaveRequestSchema.safeParse({ date_to: '2026-05-08' }).success).toBe(true);
+    expect(UpdateHrLeaveRequestSchema.safeParse({ type: 'holiday' }).success).toBe(true);
+  });
+
+  it('rejects an empty patch', () => {
+    expect(UpdateHrLeaveRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(UpdateHrLeaveRequestSchema.safeParse({ status: 'cancelled' }).success).toBe(false);
+  });
+
+  it('rejects an unknown type', () => {
+    expect(UpdateHrLeaveRequestSchema.safeParse({ type: 'unpaid' }).success).toBe(false);
+  });
+
+  it('rejects the immutable recorded subject', () => {
+    const result = UpdateHrLeaveRequestSchema.safeParse({
+      employee_id: '11111111-1111-1111-1111-111111111111',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a date range that ends before it starts', () => {
+    const result = UpdateHrLeaveRequestSchema.safeParse({
+      date_from: '2026-05-08',
+      date_to: '2026-05-01',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        (result.error.issues[0] as { params?: { code?: string } }).params?.code
+      ).toBe(HR_DOMAIN_RULES.LEAVE_DATE_RANGE_VALID);
+    }
+  });
+});
+
+describe('Leave state matrix contract (ERP5-06)', () => {
+  it('declares the approved statuses and types', () => {
+    expect([...HR_LEAVE_STATUSES].sort()).toEqual(['approved', 'pending', 'rejected']);
+    expect([...HR_LEAVE_TYPES].sort()).toEqual(['holiday', 'other', 'sick']);
+  });
+
+  it('declares pending as the only state that can move', () => {
+    expect(HR_LEAVE_STATUS_TRANSITIONS.pending).toEqual(['approved', 'rejected']);
+    expect(HR_LEAVE_STATUS_TRANSITIONS.approved).toEqual([]);
+    expect(HR_LEAVE_STATUS_TRANSITIONS.rejected).toEqual([]);
+  });
+
+  it('declares the decided states as terminal', () => {
+    expect([...HR_LEAVE_TERMINAL_STATUSES].sort()).toEqual(['approved', 'rejected']);
+  });
+});
+
+describe('Relationship warning contract (ERP5-06)', () => {
+  it('accepts the approved warning shape', () => {
+    const result = HrRelationshipWarningSchema.safeParse({
+      relationship: 'DEPARTMENT_PARENT',
+      field: 'parent_id',
+      code: HR_OPTIONAL_REFERENCE_ABSENT,
+      message: 'Optional relationship "DEPARTMENT_PARENT" on field "parent_id" is absent.',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a warning with a foreign code', () => {
+    expect(
+      HrRelationshipWarningSchema.safeParse({
+        relationship: 'DEPARTMENT_PARENT',
+        field: 'parent_id',
+        code: 'OPTIONAL_REFERENCE_ABSENT',
+        message: 'x',
+      }).success
+    ).toBe(false);
+  });
+
+  it('carries the warning on a mutation response', () => {
+    const parsed = HrDepartmentMutationResponseSchema.parse({
+      id: '66666666-6666-6666-6666-666666666666',
+      name: 'Engineering',
+      code: 'ENG',
+      parent_id: null,
+      created_at: '2026-04-01T00:00:00.000Z',
+      updated_at: '2026-04-01T00:00:00.000Z',
+      warnings: [
+        {
+          relationship: 'DEPARTMENT_PARENT',
+          field: 'parent_id',
+          code: HR_OPTIONAL_REFERENCE_ABSENT,
+          message: 'absent',
+        },
+      ],
+    });
+    expect(parsed.warnings).toHaveLength(1);
+  });
+
+  it('classifies the new relationship rules as unprocessable (422)', () => {
+    expect(HR_UNPROCESSABLE_CODES).toContain(HR_DOMAIN_RULES.INVALID_LEAVE_STATUS_TRANSITION);
+    expect(HR_UNPROCESSABLE_CODES).toContain(HR_DOMAIN_RULES.INVALID_LEAVE_TYPE);
+    expect(HR_UNPROCESSABLE_CODES).toContain(HR_DOMAIN_RULES.INVALID_LEAVE_STATUS);
+    expect(HR_UNPROCESSABLE_CODES).toContain(HR_DOMAIN_RULES.SOURCE_IDENTITY_INCOMPLETE);
+    expect(HR_UNPROCESSABLE_CODES).toContain(HR_DOMAIN_RULES.READ_MODEL_INCONSISTENT);
   });
 });

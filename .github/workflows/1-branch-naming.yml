@@ -22,7 +22,7 @@ jobs:
           # docs/short-description                    e.g. docs/update-readme
           # release/v1.2.0                            e.g. release/v1.2.0
 
-          VALID_PATTERN="^(feature|fix|hotfix|chore|docs|release|qa|refactor)\/[a-z0-9][a-z0-9/_-]*$"
+          VALID_PATTERN="^((feature|fix|hotfix|chore|docs|release|qa|refactor)\/|[0-9]+-)[a-z0-9][a-z0-9/_-]*$"
 
           if echo "$BRANCH" | grep -Eq "$VALID_PATTERN"; then
             echo "✅ Branch name '$BRANCH' follows the convention."

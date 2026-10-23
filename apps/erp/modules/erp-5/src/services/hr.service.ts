@@ -24,19 +24,30 @@ import {
   HR_DEFAULT_CURRENCY,
   HR_DOMAIN_RULES,
   HR_IMPORT_ONLY_FIELDS,
+  HR_PAGE_SIZE_DEFAULT,
   maskHrSalary,
   type CreateHrDepartmentRequest,
   type CreateHrEmployeeRequest,
   type CreateHrLeaveRequest,
   type CreateHrPayrollTotalRequest,
   type HrDepartment,
+  type HrDepartmentListQuery,
   type HrEmployee,
+  type HrEmployeeListQuery,
   type HrEmployeeView,
+  type HrIdentityUser,
+  type HrIdentityUserListQuery,
   type HrImportReceipt,
   type HrLeave,
+  type HrLeaveListQuery,
+  type HrListMeta,
   type HrPayrollTotal,
+  type HrPayrollTotalListQuery,
+  type HrRelationshipWarning,
+  type LeaveStatus,
   type UpdateHrDepartmentRequest,
   type UpdateHrEmployeeRequest,
+  type UpdateHrLeaveRequest,
 } from '@clearshift/contracts';
 import {
   HrDomainError,
@@ -48,6 +59,17 @@ import {
   assertPayrollAmountNotNegative,
   assertSalaryNotNegative,
 } from '../domain/rules.js';
+import {
+  assertHrDepartmentReadConsistency,
+  assertHrEmployeeReadConsistency,
+  assertHrLeaveReadConsistency,
+  assertHrPayrollTotalReadConsistency,
+  assertLeaveStatusTransition,
+  assertSourceIdentityIsComplete,
+  assertValidLeaveStatus,
+  assertValidLeaveType,
+  handleOptionalRelationship,
+} from '../domain/relationships.js';
 import {
   HrBadRequestError,
   HrConflictError,
@@ -63,6 +85,8 @@ export interface HrMutationResult<T> {
   entity: T;
   created: boolean;
   receipt?: HrImportReceipt;
+  /** Absent optional relationships — no synthetic record was created. */
+  warnings?: HrRelationshipWarning[];
 }
 
 /** The import provenance of a write, once it has been validated. */
@@ -99,17 +123,6 @@ export function normalizeHrAmount(value: string): string {
   const whole = match[1] ?? '0';
   const fraction = (match[2] ?? '').padEnd(4, '0').slice(0, 4);
   return `${whole}.${fraction}`;
-}
-
-function toUnprocessable(error: HrDomainError): HrUnprocessableError {
-  const field = typeof error.context['field'] === 'string' ? error.context['field'] : undefined;
-  return new HrUnprocessableError(
-    error.message,
-    field !== undefined
-      ? [{ field, message: error.message, code: error.code }]
-      : [{ message: error.message, code: error.code }],
-    error.code
-  );
 }
 
 /**
@@ -225,6 +238,38 @@ export function toHrEmployeeView(employee: HrEmployee): HrEmployeeView {
   };
 }
 
+/**
+ * Maps a domain rule violation onto the shared error envelope.
+ *
+ * A business-rule violation is `422`; a structurally impossible payload (a
+ * half-set source identity, a credential field) is `400`.
+ */
+function toServiceError(error: HrDomainError): HrServiceError {
+  const field = typeof error.context['field'] === 'string' ? error.context['field'] : undefined;
+  const details =
+    field !== undefined
+      ? [{ field, message: error.message, code: error.code }]
+      : [{ message: error.message, code: error.code }];
+
+  if (error.code === HR_DOMAIN_RULES.SOURCE_IDENTITY_INCOMPLETE) {
+    return new HrBadRequestError(error.message, details, error.code);
+  }
+
+  return new HrUnprocessableError(error.message, details, error.code);
+}
+
+/** Runs a domain rule and converts its failure into a service error. */
+function guard(rule: () => void): void {
+  try {
+    rule();
+  } catch (error) {
+    if (error instanceof HrDomainError) {
+      throw toServiceError(error);
+    }
+    throw error;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Service
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,13 +313,17 @@ export class HrService {
         );
       }
 
-      const parentId = input.parent_id ?? null;
-      if (parentId !== null) {
-        const parent = await tx.getDepartmentById(parentId);
-        if (!parent) {
+      // The parent is an *optional* relationship: an absent parent means a
+      // root department and is reported as an approved warning — no synthetic
+      // parent is ever created.
+      const parent = handleOptionalRelationship(input.parent_id, 'parent_id', 'DEPARTMENT_PARENT');
+
+      if (parent.value !== null) {
+        const existingParent = await tx.getDepartmentById(parent.value);
+        if (!existingParent) {
           throw new HrNotFoundError(
             'Parent department',
-            parentId,
+            parent.value,
             HR_DOMAIN_RULES.DEPARTMENT_REQUIRED,
             [
               {
@@ -287,18 +336,31 @@ export class HrService {
         }
       }
 
-      const department = await tx.createDepartment({
+      const created = await tx.createDepartment({
         name: input.name,
         code: input.code,
-        parent_id: parentId,
+        parent_id: parent.value,
       });
 
-      const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.DEPARTMENT, department.id);
+      const department = await this.readBack(
+        tx,
+        () => tx.getDepartmentById(created.id),
+        assertHrDepartmentReadConsistency,
+        'department'
+      );
+
+      const receipt = await this.writeReceipt(
+        tx,
+        provenance,
+        HR_IMPORT_ENTITIES.DEPARTMENT,
+        department.id
+      );
 
       return {
         entity: department,
         created: true,
         ...(receipt !== null && { receipt }),
+        ...(parent.warning !== undefined && { warnings: [parent.warning] }),
       };
     });
   }
@@ -342,18 +404,13 @@ export class HrService {
         }
 
         const ancestors = await tx.listDepartmentAncestors(input.parent_id);
-        try {
+        guard(() =>
           assertDepartmentHierarchyAcyclic(
             id,
             input.parent_id,
             ancestors.map((ancestor) => ancestor.id)
-          );
-        } catch (error) {
-          if (error instanceof HrDomainError) {
-            throw toUnprocessable(error);
-          }
-          throw error;
-        }
+          )
+        );
       }
 
       if (input.code !== undefined && input.code !== existing.code) {
@@ -388,7 +445,15 @@ export class HrService {
         updates.parent_id = input.parent_id;
       }
 
-      return tx.updateDepartment(id, updates);
+      await tx.updateDepartment(id, updates);
+
+      // The response is built from the persisted row, never from the request.
+      return this.readBack(
+        tx,
+        () => tx.getDepartmentById(id),
+        assertHrDepartmentReadConsistency,
+        'department'
+      );
     });
   }
 
@@ -399,15 +464,10 @@ export class HrService {
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
 
-    try {
-      assertJoinDateNotBeforeBirthDate(input.birth_date, input.join_date);
-      assertSalaryNotNegative(input.salary);
-    } catch (error) {
-      if (error instanceof HrDomainError) {
-        throw toUnprocessable(error);
-      }
-      throw error;
-    }
+    guard(() => assertJoinDateNotBeforeBirthDate(input.birth_date, input.join_date));
+    guard(() => assertSalaryNotNegative(input.salary));
+    // The source identity is a pair — half of it is not a valid state.
+    guard(() => assertSourceIdentityIsComplete(input.source_system, input.source_id));
 
     return this.repository.transaction(async (tx) => {
       if (provenance !== null) {
@@ -463,7 +523,7 @@ export class HrService {
         ]);
       }
 
-      const employee = await tx.createEmployee({
+      const created = await tx.createEmployee({
         employee_no: input.employee_no,
         first_name: input.first_name,
         last_name: input.last_name,
@@ -477,7 +537,20 @@ export class HrService {
         source_id: input.source_id ?? null,
       });
 
-      const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.EMPLOYEE, employee.id);
+      // The response is built from the persisted row, never from the request.
+      const employee = await this.readBack(
+        tx,
+        () => tx.getEmployeeById(created.id),
+        assertHrEmployeeReadConsistency,
+        'employee'
+      );
+
+      const receipt = await this.writeReceipt(
+        tx,
+        provenance,
+        HR_IMPORT_ENTITIES.EMPLOYEE,
+        employee.id
+      );
 
       return {
         entity: toHrEmployeeView(employee),
@@ -498,24 +571,11 @@ export class HrService {
 
       const birthDate = input.birth_date ?? existing.birth_date;
       const joinDate = input.join_date ?? existing.join_date;
-      try {
-        assertJoinDateNotBeforeBirthDate(birthDate, joinDate);
-      } catch (error) {
-        if (error instanceof HrDomainError) {
-          throw toUnprocessable(error);
-        }
-        throw error;
-      }
+      guard(() => assertJoinDateNotBeforeBirthDate(birthDate, joinDate));
 
       if (input.salary !== undefined) {
-        try {
-          assertSalaryNotNegative(input.salary);
-        } catch (error) {
-          if (error instanceof HrDomainError) {
-            throw toUnprocessable(error);
-          }
-          throw error;
-        }
+        const salary = input.salary;
+        guard(() => assertSalaryNotNegative(salary));
       }
 
       if (input.department_id !== undefined && input.department_id !== existing.department_id) {
@@ -584,7 +644,13 @@ export class HrService {
       }
 
       const updated = await tx.updateEmployee(id, updates);
-      return toHrEmployeeView(updated);
+      const persisted = await this.readBack(
+        tx,
+        () => tx.getEmployeeById(id),
+        assertHrEmployeeReadConsistency,
+        'employee'
+      );
+      return toHrEmployeeView(persisted);
     });
   }
 
@@ -595,13 +661,12 @@ export class HrService {
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
 
-    try {
-      assertLeaveDateRange(input.date_from, input.date_to);
-    } catch (error) {
-      if (error instanceof HrDomainError) {
-        throw toUnprocessable(error);
-      }
-      throw error;
+    const leaveType = input.type;
+    const leaveStatus = input.status;
+    guard(() => assertLeaveDateRange(input.date_from, input.date_to));
+    guard(() => assertValidLeaveType(leaveType));
+    if (leaveStatus !== undefined) {
+      guard(() => assertValidLeaveStatus(leaveStatus));
     }
 
     return this.repository.transaction(async (tx) => {
@@ -623,13 +688,20 @@ export class HrService {
         ]);
       }
 
-      const record = await tx.createLeave({
+      const created = await tx.createLeave({
         employee_id: input.employee_id,
         date_from: input.date_from,
         date_to: input.date_to,
         type: input.type,
         status: input.status ?? 'pending',
       });
+
+      const record = await this.readBack(
+        tx,
+        () => tx.getLeaveById(created.id),
+        assertHrLeaveReadConsistency,
+        'leave'
+      );
 
       const receipt = await this.writeReceipt(tx, provenance, HR_IMPORT_ENTITIES.LEAVE, record.id);
 
@@ -638,6 +710,69 @@ export class HrService {
         created: true,
         ...(receipt !== null && { receipt }),
       };
+    });
+  }
+
+  /**
+   * PATCH /api/v1/erp-hr/leave/{id}
+   *
+   * `status` is the state transition and is checked against the V1 leave
+   * state matrix. The recorded subject (`employee_id`) is immutable — a leave
+   * is a fact about one employee and is never re-parented.
+   */
+  async updateLeave(id: string, input: UpdateHrLeaveRequest): Promise<HrLeave> {
+    assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
+
+    return this.repository.transaction(async (tx) => {
+      const existing = await tx.getLeaveById(id);
+      if (!existing) {
+        throw new HrNotFoundError('Leave record', id);
+      }
+
+      const dateFrom = input.date_from ?? existing.date_from;
+      const dateTo = input.date_to ?? existing.date_to;
+      guard(() => assertLeaveDateRange(dateFrom, dateTo));
+
+      const nextType = input.type;
+      const nextStatus = input.status;
+      if (nextType !== undefined) {
+        guard(() => assertValidLeaveType(nextType));
+      }
+
+      if (nextStatus !== undefined) {
+        guard(() => assertValidLeaveStatus(nextStatus));
+        // The state matrix — a decision is never reversed and a leave is never
+        // un-decided (DR-10).
+        guard(() => assertLeaveStatusTransition(existing.status, nextStatus));
+      }
+
+      const updates: {
+        status?: LeaveStatus;
+        date_from?: string;
+        date_to?: string;
+        type?: HrLeave['type'];
+      } = {};
+      if (nextStatus !== undefined) {
+        updates.status = nextStatus;
+      }
+      if (input.date_from !== undefined) {
+        updates.date_from = input.date_from;
+      }
+      if (input.date_to !== undefined) {
+        updates.date_to = input.date_to;
+      }
+      if (nextType !== undefined) {
+        updates.type = nextType;
+      }
+
+      await tx.updateLeave(id, updates);
+
+      return this.readBack(
+        tx,
+        () => tx.getLeaveById(id),
+        assertHrLeaveReadConsistency,
+        'leave'
+      );
     });
   }
 
@@ -669,15 +804,7 @@ export class HrService {
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
 
-    try {
-      assertPayrollAmountNotNegative(input.total_amount);
-    } catch (error) {
-      if (error instanceof HrDomainError) {
-        throw toUnprocessable(error);
-      }
-      throw error;
-    }
-
+    guard(() => assertPayrollAmountNotNegative(input.total_amount));
     return this.repository.transaction(async (tx) => {
       if (provenance !== null) {
         const replay = await this.replayPayrollTotal(tx, provenance, input);
@@ -712,13 +839,23 @@ export class HrService {
         );
       }
 
-      const total = await tx.createPayrollTotal({
+      const created = await tx.createPayrollTotal({
         department_id: input.department_id,
         month: input.month,
         total_amount: input.total_amount,
         currency_code: input.currency_code ?? HR_DEFAULT_CURRENCY,
         headcount: input.headcount ?? 0,
       });
+
+      // The aggregate is authoritative as loaded (DR-11): the module validates
+      // it against its own invariants and reads the persisted row back, but it
+      // never recomputes the amount from the employee rows.
+      const total = await this.readBack(
+        tx,
+        () => tx.getPayrollTotalById(created.id),
+        assertHrPayrollTotalReadConsistency,
+        'payroll_total'
+      );
 
       const receipt = await this.writeReceipt(
         tx,
@@ -735,7 +872,164 @@ export class HrService {
     });
   }
 
+  // ── Query layer (ERP5-02) ────────────────────────────────────────────────
+
+  /**
+   * The bounded page metadata of a collection.
+   *
+   * `totalPages` is `0` for an empty collection — the honest answer, and
+   * within the published `HrListMeta` contract.
+   */
+  private static toListMeta(page: number, pageSize: number, total: number): HrListMeta {
+    return {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
+
+  /**
+   * Lists the employees.
+   *
+   * The result is the **masked** projection — the raw `salary` column never
+   * leaves the module (BR-ERP5-02).
+   */
+  async listEmployees(
+    query: HrEmployeeListQuery
+  ): Promise<{ data: HrEmployeeView[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listEmployees({ ...query, page, pageSize });
+
+    return {
+      data: result.items.map(toHrEmployeeView),
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listDepartments(
+    query: HrDepartmentListQuery
+  ): Promise<{ data: HrDepartment[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listDepartments({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listLeave(query: HrLeaveListQuery): Promise<{ data: HrLeave[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listLeave({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async listPayrollTotals(
+    query: HrPayrollTotalListQuery
+  ): Promise<{ data: HrPayrollTotal[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listPayrollTotals({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  /**
+   * Lists the read-only Hub Identity projection.
+   *
+   * The projection is owned by the platform and exposes identity attributes
+   * only — no credential, hash, token or refresh-token field. It is empty
+   * when the platform has not created it yet.
+   */
+  async listIdentityUsers(
+    query: HrIdentityUserListQuery
+  ): Promise<{ data: HrIdentityUser[]; meta: HrListMeta }> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
+    const result = await this.repository.listIdentityUsers({ ...query, page, pageSize });
+
+    return {
+      data: result.items,
+      meta: HrService.toListMeta(page, pageSize, result.total),
+    };
+  }
+
+  async getEmployeeById(id: string): Promise<HrEmployeeView> {
+    const employee = await this.repository.getEmployeeById(id);
+    if (!employee) {
+      throw new HrNotFoundError('Employee', id);
+    }
+    return toHrEmployeeView(employee);
+  }
+
+  async getDepartmentById(id: string): Promise<HrDepartment> {
+    const department = await this.repository.getDepartmentById(id);
+    if (!department) {
+      throw new HrNotFoundError('Department', id);
+    }
+    return department;
+  }
+
+  async getLeaveById(id: string): Promise<HrLeave> {
+    const record = await this.repository.getLeaveById(id);
+    if (!record) {
+      throw new HrNotFoundError('Leave record', id);
+    }
+    return record;
+  }
+
+  async getPayrollTotalById(id: string): Promise<HrPayrollTotal> {
+    const total = await this.repository.getPayrollTotalById(id);
+    if (!total) {
+      throw new HrNotFoundError('Payroll aggregate', id);
+    }
+    return total;
+  }
+
   // ── Idempotency helpers ──────────────────────────────────────────────────
+
+  /**
+   * Reads a row back after the write and asserts the read model.
+   *
+   * The response is built from the **persisted** row, never from the request
+   * payload, so the UI and the read API can never show a status, a link or a
+   * derived total that the database does not hold (ERP5-06).
+   */
+  private async readBack<T>(
+    tx: HrRepository,
+    load: () => Promise<T | null>,
+    assert: (entity: T) => void,
+    entity: string
+  ): Promise<T> {
+    const persisted = await load();
+    if (!persisted) {
+      throw new HrUnprocessableError(
+        `The ${entity} could not be read back after the write.`,
+        [
+          {
+            field: entity,
+            message: 'The persisted row is not readable after the write',
+            code: HR_DOMAIN_RULES.READ_MODEL_INCONSISTENT,
+          },
+        ],
+        HR_DOMAIN_RULES.READ_MODEL_INCONSISTENT
+      );
+    }
+
+    guard(() => assert(persisted));
+    return persisted;
+  }
 
   /**
    * Writes the import receipt inside the caller's transaction.

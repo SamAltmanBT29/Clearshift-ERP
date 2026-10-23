@@ -65,6 +65,7 @@ import {
 import type { ReferenceResolver } from '@cs/kernel';
 import type { FinanceRepository } from './repository.js';
 import { InMemoryFinanceRepository } from './repository.js';
+import { Erp4AuditService } from './audit.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service Errors
@@ -126,22 +127,27 @@ export class ForbiddenError extends ServiceError {
 export interface FinanceServiceDependencies {
   repository?: FinanceRepository | undefined;
   referenceResolver?: ReferenceResolver | undefined;
+  auditService?: Erp4AuditService | undefined;
 }
 
 export class FinanceService {
   private readonly repository: FinanceRepository;
   private readonly referenceResolver?: ReferenceResolver | undefined;
+  public readonly auditService: Erp4AuditService;
 
   constructor(
     repoOrDeps: FinanceRepository | FinanceServiceDependencies = new InMemoryFinanceRepository(),
-    referenceResolver?: ReferenceResolver
+    referenceResolver?: ReferenceResolver,
+    auditService?: Erp4AuditService
   ) {
     if ('listAccounts' in repoOrDeps) {
       this.repository = repoOrDeps;
       this.referenceResolver = referenceResolver;
+      this.auditService = auditService ?? new Erp4AuditService();
     } else {
       this.repository = repoOrDeps.repository ?? new InMemoryFinanceRepository();
       this.referenceResolver = repoOrDeps.referenceResolver ?? referenceResolver;
+      this.auditService = repoOrDeps.auditService ?? auditService ?? new Erp4AuditService();
     }
   }
 
@@ -253,12 +259,25 @@ export class FinanceService {
       });
     }
 
-    return {
+    const result = {
       account,
       created: true,
       ...(receipt && { receipt }),
       ...(parentWarning && { warning: parentWarning }),
     };
+
+    await this.auditService.auditAccountCreated({
+      actor: 'system',
+      correlationId: randomUUID(),
+      accountId: account.id,
+      accountCode: account.code,
+      accountName: account.name,
+      accountType: account.type,
+      currencyCode: account.currency_code,
+      batchId: data.batch_id ?? undefined,
+    }).catch(() => {});
+
+    return result;
   }
 
   async updateAccount(id: string, updates: UpdateAccountRequest): Promise<Account> {
@@ -326,7 +345,16 @@ export class FinanceService {
       ...(updates.parent_id !== undefined && { parent_id: updates.parent_id }),
     };
 
-    return this.repository.updateAccount(id, filteredUpdates);
+    const updated = await this.repository.updateAccount(id, filteredUpdates);
+
+    await this.auditService.auditAccountUpdated({
+      actor: 'system',
+      correlationId: randomUUID(),
+      accountId: id,
+      updatedFields: filteredUpdates,
+    }).catch(() => {});
+
+    return updated;
   }
 
   // ── Accounting Periods ─────────────────────────────────────────────────────
@@ -363,7 +391,7 @@ export class FinanceService {
   async updatePeriod(
     id: string,
     updates: UpdatePeriodRequest,
-    user: { id: string; role?: string }
+    user: { id: string; role?: string | undefined } = { id: 'system' }
   ): Promise<AccountingPeriod> {
     const period = await this.repository.getPeriodById(id);
     if (!period) {
@@ -384,11 +412,23 @@ export class FinanceService {
       const now = new Date().toISOString();
       const isClosing = updates.status !== 'open';
 
-      return this.repository.updatePeriod(id, {
+      const updatedPeriod = await this.repository.updatePeriod(id, {
         status: updates.status,
         closed_at: isClosing ? now : null,
         closed_by_user_id: isClosing ? user.id : null,
       });
+
+      await this.auditService.auditPeriodStatusChanged({
+        actor: user.id,
+        actorRole: user.role,
+        correlationId: randomUUID(),
+        periodId: id,
+        periodLabel: period.period_label,
+        oldStatus: period.status,
+        newStatus: updates.status,
+      }).catch(() => {});
+
+      return updatedPeriod;
     }
 
     return period;
@@ -778,7 +818,7 @@ export class FinanceService {
     return updated;
   }
 
-  async postJournalEntry(id: string, user: { id: string; role?: string }): Promise<JournalEntry> {
+  async postJournalEntry(id: string, user: { id: string; role?: string | undefined }): Promise<JournalEntry> {
     const entry = await this.repository.getJournalEntryById(id);
     if (!entry) {
       throw new NotFoundError('Journal entry', id);
@@ -854,13 +894,29 @@ export class FinanceService {
     });
 
     assertJournalEntryReadConsistency(posted);
+
+    const totalAmount = (posted.lines ?? [])
+      .reduce((sum, l) => sum + parseFloat(l.debit_amount || '0'), 0)
+      .toFixed(2);
+
+    await this.auditService.auditJournalPosted({
+      actor: user.id,
+      actorRole: user.role,
+      correlationId: (user as any).correlationId || randomUUID(),
+      journalEntryId: posted.id,
+      entryNumber: posted.entry_number,
+      periodId: posted.period_id,
+      currencyCode: posted.currency_code,
+      totalAmount,
+    }).catch(() => {});
+
     return posted;
   }
 
   async reverseJournalEntry(
     id: string,
     data: ReverseJournalEntryRequest,
-    user: { id: string; role?: string }
+    user: { id: string; role?: string | undefined }
   ): Promise<{ original: JournalEntry; reversal: JournalEntry }> {
     const entry = await this.repository.getJournalEntryById(id);
     if (!entry) {
@@ -954,10 +1010,19 @@ export class FinanceService {
     assertJournalEntryReadConsistency(updatedOriginal);
     assertJournalEntryReadConsistency(postedReversal);
 
+    await this.auditService.auditJournalReversed({
+      actor: user.id,
+      actorRole: user.role,
+      correlationId: (user as any).correlationId || randomUUID(),
+      originalEntryId: id,
+      reversalEntryId: postedReversal.id,
+      reason: (data as any).reason ?? data.reversal_description,
+    }).catch(() => {});
+
     return { original: updatedOriginal, reversal: postedReversal };
   }
 
-  async voidJournalEntry(id: string, _user: { id: string; role?: string }): Promise<JournalEntry> {
+  async voidJournalEntry(id: string, _user: { id: string; role?: string | undefined }): Promise<JournalEntry> {
     const entry = await this.repository.getJournalEntryById(id);
     if (!entry) {
       throw new NotFoundError('Journal entry', id);
@@ -1247,6 +1312,16 @@ export class FinanceService {
       receipts.push(batchReceipt);
     }
 
-    return { created, skipped, ...(receipts.length > 0 && { receipts }) };
+    const result = { created, skipped, ...(receipts.length > 0 && { receipts }) };
+
+    await this.auditService.auditOpeningBalancesLoaded({
+      actor: userId,
+      correlationId: randomUUID(),
+      batchId: data.batch_id ?? undefined,
+      loadedCount: created.length,
+      skippedCount: skipped.length,
+    }).catch(() => {});
+
+    return result;
   }
 }

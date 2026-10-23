@@ -1,18 +1,18 @@
 /**
  * ERP-5 HR & Employees — Routes Plugin Index
  *
- * Exposes the V1 write endpoints of the module under the approved API base
- * path `/api/v1/erp-hr`:
+ * Exposes the V1 endpoints of the module under the approved API base path
+ * `/api/v1/erp-hr`:
  *
- *   POST  /employees
- *   PATCH /employees/{id}
- *   POST  /departments
- *   PATCH /departments/{id}
- *   POST  /leave
- *   POST  /payroll-totals
- *
- * The list/read endpoints are owned by **ERP5-02** (issue #47); this plugin
- * registers only the mutation slice so the two issues do not duplicate work.
+ *   GET   /employees        POST  /employees
+ *   GET   /employees/{id}   PATCH /employees/{id}
+ *   GET   /departments      POST  /departments
+ *   GET   /departments/{id} PATCH /departments/{id}
+ *   GET   /leave            POST  /leave
+ *   GET   /leave/{id}       PATCH /leave/{id}
+ *   GET   /payroll-totals   POST  /payroll-totals
+ *   GET   /payroll-totals/{id}
+ *   GET   /identity-users
  *
  * @module erp5/routes
  */
@@ -21,6 +21,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { HrService } from '../services/hr.service.js';
 import { employeesRoutes } from './employees.js';
 import { departmentsRoutes } from './departments.js';
+import { identityUsersRoutes } from './identity-users.js';
 import { leaveRoutes } from './leave.js';
 import { payrollTotalsRoutes } from './payroll-totals.js';
 
@@ -34,6 +35,13 @@ export const erpHrRoutes: FastifyPluginAsync<ErpHrRoutesOptions> = async (fastif
   await fastify.register(departmentsRoutes, childOpts);
   await fastify.register(leaveRoutes, childOpts);
   await fastify.register(payrollTotalsRoutes, childOpts);
+  await fastify.register(identityUsersRoutes, childOpts);
 };
 
-export { employeesRoutes, departmentsRoutes, leaveRoutes, payrollTotalsRoutes };
+export {
+  employeesRoutes,
+  departmentsRoutes,
+  identityUsersRoutes,
+  leaveRoutes,
+  payrollTotalsRoutes,
+};

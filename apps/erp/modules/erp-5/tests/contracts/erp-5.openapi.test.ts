@@ -43,7 +43,21 @@ const WRITE_ENDPOINTS = [
   'POST /departments',
   'PATCH /departments/{id}',
   'POST /leave',
+  'PATCH /leave/{id}',
   'POST /payroll-totals',
+] as const;
+
+/** The read endpoints of ERP5-02. */
+const READ_ENDPOINTS = [
+  'GET /employees',
+  'GET /employees/{id}',
+  'GET /departments',
+  'GET /departments/{id}',
+  'GET /leave',
+  'GET /leave/{id}',
+  'GET /identity-users',
+  'GET /payroll-totals',
+  'GET /payroll-totals/{id}',
 ] as const;
 
 /** Extracts the `METHOD /path` pairs from the `paths:` block of the document. */
@@ -88,6 +102,49 @@ function componentBlock(spec: string, name: string): string {
   const rest = spec.slice(start);
   const next = rest.slice(1).search(/^ {4}\S/m);
   return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+/** Returns the text of the operation block that declares `operationId`. */
+function operationBlock(spec: string, operationId: string): string {
+  const lines = spec.split('\n');
+  const anchor = lines.findIndex((line) => line.includes(`operationId: ${operationId}`));
+  if (anchor === -1) {
+    return '';
+  }
+
+  // Walk back to the operation key (`    get:` / `    post:` / …).
+  let start = anchor;
+  while (start > 0 && !/^ {4}\w+:/.test(lines[start] ?? '')) {
+    start -= 1;
+  }
+
+  // The operation ends at the next key on the same level.
+  const block: string[] = [];
+  for (const line of lines.slice(start)) {
+    if (block.length > 0 && /^ {4}\S/.test(line)) {
+      break;
+    }
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
+/** Returns the text of every operation block of one path. */
+function operationBlockByPath(spec: string, path: string): string {
+  const lines = spec.split('\n');
+  const start = lines.findIndex((line) => line.trim() === `${path}:`);
+  if (start === -1) {
+    return '';
+  }
+
+  const block: string[] = [];
+  for (const line of lines.slice(start)) {
+    if (block.length > 0 && /^ {2}\S/.test(line)) {
+      break;
+    }
+    block.push(line);
+  }
+  return block.join('\n');
 }
 
 /** Extracts the response status codes documented for one operation. */
@@ -177,6 +234,36 @@ describe('ERP-5 OpenAPI contract', () => {
     }
   });
 
+  it('documents every read endpoint the module registers', () => {
+    const documented = documentedEndpoints(SPEC);
+
+    for (const endpoint of READ_ENDPOINTS) {
+      expect(documented.has(endpoint), `${endpoint} is not documented`).toBe(true);
+    }
+
+    const readRoutes = (registeredRoutes ?? []).filter((route) => /^GET /.test(route));
+    expect(readRoutes.length).toBeGreaterThan(0);
+    for (const route of readRoutes) {
+      const withPrefix = route.replace('/api/v1/erp-hr', '');
+      expect(documented.has(withPrefix), `${route} is not documented`).toBe(true);
+    }
+  });
+
+  it('documents the bounded paging of every collection', () => {
+    for (const collection of [
+      'listEmployees',
+      'listDepartments',
+      'listLeave',
+      'listIdentityUsers',
+      'listPayrollTotals',
+    ]) {
+      const block = operationBlock(SPEC, collection);
+      expect(block, `${collection} is not documented`).not.toBe('');
+      expect(block).toContain('#/components/parameters/Page');
+      expect(block).toContain('#/components/parameters/PageSize');
+    }
+  });
+
   it('documents the expected status codes for every write operation', () => {
     const expectations: Record<string, string[]> = {
       createEmployee: ['201', '200', '400', '401', '403', '404', '409', '422', '500'],
@@ -184,6 +271,7 @@ describe('ERP-5 OpenAPI contract', () => {
       createDepartment: ['201', '200', '400', '401', '403', '404', '409', '500'],
       updateDepartment: ['200', '400', '401', '403', '404', '409', '422', '500'],
       createLeave: ['201', '200', '400', '401', '403', '404', '409', '422', '500'],
+      updateLeave: ['200', '400', '401', '403', '404', '422', '500'],
       createPayrollTotal: ['201', '200', '400', '401', '403', '404', '409', '422', '500'],
     };
 
@@ -202,6 +290,7 @@ describe('ERP-5 OpenAPI contract', () => {
       'CreateDepartmentRequest',
       'UpdateDepartmentRequest',
       'CreateLeaveRequest',
+      'UpdateLeaveRequest',
       'CreatePayrollTotalRequest',
     ]) {
       const block = componentBlock(SPEC, schema);
@@ -217,6 +306,29 @@ describe('ERP-5 OpenAPI contract', () => {
     expect(block).not.toBe('');
     expect(block).toContain('#/components/schemas/EmployeeView');
     expect(block).not.toMatch(/#\/components\/schemas\/Employee$/m);
+  });
+
+  it('documents the leave state matrix', () => {
+    expect(SPEC).toContain('UpdateLeaveRequest:');
+    expect(SPEC).toContain('HR_INVALID_LEAVE_STATUS_TRANSITION');
+  });
+
+  it('documents the relationship warning', () => {
+    expect(SPEC).toContain('RelationshipWarning:');
+    expect(SPEC).toContain('HR_OPTIONAL_REFERENCE_ABSENT');
+  });
+
+  it('documents the authorization contract of every operation', () => {
+    // Every operation must declare the authentication and the authorization
+    // outcome — an operation that does not is a contract gap (ERP5-15).
+    const lines = SPEC.split('\n');
+    for (const path of Object.keys(documentedEndpoints(SPEC))) {
+      const block = operationBlockByPath(SPEC, path);
+      expect(block, `${path} is not documented`).not.toBe('');
+      expect(block, `${path} does not document 401`).toContain('"401":');
+      expect(block, `${path} does not document 403`).toContain('"403":');
+    }
+    expect(lines.length).toBeGreaterThan(0);
   });
 
   it('documents the import receipt of a write', () => {

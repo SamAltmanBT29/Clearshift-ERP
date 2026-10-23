@@ -13,11 +13,17 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@cs/kernel": "*",
+    "@clearshift/contracts": "*",
     "@cs/core": "*",
-    "@cs/kit": "*"
+    "@cs/db": "*",
+    "@cs/identity": "*",
+    "@cs/kernel": "*",
+    "@cs/kit": "*",
+    "drizzle-orm": "^0.36.0",
+    "fastify": "^5.12.7"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
   }
 }
