@@ -3,81 +3,740 @@
   "rules_version": "1.0.0",
   "module": "erp1",
   "fixture": "sample-data/erp-1/dirty-data-v1.csv",
-  "fixture_sha256": "e9e55b4d27445f1f9a73fa39dcbd72c14cea85c8d6240dacfe5b91fcaff42e00",
-  "total_rows": 79,
+  "fixture_sha256": "25040ea5a6c9ec820f21798f0f4014edb116844392fea024048e96537c39ee91",
+  "total_rows": 131,
   "reconciliation": {
-    "total_source_rows": 79,
-    "accepted": 39,
-    "rejected": 36,
-    "review": 4,
+    "total_source_rows": 131,
+    "accepted": 69,
+    "rejected": 55,
+    "review": 7,
     "skipped": 0,
     "unaccounted": 0,
     "is_balanced": true
   },
   "by_record_type": {
     "category": {
-      "accepted": 6,
-      "rejected": 3,
-      "review": 1,
+      "accepted": 8,
+      "rejected": 5,
+      "review": 2,
       "skipped": 0,
-      "total": 10
+      "total": 15
     },
     "warehouse": {
       "accepted": 1,
-      "rejected": 3,
+      "rejected": 5,
       "review": 0,
       "skipped": 0,
-      "total": 4
+      "total": 6
     },
     "product": {
-      "accepted": 16,
-      "rejected": 21,
-      "review": 2,
+      "accepted": 35,
+      "rejected": 27,
+      "review": 3,
       "skipped": 0,
-      "total": 39
+      "total": 65
     },
     "stock_level": {
-      "accepted": 16,
-      "rejected": 9,
-      "review": 1,
+      "accepted": 25,
+      "rejected": 18,
+      "review": 2,
       "skipped": 0,
-      "total": 26
+      "total": 45
     }
   },
   "by_reason_code": {
     "CATEGORY_CODE_REQUIRED": 1,
     "CATEGORY_NAME_REQUIRED": 1,
     "CATEGORY_CODE_TOO_LONG": 1,
-    "DUPLICATE_CATEGORY_CODE_REVIEW": 1,
-    "MULTIPLE_WAREHOUSES_REJECTED": 2,
+    "DUPLICATE_CATEGORY_CODE_REVIEW": 2,
+    "FORMULA_INJECTION_DETECTED": 9,
+    "MULTIPLE_WAREHOUSES_REJECTED": 4,
     "WAREHOUSE_CODE_REQUIRED": 1,
     "WAREHOUSE_NAME_REQUIRED": 1,
-    "DUPLICATE_SKU_REVIEW": 2,
+    "DUPLICATE_SKU_REVIEW": 3,
     "PRODUCT_NAME_REQUIRED": 1,
     "SKU_REQUIRED": 1,
     "UNIT_OF_MEASURE_REQUIRED": 1,
     "INVALID_UNIT_OF_MEASURE": 3,
     "PRICE_REQUIRED": 1,
-    "NEGATIVE_PRICE": 1,
+    "NEGATIVE_PRICE": 2,
     "INVALID_PRICE_FORMAT": 1,
     "EXCESS_DECIMAL_PLACES": 2,
     "CURRENCY_REQUIRED": 1,
     "INVALID_CURRENCY": 2,
-    "NEGATIVE_TAX_RATE": 1,
-    "TAX_RATE_OUT_OF_RANGE": 1,
+    "NEGATIVE_TAX_RATE": 2,
+    "TAX_RATE_OUT_OF_RANGE": 2,
     "INVALID_TAX_RATE_FORMAT": 1,
     "CATEGORY_NOT_FOUND": 1,
     "INVALID_EMAIL_FORMAT": 1,
     "INVALID_PHONE_FORMAT": 1,
-    "FORMULA_INJECTION_DETECTED": 2,
-    "DUPLICATE_STOCK_LEVEL_REVIEW": 1,
-    "NEGATIVE_STOCK": 2,
-    "PRODUCT_NOT_FOUND": 2,
-    "PRODUCT_REQUIRED": 1,
-    "WAREHOUSE_REQUIRED": 2,
+    "DUPLICATE_STOCK_LEVEL_REVIEW": 2,
+    "NEGATIVE_STOCK": 3,
+    "PRODUCT_NOT_FOUND": 3,
+    "PRODUCT_REQUIRED": 2,
+    "WAREHOUSE_NOT_FOUND": 2,
+    "WAREHOUSE_REQUIRED": 3,
+    "INVALID_QUANTITY_FORMAT": 1,
     "QUANTITY_REQUIRED": 3,
-    "WAREHOUSE_NOT_FOUND": 1,
-    "INVALID_QUANTITY_FORMAT": 1
+    "AMBIGUOUS_DATE_FORMAT": 2,
+    "INVALID_DATE": 2
+  },
+  "rows": {
+    "R001": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R002": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R003": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R004": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R005": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R006": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R007": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R008": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R009": {
+      "outcome": "rejected",
+      "reasons": [
+        "CATEGORY_CODE_REQUIRED"
+      ]
+    },
+    "R010": {
+      "outcome": "rejected",
+      "reasons": [
+        "CATEGORY_NAME_REQUIRED"
+      ]
+    },
+    "R011": {
+      "outcome": "rejected",
+      "reasons": [
+        "CATEGORY_CODE_TOO_LONG"
+      ]
+    },
+    "R012": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_CATEGORY_CODE_REVIEW"
+      ]
+    },
+    "R013": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_CATEGORY_CODE_REVIEW"
+      ]
+    },
+    "R014": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R015": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R016": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R017": {
+      "outcome": "rejected",
+      "reasons": [
+        "MULTIPLE_WAREHOUSES_REJECTED"
+      ]
+    },
+    "R018": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_CODE_REQUIRED"
+      ]
+    },
+    "R019": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_NAME_REQUIRED",
+        "MULTIPLE_WAREHOUSES_REJECTED"
+      ]
+    },
+    "R020": {
+      "outcome": "rejected",
+      "reasons": [
+        "MULTIPLE_WAREHOUSES_REJECTED"
+      ]
+    },
+    "R021": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED",
+        "MULTIPLE_WAREHOUSES_REJECTED"
+      ]
+    },
+    "R022": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R023": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R024": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R025": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R026": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R027": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R028": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R029": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R030": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R031": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R032": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R033": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R034": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R035": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R036": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R037": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R038": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R039": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R040": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R041": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R042": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R043": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R044": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R045": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R046": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R047": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R048": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R049": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R050": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R051": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R052": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R053": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R054": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R055": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R056": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R057": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_SKU_REVIEW"
+      ]
+    },
+    "R058": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_SKU_REVIEW"
+      ]
+    },
+    "R059": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_SKU_REVIEW"
+      ]
+    },
+    "R060": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_NAME_REQUIRED"
+      ]
+    },
+    "R061": {
+      "outcome": "rejected",
+      "reasons": [
+        "SKU_REQUIRED"
+      ]
+    },
+    "R062": {
+      "outcome": "rejected",
+      "reasons": [
+        "UNIT_OF_MEASURE_REQUIRED"
+      ]
+    },
+    "R063": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_UNIT_OF_MEASURE"
+      ]
+    },
+    "R064": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_UNIT_OF_MEASURE"
+      ]
+    },
+    "R065": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_UNIT_OF_MEASURE"
+      ]
+    },
+    "R066": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRICE_REQUIRED"
+      ]
+    },
+    "R067": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_PRICE"
+      ]
+    },
+    "R068": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_PRICE"
+      ]
+    },
+    "R069": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PRICE_FORMAT"
+      ]
+    },
+    "R070": {
+      "outcome": "rejected",
+      "reasons": [
+        "EXCESS_DECIMAL_PLACES"
+      ]
+    },
+    "R071": {
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R072": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R073": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R074": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_TAX_RATE"
+      ]
+    },
+    "R075": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_TAX_RATE"
+      ]
+    },
+    "R076": {
+      "outcome": "rejected",
+      "reasons": [
+        "TAX_RATE_OUT_OF_RANGE"
+      ]
+    },
+    "R077": {
+      "outcome": "rejected",
+      "reasons": [
+        "TAX_RATE_OUT_OF_RANGE"
+      ]
+    },
+    "R078": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_TAX_RATE_FORMAT"
+      ]
+    },
+    "R079": {
+      "outcome": "rejected",
+      "reasons": [
+        "CATEGORY_NOT_FOUND"
+      ]
+    },
+    "R080": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_EMAIL_FORMAT"
+      ]
+    },
+    "R081": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PHONE_FORMAT"
+      ]
+    },
+    "R082": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R083": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R084": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R085": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R086": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R087": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R088": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R089": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R090": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R091": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R092": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R093": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R094": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R095": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R096": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R097": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R098": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R099": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R100": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R101": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R102": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R103": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R104": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R105": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R106": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R107": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R108": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R109": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R110": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R111": {
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R112": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_STOCK_LEVEL_REVIEW"
+      ]
+    },
+    "R113": {
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_STOCK_LEVEL_REVIEW"
+      ]
+    },
+    "R114": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_STOCK"
+      ]
+    },
+    "R115": {
+      "outcome": "rejected",
+      "reasons": [
+        "NEGATIVE_STOCK"
+      ]
+    },
+    "R116": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_NOT_FOUND"
+      ]
+    },
+    "R117": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_REQUIRED"
+      ]
+    },
+    "R118": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_NOT_FOUND"
+      ]
+    },
+    "R119": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_NOT_FOUND"
+      ]
+    },
+    "R120": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_REQUIRED"
+      ]
+    },
+    "R121": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_QUANTITY_FORMAT"
+      ]
+    },
+    "R122": {
+      "outcome": "rejected",
+      "reasons": [
+        "EXCESS_DECIMAL_PLACES"
+      ]
+    },
+    "R123": {
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_REQUIRED"
+      ]
+    },
+    "R124": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_NOT_FOUND",
+        "NEGATIVE_STOCK"
+      ]
+    },
+    "R125": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT"
+      ]
+    },
+    "R126": {
+      "outcome": "rejected",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT"
+      ]
+    },
+    "R127": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DATE"
+      ]
+    },
+    "R128": {
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DATE"
+      ]
+    },
+    "R129": {
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED",
+        "PRODUCT_NOT_FOUND"
+      ]
+    },
+    "R130": {
+      "outcome": "rejected",
+      "reasons": [
+        "WAREHOUSE_REQUIRED",
+        "QUANTITY_REQUIRED"
+      ]
+    },
+    "R131": {
+      "outcome": "rejected",
+      "reasons": [
+        "PRODUCT_REQUIRED",
+        "WAREHOUSE_REQUIRED",
+        "QUANTITY_REQUIRED"
+      ]
+    }
   },
   "generated_at": "2026-10-23T00:00:00.000Z"
 }

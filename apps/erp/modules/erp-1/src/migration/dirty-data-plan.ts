@@ -26,7 +26,9 @@ export type AcceptedUom = (typeof ACCEPTED_UOMS)[number];
 export const ACCEPTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'INR'] as const;
 
 export const FIXTURE_COLUMNS = [
+  'row_id',
   'record_type',
+  'case_tags',
   'source_id',
   'code',
   'name',
@@ -38,19 +40,24 @@ export const FIXTURE_COLUMNS = [
   'tax_rate',
   'warehouse_code',
   'quantity',
+  'as_of_date',
   'is_default',
   'notification_email',
   'contact_phone',
   'supplier_bank_account',
   'employee_ssn',
   'source_system',
+  'expect_outcome',
+  'expect_reasons',
 ] as const;
 
 export type FixtureColumn = (typeof FIXTURE_COLUMNS)[number];
 
 export interface RawRow {
   line_number: number;
+  row_id: string;
   record_type: string;
+  case_tags: string;
   source_id: string;
   code: string;
   name: string;
@@ -62,18 +69,22 @@ export interface RawRow {
   tax_rate: string;
   warehouse_code: string;
   quantity: string;
+  as_of_date: string;
   is_default: string;
   notification_email: string;
   contact_phone: string;
   supplier_bank_account: string;
   employee_ssn: string;
   source_system: string;
+  expect_outcome: string;
+  expect_reasons: string;
 }
 
 export type TerminalOutcome = 'accepted' | 'rejected' | 'review' | 'skipped';
 
 export interface EvaluatedRow {
   line_number: number;
+  row_id: string;
   record_type: string;
   source_id: string;
   outcome: TerminalOutcome;
@@ -477,6 +488,28 @@ export const RULE_CATALOGUE: DataQualityRule[] = [
     explanation: 'Repeated opening stock line for product/warehouse held for review.',
     doc_reference: 'FR-ERP1-06 / DR-6',
   },
+  {
+    rule_id: 'STK-010',
+    version: '1.0.0',
+    record_type: 'stock_level',
+    field: 'as_of_date',
+    condition: 'date provided in ambiguous format (e.g. MM/DD/YYYY or DD-MM-YYYY); explicit ISO-8601 YYYY-MM-DD required',
+    action: 'reject',
+    reason_code: 'AMBIGUOUS_DATE_FORMAT',
+    explanation: 'Ambiguous date format detected; explicit ISO-8601 YYYY-MM-DD format required.',
+    doc_reference: 'FR-ERP1-06 / SDS §4.7',
+  },
+  {
+    rule_id: 'STK-011',
+    version: '1.0.0',
+    record_type: 'stock_level',
+    field: 'as_of_date',
+    condition: 'date is not a valid calendar date',
+    action: 'reject',
+    reason_code: 'INVALID_DATE',
+    explanation: 'Date provided does not represent a valid calendar date.',
+    doc_reference: 'FR-ERP1-06',
+  },
 ];
 
 export interface ProfileReport {
@@ -506,7 +539,52 @@ export interface ProfileReport {
     }
   >;
   by_reason_code: Record<string, number>;
+  rows: Record<
+    string,
+    {
+      outcome: TerminalOutcome;
+      reasons: string[];
+    }
+  >;
   generated_at: string;
+}
+
+/**
+ * Validates ISO-8601 calendar date and flags ambiguous formats.
+ */
+export function validateIsoDate(raw: string): { valid: boolean; ambiguous: boolean } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { valid: true, ambiguous: false };
+
+  // Check for ambiguous formats: MM/DD/YYYY, DD/MM/YYYY, MM-DD-YYYY, etc.
+  if (/^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}$/.test(trimmed)) {
+    return { valid: false, ambiguous: true };
+  }
+
+  // Must match YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss(Z|...)
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+  if (!isoMatch) {
+    return { valid: false, ambiguous: false };
+  }
+
+  const year = parseInt(isoMatch[1]!, 10);
+  const month = parseInt(isoMatch[2]!, 10);
+  const day = parseInt(isoMatch[3]!, 10);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return { valid: false, ambiguous: false };
+  }
+
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() !== month - 1 ||
+    d.getUTCDate() !== day
+  ) {
+    return { valid: false, ambiguous: false };
+  }
+
+  return { valid: true, ambiguous: false };
 }
 
 /**
@@ -557,24 +635,29 @@ export function parseCsv(csvText: string): RawRow[] {
 
     rows.push({
       line_number: i + 1,
-      record_type: getCol('record_type').trim(),
-      source_id: getCol('source_id').trim(),
-      code: getCol('code').trim(),
-      name: getCol('name').trim(),
-      sku: getCol('sku').trim(),
-      category_code: getCol('category_code').trim(),
-      unit_of_measure: getCol('unit_of_measure').trim(),
-      price: getCol('price').trim(),
-      currency: getCol('currency').trim(),
-      tax_rate: getCol('tax_rate').trim(),
-      warehouse_code: getCol('warehouse_code').trim(),
-      quantity: getCol('quantity').trim(),
-      is_default: getCol('is_default').trim(),
-      notification_email: getCol('notification_email').trim(),
-      contact_phone: getCol('contact_phone').trim(),
-      supplier_bank_account: getCol('supplier_bank_account').trim(),
-      employee_ssn: getCol('employee_ssn').trim(),
-      source_system: getCol('source_system').trim(),
+      row_id: getCol('row_id') || `R${String(i).padStart(3, '0')}`,
+      record_type: getCol('record_type'),
+      case_tags: getCol('case_tags'),
+      source_id: getCol('source_id'),
+      code: getCol('code'),
+      name: getCol('name'),
+      sku: getCol('sku'),
+      category_code: getCol('category_code'),
+      unit_of_measure: getCol('unit_of_measure'),
+      price: getCol('price'),
+      currency: getCol('currency'),
+      tax_rate: getCol('tax_rate'),
+      warehouse_code: getCol('warehouse_code'),
+      quantity: getCol('quantity'),
+      as_of_date: getCol('as_of_date'),
+      is_default: getCol('is_default'),
+      notification_email: getCol('notification_email'),
+      contact_phone: getCol('contact_phone'),
+      supplier_bank_account: getCol('supplier_bank_account'),
+      employee_ssn: getCol('employee_ssn'),
+      source_system: getCol('source_system'),
+      expect_outcome: getCol('expect_outcome'),
+      expect_reasons: getCol('expect_reasons'),
     });
   }
 
@@ -587,12 +670,12 @@ export function parseCsv(csvText: string): RawRow[] {
 export function maskSensitiveFields(row: RawRow): Record<string, unknown> {
   const res: Record<string, unknown> = { ...row };
   if (row.supplier_bank_account) {
-    const raw = row.supplier_bank_account;
+    const raw = row.supplier_bank_account.trim();
     res['supplier_bank_account'] =
       raw.length > 4 ? `****-****-${raw.slice(-4)}` : '****';
   }
   if (row.employee_ssn) {
-    const raw = row.employee_ssn;
+    const raw = row.employee_ssn.trim();
     res['employee_ssn'] =
       raw.length > 4 ? `***-**-${raw.slice(-4)}` : '***-**-****';
   }
@@ -628,7 +711,7 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
     // Check for formula injection in textual fields (PLT-12 / KIT-16)
     const textValues = [row.name, row.sku, row.code, row.category_code];
     for (const val of textValues) {
-      if (/^[=+\-@\t\r]/.test(val)) {
+      if (/^[=+\-@\t\r]/.test(val.trim()) || /^[\t\r]/.test(val)) {
         rejectionReasons.push('FORMULA_INJECTION_DETECTED');
         ruleIds.push('PRD-018');
         break;
@@ -636,14 +719,17 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
     }
 
     if (row.record_type === 'category') {
-      if (!row.code) {
+      const codeTrimmed = row.code.trim();
+      const nameTrimmed = row.name.trim();
+
+      if (!codeTrimmed) {
         rejectionReasons.push('CATEGORY_CODE_REQUIRED');
         ruleIds.push('CAT-001');
-      } else if (row.code.length > 64) {
+      } else if (codeTrimmed.length > 64) {
         rejectionReasons.push('CATEGORY_CODE_TOO_LONG');
         ruleIds.push('CAT-003');
       } else {
-        const normCode = row.code.toUpperCase();
+        const normCode = codeTrimmed.toUpperCase();
         if (seenCategoryCodes.has(normCode)) {
           reviewReasons.push('DUPLICATE_CATEGORY_CODE_REVIEW');
           ruleIds.push('CAT-004');
@@ -653,22 +739,25 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (!row.name) {
+      if (!nameTrimmed) {
         rejectionReasons.push('CATEGORY_NAME_REQUIRED');
         ruleIds.push('CAT-002');
       }
     } else if (row.record_type === 'warehouse') {
-      if (!row.code) {
+      const codeTrimmed = row.code.trim();
+      const nameTrimmed = row.name.trim();
+
+      if (!codeTrimmed) {
         rejectionReasons.push('WAREHOUSE_CODE_REQUIRED');
         ruleIds.push('WH-001');
       }
-      if (!row.name) {
+      if (!nameTrimmed) {
         rejectionReasons.push('WAREHOUSE_NAME_REQUIRED');
         ruleIds.push('WH-002');
       }
 
-      if (row.code) {
-        const normCode = row.code.toUpperCase();
+      if (codeTrimmed) {
+        const normCode = codeTrimmed.toUpperCase();
         if (seenWarehouses.size >= 1 && !seenWarehouses.has(normCode)) {
           rejectionReasons.push('MULTIPLE_WAREHOUSES_REJECTED');
           ruleIds.push('WH-003');
@@ -681,12 +770,19 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
     } else if (row.record_type === 'product') {
-      if (!row.name) {
+      const nameTrimmed = row.name.trim();
+      const skuTrimmed = row.sku.trim();
+      const uomTrimmed = row.unit_of_measure.trim();
+      const priceTrimmed = row.price.trim();
+      const currencyTrimmed = row.currency.trim().toUpperCase();
+      const catTrimmed = row.category_code.trim().toUpperCase();
+
+      if (!nameTrimmed) {
         rejectionReasons.push('PRODUCT_NAME_REQUIRED');
         ruleIds.push('PRD-001');
       }
 
-      if (!row.sku) {
+      if (!skuTrimmed) {
         rejectionReasons.push('SKU_REQUIRED');
         ruleIds.push('PRD-002');
       } else {
@@ -700,19 +796,19 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (!row.unit_of_measure) {
+      if (!uomTrimmed) {
         rejectionReasons.push('UNIT_OF_MEASURE_REQUIRED');
         ruleIds.push('PRD-004');
-      } else if (!ACCEPTED_UOMS.includes(row.unit_of_measure as AcceptedUom)) {
+      } else if (!ACCEPTED_UOMS.includes(uomTrimmed as AcceptedUom)) {
         rejectionReasons.push('INVALID_UNIT_OF_MEASURE');
         ruleIds.push('PRD-005');
       }
 
-      if (!row.price) {
+      if (!priceTrimmed) {
         rejectionReasons.push('PRICE_REQUIRED');
         ruleIds.push('PRD-006');
       } else {
-        const num = Number(row.price);
+        const num = Number(priceTrimmed);
         if (isNaN(num)) {
           rejectionReasons.push('INVALID_PRICE_FORMAT');
           ruleIds.push('PRD-008');
@@ -720,7 +816,7 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
           rejectionReasons.push('NEGATIVE_PRICE');
           ruleIds.push('PRD-007');
         } else {
-          const parts = row.price.split('.');
+          const parts = priceTrimmed.split('.');
           if (parts[1] && parts[1].length > 4) {
             rejectionReasons.push('EXCESS_DECIMAL_PLACES');
             ruleIds.push('PRD-009');
@@ -728,16 +824,16 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (!row.currency) {
+      if (!currencyTrimmed) {
         rejectionReasons.push('CURRENCY_REQUIRED');
         ruleIds.push('PRD-010');
-      } else if (!/^[A-Z]{3}$/.test(row.currency)) {
+      } else if (!/^[A-Z]{3}$/.test(currencyTrimmed)) {
         rejectionReasons.push('INVALID_CURRENCY');
         ruleIds.push('PRD-011');
       }
 
-      if (row.tax_rate) {
-        const taxNum = Number(row.tax_rate);
+      if (row.tax_rate.trim()) {
+        const taxNum = Number(row.tax_rate.trim());
         if (isNaN(taxNum)) {
           rejectionReasons.push('INVALID_TAX_RATE_FORMAT');
           ruleIds.push('PRD-014');
@@ -750,22 +846,26 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (row.category_code && !validCategoryCodes.has(row.category_code.toUpperCase())) {
+      if (catTrimmed && !validCategoryCodes.has(catTrimmed)) {
         rejectionReasons.push('CATEGORY_NOT_FOUND');
         ruleIds.push('PRD-015');
       }
 
-      if (row.notification_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.notification_email)) {
+      if (row.notification_email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.notification_email.trim())) {
         rejectionReasons.push('INVALID_EMAIL_FORMAT');
         ruleIds.push('PRD-016');
       }
 
-      if (row.contact_phone && !/^\+?[0-9\s\-()]{7,20}$/.test(row.contact_phone)) {
+      if (row.contact_phone.trim() && !/^\+?[0-9\s\-()]{7,20}$/.test(row.contact_phone.trim())) {
         rejectionReasons.push('INVALID_PHONE_FORMAT');
         ruleIds.push('PRD-017');
       }
     } else if (row.record_type === 'stock_level') {
-      if (!row.sku) {
+      const skuTrimmed = row.sku.trim();
+      const whTrimmed = row.warehouse_code.trim().toUpperCase();
+      const qtyTrimmed = row.quantity.trim();
+
+      if (!skuTrimmed) {
         rejectionReasons.push('PRODUCT_REQUIRED');
         ruleIds.push('STK-001');
       } else {
@@ -776,19 +876,19 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (!row.warehouse_code) {
+      if (!whTrimmed) {
         rejectionReasons.push('WAREHOUSE_REQUIRED');
         ruleIds.push('STK-003');
-      } else if (row.warehouse_code.toUpperCase() !== 'WH-01') {
+      } else if (whTrimmed !== 'WH-01') {
         rejectionReasons.push('WAREHOUSE_NOT_FOUND');
         ruleIds.push('STK-004');
       }
 
-      if (!row.quantity) {
+      if (!qtyTrimmed) {
         rejectionReasons.push('QUANTITY_REQUIRED');
         ruleIds.push('STK-005');
       } else {
-        const qtyNum = Number(row.quantity);
+        const qtyNum = Number(qtyTrimmed);
         if (isNaN(qtyNum)) {
           rejectionReasons.push('INVALID_QUANTITY_FORMAT');
           ruleIds.push('STK-007');
@@ -796,7 +896,7 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
           rejectionReasons.push('NEGATIVE_STOCK');
           ruleIds.push('STK-006');
         } else {
-          const parts = row.quantity.split('.');
+          const parts = qtyTrimmed.split('.');
           if (parts[1] && parts[1].length > 4) {
             rejectionReasons.push('EXCESS_DECIMAL_PLACES');
             ruleIds.push('STK-008');
@@ -804,13 +904,24 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
         }
       }
 
-      if (row.sku && row.warehouse_code) {
-        const stockKey = `${normalizeSku(row.sku)}::${row.warehouse_code.toUpperCase()}`;
+      if (skuTrimmed && whTrimmed) {
+        const stockKey = `${normalizeSku(row.sku)}::${whTrimmed}`;
         if (seenStockKeys.has(stockKey)) {
           reviewReasons.push('DUPLICATE_STOCK_LEVEL_REVIEW');
           ruleIds.push('STK-009');
         } else {
           seenStockKeys.add(stockKey);
+        }
+      }
+
+      if (row.as_of_date && row.as_of_date.trim()) {
+        const dateRes = validateIsoDate(row.as_of_date);
+        if (dateRes.ambiguous) {
+          rejectionReasons.push('AMBIGUOUS_DATE_FORMAT');
+          ruleIds.push('STK-010');
+        } else if (!dateRes.valid) {
+          rejectionReasons.push('INVALID_DATE');
+          ruleIds.push('STK-011');
         }
       }
     }
@@ -828,6 +939,7 @@ export function evaluateDataset(rows: RawRow[]): EvaluatedRow[] {
 
     evaluated.push({
       line_number: row.line_number,
+      row_id: row.row_id || `R${String(row.line_number - 1).padStart(3, '0')}`,
       record_type: row.record_type,
       source_id: row.source_id,
       outcome,
@@ -864,6 +976,7 @@ export function buildProfile(csvText: string, evaluatedRows: EvaluatedRow[]): Pr
   > = {};
 
   const byReasonCode: Record<string, number> = {};
+  const rowManifest: Record<string, { outcome: TerminalOutcome; reasons: string[] }> = {};
 
   for (const row of evaluatedRows) {
     if (!byRecordType[row.record_type]) {
@@ -890,6 +1003,11 @@ export function buildProfile(csvText: string, evaluatedRows: EvaluatedRow[]): Pr
     for (const reason of row.reason_codes) {
       byReasonCode[reason] = (byReasonCode[reason] || 0) + 1;
     }
+
+    rowManifest[row.row_id] = {
+      outcome: row.outcome,
+      reasons: row.reason_codes,
+    };
   }
 
   const total = evaluatedRows.length;
@@ -913,6 +1031,7 @@ export function buildProfile(csvText: string, evaluatedRows: EvaluatedRow[]): Pr
     },
     by_record_type: byRecordType,
     by_reason_code: byReasonCode,
+    rows: rowManifest,
     generated_at: '2026-10-23T00:00:00.000Z',
   };
 }
