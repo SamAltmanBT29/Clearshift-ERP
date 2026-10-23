@@ -327,3 +327,27 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 4. **Active Filter Pill Tags**: Active filters render as removable pill tags. Clicking the clear button on an individual pill removes that filter, updates the URL query state, and reloads table results; a 'Clear All' button resets all filters simultaneously.
 5. **Stable Empty States**: When search or filter queries return zero matching rows, the interface displays an informative empty state message (`No products match the selected filters or search query`) with a direct action to reset/clear filters.
 
+---
+
+## 13. Loading, Empty, Error and Access-Denied States (ERP1-19)
+
+**Issue**: [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) — `[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/components/StateViews.tsx`, `ProductsListPage.tsx`, `theme.css`.
+
+### 13.1 State Specifications & Acceptance Criteria
+
+| State | Trigger Condition | Presentation | Actions Available | Retry Allowed? |
+|---|---|---|---|---|
+| **Loading** | Initial catalog fetch or parameter filter reload | Animated table skeleton (`role="status"`, `aria-busy="true"`) matching table header/cell shapes | None (busy/pending) | No |
+| **Zero-Data Empty State** | Zero products recorded in the catalog (`total === 0` and no active filters) | Informative card (`📦`) explaining catalog is empty | Primary CTA button: `Add Product` (`onCreateProduct`) | No |
+| **Filtered Empty State** | Active filter or search query returns zero matching records | Informative card (`🔍`) explaining no products match current filters | Primary CTA button: `Clear all filters` | Yes (clears filters) |
+| **API Failure** | HTTP 500, Network failure, or unhandled server error | Accessible alert banner (`role="alert"`), sanitized message, Reference ID | Primary button: `Try Again` (`onRetry`) | Yes |
+| **Access Denied** | HTTP 403 Forbidden or missing `inventory:read` permission | Dedicated access-denied region (`role="region"`), explaining missing capability | Guidance to contact administrator | **No** (never retry on 403) |
+
+### 13.2 Security & Error Sanitization Rules
+
+1. **Stack Trace Stripping**: Stack traces (`at ...`, `node_modules`, internal filesystem paths) are stripped via `sanitizeErrorMessage` to prevent leakage of internal server details.
+2. **Database Error Masking**: Low-level SQL errors (e.g. syntax errors, connection timeouts, socket disconnects) are mapped to a secure generic message.
+3. **Correlation ID Tracing**: Server error envelopes containing `correlation_id` display a user-friendly reference identifier for support diagnostics without exposing internal logs.
+
+

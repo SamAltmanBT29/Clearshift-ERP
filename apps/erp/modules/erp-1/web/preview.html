@@ -4,68 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ClearShift ERP-1 — Products and Inventory Preview</title>
+  <link rel="stylesheet" href="./src/theme.css">
   <style>
-    :root {
-      --color-background: #ffffff;
-      --color-surface: #f9fafb;
-      --color-surface-hover: #f3f4f6;
-      --color-text: #111827;
-      --color-text-muted: #4b5563;
-      --color-text-subtle: #9ca3af;
-      
-      --border-subtle: #e5e7eb;
-      --border-strong: #d1d5db;
-      --border-focus: #1d4ed8;
-
-      --color-primary: #1d4ed8;
-      --color-primary-hover: #1e40af;
-      --color-primary-text: #ffffff;
-
-      --color-success: #166534;
-      --color-success-bg: #dcfce7;
-      --color-success-border: #bbf7d0;
-
-      --color-warning: #92400e;
-      --color-warning-bg: #fef3c7;
-      --color-warning-border: #fde68a;
-
-      --color-error: #b91c1c;
-      --color-error-bg: #fee2e2;
-      --color-error-border: #fecaca;
-
-      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-
-      --radius-sm: 4px;
-      --radius-md: 6px;
-      --radius-lg: 8px;
-      --radius-full: 9999px;
-
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-6: 24px;
-      --space-8: 32px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
     body {
       background-color: var(--color-background);
       color: var(--color-text);
       font-family: var(--font-sans);
       line-height: 1.5;
       padding: var(--space-6);
+      max-width: 1280px;
+      margin: 0 auto;
     }
 
     .preview-header {
-      margin-bottom: var(--space-6);
+      margin-bottom: var(--space-4);
       padding-bottom: var(--space-4);
       border-bottom: 1px solid var(--border-subtle);
     }
@@ -94,378 +46,156 @@
       margin-top: var(--space-1);
     }
 
-    /* Toolbar */
-    .cs-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-4);
-      margin-bottom: var(--space-4);
-    }
-
-    .cs-search-box {
-      flex: 1 1 320px;
-      max-width: 500px;
-      position: relative;
-    }
-
-    .cs-search-input {
-      width: 100%;
-      padding: var(--space-2) var(--space-8) var(--space-2) 2.25rem;
-      font-size: 0.875rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-md);
-      outline: none;
-    }
-
-    .cs-search-input:focus {
-      border-color: var(--border-focus);
-      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15);
-    }
-
-    .cs-search-icon {
-      position: absolute;
-      left: var(--space-3);
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 0.875rem;
-      color: var(--color-text-subtle);
-      pointer-events: none;
-    }
-
-    .cs-search-clear {
-      position: absolute;
-      right: var(--space-2);
-      top: 50%;
-      transform: translateY(-50%);
-      background: transparent;
-      border: none;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 4px;
-    }
-
-    .cs-sort-controls {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-
-    .cs-sort-label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--color-text-muted);
-    }
-
-    .cs-sort-select {
-      padding: var(--space-2) var(--space-3);
-      font-size: 0.875rem;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-md);
-      background-color: var(--color-background);
-      cursor: pointer;
-    }
-
-    .cs-sort-btn {
-      padding: var(--space-2) var(--space-3);
-      font-size: 0.8125rem;
-      font-weight: 500;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-md);
+    /* State Simulation Toolbar */
+    .state-simulator {
       background-color: var(--color-surface);
-      cursor: pointer;
-    }
-
-    /* Active Filter Pills */
-    .cs-active-pills-bar {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-6);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
-      margin-bottom: var(--space-4);
-      background-color: var(--color-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
     }
 
-    .cs-pill-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px var(--space-2);
-      font-size: 0.75rem;
-      background-color: var(--color-background);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-full);
-    }
-
-    .cs-pill-remove {
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      color: var(--color-text-muted);
-      font-size: 0.6875rem;
-      padding: 0 2px;
-    }
-
-    .cs-pill-remove:hover {
-      color: var(--color-error);
-    }
-
-    .cs-clear-all {
-      margin-left: auto;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--color-error);
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    /* Grid Layout */
-    .cs-layout {
-      display: grid;
-      grid-template-columns: 260px 1fr;
-      gap: var(--space-6);
-      align-items: start;
-    }
-
-    /* Sidebar */
-    .cs-sidebar {
-      background-color: var(--color-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: var(--space-4);
-    }
-
-    .cs-sidebar-title {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: var(--space-3);
-      padding-bottom: var(--space-2);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .cs-facet-group {
-      margin-bottom: var(--space-4);
-      padding-bottom: var(--space-3);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .cs-facet-heading {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--color-text-muted);
-      margin-bottom: var(--space-2);
-    }
-
-    .cs-radio-option {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
+    .state-simulator-label {
       font-size: 0.8125rem;
-      margin-bottom: 6px;
-      cursor: pointer;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      margin-right: var(--space-2);
     }
 
-    /* Table */
-    .cs-table-card {
+    .state-btn {
+      padding: 6px 12px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
       background-color: var(--color-background);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-sm);
-      overflow: hidden;
+      color: var(--color-text);
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    .cs-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 0.875rem;
+    .state-btn:hover {
+      background-color: var(--color-surface-hover);
+      border-color: var(--color-text-muted);
     }
 
-    .cs-table th {
-      padding: var(--space-3) var(--space-4);
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--color-text-muted);
-      background-color: var(--color-surface);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .cs-table td {
-      padding: var(--space-3) var(--space-4);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .cs-table tr:hover {
-      background-color: var(--color-surface);
-    }
-
-    .badge-in-stock {
-      background-color: var(--color-success-bg);
-      color: var(--color-success);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .badge-out-of-stock {
-      background-color: var(--color-error-bg);
-      color: var(--color-error);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .badge-low-stock {
-      background-color: var(--color-warning-bg);
-      color: var(--color-warning);
-      padding: 2px 6px;
-      border-radius: var(--radius-sm);
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    /* Empty state */
-    .cs-empty-state {
-      padding: var(--space-8);
-      text-align: center;
-    }
-
-    .cs-empty-state-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: var(--space-1);
-    }
-
-    .cs-empty-state-msg {
-      font-size: 0.875rem;
-      color: var(--color-text-muted);
-      margin-bottom: var(--space-4);
-    }
-
-    .cs-btn-primary {
-      padding: var(--space-2) var(--space-4);
+    .state-btn.active {
       background-color: var(--color-primary);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius-md);
-      font-size: 0.8125rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .cs-btn-primary:hover {
-      background-color: var(--color-primary-hover);
+      color: #ffffff;
+      border-color: var(--color-primary);
     }
   </style>
 </head>
 <body>
   <div class="preview-header">
-    <span class="preview-badge">Gate G2 Module Delivery</span>
+    <span class="preview-badge">Gate G1 / G2 Module Delivery</span>
     <h1 class="preview-title">ERP-1 Products and Inventory</h1>
     <p class="preview-subtitle">
-      Search, faceted filter sidebar, active filter pill tags, and sorting controls strictly conforming to ClearShift V1 architecture.
+      Search, faceted filters, sorting controls, and UI states (loading skeleton, empty, error, access-denied) strictly conforming to ClearShift V1 architecture.
     </p>
   </div>
 
+  <!-- State Simulation Selector (ERP1-19) -->
+  <div class="state-simulator" role="group" aria-label="Simulate UI state">
+    <span class="state-simulator-label">Simulate UI State (ERP1-19):</span>
+    <button class="state-btn active" onclick="switchState('normal')">Normal Table</button>
+    <button class="state-btn" onclick="switchState('loading')">Loading Skeleton (AC1)</button>
+    <button class="state-btn" onclick="switchState('zero_data')">Zero-Data Catalog (AC2)</button>
+    <button class="state-btn" onclick="switchState('filtered_empty')">Filtered Empty State (AC2)</button>
+    <button class="state-btn" onclick="switchState('error')">API Failure + Retry (AC3)</button>
+    <button class="state-btn" onclick="switchState('forbidden')">403 Access Denied (AC4)</button>
+  </div>
+
   <!-- Search & Sorting Toolbar -->
-  <div class="cs-toolbar" role="search" aria-label="Search and sort products">
-    <div class="cs-search-box">
-      <span class="cs-search-icon" aria-hidden="true">🔍</span>
-      <input
-        id="search-input"
-        type="search"
-        class="cs-search-input"
-        placeholder="Search products by name or SKU (debounced 300ms)..."
-        aria-label="Search products by name or SKU"
-      />
-      <button id="search-clear-btn" class="cs-search-clear" style="display: none;" aria-label="Clear search">✕</button>
-    </div>
-
-    <div class="cs-sort-controls">
-      <label for="sort-select" class="cs-sort-label">Sort by:</label>
-      <select id="sort-select" class="cs-sort-select" aria-label="Sort products by field">
-        <option value="name">Product Name</option>
-        <option value="sku">SKU</option>
-        <option value="price">Price</option>
-        <option value="createdAt">Date Created</option>
-        <option value="quantity">Stock Quantity</option>
-      </select>
-      <button id="sort-dir-btn" class="cs-sort-btn" aria-label="Toggle sort direction">▲ Asc</button>
-    </div>
-  </div>
-
-  <!-- Active Filter Pills -->
-  <div id="pills-bar" class="cs-active-pills-bar" style="display: none;" role="region" aria-label="Active filters">
-    <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted);">Active filters:</span>
-    <div id="pills-container" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
-    <button id="clear-all-btn" class="cs-clear-all" aria-label="Clear all active filters">Clear All</button>
-  </div>
-
-  <!-- Main Layout -->
-  <div class="cs-layout">
-    <!-- Faceted Filter Sidebar -->
-    <aside class="cs-sidebar" aria-label="Faceted filter sidebar">
-      <h2 class="cs-sidebar-title">Faceted Filters</h2>
-
-      <!-- Categories -->
-      <div class="cs-facet-group">
-        <h3 class="cs-facet-heading">Categories</h3>
-        <label class="cs-radio-option">
-          <input type="radio" name="cat" value="" checked />
-          <span>All Categories</span>
-        </label>
-        <label class="cs-radio-option">
-          <input type="radio" name="cat" value="raw-materials" />
-          <span>Raw Materials (RAW)</span>
-        </label>
-        <label class="cs-radio-option">
-          <input type="radio" name="cat" value="finished-goods" />
-          <span>Finished Goods (FIN)</span>
-        </label>
-        <label class="cs-radio-option">
-          <input type="radio" name="cat" value="packaging" />
-          <span>Packaging (PKG)</span>
-        </label>
+  <div class="cs-erp1-toolbar" role="search" aria-label="Search and sort products">
+    <div class="cs-erp1-toolbar-search">
+      <div class="cs-erp1-search-wrapper">
+        <span class="cs-erp1-search-icon" aria-hidden="true">🔍</span>
+        <input
+          id="search-input"
+          type="search"
+          class="cs-erp1-search-input"
+          placeholder="Search products by name or SKU (debounced 300ms)..."
+          aria-label="Search products by name or SKU"
+        />
+        <button id="search-clear-btn" class="cs-erp1-search-clear-btn" style="display: none;" aria-label="Clear search">✕</button>
       </div>
+    </div>
+
+    <div class="cs-erp1-toolbar-actions">
+      <div class="cs-erp1-sorting-group">
+        <label for="sort-select" class="cs-erp1-sort-label">Sort by:</label>
+        <select id="sort-select" class="cs-erp1-sort-select" aria-label="Sort products by field">
+          <option value="name">Product Name</option>
+          <option value="sku">SKU</option>
+          <option value="price">Price</option>
+          <option value="quantity">Stock Quantity</option>
+        </select>
+        <button id="sort-dir-btn" class="cs-erp1-sort-direction-btn" aria-label="Sort direction">▲ Asc</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Filter Pills Bar -->
+  <div id="pills-bar" class="cs-erp1-pills-bar" style="display: none;" role="region" aria-label="Active filters">
+    <span class="cs-erp1-pills-label">Active filters:</span>
+    <div id="pills-container" class="cs-erp1-pills-list"></div>
+    <button id="clear-all-btn" class="cs-erp1-clear-all-btn">Clear All</button>
+  </div>
+
+  <!-- Two Column Layout: Faceted Filter Sidebar + Results Area -->
+  <div class="cs-erp1-layout-container">
+    <!-- Faceted Filter Sidebar -->
+    <aside class="cs-erp1-faceted-sidebar" aria-label="Product facets">
+      <div class="cs-erp1-facet-header">
+        <h2 class="cs-erp1-facet-title">Faceted Filters</h2>
+      </div>
+
+      <!-- Category Facet -->
+      <section class="cs-erp1-facet-group" aria-labelledby="facet-cat-heading">
+        <h3 id="facet-cat-heading" class="cs-erp1-facet-heading">Category</h3>
+        <div class="cs-erp1-facet-content">
+          <label class="cs-erp1-radio-option"><input type="radio" name="cat" value="" checked /> <span>All Categories</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="cat" value="raw-materials" /> <span>Raw Materials <span class="cs-erp1-code-badge">(RAW)</span></span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="cat" value="finished-goods" /> <span>Finished Goods <span class="cs-erp1-code-badge">(FIN)</span></span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="cat" value="packaging" /> <span>Packaging <span class="cs-erp1-code-badge">(PKG)</span></span></label>
+        </div>
+      </section>
 
       <!-- Unit of Measure -->
-      <div class="cs-facet-group">
-        <h3 class="cs-facet-heading">Unit of Measure</h3>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="" checked /> <span>All Units</span></label>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="pcs" /> <span>Pieces (pcs)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="kg" /> <span>Kilograms (kg)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="g" /> <span>Grams (g)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="litre" /> <span>Litres (litre)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="uom" value="box" /> <span>Boxes (box)</span></label>
-      </div>
+      <section class="cs-erp1-facet-group" aria-labelledby="facet-uom-heading">
+        <h3 id="facet-uom-heading" class="cs-erp1-facet-heading">Unit of Measure</h3>
+        <div class="cs-erp1-facet-content">
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="" checked /> <span>All Units</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="pcs" /> <span>Pieces (pcs)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="kg" /> <span>Kilograms (kg)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="g" /> <span>Grams (g)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="litre" /> <span>Litres (litre)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="uom" value="box" /> <span>Boxes (box)</span></label>
+        </div>
+      </section>
 
       <!-- Stock Status -->
-      <div class="cs-facet-group">
-        <h3 class="cs-facet-heading">Stock Status</h3>
-        <label class="cs-radio-option"><input type="radio" name="stock" value="" checked /> <span>All Statuses</span></label>
-        <label class="cs-radio-option"><input type="radio" name="stock" value="in_stock" /> <span>In Stock (> 10)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="stock" value="low_stock" /> <span>Low Stock (1-10)</span></label>
-        <label class="cs-radio-option"><input type="radio" name="stock" value="out_of_stock" /> <span>Out of Stock (0)</span></label>
-      </div>
+      <section class="cs-erp1-facet-group" aria-labelledby="facet-stock-heading">
+        <h3 id="facet-stock-heading" class="cs-erp1-facet-heading">Stock Status</h3>
+        <div class="cs-erp1-facet-content">
+          <label class="cs-erp1-radio-option"><input type="radio" name="stock" value="" checked /> <span>All Stock Levels</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="stock" value="in_stock" /> <span>In Stock (&gt; 10)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="stock" value="low_stock" /> <span>Low Stock (1-10)</span></label>
+          <label class="cs-erp1-radio-option"><input type="radio" name="stock" value="out_of_stock" /> <span>Out of Stock (0)</span></label>
+        </div>
+      </section>
     </aside>
 
-    <!-- Products Table Area -->
-    <main class="cs-table-card" aria-label="Products data table">
-      <div id="table-container">
-        <table class="cs-table" aria-label="Products Table">
+    <!-- Main Results Area -->
+    <main class="cs-erp1-results-container" aria-label="Products list and results">
+      <!-- 1. Table View -->
+      <div id="view-table" class="cs-erp1-table-card">
+        <table class="cs-erp1-table" aria-label="Products Table">
           <thead>
             <tr>
               <th>Product Name</th>
@@ -481,12 +211,80 @@
         </table>
       </div>
 
-      <div id="empty-state" class="cs-empty-state" style="display: none;">
-        <div style="font-size: 2rem; margin-bottom: 8px;" aria-hidden="true">📭</div>
-        <h2 class="cs-empty-state-title">No matching products found</h2>
-        <p class="cs-empty-state-msg">No products match the selected filters or search query. Try adjusting your search term or clearing active filters.</p>
-        <button id="empty-clear-btn" class="cs-btn-primary">Clear All Filters</button>
+      <!-- 2. Loading Skeleton View (AC1) -->
+      <div id="view-loading" class="cs-erp1-skeleton-container" style="display: none;" role="status" aria-busy="true" aria-label="Loading products table">
+        <div class="cs-erp1-skeleton-card animate-pulse">
+          <table class="cs-erp1-skeleton-table" aria-hidden="true">
+            <thead>
+              <tr>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+                <th><div class="cs-erp1-skeleton-cell skeleton-header"></div></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7"><div class="cs-erp1-skeleton-cell" style="width: 85%;"></div></td></tr>
+              <tr><td colspan="7"><div class="cs-erp1-skeleton-cell" style="width: 70%;"></div></td></tr>
+              <tr><td colspan="7"><div class="cs-erp1-skeleton-cell" style="width: 90%;"></div></td></tr>
+              <tr><td colspan="7"><div class="cs-erp1-skeleton-cell" style="width: 60%;"></div></td></tr>
+              <tr><td colspan="7"><div class="cs-erp1-skeleton-cell" style="width: 75%;"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <span class="cs-erp1-sr-only">Loading products, please wait...</span>
       </div>
+
+      <!-- 3. Zero-Data Empty State with CTA (AC2) -->
+      <div id="view-zero-data" class="cs-erp1-empty-state cs-erp1-empty-zero-data" style="display: none;">
+        <span class="cs-erp1-empty-icon" aria-hidden="true">📦</span>
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 8px;">No products in inventory</h2>
+        <p style="font-size: 0.875rem; color: var(--color-text-muted); max-width: 440px; margin-bottom: 20px;">
+          No products have been recorded in the catalog yet. Add your first product to begin tracking inventory and stock levels.
+        </p>
+        <button class="state-btn active" style="background-color: var(--color-primary);" onclick="alert('Synthetic Action: Open Add Product Dialog')">Add Product</button>
+      </div>
+
+      <!-- 4. Filtered Empty State (AC2) -->
+      <div id="view-filtered-empty" class="cs-erp1-empty-state" style="display: none;">
+        <span class="cs-erp1-empty-icon" aria-hidden="true">🔍</span>
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 8px;">No matching products found</h2>
+        <p style="font-size: 0.875rem; color: var(--color-text-muted); max-width: 440px; margin-bottom: 20px;">
+          No products match the selected filters or search query. Try adjusting your search term or clearing active filters.
+        </p>
+        <button class="state-btn active" onclick="clearAll(); switchState('normal');">Clear All Filters</button>
+      </div>
+
+      <!-- 5. Error Alert Banner with Stack Trace Sanitization & Retry (AC3) -->
+      <div id="view-error" class="cs-erp1-error-banner" style="display: none;" role="alert" aria-label="Error loading products">
+        <div class="cs-erp1-error-header">
+          <span class="cs-erp1-error-icon" aria-hidden="true">✕</span>
+          <div class="cs-erp1-error-content">
+            <h3 class="cs-erp1-error-title">Unable to load products</h3>
+            <p class="cs-erp1-error-message">Database connection error occurred while retrieving products. (Raw stack trace safely hidden).</p>
+            <p class="cs-erp1-correlation-hint">Reference ID: <code>corr-erp1-7890-test</code></p>
+          </div>
+        </div>
+        <button class="cs-erp1-retry-btn" onclick="switchState('normal'); alert('Retrying fetchProducts API call...');">Try Again</button>
+      </div>
+
+      <!-- 6. 403 Access Denied View (AC4) -->
+      <section id="view-forbidden" class="cs-erp1-access-denied" style="display: none;" role="region" aria-labelledby="preview-forbidden-title">
+        <span class="cs-erp1-access-denied-icon" aria-hidden="true">🔒</span>
+        <h2 id="preview-forbidden-title" class="cs-erp1-access-denied-title">Access Denied</h2>
+        <p class="cs-erp1-access-denied-message">
+          You do not have the required permissions to view products and inventory.
+        </p>
+        <div class="cs-erp1-access-denied-role-hint">
+          Required permission: <code>inventory:read</code> (or <code>inventory:manage</code>)
+        </div>
+        <p class="cs-erp1-access-denied-footer">
+          Please contact your system administrator to assign the necessary role to your account.
+        </p>
+      </section>
     </main>
   </div>
 
@@ -508,11 +306,41 @@
       stock: '',
       sortBy: 'name',
       sortDir: 'asc',
+      activeSimulation: 'normal',
     };
 
     let debounceTimer = null;
 
+    window.switchState = function(simState) {
+      state.activeSimulation = simState;
+      document.querySelectorAll('.state-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.getAttribute('onclick')?.includes(simState));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const views = ['view-table', 'view-loading', 'view-zero-data', 'view-filtered-empty', 'view-error', 'view-forbidden'];
+      views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+
+      if (simState === 'normal') {
+        render();
+      } else if (simState === 'loading') {
+        document.getElementById('view-loading').style.display = 'block';
+      } else if (simState === 'zero_data') {
+        document.getElementById('view-zero-data').style.display = 'flex';
+      } else if (simState === 'filtered_empty') {
+        document.getElementById('view-filtered-empty').style.display = 'flex';
+      } else if (simState === 'error') {
+        document.getElementById('view-error').style.display = 'flex';
+      } else if (simState === 'forbidden') {
+        document.getElementById('view-forbidden').style.display = 'flex';
+      }
+    };
+
     function render() {
+      if (state.activeSimulation !== 'normal') return;
+
       // 1. Filter
       let filtered = SYNTHETIC_PRODUCTS.filter(p => {
         if (state.search) {
@@ -542,26 +370,26 @@
         return 0;
       });
 
-      // 3. Render Table or Empty State
+      // 3. Render Table or Filtered Empty
       const tbody = document.getElementById('products-tbody');
-      const tableContainer = document.getElementById('table-container');
-      const emptyState = document.getElementById('empty-state');
+      const tableCard = document.getElementById('view-table');
+      const filteredEmpty = document.getElementById('view-filtered-empty');
 
       if (filtered.length === 0) {
-        tableContainer.style.display = 'none';
-        emptyState.style.display = 'block';
+        tableCard.style.display = 'none';
+        filteredEmpty.style.display = 'flex';
       } else {
-        tableContainer.style.display = 'block';
-        emptyState.style.display = 'none';
+        tableCard.style.display = 'block';
+        filteredEmpty.style.display = 'none';
 
         tbody.innerHTML = filtered.map(p => {
-          let badgeClass = 'badge-in-stock';
+          let badgeClass = 'cs-erp1-stock-in';
           let badgeText = `In Stock (${p.qty})`;
           if (p.qty === 0) {
-            badgeClass = 'badge-out-of-stock';
+            badgeClass = 'cs-erp1-stock-out';
             badgeText = 'Out of Stock (0)';
           } else if (p.qty <= 10) {
-            badgeClass = 'badge-low-stock';
+            badgeClass = 'cs-erp1-stock-low';
             badgeText = `Low Stock (${p.qty})`;
           }
 
@@ -570,16 +398,15 @@
               <td><strong>${p.name}</strong></td>
               <td><code>${p.sku}</code></td>
               <td>${p.categoryName}</td>
-              <td><span style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${p.uom}</span></td>
+              <td><span class="cs-erp1-uom-tag">${p.uom}</span></td>
               <td style="text-align: right; font-variant-numeric: tabular-nums;">$${Number(p.price).toFixed(2)} ${p.currency}</td>
               <td style="text-align: right;">${p.tax}%</td>
-              <td><span class="${badgeClass}">${badgeText}</span></td>
+              <td><span class="cs-erp1-stock-badge ${badgeClass}">${badgeText}</span></td>
             </tr>
           `;
         }).join('');
       }
 
-      // 4. Render Active Pills
       renderPills();
     }
 
@@ -604,9 +431,9 @@
       } else {
         pillsBar.style.display = 'flex';
         pillsContainer.innerHTML = pills.map(pill => `
-          <span class="cs-pill-tag">
+          <span class="cs-erp1-pill-item">
             <strong>${pill.label}:</strong> ${pill.val}
-            <button class="cs-pill-remove" onclick="removePill('${pill.key}')" aria-label="Remove filter: ${pill.label}">✕</button>
+            <button class="cs-erp1-pill-remove" onclick="removePill('${pill.key}')" aria-label="Remove filter: ${pill.label}">✕</button>
           </span>
         `).join('');
       }
@@ -644,7 +471,6 @@
     }
 
     document.getElementById('clear-all-btn').addEventListener('click', clearAll);
-    document.getElementById('empty-clear-btn').addEventListener('click', clearAll);
 
     // Search with 300ms Debounce
     const searchInput = document.getElementById('search-input');
