@@ -153,6 +153,26 @@ issue #192
 | Permission-aware actions | the create action is offered only to a session that may write — the question is asked of the shared central matrix of PLT-06, never of a local copy of the role list |
 | Authorization | the server remains the authority; the client matrix only decides whether an action is offered at all |
 
+## Create, Edit and Detail Screens (ERP5-05)
+
+**Issue**: [#50](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/50) —
+`[ERP5-05] ERP-5 HR and Employees: Create/edit/detail workflow and client-side validation`
+**Canonical detail**:
+[`apps/erp/modules/erp-5/docs/data-dictionary.md`](../../apps/erp/modules/erp-5/docs/data-dictionary.md)
+§17
+
+| Aspect | Rule |
+|---|---|
+| Screens | the create, edit and detail screen of the employee, the department and the leave record; every screen links back to the list it belongs to |
+| Validation | the form is handed **the same Zod schema the API validates the payload with** — the message on a field is the contract's message; the server re-validates every payload and stays the authority |
+| Field-level failure | a refused payload shows the API's field detail on that field and **keeps the other values** |
+| Read-only, masked and computed fields | `id`, `created_at`, `updated_at`, `salary_display`, the immutable `currency_code` and the immutable `employee_id` of a leave record have **no control** — they are shown as values, never sent |
+| The patch | an edit sends **only the fields the operator changed**, so a field the API never accepted cannot ride along |
+| The leave state matrix | the status is a transition, not a field: the form offers exactly what `HR_LEAVE_STATUS_TRANSITIONS` allows, and a decided record offers none |
+| The irreversible action | a decision is confirmed once, in plain words, before it is written; cancelling it leaves the record untouched |
+| The payroll aggregate | no form — the V1 API has no `PATCH` for it, so a form could only add an aggregate and never correct one; the Kit owns the bulk path |
+| Full note | `apps/erp/modules/erp-5/web/README.md` |
+
 ## Open Decision Records (V1)
 
 | ID | Decision | Status |
@@ -182,4 +202,5 @@ issue #192
 | Mutation API (service + API level) | `npx vitest run apps/erp/modules/erp-5/tests` |
 | Relationships, state transitions and read model | `npx vitest run apps/erp/modules/erp-5/tests/domain apps/erp/modules/erp-5/tests/services/hr.relationships.test.ts apps/erp/modules/erp-5/tests/api/state-transitions.test.ts` |
 | Collection screens (API client, list screens, states) | `npx vitest run apps/erp/modules/erp-5/web` |
+| Create, edit and detail screens (forms, validation, the state matrix) | `npx vitest run apps/erp/modules/erp-5/web` |
 | Migration apply / re-apply | `npm run db:migrate` twice against an empty database |

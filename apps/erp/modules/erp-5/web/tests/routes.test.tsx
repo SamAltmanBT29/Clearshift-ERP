@@ -183,6 +183,34 @@ describe('ERP-5 module route registration', () => {
       expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Employee');
     });
 
+    it('renders every detail screen of the module', async () => {
+      const cases: [string, string][] = [
+        ['/erp5/employees/e1000000-0000-4000-8000-000000000001', 'Employee'],
+        ['/erp5/departments/d1000000-0000-4000-8000-000000000001', 'Department'],
+        ['/erp5/leave/l1000000-0000-4000-8000-000000000001', 'Leave record'],
+      ];
+
+      for (const [path, heading] of cases) {
+        const { unmount } = renderModule(path);
+        expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeDefined();
+        unmount();
+      }
+    });
+
+    it('renders every edit screen of the module', async () => {
+      const cases: [string, string][] = [
+        ['/erp5/employees/e1000000-0000-4000-8000-000000000001/edit', 'Edit employee'],
+        ['/erp5/departments/d1000000-0000-4000-8000-000000000001/edit', 'Edit department'],
+        ['/erp5/leave/l1000000-0000-4000-8000-000000000001/edit', 'Edit leave record'],
+      ];
+
+      for (const [path, heading] of cases) {
+        const { unmount } = renderModule(path);
+        expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeDefined();
+        unmount();
+      }
+    });
+
     it('keeps an unknown module path inside the shell', () => {
       renderModule('/erp5/not-a-real-screen');
       expect(screen.getByRole('banner', { name: 'HR & Employees' })).toBeDefined();

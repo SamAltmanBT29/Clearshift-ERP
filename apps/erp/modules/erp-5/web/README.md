@@ -189,23 +189,80 @@ links to the employee record and carries the identifier.
 
 ---
 
-## 6. Screen ownership
+## 6. The create, edit and detail screens
+
+**Issue:** [#50](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/50) —
+`[ERP5-05] ERP-5 HR and Employees: Create/edit/detail workflow and client-side validation`
+
+| Screen | Route | Endpoint |
+|---|---|---|
+| Employee create | `/erp5/employees/new` | `POST /api/v1/erp-hr/employees` |
+| Employee edit | `/erp5/employees/{id}/edit` | `PATCH /api/v1/erp-hr/employees/{id}` |
+| Employee detail | `/erp5/employees/{id}` | `GET /api/v1/erp-hr/employees/{id}` |
+| Department create | `/erp5/departments/new` | `POST /api/v1/erp-hr/departments` |
+| Department edit | `/erp5/departments/{id}/edit` | `PATCH /api/v1/erp-hr/departments/{id}` |
+| Department detail | `/erp5/departments/{id}` | `GET /api/v1/erp-hr/departments/{id}` |
+| Leave create | `/erp5/leave/new` | `POST /api/v1/erp-hr/leave` |
+| Leave edit | `/erp5/leave/{id}/edit` | `PATCH /api/v1/erp-hr/leave/{id}` |
+| Leave detail | `/erp5/leave/{id}` | `GET /api/v1/erp-hr/leave/{id}` |
+
+### The validation is the contract's
+
+Each form is handed the **same Zod schema the API validates the payload
+with**, out of `@clearshift/contracts`. The module never re-states a rule:
+the message the operator reads on a field is the message the contract
+defines, and a rule that changes in the contract changes in the browser in
+the same commit. The server stays authoritative — a payload the browser
+accepted can still be refused with a field detail, and the screen then
+shows that message **without losing the other values**.
+
+### The fields the browser may not write
+
+The contract's request schemas are **strict**, so a payload that carries a
+field outside the allow-list is refused by the API with
+`400 HR_PROTECTED_FIELD`. The screens never send such a field, because they
+have no control for it — `id`, `created_at`, `updated_at`, the masked
+`salary_display`, the immutable `currency_code` and the immutable
+`employee_id` of a leave record are shown as **values**, not as inputs. An
+edit sends only the fields the operator actually changed.
+
+### The leave state matrix
+
+The status of a leave record is a **transition**, not a free field. The form
+offers exactly what `HR_LEAVE_STATUS_TRANSITIONS` allows — `approved` and
+`rejected` for a pending record, and nothing at all for a decided one. A
+decision is irreversible, so it is confirmed once, in plain words, before the
+record is written; cancelling the confirmation leaves the record untouched.
+
+### The payroll aggregate has no form
+
+The V1 API offers `POST /api/v1/erp-hr/payroll-totals` but no `PATCH`, so a
+form could only ever *add* an aggregate and never correct one, and the
+unique `(department_id, month)` constraint would turn a correction into a
+conflict. The aggregate is loaded by the Migration Kit (ERP5-07 / ERP5-11),
+which owns the bulk path; the read-only payroll list is the module's V1
+screen for it.
+
+---
+
+## 7. Screen ownership
 
 | Issue | Delivers |
 |---|---|
 | ERP5-16 | The route table, the navigation, the shell, the guard — **delivered** |
 | ERP5-04 | The collection screens, the API client, the four states — **delivered** |
+| ERP5-05 | The create, edit and detail screens, the client-side validation, the leave state matrix — **delivered** |
 | ERP5-17 | The collection tables — **delivered** as part of ERP5-04 |
 | ERP5-18 | The faceted filter sidebar, the active filter pills, the URL query state — *not yet* |
 | ERP5-19 | The shared loading, empty, error and 403 states — **delivered** as part of ERP5-04 |
-| ERP5-20 | The create forms — *not yet* |
-| ERP5-21 | The detail views — *not yet* |
+| ERP5-20 | The create forms — **delivered** as part of ERP5-05 |
+| ERP5-21 | The detail views — **delivered** as part of ERP5-05 |
 | ERP5-22 | The module metadata for the shared Migration Kit wizard — *not yet* |
 | ERP5-23 | The module context in the shared reject review screen — *not yet* |
 
 ---
 
-## 7. Tests
+## 8. Tests
 
 ```bash
 npx vitest run apps/erp/modules/erp-5/web
@@ -218,6 +275,10 @@ npx vitest run apps/erp/modules/erp-5/web
 | `permissions.test.ts` | The role narrowing and the create permission of the shared matrix |
 | `hr-api.test.ts` | The query construction, the session header, the error envelope, the transport failure, the absence of a leak |
 | `format.test.ts` | The amount, identifier and absent-value formatting |
+| `hr-form.test.ts` | The empty value that is dropped, the changed fields, the contract failure that sends nothing |
+| `employee-form.test.tsx` | The employee create, edit and detail screens, the contract's field-level messages, the API failure that keeps the other values, the protected fields, the masked salary |
+| `department-form.test.tsx` | The department create, edit and detail screens, the parent cleared with an explicit `null` |
+| `leave-form.test.tsx` | The leave create, edit and detail screens, the immutable employee, the transitions of the state matrix, the confirmation of an irreversible decision |
 | `public-facade.test.ts` | The exported surface a host application depends on |
 | `routes.test.tsx` | Every route resolves inside the shell, in a real DOM |
 | `module-shell.test.tsx` | Landmarks, keyboard navigation, the active state, the title, the guard |

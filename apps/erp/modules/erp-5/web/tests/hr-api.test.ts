@@ -183,6 +183,25 @@ describe('ERP-5 module API client', () => {
       expect((error as HrApiError).message.length).toBeGreaterThan(0);
     });
 
+    it('has a readable message for every status the module answers with', async () => {
+      const cases: [number, string][] = [
+        [400, 'The request was rejected because it is not valid.'],
+        [401, 'Your session is missing or has expired. Sign in again to continue.'],
+        [403, 'You do not have permission to view this data.'],
+        [404, 'The requested record does not exist.'],
+        [409, 'The request conflicts with the current state of the record.'],
+        [422, 'The request breaks a business rule of the HR module.'],
+      ];
+
+      for (const [status, message] of cases) {
+        respond(status, {});
+        const error = await listEmployees({ page: 1, pageSize: 25, sort: 'name' }).catch(
+          (cause: unknown) => cause
+        );
+        expect((error as HrApiError).message).toBe(message);
+      }
+    });
+
     it('turns a transport failure into a retryable error', async () => {
       vi.stubGlobal(
         'fetch',
@@ -220,6 +239,51 @@ describe('ERP-5 module API client', () => {
     it('keeps an error that is already an API error', () => {
       const original = new HrApiError(404, 'NOT_FOUND', 'gone');
       expect(toHrApiError(original)).toBe(original);
+    });
+
+    it('falls back to a readable message when the error body is not JSON', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('<html>gateway error</html>', { status: 502 }))
+      );
+
+      const error = await listEmployees({ page: 1, pageSize: 25, sort: 'name' }).catch(
+        (cause: unknown) => cause
+      );
+
+      expect((error as HrApiError).status).toBe(502);
+      expect((error as HrApiError).message.length).toBeGreaterThan(0);
+    });
+
+    it('turns an unreadable answer into a readable error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response('not json', { status: 200 }))
+      );
+
+      const error = await listEmployees({ page: 1, pageSize: 25, sort: 'name' }).catch(
+        (cause: unknown) => cause
+      );
+
+      expect((error as HrApiError).code).toBe('HR_API_MALFORMED_RESPONSE');
+    });
+
+    it('lets an aborted request through, so a cancelled screen shows no error', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          const aborted = new Error('The operation was aborted.');
+          aborted.name = 'AbortError';
+          throw aborted;
+        })
+      );
+
+      const error = await listEmployees({ page: 1, pageSize: 25, sort: 'name' }).catch(
+        (cause: unknown) => cause
+      );
+
+      expect((error as Error).name).toBe('AbortError');
+      expect(error).not.toBeInstanceOf(HrApiError);
     });
   });
 });

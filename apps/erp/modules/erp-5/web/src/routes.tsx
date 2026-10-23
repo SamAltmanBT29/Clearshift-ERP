@@ -25,13 +25,16 @@ import { RequireAuth } from './auth/RequireAuth.js';
 import { ModuleShell } from './components/ModuleShell.js';
 import { DepartmentCreatePage } from './pages/DepartmentCreatePage.js';
 import { DepartmentDetailPage } from './pages/DepartmentDetailPage.js';
+import { DepartmentEditPage } from './pages/DepartmentEditPage.js';
 import { DepartmentsListPage } from './pages/DepartmentsListPage.js';
 import { EmployeeCreatePage } from './pages/EmployeeCreatePage.js';
 import { EmployeeDetailPage } from './pages/EmployeeDetailPage.js';
+import { EmployeeEditPage } from './pages/EmployeeEditPage.js';
 import { EmployeesListPage } from './pages/EmployeesListPage.js';
 import { IdentityUsersListPage } from './pages/IdentityUsersListPage.js';
 import { LeaveCreatePage } from './pages/LeaveCreatePage.js';
 import { LeaveDetailPage } from './pages/LeaveDetailPage.js';
+import { LeaveEditPage } from './pages/LeaveEditPage.js';
 import { LeaveListPage } from './pages/LeaveListPage.js';
 import { ModuleNotFoundPage } from './pages/ModuleNotFoundPage.js';
 import { PayrollTotalsListPage } from './pages/PayrollTotalsListPage.js';
@@ -68,6 +71,11 @@ export const erp5Routes: RouteObject[] = [
             element: <EmployeeDetailPage />,
           },
           {
+            id: 'erp5-employees-edit',
+            path: 'employees/:employeeId/edit',
+            element: <EmployeeEditPage />,
+          },
+          {
             id: 'erp5-departments',
             path: 'departments',
             element: <DepartmentsListPage />,
@@ -83,6 +91,11 @@ export const erp5Routes: RouteObject[] = [
             element: <DepartmentDetailPage />,
           },
           {
+            id: 'erp5-departments-edit',
+            path: 'departments/:departmentId/edit',
+            element: <DepartmentEditPage />,
+          },
+          {
             id: 'erp5-leave',
             path: 'leave',
             element: <LeaveListPage />,
@@ -96,6 +109,11 @@ export const erp5Routes: RouteObject[] = [
             id: 'erp5-leave-detail',
             path: 'leave/:leaveId',
             element: <LeaveDetailPage />,
+          },
+          {
+            id: 'erp5-leave-edit',
+            path: 'leave/:leaveId/edit',
+            element: <LeaveEditPage />,
           },
           {
             id: 'erp5-payroll-totals',
