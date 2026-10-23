@@ -1,6 +1,9 @@
-# ERP-2 Vendors & Purchasing — Data Dictionary
+# ERP-2 Vendors & Purchasing — Data Dictionary (Global Reference)
 
-This document is the global reference copy of the data dictionary for ERP-2 Vendors & Purchasing.
+This document is the global-docs copy of the module data dictionary.
+
+For the canonical, detailed version see:
+[`apps/erp/modules/erp-2/docs/data-dictionary.md`](../../apps/erp/modules/erp-2/docs/data-dictionary.md)
 
 ---
 
@@ -8,21 +11,21 @@ This document is the global reference copy of the data dictionary for ERP-2 Vend
 
 | Field | Value |
 |---|---|
-| **Module** | ERP-2 Vendors and Purchasing |
-| **Issues** | #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #22: ERP2-07 (Migration Kit Adapter) |
+| **Module** | ERP-2 Vendors & Purchasing (Group 7) |
+| **Issue** | #16 — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations` |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
-| **TypeScript Contracts** | `packages/contracts/src/erp-2.ts`, `packages/contracts/src/import-target.ts` |
+| **Zod Contract** | `packages/contracts/src/erp-2.ts` |
+| **Drizzle Model** | `apps/erp/modules/erp-2/db/schema.ts` |
+| **Migration** | `packages/database/migrations/erp2_v1.sql` |
 | **Tables** | `erp2.vendors`, `erp2.purchase_orders`, `erp2.po_lines`, `erp2.import_receipts` |
 | **Version** | V1.0 |
-| **SDS Reference** | ClearShift ERP v2.0 §4.3, §4.7, §4.8, §7.7, FR-ERP2-01..06, BR-ERP2-01 |
-
----
+| **SDS Reference** | ClearShift ERP v2.0 §4.3 (FR-ERP2-01..06, BR-ERP2-01), §4.7 (ERP-2 tables) |
 
 ## Table Index
 
-| Table | Purpose | Key Constraints |
+| Table | Purpose | Key Constraint |
 |---|---|---|
 | `erp2.vendors` | Supplier / vendor master catalog with masked bank details | UNIQUE(`tax_number`), INDEX(`name`) |
 | `erp2.purchase_orders` | Purchase order headers with status lifecycle & total | UNIQUE(`po_number`), FK(`vendor_id`$\rightarrow$ `vendors.id`) |
