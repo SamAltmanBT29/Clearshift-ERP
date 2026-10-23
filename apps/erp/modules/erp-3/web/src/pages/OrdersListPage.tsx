@@ -22,8 +22,12 @@ export type OrdersViewMode =
   | 'create-invoice'
   | 'invoice-detail';
 
-export const OrdersListPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>('orders');
+export interface OrdersListPageProps {
+  initialTab?: 'orders' | 'invoices';
+}
+
+export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'orders' }) => {
+  const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(initialTab);
   const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
@@ -228,7 +232,7 @@ export const OrdersListPage: React.FC = () => {
 
       {/* Main Tab Content */}
       {activeTab === 'orders' ? (
-        <main>
+        <div className="cs-tab-content">
           <FilterBar
             filters={orderFilters}
             onFilterChange={(updated) => setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))}
@@ -259,9 +263,9 @@ export const OrdersListPage: React.FC = () => {
               }}
             />
           )}
-        </main>
+        </div>
       ) : (
-        <main>
+        <div className="cs-tab-content">
           <InvoiceFilterBar
             filters={invoiceFilters}
             onFilterChange={(updated) => setInvoiceFilters((prev) => ({ ...prev, ...updated, page: 1 }))}
@@ -291,7 +295,7 @@ export const OrdersListPage: React.FC = () => {
               }}
             />
           )}
-        </main>
+        </div>
       )}
     </div>
   );
