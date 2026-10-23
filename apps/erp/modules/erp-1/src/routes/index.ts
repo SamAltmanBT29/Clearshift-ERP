@@ -10,6 +10,7 @@ import { categoriesRoutes } from './categories.js';
 import { importRoutes } from './import.js';
 import { productsRoutes } from './products.js';
 import { stockRoutes } from './stock.js';
+import { duplicateRoutes } from './duplicates.js';
 
 export interface Erp1RoutesOptions {
   erp1Service: Erp1Service;
@@ -21,6 +22,7 @@ export const erp1Routes: FastifyPluginAsync<Erp1RoutesOptions> = async (fastify,
   await fastify.register(categoriesRoutes, childOpts);
   await fastify.register(stockRoutes, childOpts);
   await fastify.register(importRoutes, childOpts);
+  await fastify.register(duplicateRoutes, childOpts);
 };
 
-export { categoriesRoutes, importRoutes, productsRoutes, stockRoutes };
+export { categoriesRoutes, duplicateRoutes, importRoutes, productsRoutes, stockRoutes };

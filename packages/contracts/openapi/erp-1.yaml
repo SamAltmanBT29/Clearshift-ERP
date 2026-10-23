@@ -459,6 +459,124 @@ paths:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
+  /api/v1/erp-products/duplicates/check:
+    post:
+      operationId: checkErp1Duplicates
+      tags: [ERP-1 Duplicates]
+      summary: Scans candidate records for exact or ambiguous duplicates against the target database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckErp1DuplicatesRequest'
+      responses:
+        '200':
+          description: Duplicate check results with identified candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckErp1DuplicatesResponse'
+        '400':
+          description: Invalid check payload
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates:
+    get:
+      operationId: listErp1DuplicateCandidates
+      tags: [ERP-1 Duplicates]
+      summary: List all held duplicate candidates awaiting human review
+      parameters:
+        - name: entity
+          in: query
+          schema:
+            type: string
+            enum: [product, category]
+      responses:
+        '200':
+          description: List of duplicate candidate records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+                  total:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates/{id}:
+    get:
+      operationId: getErp1DuplicateCandidateById
+      tags: [ERP-1 Duplicates]
+      summary: Retrieve a single duplicate candidate by candidate UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Candidate record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+        '400':
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/duplicates/review:
+    post:
+      operationId: reviewErp1DuplicateCandidate
+      tags: [ERP-1 Duplicates]
+      summary: Submit an authorized human review decision for a held duplicate candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewErp1DuplicateRequest'
+      responses:
+        '200':
+          description: Review decision executed and recorded in immutable audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewErp1DuplicateResponse'
+        '400':
+          description: Invalid review payload or missing rationale
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate or target record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
   /api/v1/erp-products/import:
     post:
       operationId: importRow
@@ -1087,6 +1205,90 @@ components:
             quantity: { oneOf: [{ type: string }, { type: number }] }
         - $ref: '#/components/schemas/ImportProvenance'
       additionalProperties: false
+
+    Erp1DuplicateMatchKind:
+      type: string
+      enum: [EXACT_SKU, EXACT_NAME, EXACT_CATEGORY_CODE, NORMALIZED_EXACT, EXACT, AMBIGUOUS_MULTI_MATCH, AMBIGUOUS]
+
+    Erp1DuplicateCandidateStatus:
+      type: string
+      enum: [PENDING_REVIEW, MERGED, REJECTED, KEPT_BOTH]
+
+    Erp1MergeDecisionType:
+      type: string
+      enum: [MERGE, REJECT, KEEP_BOTH]
+
+    Erp1DuplicateCandidateRecord:
+      type: object
+      required:
+        - candidate_id
+        - entity
+        - match_kind
+        - status
+        - matching_key
+        - matching_value
+        - incoming_record
+        - existing_record
+        - confidence
+        - created_at
+      properties:
+        candidate_id: { type: string, format: uuid }
+        entity: { type: string, enum: [product, category] }
+        match_kind: { $ref: '#/components/schemas/Erp1DuplicateMatchKind' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        matching_key: { type: string }
+        matching_value: { type: string }
+        incoming_record: { type: object }
+        existing_record: { type: object }
+        confidence: { type: number, enum: [1.0] }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decided_by: { type: string, nullable: true }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType', nullable: true }
+        rationale: { type: string, nullable: true }
+
+    CheckErp1DuplicatesRequest:
+      type: object
+      required: [entity, records]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        records:
+          type: array
+          items: { type: object }
+
+    CheckErp1DuplicatesResponse:
+      type: object
+      required: [entity, total_checked, duplicates_found, candidates]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        total_checked: { type: integer }
+        duplicates_found: { type: integer }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/Erp1DuplicateCandidateRecord' }
+
+    ReviewErp1DuplicateRequest:
+      type: object
+      required: [candidate_id, decision, rationale]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        rationale: { type: string, minLength: 5 }
+
+    ReviewErp1DuplicateResponse:
+      type: object
+      required: [candidate_id, decision, status, actor_id, timestamp, audit_record_id]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        actor_id: { type: string }
+        timestamp: { type: string, format: date-time }
+        audit_record_id: { type: string, format: uuid }
 
     ImportRowRequest:
       type: object
