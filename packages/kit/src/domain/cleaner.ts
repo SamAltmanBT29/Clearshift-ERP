@@ -440,7 +440,16 @@ export function cleanDataset<T extends Record<string, string>>(
  * Exports field-level change audits to formula-safe CSV conforming to SDS §4.4 (kit_clean_log).
  */
 export function exportFieldAuditCsv(audits: readonly FieldChangeAudit[]): string {
-  const headers = [
+  const records = audits.map((a) => ({
+    'Source Row': String(a.sourceRow),
+    'Field Name': a.fieldName,
+    'Original Value': a.originalValue,
+    'Cleaned Value': a.cleanedValue,
+    'Rule ID': a.ruleId,
+    'Timestamp': a.timestamp ?? '',
+  }));
+
+  const columns = [
     'Source Row',
     'Field Name',
     'Original Value',
@@ -449,14 +458,5 @@ export function exportFieldAuditCsv(audits: readonly FieldChangeAudit[]): string
     'Timestamp',
   ];
 
-  const dataRows = audits.map((a) => [
-    String(a.sourceRow),
-    a.fieldName,
-    a.originalValue,
-    a.cleanedValue,
-    a.ruleId,
-    a.timestamp ?? '',
-  ]);
-
-  return formatSafeCsv([headers, ...dataRows]);
+  return formatSafeCsv(records, columns);
 }
