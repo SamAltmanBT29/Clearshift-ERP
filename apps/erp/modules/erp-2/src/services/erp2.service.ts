@@ -19,22 +19,23 @@ import { randomUUID } from 'node:crypto';
 import Decimal from 'decimal.js';
 import { AppError } from '@cs/kernel';
 import type { ReferenceResolver } from '@cs/kernel';
-import type {
-  Vendor,
-  CreateVendorRequest,
-  UpdateVendorRequest,
-  VendorListQuery,
-  PurchaseOrder,
-  CreatePurchaseOrderRequest,
-  PurchaseOrderListQuery,
-  PurchaseOrderStatus,
-  ImportRowRequest,
-  ImportRowResponse,
-  CheckDuplicatesRequest,
-  CheckDuplicatesResponse,
-  ReviewDuplicateRequest,
-  ReviewDuplicateResponse,
-  DuplicateCandidateRecord,
+import {
+  CreateVendorRequestSchema,
+  type Vendor,
+  type CreateVendorRequest,
+  type UpdateVendorRequest,
+  type VendorListQuery,
+  type PurchaseOrder,
+  type CreatePurchaseOrderRequest,
+  type PurchaseOrderListQuery,
+  type PurchaseOrderStatus,
+  type ImportRowRequest,
+  type ImportRowResponse,
+  type CheckDuplicatesRequest,
+  type CheckDuplicatesResponse,
+  type ReviewDuplicateRequest,
+  type ReviewDuplicateResponse,
+  type DuplicateCandidateRecord,
 } from '@clearshift/contracts';
 import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import {
@@ -363,7 +364,15 @@ export class Erp2Service {
       let receiptKind: 'created' | 'linked' = 'created';
 
       if (req.entity === 'vendor') {
-        const vendorData = req.record as unknown as CreateVendorRequest;
+        const parsed = CreateVendorRequestSchema.safeParse(req.record);
+        if (!parsed.success) {
+          const firstIssue = parsed.error.issues[0];
+          throw new ValidationError(
+            firstIssue?.message ?? 'Invalid vendor data',
+            firstIssue?.path.join('.')
+          );
+        }
+        const vendorData = parsed.data;
         // Duplicate key check — strict-create or UPSERT depending on options
         const existing = await txRepo.getVendorByTaxNumber(vendorData.tax_number);
         if (existing) {

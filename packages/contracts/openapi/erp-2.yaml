@@ -937,20 +937,36 @@ components:
       type: object
       required:
         - batchId
+        - status
         - total
+        - attempted
         - loaded
         - rejected
+        - unattempted
+        - chunksProcessed
         - rows
       properties:
         batchId:
           type: string
           format: uuid
+        status:
+          type: string
+          enum: [COMPLETED, STOPPED_EXCESSIVE_FAILURES]
         total:
+          type: integer
+        attempted:
           type: integer
         loaded:
           type: integer
         rejected:
           type: integer
+        unattempted:
+          type: integer
+        chunksProcessed:
+          type: integer
+        stoppedReason:
+          type: string
+          nullable: true
         rows:
           type: array
           items:
@@ -969,7 +985,10 @@ components:
           type: string
         outcome:
           type: string
-          enum: [loaded, rejected]
+          enum: [loaded, rejected, unattempted]
+        attempts:
+          type: integer
+          default: 1
         result:
           type: object
           nullable: true

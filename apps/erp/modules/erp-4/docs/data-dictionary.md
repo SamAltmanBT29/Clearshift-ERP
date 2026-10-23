@@ -354,6 +354,7 @@ When an optional relationship is absent, the system emits an approved warning ob
 - **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
 - **Version 1.1.0 (2026-10-23)**: Sprint 3 / Gate G4 sign-off by Data / QA Lead (Issue #43). Defined module data quality rules catalogue, cleaning routines, 143-row synthetic dirty data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and automated migration test suite.
 - **Version 1.2.0 (2026-10-23)**: Sprint 2 / Gate G2 sign-off by Data / QA Lead (Issue #182 / ERP4-26). Delivered shared profiler integration (`@cs/kit` / `KIT-03`), module column profiling rules, exact duplicate candidate assertions, formula-safe CSV data health export, Fastify 5 endpoints (`/api/v1/erp-finance/migration/profile`), React UI screen (`DataHealthProfilePage`), and 20 automated assertion tests.
+- **Version 1.3.0 (2026-10-23)**: Sprint 3 / Gate G3 sign-off by Data / QA Lead (Issue #183 / ERP4-27 / KIT-04). Implemented canonical 12 V1 cleaning rules (`@cs/kit/domain/cleaner.ts`), field-level change audit tracking (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints (`/api/v1/erp-finance/migration/clean`), React review screen (`DataCleaningReviewPage`), and automated test suite.
 
 ---
 
@@ -395,3 +396,23 @@ When an optional relationship is absent, the system emits an approved warning ob
   - `POST /api/v1/erp-finance/migration/profile` (in-memory non-destructive profiling on uploaded CSV)
 - **Frontend Screen**: Accessible React component [`DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics table, duplicate review candidates, and formula-safe CSV download.
 - **Automated Assertions**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../tests/migration/profiling.test.ts) (20 tests) asserting all column metrics and duplicate candidate numbers match the manifest.
+
+---
+
+## 14. Cleaning Rules & Field-Level Change Audit (Issue #183 / ERP4-27 / KIT-04)
+
+### 14.1 Shared Migration Kit Cleaning & Audit Engine
+- Domain cleaner and change accumulator implemented in `@cs/kit` (`packages/kit/src/domain/cleaner.ts`) complying with SDS §3.4 and §4.4 (FR-CL-01..05).
+- Canonical 12 V1 rules: `RL-TEXT-01` (whitespace trim/collapse), `RL-TEXT-02` (control chars), `RL-NAME-01` (proper case), `RL-EMAIL-01` (email normalize), `RL-PHONE-01` (phone strip/prefix), `RL-DATE-01` (date coerce ISO), `RL-CURRENCY-01` (currency symbol/comma strip), `RL-REQ-01` (required field check), `RL-FORMAT-01` (pattern format check), `RL-DUP-01` (exact normalized duplicate detection).
+- Per-field audit log (`kit_clean_log` shape): records `source_row`, `field_name`, `original_value`, `cleaned_value`, `rule_id`, and timestamp for every altered value.
+- Rule toggle management (`FR-CL-05`): allows selective activation/deactivation of cleaning rules for a batch run.
+- Formula-safe CSV audit export: protects against formula injection attacks using standard apostrophe prefixing (`'=`, `'+`, `'-`, `'@`).
+
+### 14.2 ERP-4 Cleaning Configuration & Artifacts
+- **Module Cleaning Configuration**: [`apps/erp/modules/erp-4/src/migration/cleaning-config.ts`](../src/migration/cleaning-config.ts) binds accounts, opening balances, journal entries, and journal lines to standard cleaning rules.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/cleaning.ts`](../src/routes/cleaning.ts):
+  - `GET /api/v1/erp-finance/migration/clean` (executes cleaning on canonical Dirty Data Pack)
+  - `GET /api/v1/erp-finance/migration/clean/audit/export` (downloads formula-safe CSV field change audit trail)
+  - `POST /api/v1/erp-finance/migration/clean` (in-memory cleaning with rule toggles on uploaded CSV)
+- **Frontend Screen**: Accessible React component [`DataCleaningReviewPage.tsx`](../web/src/pages/DataCleaningReviewPage.tsx) featuring audit change inspection table, row previews with outcome badges, and rule toggle checklist.
+- **Automated Test Suite**: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../tests/migration/cleaning.test.ts) (20 tests) verifying standard cleaner execution, field change audit generation, required field anomaly rejection, rule toggles, and security guards.
