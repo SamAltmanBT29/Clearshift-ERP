@@ -42,7 +42,10 @@ const ImportBatchRequestSchema = z.object({
   entity: z.enum(['vendor', 'purchase_order']),
   /** When true, existing records with matching natural keys will be updated. */
   upsert: z.boolean().optional().default(false),
-  rows: z.array(BatchRowInputSchema).min(1).max(500),
+  chunk_size: z.number().int().positive().max(500).optional(),
+  failure_threshold: z.number().min(0).max(1).optional(),
+  min_attempted_rows: z.number().int().nonnegative().optional(),
+  rows: z.array(BatchRowInputSchema).min(1),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,7 +121,15 @@ export const importRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> = as
       });
     }
 
-    const { batch_id, entity, upsert, rows } = parsed.data;
+    const {
+      batch_id,
+      entity,
+      upsert,
+      chunk_size,
+      failure_threshold,
+      min_attempted_rows,
+      rows,
+    } = parsed.data;
 
     // Instantiate in-process target adapter scoped to the declared entity
     const adapter = new Erp2TargetAdapter(service, entity);
@@ -132,7 +143,12 @@ export const importRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> = as
       data: r.record,
     }));
 
-    const result = await adapter.loadBatch(batch_id, batchRows, { upsert });
+    const result = await adapter.loadBatch(batch_id, batchRows, {
+      upsert,
+      chunkSize: chunk_size,
+      failureThreshold: failure_threshold,
+      minAttemptedRows: min_attempted_rows,
+    });
 
     return reply.status(200).send(result);
   });
