@@ -205,3 +205,5 @@ export const VendorsListPage: React.FC = () => {
     </div>
   );
 };
+
+export default VendorsListPage;

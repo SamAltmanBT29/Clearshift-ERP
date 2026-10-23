@@ -63,7 +63,7 @@ npm run db:reset                                                                
 | 6 | P2 | Status update is read-then-write without `WHERE status = <current>`: two concurrent PATCHes can both pass the check | OPEN |
 | 7 | P2 | Service re-implements rules from `domain/rules.ts` instead of calling them (drift risk); `assertValidBankDetails` is not called by the service | OPEN |
 | 8 | P2 | PO currency is not checked against the vendor currency | OPEN - confirm rule |
-| 9 | P1 | `apps/erp/modules/erp-2/web/` does not exist and branches ERP2-04/05/06/08 are not on the remote: React Testing Library and Playwright tests are blocked | OPEN - dependency |
+| 9 | P1 | `apps/erp/modules/erp-2/web/` established with route registration, manifest, shell, and tests | Delivered by ERP2-16 (Issue #132) |
 | 10 | P3 | Root `vitest.config.ts` coverage `include` has no ERP-2 paths | OPEN |
 
 Do not close ERP2-10 while 3, 4 and 9 are open.
