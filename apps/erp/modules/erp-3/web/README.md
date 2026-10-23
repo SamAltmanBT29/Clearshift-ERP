@@ -4,7 +4,8 @@ The frontend implementation for **ERP-3 Sales Orders and Invoices**: collection 
 
 **Issues:**
 - [#29](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/29) — `[ERP3-04] ERP-3 Sales Orders and Invoices: List screen, search/filter and stable empty/loading/error states` (Merged via PR [#246](https://github.com/SamAltmanBT29/Clearshift-ERP/pull/246))
-- [#30](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/30) — `[ERP3-05] ERP-3 Sales Orders and Invoices: Create/edit/detail workflow and client-side validation`
+- [#30](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/30) — `[ERP3-05] ERP-3 Sales Orders and Invoices: Create/edit/detail workflow and client-side validation` (Merged via PR [#251](https://github.com/SamAltmanBT29/Clearshift-ERP/pull/251))
+- [#152](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/152) — `[ERP3-16] ERP-3 Sales Orders and Invoices: Module route/page registration using the shared shell`
 
 **Architecture & Specifications:**
 - ClearShift Master Architecture Spec & SDS ERP v2.0
@@ -22,10 +23,18 @@ apps/erp/modules/erp-3/web/
 ├── preview.html                             # Browser preview for visual inspection
 ├── src/
 │   ├── index.ts                             # Public facade module exports
+│   ├── route-manifest.ts                    # Frozen route manifest (single source of truth)
+│   ├── routes.tsx                           # React Router 7 route definitions under /erp3
 │   ├── theme.css                            # Minimal white SaaS theme using :root CSS tokens
 │   ├── api/
 │   │   └── erp-3.ts                         # Type-safe API client and financial math utilities
+│   ├── auth/
+│   │   ├── RequireAuth.tsx                  # Module route guard redirecting to Hub /login
+│   │   └── session.ts                       # Opaque token reader with JWT expiration check
 │   ├── components/
+│   │   ├── ModuleShell.tsx                  # Shared layout shell (landmarks, banner, skip-link)
+│   │   ├── ModuleNav.tsx                    # Accessible navigation hierarchy & active states
+│   │   ├── ModuleBreadcrumbs.tsx            # Shared @cs/ui Breadcrumb adapter
 │   │   ├── FilterBar.tsx                    # Accessible filter bar for Sales Orders
 │   │   ├── InvoiceFilterBar.tsx             # Accessible filter bar for Invoices
 │   │   ├── OrdersTable.tsx                  # Semantic data table for Sales Orders
@@ -38,14 +47,34 @@ apps/erp/modules/erp-3/web/
 │   │       └── PaymentModal.tsx             # Modal dialog for invoice full settlement
 │   └── pages/
 │       ├── OrdersListPage.tsx               # Primary tabbed list view (Orders & Invoices)
+│       ├── SalesOrdersListPage.tsx          # Routed Sales Orders collection view
+│       ├── InvoicesListPage.tsx             # Routed Invoices collection view
+│       ├── PaymentsListPage.tsx             # Routed Payments collection view
 │       ├── OrderCreatePage.tsx              # Sales Order creation screen
+│       ├── SalesOrderCreatePage.tsx         # Routed Sales Order creation page
 │       ├── OrderDetailPage.tsx              # Sales Order detail & status transition screen
+│       ├── SalesOrderDetailPage.tsx         # Routed Sales Order detail page
+│       ├── SalesOrderEditPage.tsx           # Routed Sales Order edit page
 │       ├── InvoiceCreatePage.tsx            # Invoice creation screen
-│       └── InvoiceDetailPage.tsx            # Invoice detail, status badge & payment screen
+│       ├── InvoiceCreateRoutePage.tsx       # Routed Invoice creation page
+│       ├── InvoiceDetailPage.tsx            # Invoice detail, status badge & payment screen
+│       ├── InvoiceDetailRoutePage.tsx       # Routed Invoice detail page
+│       ├── InvoiceEditRoutePage.tsx         # Routed Invoice edit page
+│       └── ModuleNotFoundPage.tsx           # Accessible 404 recovery screen under /erp3/*
 └── tests/
     ├── OrdersListPage.test.ts               # Domain invariant and query tests
     ├── OrdersListPage.test.tsx              # RTL tests for tab navigation, tables, and states
-    └── OrderFormsAndWorkflow.test.tsx       # RTL tests for form validation, live totals, & modals
+    ├── OrderFormsAndWorkflow.test.tsx       # RTL tests for form validation, live totals, & modals
+    ├── route-manifest.test.ts               # Route manifest, matching & breadcrumb tests
+    ├── routes.test.tsx                      # React Router registration & screen rendering tests
+    ├── module-shell.test.tsx                # Accessibility landmarks, keyboard & guard tests
+    ├── module-nav.test.tsx                  # Navigation component active state tests
+    ├── session.test.ts                      # Session token storage & JWT expiration tests
+    ├── public-facade.test.ts                # Public exports verification tests
+    └── support/
+        ├── api-mock.ts                      # Module fetch stub for tests
+        ├── jsdom-environment.ts             # JSDOM Request/AbortSignal shim
+        └── session.ts                       # Test JWT generation and storage helpers
 ```
 
 ---

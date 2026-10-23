@@ -46,14 +46,14 @@ export const OrderCreatePage: React.FC<OrderCreatePageProps> = ({ onBack, onOrde
         </p>
       </header>
 
-      <main>
+      <div className="cs-form-content">
         <OrderForm
           onSubmit={handleSubmit}
           onCancel={onBack}
           isLoading={isLoading}
           apiError={apiError}
         />
-      </main>
+      </div>
     </div>
   );
 };

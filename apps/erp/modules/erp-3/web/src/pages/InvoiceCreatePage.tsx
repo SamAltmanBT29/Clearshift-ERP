@@ -51,7 +51,7 @@ export const InvoiceCreatePage: React.FC<InvoiceCreatePageProps> = ({
         </p>
       </header>
 
-      <main>
+      <div className="cs-form-content">
         <InvoiceForm
           initialValues={{ orderId: initialOrderId }}
           onSubmit={handleSubmit}
@@ -59,7 +59,7 @@ export const InvoiceCreatePage: React.FC<InvoiceCreatePageProps> = ({
           isLoading={isLoading}
           apiError={apiError}
         />
-      </main>
+      </div>
     </div>
   );
 };

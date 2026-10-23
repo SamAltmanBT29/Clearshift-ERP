@@ -178,7 +178,7 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
         </div>
       </header>
 
-      <main className="cs-detail-layout">
+      <div className="cs-detail-layout">
         {/* Info metadata cards */}
         <div className="cs-detail-meta-grid">
           <div className="cs-meta-card">
@@ -280,7 +280,7 @@ export const OrderDetailPage: React.FC<OrderDetailPageProps> = ({
             </div>
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Confirmation Dialog for Irreversible Status Transitions */}
       <ConfirmActionDialog

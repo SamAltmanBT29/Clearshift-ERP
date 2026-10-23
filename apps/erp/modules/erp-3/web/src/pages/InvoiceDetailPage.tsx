@@ -156,7 +156,7 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
         </div>
       </header>
 
-      <main className="cs-detail-layout">
+      <div className="cs-detail-layout">
         {/* Info metadata cards */}
         <div className="cs-detail-meta-grid">
           <div className="cs-meta-card">
@@ -249,7 +249,7 @@ export const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
             </table>
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Payment Recording Modal */}
       <PaymentModal
