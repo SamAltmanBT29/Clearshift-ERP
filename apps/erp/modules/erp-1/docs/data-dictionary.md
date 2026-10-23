@@ -835,3 +835,30 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Review Date**: 2026-10-23
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
 - **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests.
+
+---
+
+## 22. QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)
+
+### 22.1 Test Evidence & Invariant Mapping
+
+| Invariant / Requirement | Contract & Enforcement | Verification Test File | Status |
+|---|---|---|:---:|
+| **BR-ERP1-01** (Unique SKU) | `erp1_products_sku_unique` index + normalized uppercase matching | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **BR-ERP1-02** (Non-negative stock) | `check_erp1_stock_quantity_non_negative` constraint | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/constraints.test.ts` | **Verified** |
+| **FR-ERP1-03** (1-level category hierarchy) | Schema has no `parent_id`, validator prohibits nested subcategories | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/e2e/demo-journey.test.ts` | **Verified** |
+| **FR-ERP1-04** (Fixed units: pcs, kg, g, litre, metre, box) | `erp1.unit_of_measure` enum & `UnitOfMeasureSchema` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **FR-ERP1-05** (Single warehouse in V1) | `erp1_warehouses_single_idx` on constant `true` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **Explicit Currency (USD)** | Uppercase ISO-4217 code required on create | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **Decimal Price (NUMERIC 19,4)** | Decimal format preserved without float rounding | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **OpenAPI Parity** | 100% routes mapped to `packages/contracts/openapi/erp-1.yaml` | `apps/erp/modules/erp-1/tests/contract/openapi-parity.test.ts` | **Verified** |
+| **Deterministic Seed & Reset** | Re-running produces identical IDs without duplicate writes | `apps/erp/modules/erp-1/tests/seed/seed.test.ts`, `sample-data/erp-1/seed.ts` | **Verified** |
+| **Scripted 5-Minute Demo** | In-process execution of full V1 demo workflow | `apps/erp/modules/erp-1/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-1-v1.md` | **Verified** |
+| **Error Envelope Compliance** | Conforms to `{ statusCode, error, code, message, details, correlation_id }` | `apps/erp/modules/erp-1/tests/api/auth-and-envelope.test.ts` | **Verified** |
+
+### 22.2 Handoff Sign-Off
+- **Issue Reference**: Resolves [#15](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/15) ([ERP1-10])
+- **Author**: Samarth (`Samarth-ITM`)
+- **Role**: Group 6 / Role 4 — Data & QA Lead
+- **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+

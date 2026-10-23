@@ -838,6 +838,38 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 
 ---
 
+## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
+
+**Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
+**Contract Reference**: KIT-08 / Decision C4 (`@cs/kit` TargetAdapter port)
+**Implementation**: `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
+
+### 22.1 Architecture & Invariants
+
+1. **In-Process Execution**: The Migration Kit interacts with ERP-1 exclusively in-process through the typed `Erp1TargetAdapter` or via authenticated public HTTP endpoints (`/import`, `/import/batch`). The Kit possesses no direct database write privileges to `erp1.*` tables.
+2. **Atomic Dual-Write**: Business entity creation/linking and durable receipt persistence commit within a single local PostgreSQL transaction (`this.repo.transaction`). Either both succeed or both roll back together.
+3. **Idempotency Invariant**:
+   - Receipt lookup by `idempotency_key` strictly precedes any database write.
+   - Same `idempotency_key` + identical request payload returns HTTP 200 with `prior_result: true` and the existing target record.
+   - Same `idempotency_key` + conflicting request payload returns HTTP 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` with zero database writes.
+4. **Type-Safe UPSERT Semantics**:
+   - When `upsert: true`, incoming rows matching an existing natural key (normalized SKU for `product`, code for `category`) update existing records in-place and produce an import receipt with `kind: 'linked'`.
+   - When `upsert: false`, duplicate natural keys trigger HTTP 409 `SKU_DUPLICATE` rejection.
+5. **Batch Execution & Error Isolation**:
+   - `loadBatch` processes rows in sequential chunks of up to 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
+   - Business rejections (400, 409, 422) are isolated per-row as `rejected` outcomes and do not abort subsequent rows.
+   - Transient infrastructure errors (503, connection reset, PostgreSQL deadlocks) trigger bounded exponential backoff retries without mutating client idempotency keys.
+   - Batch execution safely halts if row failures exceed the 10% threshold (`STOPPED_EXCESSIVE_FAILURES`). No compensating rollback sagas exist in V1.
+
+### 22.2 HTTP Endpoints
+
+| Method | Path | Summary | Success Status | Replay Status |
+|---|---|---|:---:|:---:|
+| `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
+| `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
+
+---
+
 ## 23. Exact Duplicate Key Policy & Human Review Workflow (ERP1-12)
 
 **Issue**: [#108](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/108) — `[ERP1-12] ERP-1 Products and Inventory: Exact duplicate key policy for the module`<br />
@@ -876,37 +908,6 @@ In compliance with ClearShift V1 non-negotiable rules, duplicate detection uses 
    - `targetId`: Retained entity UUID (`kept_id`)
    - `metadata`: `candidateId`, `keptId`, `mergedId`, `decision`, `matchingKey`, `matchingValue`
    - `reason`: Operator documented review rationale
-
----
-## 22. Module Target Adapter & Durable Import Receipt (ERP1-11)
-
-**Issue Reference**: [#107](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/107)
-**Contract Reference**: KIT-08 / Decision C4 (`@cs/kit` TargetAdapter port)
-**Implementation**: `apps/erp/modules/erp-1/src/migration/target-adapter.ts`
-
-### 22.1 Architecture & Invariants
-
-1. **In-Process Execution**: The Migration Kit interacts with ERP-1 exclusively in-process through the typed `Erp1TargetAdapter` or via authenticated public HTTP endpoints (`/import`, `/import/batch`). The Kit possesses no direct database write privileges to `erp1.*` tables.
-2. **Atomic Dual-Write**: Business entity creation/linking and durable receipt persistence commit within a single local PostgreSQL transaction (`this.repo.transaction`). Either both succeed or both roll back together.
-3. **Idempotency Invariant**:
-   - Receipt lookup by `idempotency_key` strictly precedes any database write.
-   - Same `idempotency_key` + identical request payload returns HTTP 200 with `prior_result: true` and the existing target record.
-   - Same `idempotency_key` + conflicting request payload returns HTTP 409 `IDEMPOTENCY_KEY_PAYLOAD_MISMATCH` with zero database writes.
-4. **Type-Safe UPSERT Semantics**:
-   - When `upsert: true`, incoming rows matching an existing natural key (normalized SKU for `product`, code for `category`) update existing records in-place and produce an import receipt with `kind: 'linked'`.
-   - When `upsert: false`, duplicate natural keys trigger HTTP 409 `SKU_DUPLICATE` rejection.
-5. **Batch Execution & Error Isolation**:
-   - `loadBatch` processes rows in sequential chunks of up to 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
-   - Business rejections (400, 409, 422) are isolated per-row as `rejected` outcomes and do not abort subsequent rows.
-   - Transient infrastructure errors (503, connection reset, PostgreSQL deadlocks) trigger bounded exponential backoff retries without mutating client idempotency keys.
-   - Batch execution safely halts if row failures exceed the 10% threshold (`STOPPED_EXCESSIVE_FAILURES`). No compensating rollback sagas exist in V1.
-
-### 22.2 HTTP Endpoints
-
-| Method | Path | Summary | Success Status | Replay Status |
-|---|---|---|:---:|:---:|
-| `POST` | `/api/v1/erp-products/import` | Single-row import with per-row idempotency | `201 Created` | `200 OK` (`prior_result: true`) |
-| `POST` | `/api/v1/erp-products/import/batch` | Chunked batch import (up to 500 rows) with per-row outcomes | `200 OK` | `200 OK` |
 
 ---
 
@@ -997,3 +998,30 @@ const mock = createErp1MockServer();
 - Categories: `TOOLS` (`bbbbbbbb-0001-4000-8000-000000000001`), `GEN` (`bbbbbbbb-0001-4000-8000-000000000002`)
 - Products: `TOOL-HEX-01` (`cccccccc-0001-4000-8000-000000000001`), `GEN-TIE-100` (`cccccccc-0001-4000-8000-000000000002`), `LUB-GRS-500` (`cccccccc-0001-4000-8000-000000000003`)
 - Pre-seeded stock levels for all products in `WH-MAIN`.
+
+---
+
+## 26. QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)
+
+### 26.1 Test Evidence & Invariant Mapping
+
+| Invariant / Requirement | Contract & Enforcement | Verification Test File | Status |
+|---|---|---|:---:|
+| **BR-ERP1-01** (Unique SKU) | `erp1_products_sku_unique` index + normalized uppercase matching | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **BR-ERP1-02** (Non-negative stock) | `check_erp1_stock_quantity_non_negative` constraint | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/constraints.test.ts` | **Verified** |
+| **FR-ERP1-03** (1-level category hierarchy) | Schema has no `parent_id`, validator prohibits nested subcategories | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/e2e/demo-journey.test.ts` | **Verified** |
+| **FR-ERP1-04** (Fixed units: pcs, kg, g, litre, metre, box) | `erp1.unit_of_measure` enum & `UnitOfMeasureSchema` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **FR-ERP1-05** (Single warehouse in V1) | `erp1_warehouses_single_idx` on constant `true` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **Explicit Currency (USD)** | Uppercase ISO-4217 code required on create | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **Decimal Price (NUMERIC 19,4)** | Decimal format preserved without float rounding | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **OpenAPI Parity** | 100% routes mapped to `packages/contracts/openapi/erp-1.yaml` | `apps/erp/modules/erp-1/tests/contract/openapi-parity.test.ts` | **Verified** |
+| **Deterministic Seed & Reset** | Re-running produces identical IDs without duplicate writes | `apps/erp/modules/erp-1/tests/seed/seed.test.ts`, `sample-data/erp-1/seed.ts` | **Verified** |
+| **Scripted 5-Minute Demo** | In-process execution of full V1 demo workflow | `apps/erp/modules/erp-1/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-1-v1.md` | **Verified** |
+| **Error Envelope Compliance** | Conforms to `{ statusCode, error, code, message, details, correlation_id }` | `apps/erp/modules/erp-1/tests/api/auth-and-envelope.test.ts` | **Verified** |
+
+### 26.2 Handoff Sign-Off
+- **Issue Reference**: Resolves [#15](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/15) ([ERP1-10])
+- **Author**: Samarth (`Samarth-ITM`)
+- **Role**: Group 6 / Role 4 — Data & QA Lead
+- **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
