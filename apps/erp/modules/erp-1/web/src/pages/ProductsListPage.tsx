@@ -323,6 +323,12 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
     setPage(newPage);
   };
 
+  const handlePageSizeChange = (newPageSize: number) => {
+    const boundedSize = Math.max(1, Math.min(100, newPageSize));
+    setPageSize(boundedSize);
+    setPage(1);
+  };
+
   const handleOpenCreateModal = useCallback(() => {
     setIsCreateModalOpen(true);
     if (onCreateProduct) {
@@ -532,6 +538,8 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
               pageSize={pageSize}
               totalPages={totalPages}
               onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[10, 25, 50, 100]}
               sortBy={sortBy}
               sortDirection={sortDirection}
               onSort={(column) => {
