@@ -28,14 +28,16 @@ const SPEC_PATH = resolve(
 
 const SPEC = readFileSync(SPEC_PATH, "utf-8");
 
-/** SDS §4.8 routes plus two detail routes flagged for Integration Lead confirmation. */
+/** SDS §4.8 routes plus detail routes and baseline operations specified in Issue #35. */
 const EXPECTED_ENDPOINTS = [
   "GET /sales-orders",
   "POST /sales-orders",
   "GET /sales-orders/{id}",
+  "PATCH /sales-orders/{id}",
   "GET /invoices",
   "POST /invoices",
   "GET /invoices/{id}",
+  "GET /payments",
   "POST /payments",
 ] as const;
 
@@ -139,7 +141,7 @@ describe("ERP-3 OpenAPI 3.1 Contract Specification", () => {
     }
   });
 
-  it("documents every V1 endpoint (7 routes) and no others", () => {
+  it("documents every V1 baseline endpoint (9 routes) and no others", () => {
     const documented = extractDocumentedEndpoints(SPEC);
     for (const endpoint of EXPECTED_ENDPOINTS) {
       expect(documented.has(endpoint), `Missing endpoint: ${endpoint}`).toBe(
