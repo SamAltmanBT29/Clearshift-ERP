@@ -18,6 +18,7 @@ export interface ProductsTableProps {
   readonly sortBy?: ProductSortField;
   readonly sortDirection?: 'asc' | 'desc';
   readonly onSort?: (column: ProductSortField) => void;
+  readonly onSelectProduct?: ((product: ProductWithStock) => void) | undefined;
 }
 
 function resolveStockStatus(quantityStr?: string): {
@@ -49,6 +50,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   sortBy,
   sortDirection = 'asc',
   onSort,
+  onSelectProduct,
 }) => {
   const categoryMap = React.useMemo(() => {
     const map = new Map<string, Category>();
@@ -190,7 +192,18 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
                 return (
                   <tr key={product.id} className="cs-erp1-row">
                   <td className="cs-erp1-cell-primary">
-                    <div className="cs-erp1-product-name">{product.name}</div>
+                    {onSelectProduct ? (
+                      <button
+                        type="button"
+                        className="cs-erp1-link-btn cs-erp1-product-name-link"
+                        onClick={() => onSelectProduct(product)}
+                        aria-label={`View details for ${product.name}`}
+                      >
+                        {product.name}
+                      </button>
+                    ) : (
+                      <div className="cs-erp1-product-name">{product.name}</div>
+                    )}
                     {product.sourceSystem && (
                       <span className="cs-erp1-source-meta">
                         Source: {product.sourceSystem} #{product.sourceId}

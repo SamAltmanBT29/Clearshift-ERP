@@ -169,8 +169,35 @@ paths:
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        "409":
+          description: Concurrent modification conflict or duplicate SKU conflict
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
         "422":
           description: Database invariant violation
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/products/{id}/linked-records:
+    get:
+      operationId: getErp1ProductLinkedRecords
+      tags: [ERP-1 Products]
+      summary: Read linked inventory, purchasing, and sales records for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Linked records for product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductLinkedRecords' }
+        "404":
+          description: Product not found
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
@@ -384,6 +411,7 @@ components:
         contactPhone: { type: string, nullable: true }
         sourceSystem: { type: string, nullable: true }
         sourceId: { type: string, nullable: true }
+        goldenId: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -412,6 +440,64 @@ components:
         price: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
         currency: { $ref: '#/components/schemas/Currency' }
         taxRate: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,2})?$' }, { type: number, minimum: 0 }] }
+        notificationEmail: { type: string, format: email }
+        contactPhone: { type: string, pattern: '^\+?[0-9\s\-()]{7,20}$' }
+        version: { type: string }
+
+    ProductWarehouseStockLinkedRecord:
+      type: object
+      required: [warehouseId, warehouseCode, warehouseName, quantity, unitOfMeasure, updatedAt]
+      properties:
+        warehouseId: { type: string, format: uuid }
+        warehouseCode: { type: string }
+        warehouseName: { type: string }
+        quantity: { type: string, pattern: '^\d+(\.\d{1,4})?$' }
+        unitOfMeasure: { $ref: '#/components/schemas/UnitOfMeasure' }
+        updatedAt: { type: string, format: date-time }
+
+    ProductPurchaseLineLinkedRecord:
+      type: object
+      required: [id, purchaseOrderId, poNumber, vendorName, orderDate, quantity, unitPrice, currency, status]
+      properties:
+        id: { type: string, format: uuid }
+        purchaseOrderId: { type: string, format: uuid }
+        poNumber: { type: string }
+        vendorName: { type: string }
+        orderDate: { type: string }
+        quantity: { type: string }
+        unitPrice: { type: string }
+        currency: { $ref: '#/components/schemas/Currency' }
+        status: { type: string }
+
+    ProductSalesLineLinkedRecord:
+      type: object
+      required: [id, orderId, orderNumber, customerGoldenId, orderDate, quantity, unitPrice, lineTotal, currency, status]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        orderNumber: { type: string }
+        customerGoldenId: { type: string }
+        orderDate: { type: string }
+        quantity: { type: string }
+        unitPrice: { type: string }
+        lineTotal: { type: string }
+        currency: { $ref: '#/components/schemas/Currency' }
+        status: { type: string }
+
+    ProductLinkedRecords:
+      type: object
+      required: [productId, stockLevels, purchaseOrders, salesOrders]
+      properties:
+        productId: { type: string, format: uuid }
+        stockLevels:
+          type: array
+          items: { $ref: '#/components/schemas/ProductWarehouseStockLinkedRecord' }
+        purchaseOrders:
+          type: array
+          items: { $ref: '#/components/schemas/ProductPurchaseLineLinkedRecord' }
+        salesOrders:
+          type: array
+          items: { $ref: '#/components/schemas/ProductSalesLineLinkedRecord' }
 
     StockLevel:
       type: object
