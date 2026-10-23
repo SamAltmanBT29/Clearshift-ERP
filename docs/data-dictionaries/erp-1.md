@@ -944,3 +944,56 @@ When a batch halts due to excessive failures:
 ### 24.5 Prohibition of Rollback Sagas (AC5)
 
 In compliance with ClearShift V1 non-negotiable architectural rules, compensating rollback sagas are strictly out of scope. System implements stop-safely behavior, preserving durable evidence for operator remediation.
+
+---
+
+## 25. OpenAPI, Event Contracts, and Mock Package (ERP1-14)
+
+**Issue Reference**: [#110](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/110)<br />
+**Contract Reference**: `@clearshift/contracts` (`packages/contracts`)<br />
+**OpenAPI Specification**: `packages/contracts/openapi/erp-1.yaml`<br />
+**Event Contracts**: `packages/contracts/src/erp-1-events.ts`<br />
+**Deterministic Mock Server**: `packages/contracts/src/erp-1-mock.ts`
+
+### 25.1 OpenAPI 3.1 Specification Parity (AC1)
+
+The complete ERP-1 surface is specified in `packages/contracts/openapi/erp-1.yaml` with OpenAPI 3.1.0 compliance:
+- Bounded pagination parameters (`pageSize` default 25, maximum 100).
+- Standard ADR-002 / PLT-04 error envelopes (`{ code, message, details }`).
+- Decimal string formats for all monetary amounts and inventory balances (zero IEEE-754 floating point inaccuracies).
+- Operation definitions for products, categories, warehouses, stock levels, and batch imports.
+
+### 25.2 Domain Event Specifications (AC2)
+
+All state-changing domain mutations emit transactional event envelopes conforming to the ClearShift Event Envelope Schema (`PLT-04` / `PLT-09`):
+
+| Event Type | Producer | Entity Type | Trigger | Key Payload Fields |
+|---|---|---|---|---|
+| `erp.product.created` | `erp-1` | `product` | Product master record created | `id`, `sku`, `name`, `categoryId`, `unitOfMeasure`, `price`, `currency` |
+| `erp.product.updated` | `erp-1` | `product` | Product attributes or price updated | `id`, `sku`, `name`, `previousPrice`, `newPrice`, `categoryId`, `status` |
+| `erp.category.created` | `erp-1` | `category` | Product category registered | `id`, `code`, `name` |
+| `erp.warehouse.created` | `erp-1` | `warehouse` | Warehouse facility configured | `id`, `code`, `name`, `isDefault` |
+| `erp.stock_level.adjusted` | `erp-1` | `stock_level` | Inventory quantity adjusted | `productId`, `warehouseId`, `previousQuantity`, `newQuantity`, `adjustmentQuantity`, `stockStatus`, `reason` |
+
+#### Cross-Module Inbound Events Consumed
+- `erp.purchase_order.received` (from ERP-2): Goods received against purchase order lines, increasing warehouse inventory.
+- `erp.sales_order.fulfilled` (from ERP-3): Goods dispatched against sales orders, decrementing warehouse inventory without breaching the non-negative stock constraint (`BR-ERP1-01`).
+
+### 25.3 Deterministic Mock Server & Fixture Package (AC3)
+
+For dependent teams (ERP-2, ERP-3, CRM-2, Migration Kit), `@clearshift/contracts` exposes:
+```typescript
+import { createErp1MockServer } from '@clearshift/contracts';
+
+const mock = createErp1MockServer();
+// mock.app: Fastify instance with all ERP-1 routes
+// mock.store: Deterministic synthetic in-memory data store
+// mock.reset(): Resets fixtures to clean baseline state
+// mock.stop(): Closes server instance
+```
+
+#### Deterministic Seed Fixtures
+- Default Warehouse: `WH-MAIN` (`aaaaaaaa-0001-4000-8000-000000000001`)
+- Categories: `TOOLS` (`bbbbbbbb-0001-4000-8000-000000000001`), `GEN` (`bbbbbbbb-0001-4000-8000-000000000002`)
+- Products: `TOOL-HEX-01` (`cccccccc-0001-4000-8000-000000000001`), `GEN-TIE-100` (`cccccccc-0001-4000-8000-000000000002`), `LUB-GRS-500` (`cccccccc-0001-4000-8000-000000000003`)
+- Pre-seeded stock levels for all products in `WH-MAIN`.
