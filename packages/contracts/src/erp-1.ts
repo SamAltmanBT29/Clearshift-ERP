@@ -437,5 +437,51 @@ export const ModuleMigrationMetadataSchema = z.object({
 });
 export type ModuleMigrationMetadata = z.infer<typeof ModuleMigrationMetadataSchema>;
 
+/**
+ * Migration Kit Rejection & Review Schemas (KIT-16 / ERP1-23)
+ */
+export const RejectionColumnConfigSchema = z.object({
+  field: z.string().min(1),
+  label: z.string().min(1),
+  isIdentifier: z.boolean().optional(),
+  isSensitive: z.boolean().optional(),
+});
+export type RejectionColumnConfig = z.infer<typeof RejectionColumnConfigSchema>;
+
+export const FailureExplanationSchema = z.object({
+  code: z.string().min(1),
+  title: z.string().min(1),
+  explanation: z.string().min(1),
+  docReference: z.string().optional(),
+  resolution: z.string().optional(),
+});
+export type FailureExplanation = z.infer<typeof FailureExplanationSchema>;
+
+export const ModuleRejectionContextSchema = z.object({
+  moduleId: z.string().min(1),
+  moduleName: z.string().min(1),
+  entity: z.string().min(1),
+  identifierColumns: z.array(RejectionColumnConfigSchema),
+  additionalColumns: z.array(RejectionColumnConfigSchema).optional(),
+  sensitiveFields: z.array(z.string()).optional(),
+  failureExplanations: z.record(FailureExplanationSchema),
+});
+export type ModuleRejectionContext = z.infer<typeof ModuleRejectionContextSchema>;
+
+export const RejectedRowSchema = z.object({
+  id: z.string().min(1),
+  batchId: z.string().min(1),
+  sourceRow: z.number().int().min(1),
+  entity: z.string().min(1),
+  schemaVersion: z.number().int().min(1).optional(),
+  errorCode: z.string().min(1),
+  failureReason: z.string().optional(),
+  field: z.string().optional(),
+  rawData: z.record(z.unknown()),
+  createdAt: z.string().optional(),
+});
+export type RejectedRow = z.infer<typeof RejectedRowSchema>;
+
 export { ErrorEnvelopeSchema };
+
 

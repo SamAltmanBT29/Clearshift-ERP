@@ -477,7 +477,53 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 | `enum` | `string`, `text` (exact match) | `string` (warns allowed enum options) | `number`, `date`, `boolean`, `uuid` |
 | `uuid` | `uuid` | `string` (must match RFC-4122 format) | `number`, `date`, `boolean` |
 
+---
 
+## 17. Migration Rejection, Review, and Export Context (ERP1-23)
 
+**Issue**: [#119](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/119) — `[ERP1-23] ERP-1 Products and Inventory: Module context in shared rejection/review/export screens`  
+**Implementation**: `packages/kit/src/domain/rejection.ts`, `packages/ui/src/components/RejectionReviewScreen.tsx`, `apps/erp/modules/erp-1/src/kit/rejection-context.ts`, `apps/erp/modules/erp-1/web/src/pages/ProductRejectionReviewPage.tsx`.
 
+### 17.1 Module Identifier Columns (AC1)
 
+The shared Migration Kit rejection review interface dynamically displays ERP-1's primary identifier and business columns:
+
+| Column | Field | Role | Formatting / Constraints |
+|---|---|---|---|
+| **Source Row** | `sourceRow` | Line Number | 1-based source file line reference |
+| **Error Code** | `errorCode` | Standard Code | Formatted as high-contrast red badge (`data-testid="error-code-badge"`) |
+| **SKU** | `sku` | Primary Natural Identifier | Normalized uppercase string; badged with `ID` pill |
+| **Product Name** | `name` | Primary Identifier | Human-readable catalog title |
+| **Source ID** | `sourceId` | Provenance Key | Legacy primary key preserved without mutation (KIT-08) |
+| **Category Code** | `categoryCode` | Category Reference | Associated category natural code |
+| **Unit of Measure** | `unitOfMeasure` | Secondary Context | V1 unit of measure (`pcs`, `kg`, `g`, `litre`, `metre`, `box`) |
+| **Unit Price** | `price` | Financial Context | Decimal selling price |
+
+### 17.2 Standardized Error Codes & Failure Explanations (AC2)
+
+| Error Code | Title | Failure Explanation | Doc Ref | Remediation Guidance |
+|---|---|---|---|---|
+| `DUPLICATE_SKU` | Duplicate SKU | SKU is already registered after normalization (BR-ERP1-01). SKUs must be globally unique across active and archived records. | BR-ERP1-01 | Verify existing catalog in ERP-1 or re-map source SKU. |
+| `INVALID_UNIT_OF_MEASURE` | Invalid Unit of Measure | Unit of measure must be one of the approved V1 units: pcs, kg, g, litre, metre, box (FR-ERP1-04). | FR-ERP1-04 | Standardize unit to one of the 6 allowed V1 units. |
+| `NEGATIVE_PRICE` | Negative Unit Price | Product unit price cannot be negative (FR-ERP1-02). Must be a decimal >= 0.0000. | FR-ERP1-02 | Ensure unit price is non-negative. |
+| `INVALID_TAX_RATE` | Invalid Tax Rate | Tax rate must be a valid decimal between 0.0000 and 1.0000 (FR-ERP1-02). Percentages (e.g. 18%) must be formatted as decimals (0.1800). | FR-ERP1-02 | Divide percentage by 100 to produce decimal rate between 0.0000 and 1.0000. |
+| `NEGATIVE_STOCK` | Negative Stock Level | Stock quantity cannot be negative (BR-ERP1-02 / FR-ERP1-06). Minimum stock level is 0. | BR-ERP1-02 | Reconcile warehouse inventory quantity. |
+| `INVALID_CATEGORY` | Category Not Found | Referenced category code does not exist in erp1_categories (FR-ERP1-03). | FR-ERP1-03 | Import or create categories prior to importing products. |
+| `MISSING_REQUIRED_FIELD` | Missing Mandatory Field | A required product field (such as Name, SKU, or Unit of Measure) is missing or blank. | FR-ERP1-01 | Populate all mandatory columns in source data before importing. |
+| `MULTIPLE_WAREHOUSES_REJECTED` | Multiple Warehouses Not Supported | V1 scope strictly supports a single warehouse (BR-ERP1-03). Second warehouse was rejected. | BR-ERP1-03 | Assign all inventory to the primary default warehouse. |
+| `SOURCE_VALUE_MUTATED` | Raw Source Value Alteration | Raw source values must be preserved without destructive mutation (KIT-08). | KIT-08 | Retain original sourceSystem and sourceId untouched. |
+
+### 17.3 Sensitive Field Masking (AC3)
+
+All sensitive financial, bank, or employee fields are automatically masked or excluded from review tables, payload inspector modals, and CSV downloads:
+- **Credentials & Passwords**: `[REDACTED]`
+- **Bank Accounts & Card Numbers**: `****-****-XXXX` (last 4 characters preserved)
+- **Government Tax IDs & SSNs**: `***-**-XXXX` (last 4 characters preserved)
+- **Employee Salaries**: `[CONFIDENTIAL SALARY]`
+
+### 17.4 Formula-Safe CSV Export (AC4)
+
+Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines (PLT-12 / KIT-16):
+- Any cell value starting with `=`, `+`, `-`, `@`, `\t`, or `\r` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
+- Export includes all standardized headers: `"Source Row"`, `"Error Code"`, `"Error Title"`, `"Reason"`, `"Doc Reference"`, `"Resolution"`, `"SKU"`, `"Product Name"`, `"Source ID"`, `"Failed Field"`.
+- Filtering is preserved: exporting with active filters downloads only the matching subset of rejected rows.
