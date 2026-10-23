@@ -41,6 +41,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'pcs',
         price: '19.9900',
         currency: 'USD',
+        taxRate: '0.00',
       });
       expect(prod.id).toBeDefined();
       expect(prod.normalizedSku).toBe('WDG-UNIQ-001');
@@ -53,6 +54,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'pcs',
         price: '19.9900',
         currency: 'USD',
+        taxRate: '0.00',
       });
 
       await expect(
@@ -62,6 +64,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
           unitOfMeasure: 'pcs',
           price: '29.9900',
           currency: 'USD',
+          taxRate: '0.00',
         })
       ).rejects.toThrowError(/already exists/i);
     });
@@ -73,6 +76,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'pcs',
         price: '10.0000',
         currency: 'USD',
+        taxRate: '0.00',
       });
 
       await expect(
@@ -82,6 +86,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
           unitOfMeasure: 'pcs',
           price: '10.0000',
           currency: 'USD',
+          taxRate: '0.00',
         })
       ).rejects.toThrowError(/already exists/i);
     });
@@ -93,6 +98,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'pcs',
         price: '10.0000',
         currency: 'USD',
+        taxRate: '0.00',
       });
       const p2 = await service.createProduct({
         name: 'Product 2',
@@ -100,6 +106,7 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'pcs',
         price: '15.0000',
         currency: 'USD',
+        taxRate: '0.00',
       });
 
       await expect(
@@ -120,23 +127,27 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'kg',
         price: '5.5000',
         currency: 'USD',
+        taxRate: '0.00',
       });
 
       const wh = await service.getDefaultWarehouse();
+      expect(wh).not.toBeNull();
 
       const zeroStock = await service.setOpeningStock({
         productId: prod.id,
-        warehouseId: wh.id,
+        warehouseId: wh!.id,
         quantity: '0.0000',
+        idempotencyKey: 'inv-test-zero-stock',
       });
-      expect(zeroStock.quantity).toBe('0.0000');
+      expect(zeroStock.entity.quantity).toBe('0.0000');
 
       const posStock = await service.setOpeningStock({
         productId: prod.id,
-        warehouseId: wh.id,
+        warehouseId: wh!.id,
         quantity: '125.7500',
+        idempotencyKey: 'inv-test-pos-stock',
       });
-      expect(posStock.quantity).toBe('125.7500');
+      expect(posStock.entity.quantity).toBe('125.7500');
     });
 
     it('rejects negative stock quantities', async () => {
@@ -146,14 +157,17 @@ describe('ERP-1 Domain Invariants Suite', () => {
         unitOfMeasure: 'litre',
         price: '12.0000',
         currency: 'USD',
+        taxRate: '0.00',
       });
       const wh = await service.getDefaultWarehouse();
+      expect(wh).not.toBeNull();
 
       await expect(
         service.setOpeningStock({
           productId: prod.id,
-          warehouseId: wh.id,
+          warehouseId: wh!.id,
           quantity: '-1.0000',
+          idempotencyKey: 'inv-test-neg-stock',
         })
       ).rejects.toThrowError(/negative/i);
 
@@ -210,8 +224,9 @@ describe('ERP-1 Domain Invariants Suite', () => {
   describe('FR-ERP1-05: Single Default Warehouse Invariant', () => {
     it('provides standard default warehouse WH-01 in V1', async () => {
       const wh = await service.getDefaultWarehouse();
-      expect(wh.code).toBe('WH-01');
-      expect(wh.isDefault).toBe(true);
+      expect(wh).not.toBeNull();
+      expect(wh!.code).toBe('WH-01');
+      expect(wh!.isDefault).toBe(true);
     });
   });
 });

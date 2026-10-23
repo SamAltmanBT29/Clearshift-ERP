@@ -16,7 +16,7 @@
  */
 
 export const SEED_BATCH_ID = 'b1000000-0000-4000-8000-000000000001';
-export const DEFAULT_WAREHOUSE_ID = '00000000-0000-4000-8000-000000000001';
+export const DEFAULT_WAREHOUSE_ID = '00000000-0000-4000-8000-000000000002';
 
 export const SEED_CATEGORIES = [
   { name: 'Hardware & Tools', code: 'CAT-TOOL' },
@@ -99,10 +99,13 @@ export async function runSeed(post: PostFn): Promise<SeedResult> {
     const res = await post('POST', `${BASE}/categories`, {
       name: cat.name,
       code: cat.code,
+      idempotency_key: `seed-category-${SEED_BATCH_ID}-${i}`,
     });
 
     if (res.status === 201) {
       allReplayed = false;
+      categoryIds.push(String(res.body['id']));
+    } else if (res.status === 200 && res.body['prior_result']) {
       categoryIds.push(String(res.body['id']));
     } else if (res.status === 409) {
       // Already exists - fetch category by code or list
@@ -129,11 +132,13 @@ export async function runSeed(post: PostFn): Promise<SeedResult> {
       price: prod.price,
       currency: prod.currency,
       taxRate: prod.taxRate,
-      description: prod.description,
+      idempotency_key: `seed-product-${SEED_BATCH_ID}-${i}`,
     });
 
     if (res.status === 201) {
       allReplayed = false;
+      productIds.push(String(res.body['id']));
+    } else if (res.status === 200 && res.body['prior_result']) {
       productIds.push(String(res.body['id']));
     } else if (res.status === 409) {
       // Already exists - fetch product by SKU
@@ -156,10 +161,10 @@ export async function runSeed(post: PostFn): Promise<SeedResult> {
       productId: prodId,
       warehouseId: DEFAULT_WAREHOUSE_ID,
       quantity: prod.openingStock,
-      notes: `V1 initial opening stock balance: ${prod.name}`,
+      idempotency_key: `seed-stock-${SEED_BATCH_ID}-${i}`,
     });
 
-    if (res.status === 201) {
+    if (res.status === 201 || (res.status === 200 && !res.body['prior_result'])) {
       allReplayed = false;
     }
     expectOk(res, `stock for product ${prod.sku}`);
@@ -183,9 +188,7 @@ if (typeof process !== 'undefined' && process.argv[1]?.endsWith('seed.ts')) {
       headers: {
         'content-type': 'application/json',
         accept: 'application/json',
-        ...(process.env['ERP1_AUTH_TOKEN']
-          ? { authorization: `Bearer ${process.env['ERP1_AUTH_TOKEN']}` }
-          : {}),
+        authorization: `Bearer ${process.env['ERP1_AUTH_TOKEN'] ?? 'role:admin'}`,
       },
       body: body ? JSON.stringify(body) : undefined,
     });

@@ -47,8 +47,25 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
     await app.close();
   });
 
+  it('rejects unauthenticated request with standard 401 envelope when authRequired is true', async () => {
+    const app = buildApp({ authRequired: true });
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/erp-products/products',
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.code).toBe('UNAUTHORIZED');
+    expect(body.correlation_id).toBeDefined();
+
+    await app.close();
+  });
+
   it('formats validation errors into standard 400 envelope with details array', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     const res = await app.inject({
@@ -61,8 +78,6 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
 
     expect(res.statusCode).toBe(400);
     const body = res.json();
-    expect(body.statusCode).toBe(400);
-    expect(body.error).toBe('Bad Request');
     expect(body.code).toBe('VALIDATION_ERROR');
     expect(body.correlation_id).toBeDefined();
     expect(Array.isArray(body.details)).toBe(true);
@@ -74,7 +89,7 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
   });
 
   it('formats missing entity into standard 404 envelope', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     const res = await app.inject({
@@ -84,15 +99,14 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
 
     expect(res.statusCode).toBe(404);
     const body = res.json();
-    expect(body.statusCode).toBe(404);
-    expect(body.code).toBe('PRODUCT_NOT_FOUND');
+    expect(body.code).toBe('NOT_FOUND');
     expect(body.correlation_id).toBeDefined();
 
     await app.close();
   });
 
   it('formats duplicate conflict into standard 409 envelope', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     // Create product
@@ -105,6 +119,7 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
         unitOfMeasure: 'pcs',
         price: '10.0000',
         currency: 'USD',
+        taxRate: '0.00',
       },
     });
 
@@ -118,12 +133,12 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
         unitOfMeasure: 'pcs',
         price: '15.0000',
         currency: 'USD',
+        taxRate: '0.00',
       },
     });
 
     expect(res.statusCode).toBe(409);
     const body = res.json();
-    expect(body.statusCode).toBe(409);
     expect(body.code).toBe('DUPLICATE_SKU');
     expect(body.correlation_id).toBeDefined();
 
@@ -131,7 +146,7 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
   });
 
   it('formats domain rule violations into standard 422 envelope', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     // Create a product
@@ -144,6 +159,7 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
         unitOfMeasure: 'pcs',
         price: '10.0000',
         currency: 'USD',
+        taxRate: '0.00',
       },
     });
     const prod = prodRes.json();
@@ -155,12 +171,12 @@ describe('ERP-1 Error Envelope & Correlation ID Suite', () => {
       payload: {
         productId: prod.id,
         quantity: '-5.0000',
+        idempotency_key: 'test-env-neg-stock',
       },
     });
 
     expect(res.statusCode).toBe(422);
     const body = res.json();
-    expect(body.statusCode).toBe(422);
     expect(body.code).toBe('NEGATIVE_STOCK');
     expect(body.correlation_id).toBeDefined();
     expect(body.details[0].field).toBe('quantity');

@@ -18,7 +18,7 @@ import { runSeed, type PostFn } from '../../../../../../sample-data/erp-1/seed.j
 
 describe('ERP-1 Scripted Demo Journey (In-Process E2E)', () => {
   it('executes full 5-minute V1 demo journey successfully', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     // ── 0:00 Seed ────────────────────────────────────────────────────────────
@@ -48,7 +48,14 @@ describe('ERP-1 Scripted Demo Journey (In-Process E2E)', () => {
     expect(searchData.items[0].sku).toBe('SKU-HAMMER-01');
     expect(searchData.items[0].price).toBe('24.5000');
     expect(searchData.items[0].currency).toBe('USD');
-    expect(searchData.items[0].quantity).toBe('150.0000');
+
+    // Verify stock is retrievable via stock endpoint
+    const stockRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/erp-products/stock?productId=${searchData.items[0].id}`,
+    });
+    expect(stockRes.statusCode).toBe(200);
+    expect(stockRes.json().quantity).toBe('150.0000');
 
     // ── 2:00 Product Creation ────────────────────────────────────────────────
     const createRes = await app.inject({
@@ -61,7 +68,6 @@ describe('ERP-1 Scripted Demo Journey (In-Process E2E)', () => {
         price: '0.1500',
         currency: 'USD',
         taxRate: '5.00',
-        description: 'Zinc-plated grade 8 hex nut',
       },
     });
     expect(createRes.statusCode).toBe(201);
@@ -95,6 +101,7 @@ describe('ERP-1 Scripted Demo Journey (In-Process E2E)', () => {
       payload: {
         productId: createdProd.id,
         quantity: '-25.0000',
+        idempotency_key: 'demo-neg-stock-key',
       },
     });
     expect(negStockRes.statusCode).toBe(422);
@@ -107,7 +114,7 @@ describe('ERP-1 Scripted Demo Journey (In-Process E2E)', () => {
       payload: {
         productId: createdProd.id,
         quantity: '500.0000',
-        notes: 'Initial inventory load',
+        idempotency_key: 'demo-pos-stock-key',
       },
     });
     expect(posStockRes.statusCode).toBe(200);

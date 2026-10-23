@@ -50,6 +50,45 @@ export const productsRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fasti
     }
   );
 
+  fastify.get(
+    '/products/:id/linked-records',
+    { preHandler: erp1ReadGuard },
+    async (request, reply) => {
+      const { id } = Erp1IdParamSchema.parse(request.params);
+      const product = await erp1Service.getProductById(id);
+      const defaultWh = await erp1Service.getDefaultWarehouse();
+      const stockList = await erp1Service.listStockLevels({
+        productId: product.id,
+        page: 1,
+        pageSize: 100,
+      });
+
+      const stockLevels = await Promise.all(
+        stockList.items.map(async (level) => {
+          const wh =
+            level.warehouseId === defaultWh?.id
+              ? defaultWh
+              : (await erp1Service.getWarehouseById(level.warehouseId)) ?? defaultWh;
+          return {
+            warehouseId: level.warehouseId,
+            warehouseCode: wh?.code ?? 'WH-01',
+            warehouseName: wh?.name ?? 'Main Warehouse',
+            quantity: level.quantity,
+            unitOfMeasure: product.unitOfMeasure,
+            updatedAt: level.updatedAt,
+          };
+        })
+      );
+
+      return reply.status(200).send({
+        productId: product.id,
+        stockLevels,
+        purchaseOrders: [],
+        salesOrders: [],
+      });
+    }
+  );
+
   fastify.post(
     '/products',
     { preHandler: erp1IngestGuard },

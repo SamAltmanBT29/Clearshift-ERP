@@ -16,7 +16,7 @@ import { runSeed, type PostFn } from '../../../../../../sample-data/erp-1/seed.j
 
 describe('ERP-1 Seed & Idempotency Suite', () => {
   it('executes deterministic seed and verifies idempotent replay', async () => {
-    const app = buildApp();
+    const app = buildApp({ authRequired: false });
     await app.ready();
 
     const post: PostFn = async (method, path, body) => {
@@ -66,7 +66,15 @@ describe('ERP-1 Seed & Idempotency Suite', () => {
     expect(searchBody.items[0].sku).toBe('SKU-HAMMER-01');
     expect(searchBody.items[0].price).toBe('24.5000');
     expect(searchBody.items[0].currency).toBe('USD');
-    expect(searchBody.items[0].quantity).toBe('150.0000');
+
+    // Verify stock is retrievable
+    const stockRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/erp-products/stock?productId=${searchBody.items[0].id}`,
+    });
+    expect(stockRes.statusCode).toBe(200);
+    const stockBody = stockRes.json();
+    expect(stockBody.quantity).toBe('150.0000');
 
     await app.close();
   });
