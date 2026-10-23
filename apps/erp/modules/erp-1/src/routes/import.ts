@@ -22,6 +22,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ImportRowRequestSchema } from '@clearshift/contracts';
 import type { Erp1Service } from '../services/erp1.service.js';
 import { Erp1TargetAdapter } from '../migration/target-adapter.js';
+import { erp1IngestGuard, assertTenantAccess } from './guard.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Batch request schema (ERP1-11)
@@ -60,10 +61,12 @@ export const importRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = as
    * POST /import
    * Single-row import endpoint (KIT-08 / Decision C4).
    */
-  fastify.post('/import', async (request, reply) => {
+  fastify.post('/import', { preHandler: erp1IngestGuard }, async (request, reply) => {
     const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
 
     const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+    assertTenantAccess(request.user, rawBody, request.headers['x-tenant-id'] as string | undefined);
+
     const bodyToValidate = {
       ...rawBody,
       idempotency_key: idempotencyHeader || rawBody['idempotency_key'],
@@ -102,8 +105,9 @@ export const importRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = as
    * Each row's outcome is independent: data-validation failures are collected
    * per-row without aborting the batch. Infrastructure failures propagate.
    */
-  fastify.post('/import/batch', async (request, reply) => {
+  fastify.post('/import/batch', { preHandler: erp1IngestGuard }, async (request, reply) => {
     const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+    assertTenantAccess(request.user, rawBody, request.headers['x-tenant-id'] as string | undefined);
 
     const parsed = ImportBatchRequestSchema.safeParse(rawBody);
     if (!parsed.success) {
