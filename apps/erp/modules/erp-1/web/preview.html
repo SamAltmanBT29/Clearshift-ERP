@@ -109,6 +109,7 @@
     <button class="state-btn" onclick="switchState('error')">API Failure + Retry (AC3)</button>
     <button class="state-btn" onclick="switchState('forbidden')">403 Access Denied (AC4)</button>
     <button class="state-btn" onclick="switchState('migration')">Migration Wizard (ERP1-22)</button>
+    <button class="state-btn" onclick="switchState('rejections')">Rejections Review (ERP1-23)</button>
   </div>
 
 
@@ -140,6 +141,7 @@
         <button id="sort-dir-btn" class="cs-erp1-sort-direction-btn" aria-label="Sort direction">▲ Asc</button>
       </div>
       <button type="button" class="cs-erp1-btn cs-erp1-btn-secondary cs-erp1-import-btn" onclick="switchState('migration')">📥 Migration Kit</button>
+      <button type="button" class="cs-erp1-btn cs-erp1-btn-secondary cs-erp1-rejections-btn" onclick="switchState('rejections')">⚠️ Rejections</button>
       <button type="button" class="cs-erp1-btn cs-erp1-btn-primary cs-erp1-add-product-btn" onclick="openCreateModal()">+ New Product</button>
     </div>
 
@@ -394,6 +396,110 @@
           </div>
         </div>
       </section>
+
+      <!-- Rejection Review & Export Screen (ERP1-23) -->
+      <section id="view-rejections" class="cs-product-rejection-review-page" style="display: none; padding: 24px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background-color: var(--color-background);" aria-label="Rejection Review Screen">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <button type="button" class="cs-erp1-btn" onclick="switchState('normal')" style="padding: 4px 10px; font-size: 0.8125rem;">← Back to Products</button>
+              <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">ERP-1 Products and Inventory: Migration Rejection Review</h2>
+              <span style="font-size: 0.75rem; font-weight: 600; background: rgba(59, 130, 246, 0.1); color: #2563eb; padding: 2px 8px; border-radius: 9999px;">Batch: BATCH_2026_01</span>
+            </div>
+            <p style="margin: 0; font-size: 0.875rem; color: var(--color-text-muted);">
+              Reviewing 5 rejected records in batch BATCH_2026_01. All sensitive financial, bank, and employee fields are automatically masked.
+            </p>
+          </div>
+          <button type="button" class="cs-erp1-btn cs-erp1-btn-primary" style="display: inline-flex; align-items: center; gap: 6px;" onclick="alert('Formula-safe CSV export generated according to PLT-12 / KIT-16!')">
+            <span>📥</span>
+            <span>Export Filtered CSV (5)</span>
+          </button>
+        </div>
+
+        <!-- Privacy Alert (AC3) -->
+        <div class="cs-alert rounded border p-4 mb-4" style="background: rgba(59, 130, 246, 0.05); border-color: rgba(59, 130, 246, 0.2); margin-bottom: 16px;">
+          <div style="display: flex; gap: 10px; align-items: flex-start;">
+            <span style="color: #2563eb; font-size: 1.1rem;">ℹ️</span>
+            <div>
+              <div style="font-weight: 600; color: #1e40af; font-size: 0.875rem; margin-bottom: 2px;">Privacy & Data Protection Notice (AC3)</div>
+              <div style="font-size: 0.8125rem; color: #334155;">
+                All sensitive financial, bank, and employee fields (such as bank accounts, tax IDs, salaries, and credentials) are automatically masked across all review screens and CSV exports in compliance with Gate G4 security standards.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rejections Table (AC1, AC2, AC3) -->
+        <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem; text-align: left;">
+            <thead>
+              <tr style="background: var(--color-surface); border-bottom: 1px solid var(--border-subtle);">
+                <th style="padding: 10px 12px; font-weight: 600; color: var(--color-text-muted);">#</th>
+                <th style="padding: 10px 12px; font-weight: 600;">Standard Error Code</th>
+                <th style="padding: 10px 12px; font-weight: 600;">SKU <span style="font-size: 0.625rem; background: #dbeafe; color: #1d4ed8; padding: 1px 4px; border-radius: 3px;">ID</span></th>
+                <th style="padding: 10px 12px; font-weight: 600;">Product Name <span style="font-size: 0.625rem; background: #dbeafe; color: #1d4ed8; padding: 1px 4px; border-radius: 3px;">ID</span></th>
+                <th style="padding: 10px 12px; font-weight: 600;">Source ID <span style="font-size: 0.625rem; background: #dbeafe; color: #1d4ed8; padding: 1px 4px; border-radius: 3px;">ID</span></th>
+                <th style="padding: 10px 12px; font-weight: 600;">Sensitive Details (Masked AC3)</th>
+                <th style="padding: 10px 12px; font-weight: 600;">Failure Reason & Remediation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 10px 12px; color: var(--color-text-muted);">4</td>
+                <td style="padding: 10px 12px;"><span style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 6px; border-radius: 4px;">DUPLICATE_SKU</span></td>
+                <td style="padding: 10px 12px; font-weight: 600;">WIDGET-001</td>
+                <td style="padding: 10px 12px;">Steel Industrial Precision Widget M8</td>
+                <td style="padding: 10px 12px;">LEGACY_P_1001</td>
+                <td style="padding: 10px 12px; color: #64748b;">🔒 Bank: ****-****-9012 | Tax: ***-**-7777</td>
+                <td style="padding: 10px 12px;">
+                  <div style="font-weight: 600; color: #991b1b;">Duplicate SKU</div>
+                  <div style="font-size: 0.75rem; color: #475569;">SKU already exists after normalization (BR-ERP1-01).</div>
+                  <div style="font-size: 0.6875rem; color: #0369a1; margin-top: 2px;">💡 Verify existing catalog or re-map source SKU.</div>
+                </td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-subtle); background: var(--color-surface);">
+                <td style="padding: 10px 12px; color: var(--color-text-muted);">12</td>
+                <td style="padding: 10px 12px;"><span style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 6px; border-radius: 4px;">INVALID_UNIT_OF_MEASURE</span></td>
+                <td style="padding: 10px 12px; font-weight: 600;">FLUID-CHEM-40</td>
+                <td style="padding: 10px 12px;">Synthetic Hydraulic Fluid Ultra-Grade</td>
+                <td style="padding: 10px 12px;">LEGACY_P_1002</td>
+                <td style="padding: 10px 12px; color: #64748b;">🔒 IBAN: ****-****-6819</td>
+                <td style="padding: 10px 12px;">
+                  <div style="font-weight: 600; color: #991b1b;">Invalid Unit of Measure</div>
+                  <div style="font-size: 0.75rem; color: #475569;">Unit of measure must be one of: pcs, kg, g, litre, metre, box (FR-ERP1-04).</div>
+                  <div style="font-size: 0.6875rem; color: #0369a1; margin-top: 2px;">💡 Standardize unit to one of the 6 allowed V1 units.</div>
+                </td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 10px 12px; color: var(--color-text-muted);">19</td>
+                <td style="padding: 10px 12px;"><span style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 6px; border-radius: 4px;">NEGATIVE_PRICE</span></td>
+                <td style="padding: 10px 12px; font-weight: 600;">HOSE-FLEX-20M</td>
+                <td style="padding: 10px 12px;">Reinforced Rubber Air Hose 20m</td>
+                <td style="padding: 10px 12px;">LEGACY_P_1003</td>
+                <td style="padding: 10px 12px; color: #64748b;">🔒 Routing: ****-****-0021</td>
+                <td style="padding: 10px 12px;">
+                  <div style="font-weight: 600; color: #991b1b;">Negative Unit Price</div>
+                  <div style="font-size: 0.75rem; color: #475569;">Product unit price cannot be negative (FR-ERP1-02). Must be >= 0.0000.</div>
+                  <div style="font-size: 0.6875rem; color: #0369a1; margin-top: 2px;">💡 Ensure unit price is non-negative.</div>
+                </td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-subtle); background: var(--color-surface);">
+                <td style="padding: 10px 12px; color: var(--color-text-muted);">27</td>
+                <td style="padding: 10px 12px;"><span style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 6px; border-radius: 4px;">INVALID_TAX_RATE</span></td>
+                <td style="padding: 10px 12px; font-weight: 600;">PUMP-DIAPH-01</td>
+                <td style="padding: 10px 12px;">Pneumatic Diaphragm Pump 1/2-inch</td>
+                <td style="padding: 10px 12px;">LEGACY_P_1004</td>
+                <td style="padding: 10px 12px; color: #64748b;">🔒 SSN: ***-**-6789</td>
+                <td style="padding: 10px 12px;">
+                  <div style="font-weight: 600; color: #991b1b;">Invalid Tax Rate</div>
+                  <div style="font-size: 0.75rem; color: #475569;">Tax rate 18.00 exceeds maximum decimal fraction 1.0000 (FR-ERP1-02).</div>
+                  <div style="font-size: 0.6875rem; color: #0369a1; margin-top: 2px;">💡 Divide percentage by 100 to produce decimal fraction (e.g. 0.1800).</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -426,7 +532,7 @@
       const activeBtn = Array.from(document.querySelectorAll('.state-btn')).find(b => b.getAttribute('onclick')?.includes(simState));
       if (activeBtn) activeBtn.classList.add('active');
 
-      const views = ['view-table', 'view-loading', 'view-zero-data', 'view-filtered-empty', 'view-error', 'view-forbidden', 'view-migration'];
+      const views = ['view-table', 'view-loading', 'view-zero-data', 'view-filtered-empty', 'view-error', 'view-forbidden', 'view-migration', 'view-rejections'];
       views.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
@@ -446,6 +552,8 @@
         document.getElementById('view-forbidden').style.display = 'flex';
       } else if (simState === 'migration') {
         document.getElementById('view-migration').style.display = 'block';
+      } else if (simState === 'rejections') {
+        document.getElementById('view-rejections').style.display = 'block';
       }
     };
 

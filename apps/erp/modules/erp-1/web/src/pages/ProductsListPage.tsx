@@ -34,6 +34,7 @@ import {
 import { ProductCreateModal } from '../components/ProductCreateModal.js';
 import { ProductDetailPage } from './ProductDetailPage.js';
 import { ProductImportPage } from './ProductImportPage.js';
+import { ProductRejectionReviewPage } from './ProductRejectionReviewPage.js';
 
 export interface ProductsListPageProps {
   /** Optional initial filters passed by host shell or router */
@@ -46,10 +47,12 @@ export interface ProductsListPageProps {
   onProductCreated?: ((product: Product) => void) | undefined;
   /** Optional callback when a product is selected for detail/edit */
   onSelectProduct?: ((product: Product) => void) | undefined;
-  /** Optional initial view: list or import */
-  initialView?: 'list' | 'import' | undefined;
+  /** Optional initial view: list, import, or rejections */
+  initialView?: 'list' | 'import' | 'rejections' | undefined;
   /** Optional callback when navigating to migration kit import */
   onNavigateImport?: (() => void) | undefined;
+  /** Optional callback when navigating to migration rejection review */
+  onNavigateRejections?: (() => void) | undefined;
   /** Optional permissions array for access control */
   userPermissions?: readonly string[] | undefined;
 }
@@ -120,6 +123,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   onSelectProduct,
   initialView,
   onNavigateImport,
+  onNavigateRejections,
   userPermissions,
 }) => {
 
@@ -152,8 +156,9 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
   // Selected product detail view state
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  // Migration Kit import view state
+  // Migration Kit import and rejections view state
   const [isImportView, setIsImportView] = useState<boolean>(initialView === 'import');
+  const [isRejectionsView, setIsRejectionsView] = useState<boolean>(initialView === 'rejections');
 
 
   // 2. Data state
@@ -354,6 +359,14 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
     sortDirection,
   };
 
+  if (isRejectionsView) {
+    return (
+      <ProductRejectionReviewPage
+        onNavigateBack={() => setIsRejectionsView(false)}
+      />
+    );
+  }
+
   if (isImportView) {
     return (
       <ProductImportPage
@@ -440,6 +453,19 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
             title="Import catalog data through shared Migration Kit wizard"
           >
             📥 Migration Kit
+          </button>
+
+          <button
+            type="button"
+            className="cs-erp1-btn cs-erp1-btn-secondary cs-erp1-rejections-btn"
+            data-testid="btn-rejections-list"
+            onClick={() => {
+              setIsRejectionsView(true);
+              onNavigateRejections?.();
+            }}
+            title="Review and export migration rejection records"
+          >
+            ⚠️ Rejections
           </button>
 
           <button

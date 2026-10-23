@@ -1467,5 +1467,20 @@
   font-family: monospace;
 }
 
+/* Rejection review styles (ERP1-23) */
+.cs-erp1-rejections-btn {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+  font-weight: 500;
+}
 
+.cs-erp1-rejections-btn:hover {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
 
+.cs-product-rejection-review-page {
+  animation: fadeIn 0.2s ease-in-out;
+}
