@@ -47,6 +47,7 @@
   },
   "include": [
     "apps/**/*.ts",
+    "apps/erp/modules/erp-1/web/**/*.tsx",
     "apps/erp/modules/erp-5/web/**/*.tsx",
     "packages/**/*.ts"
   ],

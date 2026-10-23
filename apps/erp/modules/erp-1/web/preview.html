@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearShift ERP-1 — Products and Inventory Preview</title>
+  <style>
+    :root {
+      --color-background: #ffffff;
+      --color-surface: #f9fafb;
+      --color-surface-hover: #f3f4f6;
+      --color-text: #111827;
+      --color-text-muted: #4b5563;
+      --color-text-subtle: #9ca3af;
+      
+      --border-subtle: #e5e7eb;
+      --border-strong: #d1d5db;
+      --border-focus: #1d4ed8;
+
+      --color-primary: #1d4ed8;
+      --color-primary-hover: #1e40af;
+      --color-primary-text: #ffffff;
+
+      --color-success: #166534;
+      --color-success-bg: #dcfce7;
+      --color-success-border: #bbf7d0;
+
+      --color-warning: #92400e;
+      --color-warning-bg: #fef3c7;
+      --color-warning-border: #fde68a;
+
+      --color-error: #b91c1c;
+      --color-error-bg: #fee2e2;
+      --color-error-border: #fecaca;
+
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+      --radius-full: 9999px;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-background);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: var(--space-6);
+    }
+
+    .preview-header {
+      margin-bottom: var(--space-6);
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .preview-badge {
+      display: inline-block;
+      padding: 2px var(--space-2);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-primary);
+      background-color: #dbeafe;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-2);
+    }
+
+    .preview-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--color-text);
+      letter-spacing: -0.02em;
+    }
+
+    .preview-subtitle {
+      color: var(--color-text-muted);
+      font-size: 0.9375rem;
+      margin-top: var(--space-1);
+    }
+
+    /* Toolbar */
+    .cs-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .cs-search-box {
+      flex: 1 1 320px;
+      max-width: 500px;
+      position: relative;
+    }
+
+    .cs-search-input {
+      width: 100%;
+      padding: var(--space-2) var(--space-8) var(--space-2) 2.25rem;
+      font-size: 0.875rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      outline: none;
+    }
+
+    .cs-search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15);
+    }
+
+    .cs-search-icon {
+      position: absolute;
+      left: var(--space-3);
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.875rem;
+      color: var(--color-text-subtle);
+      pointer-events: none;
+    }
+
+    .cs-search-clear {
+      position: absolute;
+      right: var(--space-2);
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 4px;
+    }
+
+    .cs-sort-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .cs-sort-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+    }
+
+    .cs-sort-select {
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.875rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background-color: var(--color-background);
+      cursor: pointer;
+    }
+
+    .cs-sort-btn {
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background-color: var(--color-surface);
+      cursor: pointer;
+    }
+
+    /* Active Filter Pills */
+    .cs-active-pills-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      margin-bottom: var(--space-4);
+      background-color: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .cs-pill-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px var(--space-2);
+      font-size: 0.75rem;
+      background-color: var(--color-background);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-full);
+    }
+
+    .cs-pill-remove {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      font-size: 0.6875rem;
+      padding: 0 2px;
+    }
+
+    .cs-pill-remove:hover {
+      color: var(--color-error);
+    }
+
+    .cs-clear-all {
+      margin-left: auto;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-error);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    /* Grid Layout */
+    .cs-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: var(--space-6);
+      align-items: start;
+    }
+
+    /* Sidebar */
+    .cs-sidebar {
+      background-color: var(--color-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+    }
+
+    .cs-sidebar-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-facet-group {
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-facet-heading {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-2);
+    }
+
+    .cs-radio-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 0.8125rem;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    /* Table */
+    .cs-table-card {
+      background-color: var(--color-background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .cs-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    .cs-table th {
+      padding: var(--space-3) var(--space-4);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      background-color: var(--color-surface);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-table td {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cs-table tr:hover {
+      background-color: var(--color-surface);
+    }
+
+    .badge-in-stock {
+      background-color: var(--color-success-bg);
+      color: var(--color-success);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-out-of-stock {
+      background-color: var(--color-error-bg);
+      color: var(--color-error);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-low-stock {
+      background-color: var(--color-warning-bg);
+      color: var(--color-warning);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Empty state */
+    .cs-empty-state {
+      padding: var(--space-8);
+      text-align: center;
+    }
+
+    .cs-empty-state-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: var(--space-1);
+    }
+
+    .cs-empty-state-msg {
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-4);
+    }
+
+    .cs-btn-primary {
+      padding: var(--space-2) var(--space-4);
+      background-color: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .cs-btn-primary:hover {
+      background-color: var(--color-primary-hover);
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-header">
+    <span class="preview-badge">Gate G2 Module Delivery</span>
+    <h1 class="preview-title">ERP-1 Products and Inventory</h1>
+    <p class="preview-subtitle">
+      Search, faceted filter sidebar, active filter pill tags, and sorting controls strictly conforming to ClearShift V1 architecture.
+    </p>
+  </div>
+
+  <!-- Search & Sorting Toolbar -->
+  <div class="cs-toolbar" role="search" aria-label="Search and sort products">
+    <div class="cs-search-box">
+      <span class="cs-search-icon" aria-hidden="true">🔍</span>
+      <input
+        id="search-input"
+        type="search"
+        class="cs-search-input"
+        placeholder="Search products by name or SKU (debounced 300ms)..."
+        aria-label="Search products by name or SKU"
+      />
+      <button id="search-clear-btn" class="cs-search-clear" style="display: none;" aria-label="Clear search">✕</button>
+    </div>
+
+    <div class="cs-sort-controls">
+      <label for="sort-select" class="cs-sort-label">Sort by:</label>
+      <select id="sort-select" class="cs-sort-select" aria-label="Sort products by field">
+        <option value="name">Product Name</option>
+        <option value="sku">SKU</option>
+        <option value="price">Price</option>
+        <option value="createdAt">Date Created</option>
+        <option value="quantity">Stock Quantity</option>
+      </select>
+      <button id="sort-dir-btn" class="cs-sort-btn" aria-label="Toggle sort direction">▲ Asc</button>
+    </div>
+  </div>
+
+  <!-- Active Filter Pills -->
+  <div id="pills-bar" class="cs-active-pills-bar" style="display: none;" role="region" aria-label="Active filters">
+    <span style="font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted);">Active filters:</span>
+    <div id="pills-container" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+    <button id="clear-all-btn" class="cs-clear-all" aria-label="Clear all active filters">Clear All</button>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="cs-layout">
+    <!-- Faceted Filter Sidebar -->
+    <aside class="cs-sidebar" aria-label="Faceted filter sidebar">
+      <h2 class="cs-sidebar-title">Faceted Filters</h2>
+
+      <!-- Categories -->
+      <div class="cs-facet-group">
+        <h3 class="cs-facet-heading">Categories</h3>
+        <label class="cs-radio-option">
+          <input type="radio" name="cat" value="" checked />
+          <span>All Categories</span>
+        </label>
+        <label class="cs-radio-option">
+          <input type="radio" name="cat" value="raw-materials" />
+          <span>Raw Materials (RAW)</span>
+        </label>
+        <label class="cs-radio-option">
+          <input type="radio" name="cat" value="finished-goods" />
+          <span>Finished Goods (FIN)</span>
+        </label>
+        <label class="cs-radio-option">
+          <input type="radio" name="cat" value="packaging" />
+          <span>Packaging (PKG)</span>
+        </label>
+      </div>
+
+      <!-- Unit of Measure -->
+      <div class="cs-facet-group">
+        <h3 class="cs-facet-heading">Unit of Measure</h3>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="" checked /> <span>All Units</span></label>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="pcs" /> <span>Pieces (pcs)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="kg" /> <span>Kilograms (kg)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="g" /> <span>Grams (g)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="litre" /> <span>Litres (litre)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="uom" value="box" /> <span>Boxes (box)</span></label>
+      </div>
+
+      <!-- Stock Status -->
+      <div class="cs-facet-group">
+        <h3 class="cs-facet-heading">Stock Status</h3>
+        <label class="cs-radio-option"><input type="radio" name="stock" value="" checked /> <span>All Statuses</span></label>
+        <label class="cs-radio-option"><input type="radio" name="stock" value="in_stock" /> <span>In Stock (> 10)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="stock" value="low_stock" /> <span>Low Stock (1-10)</span></label>
+        <label class="cs-radio-option"><input type="radio" name="stock" value="out_of_stock" /> <span>Out of Stock (0)</span></label>
+      </div>
+    </aside>
+
+    <!-- Products Table Area -->
+    <main class="cs-table-card" aria-label="Products data table">
+      <div id="table-container">
+        <table class="cs-table" aria-label="Products Table">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>SKU</th>
+              <th>Category</th>
+              <th>Unit</th>
+              <th style="text-align: right;">Price</th>
+              <th style="text-align: right;">Tax</th>
+              <th>Stock Status</th>
+            </tr>
+          </thead>
+          <tbody id="products-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="empty-state" class="cs-empty-state" style="display: none;">
+        <div style="font-size: 2rem; margin-bottom: 8px;" aria-hidden="true">📭</div>
+        <h2 class="cs-empty-state-title">No matching products found</h2>
+        <p class="cs-empty-state-msg">No products match the selected filters or search query. Try adjusting your search term or clearing active filters.</p>
+        <button id="empty-clear-btn" class="cs-btn-primary">Clear All Filters</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const SYNTHETIC_PRODUCTS = [
+      { id: '1', name: 'Precision Steel Hex Bolt M8', sku: 'BLT-HEX-001', category: 'raw-materials', categoryName: 'Raw Materials', uom: 'box', price: '45.5000', currency: 'USD', tax: '5.00', qty: 150 },
+      { id: '2', name: 'Industrial Silicone Gasket 200mm', sku: 'GSK-SIL-200', category: 'raw-materials', categoryName: 'Raw Materials', uom: 'pcs', price: '12.2500', currency: 'USD', tax: '5.00', qty: 8 },
+      { id: '3', name: 'Standard Ergonomic Office Chair', sku: 'CHR-ERG-901', category: 'finished-goods', categoryName: 'Finished Goods', uom: 'pcs', price: '299.9900', currency: 'USD', tax: '8.25', qty: 45 },
+      { id: '4', name: 'Ultra-Bond Solvent Cement 5L', sku: 'SOL-CMT-005', category: 'raw-materials', categoryName: 'Raw Materials', uom: 'litre', price: '78.0000', currency: 'USD', tax: '10.00', qty: 0 },
+      { id: '5', name: 'Corrugated Shipping Box XL', sku: 'BOX-CRG-990', category: 'packaging', categoryName: 'Packaging', uom: 'box', price: '3.4500', currency: 'USD', tax: '0.00', qty: 520 },
+      { id: '6', name: 'High-Torque Electric Actuator', sku: 'ACT-ELC-440', category: 'finished-goods', categoryName: 'Finished Goods', uom: 'pcs', price: '540.0000', currency: 'USD', tax: '8.25', qty: 5 },
+      { id: '7', name: 'Conductive Copper Wiring 50m', sku: 'WIR-CPR-050', category: 'raw-materials', categoryName: 'Raw Materials', uom: 'metre', price: '88.9000', currency: 'USD', tax: '5.00', qty: 75 },
+    ];
+
+    let state = {
+      search: '',
+      category: '',
+      uom: '',
+      stock: '',
+      sortBy: 'name',
+      sortDir: 'asc',
+    };
+
+    let debounceTimer = null;
+
+    function render() {
+      // 1. Filter
+      let filtered = SYNTHETIC_PRODUCTS.filter(p => {
+        if (state.search) {
+          const s = state.search.toLowerCase();
+          const matchName = p.name.toLowerCase().includes(s);
+          const matchSku = p.sku.toLowerCase().includes(s);
+          if (!matchName && !matchSku) return false;
+        }
+        if (state.category && p.category !== state.category) return false;
+        if (state.uom && p.uom !== state.uom) return false;
+        if (state.stock === 'in_stock' && p.qty <= 10) return false;
+        if (state.stock === 'low_stock' && (p.qty === 0 || p.qty > 10)) return false;
+        if (state.stock === 'out_of_stock' && p.qty !== 0) return false;
+        return true;
+      });
+
+      // 2. Sort
+      filtered.sort((a, b) => {
+        let va = a[state.sortBy];
+        let vb = b[state.sortBy];
+        if (state.sortBy === 'price' || state.sortBy === 'quantity') {
+          va = Number(state.sortBy === 'quantity' ? a.qty : a.price);
+          vb = Number(state.sortBy === 'quantity' ? b.qty : b.price);
+        }
+        if (va < vb) return state.sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return state.sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      // 3. Render Table or Empty State
+      const tbody = document.getElementById('products-tbody');
+      const tableContainer = document.getElementById('table-container');
+      const emptyState = document.getElementById('empty-state');
+
+      if (filtered.length === 0) {
+        tableContainer.style.display = 'none';
+        emptyState.style.display = 'block';
+      } else {
+        tableContainer.style.display = 'block';
+        emptyState.style.display = 'none';
+
+        tbody.innerHTML = filtered.map(p => {
+          let badgeClass = 'badge-in-stock';
+          let badgeText = `In Stock (${p.qty})`;
+          if (p.qty === 0) {
+            badgeClass = 'badge-out-of-stock';
+            badgeText = 'Out of Stock (0)';
+          } else if (p.qty <= 10) {
+            badgeClass = 'badge-low-stock';
+            badgeText = `Low Stock (${p.qty})`;
+          }
+
+          return `
+            <tr>
+              <td><strong>${p.name}</strong></td>
+              <td><code>${p.sku}</code></td>
+              <td>${p.categoryName}</td>
+              <td><span style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${p.uom}</span></td>
+              <td style="text-align: right; font-variant-numeric: tabular-nums;">$${Number(p.price).toFixed(2)} ${p.currency}</td>
+              <td style="text-align: right;">${p.tax}%</td>
+              <td><span class="${badgeClass}">${badgeText}</span></td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 4. Render Active Pills
+      renderPills();
+    }
+
+    function renderPills() {
+      const pillsBar = document.getElementById('pills-bar');
+      const pillsContainer = document.getElementById('pills-container');
+      const pills = [];
+
+      if (state.search) pills.push({ key: 'search', label: 'Search', val: `"${state.search}"` });
+      if (state.category) {
+        const catMap = { 'raw-materials': 'Raw Materials', 'finished-goods': 'Finished Goods', 'packaging': 'Packaging' };
+        pills.push({ key: 'category', label: 'Category', val: catMap[state.category] || state.category });
+      }
+      if (state.uom) pills.push({ key: 'uom', label: 'Unit', val: state.uom });
+      if (state.stock) {
+        const stockMap = { in_stock: 'In Stock', low_stock: 'Low Stock', out_of_stock: 'Out of Stock' };
+        pills.push({ key: 'stock', label: 'Stock', val: stockMap[state.stock] });
+      }
+
+      if (pills.length === 0) {
+        pillsBar.style.display = 'none';
+      } else {
+        pillsBar.style.display = 'flex';
+        pillsContainer.innerHTML = pills.map(pill => `
+          <span class="cs-pill-tag">
+            <strong>${pill.label}:</strong> ${pill.val}
+            <button class="cs-pill-remove" onclick="removePill('${pill.key}')" aria-label="Remove filter: ${pill.label}">✕</button>
+          </span>
+        `).join('');
+      }
+    }
+
+    window.removePill = function(key) {
+      if (key === 'search') {
+        state.search = '';
+        document.getElementById('search-input').value = '';
+        document.getElementById('search-clear-btn').style.display = 'none';
+      } else if (key === 'category') {
+        state.category = '';
+        document.querySelector('input[name="cat"][value=""]').checked = true;
+      } else if (key === 'uom') {
+        state.uom = '';
+        document.querySelector('input[name="uom"][value=""]').checked = true;
+      } else if (key === 'stock') {
+        state.stock = '';
+        document.querySelector('input[name="stock"][value=""]').checked = true;
+      }
+      render();
+    };
+
+    function clearAll() {
+      state.search = '';
+      state.category = '';
+      state.uom = '';
+      state.stock = '';
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-clear-btn').style.display = 'none';
+      document.querySelector('input[name="cat"][value=""]').checked = true;
+      document.querySelector('input[name="uom"][value=""]').checked = true;
+      document.querySelector('input[name="stock"][value=""]').checked = true;
+      render();
+    }
+
+    document.getElementById('clear-all-btn').addEventListener('click', clearAll);
+    document.getElementById('empty-clear-btn').addEventListener('click', clearAll);
+
+    // Search with 300ms Debounce
+    const searchInput = document.getElementById('search-input');
+    const searchClearBtn = document.getElementById('search-clear-btn');
+
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      searchClearBtn.style.display = val ? 'block' : 'none';
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.search = val.trim();
+        render();
+      }, 300);
+    });
+
+    searchClearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchClearBtn.style.display = 'none';
+      state.search = '';
+      render();
+    });
+
+    // Sidebar Facets
+    document.querySelectorAll('input[name="cat"]').forEach(el => {
+      el.addEventListener('change', (e) => { state.category = e.target.value; render(); });
+    });
+    document.querySelectorAll('input[name="uom"]').forEach(el => {
+      el.addEventListener('change', (e) => { state.uom = e.target.value; render(); });
+    });
+    document.querySelectorAll('input[name="stock"]').forEach(el => {
+      el.addEventListener('change', (e) => { state.stock = e.target.value; render(); });
+    });
+
+    // Sorting
+    document.getElementById('sort-select').addEventListener('change', (e) => {
+      state.sortBy = e.target.value;
+      render();
+    });
+
+    const sortDirBtn = document.getElementById('sort-dir-btn');
+    sortDirBtn.addEventListener('click', () => {
+      state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      sortDirBtn.textContent = state.sortDir === 'asc' ? '▲ Asc' : '▼ Desc';
+      render();
+    });
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

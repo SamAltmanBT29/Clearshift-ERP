@@ -117,6 +117,42 @@ describe('ERP-1 Products & Inventory contracts', () => {
       expect(parsed.search).toBe('widget');
       expect(parsed.categoryId).toBe(PRODUCT_ID);
     });
+
+    it('accepts faceted filters and sorting controls (ERP1-18)', () => {
+      const parsed = ProductListQuerySchema.parse({
+        search: 'bolts',
+        categoryId: PRODUCT_ID,
+        unitOfMeasure: 'box',
+        stockStatus: 'in_stock',
+        minPrice: '10.50',
+        maxPrice: '100.00',
+        sortBy: 'price',
+        sortDirection: 'asc',
+      });
+      expect(parsed.unitOfMeasure).toBe('box');
+      expect(parsed.stockStatus).toBe('in_stock');
+      expect(parsed.minPrice).toBe('10.5000');
+      expect(parsed.maxPrice).toBe('100.0000');
+      expect(parsed.sortBy).toBe('price');
+      expect(parsed.sortDirection).toBe('asc');
+    });
+
+    it('handles empty string filter values by converting them to undefined', () => {
+      const parsed = ProductListQuerySchema.parse({
+        categoryId: '',
+        unitOfMeasure: '',
+        stockStatus: '',
+        minPrice: '',
+        maxPrice: '',
+        sortBy: '',
+      });
+      expect(parsed.categoryId).toBeUndefined();
+      expect(parsed.unitOfMeasure).toBeUndefined();
+      expect(parsed.stockStatus).toBeUndefined();
+      expect(parsed.minPrice).toBeUndefined();
+      expect(parsed.maxPrice).toBeUndefined();
+      expect(parsed.sortBy).toBeUndefined();
+    });
   });
 
   describe('Category edit contract', () => {

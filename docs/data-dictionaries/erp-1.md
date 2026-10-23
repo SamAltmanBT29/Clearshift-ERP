@@ -296,3 +296,34 @@ Base: `/api/v1/erp-products`
 | POST | `/stock/opening` | Set opening stock idempotently |
 
 Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `packages/contracts/openapi/erp-1.yaml`.
+
+---
+
+## 12. Search, Filters and Sorting Controls (ERP1-18)
+
+**Issue**: [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) — `[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`  
+**Implementation**: `apps/erp/modules/erp-1/web/src/` — API client, faceted sidebar, active filter pills, sorting controls, debounced search, and products list page.
+
+### 12.1 Query Parameters (`GET /api/v1/erp-products/products`)
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `search` | `string` | No | — | Text search matched against product name and SKU (debounced 300ms on frontend) |
+| `categoryId` | `UUID` | No | — | Filter products by category UUID |
+| `unitOfMeasure` | `enum` | No | — | Filter by fixed V1 unit (`pcs`, `kg`, `g`, `litre`, `metre`, `box`) |
+| `stockStatus` | `enum` | No | `all` | Filter by inventory stock status (`all`, `in_stock`, `low_stock`, `out_of_stock`) |
+| `minPrice` | `decimal` | No | — | Filter products with price >= minPrice (numeric 19,4) |
+| `maxPrice` | `decimal` | No | — | Filter products with price <= maxPrice (numeric 19,4) |
+| `sortBy` | `enum` | No | `name` | Sort field (`name`, `sku`, `price`, `createdAt`, `quantity`) |
+| `sortDirection` | `enum` | No | `asc` | Sort direction (`asc`, `desc`) |
+| `page` | `integer` | No | `1` | 1-based page number (bounded) |
+| `pageSize` | `integer` | No | `25` | Page size capped between 1 and 100 |
+
+### 12.2 UI Operational Logic & Acceptance Criteria
+
+1. **Debounced Search**: The search input debounces keystrokes with a 300ms pause to ensure one API request per word rather than firing per keystroke.
+2. **Faceted Filter Sidebar**: Dedicated faceted sidebar allowing operators to filter by category, unit of measure, stock status, and price range.
+3. **URL Query State Synchronization**: Every faceted filter and search term synchronizes to URL query search params (`?search=...&categoryId=...&unitOfMeasure=...&sortBy=...`), enabling shareable/bookmarkable URLs and browser history navigation.
+4. **Active Filter Pill Tags**: Active filters render as removable pill tags. Clicking the clear button on an individual pill removes that filter, updates the URL query state, and reloads table results; a 'Clear All' button resets all filters simultaneously.
+5. **Stable Empty States**: When search or filter queries return zero matching rows, the interface displays an informative empty state message (`No products match the selected filters or search query`) with a direct action to reset/clear filters.
+
