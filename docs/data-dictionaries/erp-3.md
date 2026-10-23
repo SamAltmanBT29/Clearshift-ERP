@@ -105,3 +105,44 @@ This document specifies the canonical data dictionary for ERP-3 Sales Orders and
    - An unpaid/open invoice becomes `overdue` when the current UTC calendar date is strictly greater than `due_date`.
    - Otherwise, status is `open`.
 5. **Single Full Payment in V1**: Partial payments and overpayments are rejected.
+
+---
+
+## Human-Operated Workflows & UI Architecture (ERP3-05)
+
+### 1. Sales Order Creation Workflow
+- **Screen**: `OrderCreatePage` hosting `OrderForm`.
+- **Client Validation**:
+  - `customerGoldenId`: Mandatory, case-insensitive match against `/^gid-[a-zA-Z0-9_-]+$/i`.
+  - `orderDate`: Valid ISO date (`YYYY-MM-DD`).
+  - `lines`: Minimum 1 item required; each line requires non-empty `productId`, integer `quantity >= 1`, decimal `unitPrice >= 0`, and decimal `taxRate >= 0`.
+- **Live Calculations**:
+  - `taxAmount` per line computed client-side using `calculateLineAmounts` to provide immediate feedback; server validation remains authoritative.
+  - Overall order subtotal, tax total, and total render live in `cs-totals-summary-card`.
+- **Error Handling**: API errors display in `cs-form-error-banner` without wiping user-entered values.
+
+### 2. Sales Order Detail & Status Transitions
+- **Screen**: `OrderDetailPage`.
+- **Features**:
+  - Read-only display of order metadata, customer reference, and line items.
+  - Displays computed totals matching BR-ERP3-01.
+  - Status transitions (`open` -> `invoiced` -> `closed`): Irreversible action (`closed`) requires confirmation via `ConfirmActionDialog`.
+  - "Generate Invoice" workflow shortcut automatically transfers order reference to `InvoiceCreatePage`.
+
+### 3. Billing Invoice Creation Workflow
+- **Screen**: `InvoiceCreatePage` hosting `InvoiceForm`.
+- **Client Validation**:
+  - `orderId`: Required valid sales order identifier.
+  - `dueDate`: Required ISO date (`YYYY-MM-DD`); mandatory for overdue status derivation.
+- **Workflow**:
+  - On submission, calls `POST /api/v1/erp-orders/invoices`.
+  - Navigates to `InvoiceDetailPage` upon creation.
+
+### 4. Invoice Detail & Payment Settlement
+- **Screen**: `InvoiceDetailPage` hosting `PaymentModal`.
+- **Features**:
+  - Displays invoice status badge (`open`, `paid`, `overdue`).
+  - Shows overdue warning banner when status is `overdue` (current UTC date > `due_date`).
+  - Displays associated payment history from `GET /api/v1/erp-orders/payments`.
+  - "Record Payment" action opens modal to record full settlement.
+  - Once payment is recorded, status transitions automatically to `paid`.

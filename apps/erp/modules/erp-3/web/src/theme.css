@@ -402,8 +402,439 @@
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: opacity 0.15s ease;
 }
 
 .cs-btn-danger:hover {
   opacity: 0.9;
+}
+
+/* Header actions row */
+.cs-header-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+@media (min-width: 640px) {
+  .cs-header-actions-row {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.cs-top-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Back navigation */
+.cs-back-nav {
+  margin-bottom: var(--space-4);
+}
+
+.cs-btn-back {
+  background: transparent;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cs-btn-back:hover {
+  text-decoration: underline;
+}
+
+/* Form Card & Fields */
+.cs-form-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-subtle);
+}
+
+.cs-form-section {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: var(--space-4);
+  padding-bottom: 0;
+}
+
+.cs-form-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-4);
+}
+
+.cs-section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.cs-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .cs-form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+.cs-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-form-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.cs-required-marker {
+  color: var(--color-error);
+}
+
+.cs-field-helper {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.cs-field-error {
+  font-size: 0.75rem;
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.cs-field-error-xs {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-error);
+  margin-top: 2px;
+}
+
+.cs-input-error {
+  border-color: var(--color-error) !important;
+}
+
+.cs-input-error:focus {
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 0 1px var(--color-error) !important;
+}
+
+.cs-textarea {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.cs-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 1px var(--border-focus);
+}
+
+.cs-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cs-form-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+  font-size: 0.875rem;
+  color: var(--color-error);
+}
+
+.cs-error-icon {
+  font-size: 1.125rem;
+}
+
+/* Dynamic Line Items Table */
+.cs-lines-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.cs-lines-table td {
+  vertical-align: top;
+  padding: var(--space-2) var(--space-3);
+}
+
+.cs-input-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.cs-text-right {
+  text-align: right;
+}
+
+.cs-btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.cs-btn-xs {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Totals Summary Card */
+.cs-totals-summary-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  max-width: 360px;
+  margin-left: auto;
+}
+
+.cs-totals-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.cs-totals-final {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 1rem;
+  color: var(--color-text);
+  margin-bottom: 0;
+}
+
+/* Detail Screen Layout */
+.cs-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+@media (min-width: 640px) {
+  .cs-detail-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.cs-detail-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cs-detail-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.cs-detail-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.cs-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.cs-meta-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-meta-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.cs-meta-value {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.cs-meta-notes-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  font-size: 0.875rem;
+}
+
+.cs-meta-notes-card p {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.cs-text-danger {
+  color: var(--color-error);
+}
+
+.cs-table-header-title {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-section-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Modal Dialog */
+.cs-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: var(--space-4);
+}
+
+.cs-modal-card {
+  background-color: var(--color-background);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+}
+
+.cs-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cs-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.cs-modal-close:hover {
+  color: var(--color-text);
+}
+
+.cs-modal-body {
+  padding: var(--space-5);
+}
+
+.cs-modal-message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.cs-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Invoice Balance Summary Box */
+.cs-invoice-balance-box {
+  background-color: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cs-balance-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.cs-balance-value {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.cs-balance-due {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+  font-weight: 600;
+  color: var(--color-primary);
 }
