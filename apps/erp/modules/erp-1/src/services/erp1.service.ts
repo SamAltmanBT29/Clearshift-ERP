@@ -1,181 +1,592 @@
 /**
  * ERP-1 Products & Inventory — Domain Service
  *
- * Coordinates business operations, transactions, and invariants across
- * Products, Categories, Warehouses, and Stock levels.
+ * Owns the V1 business rules:
+ *   - unique SKU after deterministic normalization (BR-ERP1-01)
+ *   - fixed units of measure (FR-ERP1-04)
+ *   - single-level categories (FR-ERP1-03)
+ *   - one default warehouse and non-negative stock (FR-ERP1-05/06,
+ *     BR-ERP1-02)
+ *   - idempotent opening-stock loads with a durable receipt in the same
+ *     transaction as the stock mutation
  *
  * @module erp1/services/erp1.service
  */
 
-import type { ReferenceResolver } from '@cs/kernel';
-import type {
-  Category,
-  Warehouse,
-  Product,
-  StockLevel,
-  ProductLinkedRecords,
-  ProductListQuery,
-  CreateProductInput,
-  UpdateProductInput,
-  CreateCategoryInput,
-  UpdateCategoryInput,
-  SetOpeningStockInput,
-} from '@clearshift/contracts';
-import type { Erp1Repository } from './repository.js';
+import { randomUUID } from 'node:crypto';
 import {
-  validateUnitOfMeasure,
-  validateCurrency,
-  validateStockNonNegative,
-  validateDecimalPrice,
-  validateCategoryHierarchy,
-  Erp1DomainError,
-} from '../domain/rules.js';
+  ERP1_DOMAIN_RULES,
+  normalizeSku,
+  type Category,
+  type CategoryListQuery,
+  type CreateCategoryInput,
+  type CreateProductInput,
+  type Product,
+  type ProductListQuery,
+  type SetOpeningStockInput,
+  type StockLevel,
+  type StockLevelListQuery,
+  type UpdateCategoryInput,
+  type UpdateProductInput,
+  type Warehouse,
+} from '@clearshift/contracts';
+import {
+  Erp1ConflictError,
+  Erp1NotFoundError,
+  Erp1UnprocessableError,
+  Erp1BadRequestError,
+} from './errors.js';
+import {
+  computeRequestHash,
+  type Erp1ImportReceipt,
+  type Erp1Page,
+  type Erp1Repository,
+  type NewErp1ImportReceipt,
+  type NewErp1Product,
+} from './repository.js';
+
+const ZERO_UUID = '00000000-0000-4000-8000-000000000000';
 
 export interface Erp1ServiceOptions {
   repository: Erp1Repository;
-  referenceResolver?: ReferenceResolver | undefined;
+}
+
+export interface IdempotentResult<T> {
+  entity: T;
+  priorResult: boolean;
+  receipt?: Erp1ImportReceipt;
+}
+
+export interface OpeningStockResult extends IdempotentResult<StockLevel> {}
+
+interface ImportMeta {
+  idempotencyKey?: string | undefined;
+  batchId: string;
+  sourceRow: number;
+}
+
+function importMeta(input: {
+  idempotency_key?: string | undefined;
+  idempotencyKey?: string | undefined;
+  batch_id?: string | undefined;
+  batchId?: string | undefined;
+  source_row?: number | undefined;
+  sourceRow?: number | undefined;
+}): ImportMeta {
+  const key = input.idempotency_key ?? input.idempotencyKey;
+  return {
+    idempotencyKey: key !== undefined && key.trim().length > 0 ? key.trim() : undefined,
+    batchId: input.batch_id ?? input.batchId ?? ZERO_UUID,
+    sourceRow: input.source_row ?? input.sourceRow ?? 0,
+  };
+}
+
+function sourceSystemOf(input: {
+  source_system?: string | undefined;
+  sourceSystem?: string | undefined;
+}): string | null {
+  return input.source_system ?? input.sourceSystem ?? null;
+}
+
+function sourceIdOf(input: {
+  source_id?: string | undefined;
+  sourceId?: string | undefined;
+}): string | null {
+  return input.source_id ?? input.sourceId ?? null;
+}
+
+function parseReceiptPayload<T>(receipt: Erp1ImportReceipt | null): T | null {
+  if (!receipt?.responsePayload) return null;
+  try {
+    return JSON.parse(receipt.responsePayload) as T;
+  } catch {
+    return null;
+  }
 }
 
 export class Erp1Service {
-  readonly repository: Erp1Repository;
-  readonly referenceResolver?: ReferenceResolver | undefined;
+  private readonly repo: Erp1Repository;
 
-  constructor(options: Erp1ServiceOptions) {
-    this.repository = options.repository;
-    this.referenceResolver = options.referenceResolver;
+  constructor(options: Erp1ServiceOptions | Erp1Repository) {
+    this.repo = 'repository' in options ? options.repository : options;
   }
 
-  // ── Categories ─────────────────────────────────────────────────────────────
+  // ── Products ──────────────────────────────────────────────────────────────
 
-  async listCategories(): Promise<Category[]> {
-    return this.repository.listCategories();
-  }
-
-  async getCategoryById(id: string): Promise<Category | null> {
-    return this.repository.getCategoryById(id);
-  }
-
-  async createCategory(input: CreateCategoryInput & { id?: string }): Promise<Category> {
-    // Check hierarchy: one level only (no parentId supported in V1)
-    if ('parentId' in input && input['parentId']) {
-      validateCategoryHierarchy(true);
-    }
-    return this.repository.createCategory(input);
-  }
-
-  async updateCategory(id: string, input: UpdateCategoryInput): Promise<Category> {
-    const updated = await this.repository.updateCategory(id, input);
-    if (!updated) {
-      throw new Erp1DomainError(`Category "${id}" not found`, 'CATEGORY_NOT_FOUND', 404, 'id');
-    }
-    return updated;
-  }
-
-  // ── Warehouses ─────────────────────────────────────────────────────────────
-
-  async getDefaultWarehouse(): Promise<Warehouse> {
-    return this.repository.getDefaultWarehouse();
-  }
-
-  async getWarehouseById(id: string): Promise<Warehouse | null> {
-    return this.repository.getWarehouseById(id);
-  }
-
-  // ── Products ───────────────────────────────────────────────────────────────
-
-  async listProducts(query: ProductListQuery): Promise<{ items: Product[]; total: number; page: number; pageSize: number }> {
-    return this.repository.listProducts(query);
+  async listProducts(query: ProductListQuery): Promise<Erp1Page<Product>> {
+    return this.repo.listProducts(query);
   }
 
   async getProductById(id: string): Promise<Product> {
-    const product = await this.repository.getProductById(id);
+    const product = await this.repo.getProductById(id);
     if (!product) {
-      throw new Erp1DomainError(`Product "${id}" not found`, 'PRODUCT_NOT_FOUND', 404, 'id');
+      throw new Erp1NotFoundError('Product', id);
     }
     return product;
   }
 
-  async createProduct(input: CreateProductInput & { id?: string }): Promise<Product> {
-    // Validate unit of measure
-    validateUnitOfMeasure(input.unitOfMeasure);
-
-    // Validate currency
-    validateCurrency(input.currency);
-
-    // Validate price
-    validateDecimalPrice(input.price);
-
-    // Check category exists if provided
-    if (input.categoryId) {
-      const cat = await this.repository.getCategoryById(input.categoryId);
-      if (!cat) {
-        throw new Erp1DomainError(`Referenced category "${input.categoryId}" does not exist`, 'CATEGORY_NOT_FOUND', 422, 'categoryId');
-      }
-    }
-
-    return this.repository.createProduct(input);
+  /** Create a product without requiring import idempotency. */
+  async createProduct(input: CreateProductInput): Promise<Product> {
+    const result = await this.createProductWithIdempotency(input);
+    return result.entity;
   }
 
-  async updateProduct(id: string, input: UpdateProductInput & { sku?: string }): Promise<Product> {
-    if (input.unitOfMeasure) {
-      validateUnitOfMeasure(input.unitOfMeasure);
-    }
-    if (input.currency) {
-      validateCurrency(input.currency);
-    }
-    if (input.price !== undefined) {
-      validateDecimalPrice(input.price);
-    }
-    if (input.categoryId) {
-      const cat = await this.repository.getCategoryById(input.categoryId);
-      if (!cat) {
-        throw new Erp1DomainError(`Referenced category "${input.categoryId}" does not exist`, 'CATEGORY_NOT_FOUND', 422, 'categoryId');
-      }
-    }
-
-    const updated = await this.repository.updateProduct(id, input);
-    if (!updated) {
-      throw new Erp1DomainError(`Product "${id}" not found`, 'PRODUCT_NOT_FOUND', 404, 'id');
-    }
-    return updated;
-  }
-
-  async getLinkedRecords(id: string): Promise<ProductLinkedRecords> {
-    return this.repository.getLinkedRecords(id);
-  }
-
-  // ── Stock ──────────────────────────────────────────────────────────────────
-
-  async listStock(query?: { productId?: string; warehouseId?: string }): Promise<StockLevel[]> {
-    return this.repository.listStock(query);
-  }
-
-  async setOpeningStock(input: SetOpeningStockInput): Promise<StockLevel> {
-    // Enforce non-negative stock (BR-ERP1-02)
-    validateStockNonNegative(input.quantity);
-
-    // Resolve warehouse: use default if not specified
-    let warehouseId = input.warehouseId;
-    if (!warehouseId) {
-      const defaultWh = await this.repository.getDefaultWarehouse();
-      warehouseId = defaultWh.id;
-    }
-
-    // Verify product exists
-    const prod = await this.repository.getProductById(input.productId);
-    if (!prod) {
-      throw new Erp1DomainError(`Product "${input.productId}" not found`, 'PRODUCT_NOT_FOUND', 404, 'productId');
-    }
-
-    const stockInput: { productId: string; warehouseId: string; quantity: string; notes?: string } = {
-      productId: input.productId,
-      warehouseId,
-      quantity: input.quantity,
+  /**
+   * Create a product. When an idempotency key is present, the target row and
+   * its durable receipt are written in one transaction; a retry of the same
+   * payload returns the original result and a different payload conflicts.
+   */
+  async createProductWithIdempotency(
+    input: CreateProductInput
+  ): Promise<IdempotentResult<Product>> {
+    const meta = importMeta(input);
+    const normalizedSku = normalizeSku(input.sku);
+    const businessPayload = {
+      name: input.name,
+      sku: normalizedSku,
+      categoryId: input.categoryId ?? null,
+      unitOfMeasure: input.unitOfMeasure,
+      price: input.price,
+      currency: input.currency ?? 'USD',
+      taxRate: input.taxRate ?? '0.00',
     };
-    const notes = (input as { notes?: string }).notes;
-    if (notes !== undefined) {
-      stockInput.notes = notes;
+    const requestHash = computeRequestHash(businessPayload);
+
+    return this.repo.transaction(async (tx) => {
+      if (meta.idempotencyKey !== undefined) {
+        const replay = await this.replay<Product>(tx, meta.idempotencyKey, requestHash);
+        if (replay !== null) return replay;
+      }
+
+      if ((await tx.getProductByNormalizedSku(normalizedSku)) !== null) {
+        throw new Erp1ConflictError(
+          `A product with SKU '${input.sku}' already exists.`,
+          [
+            {
+              field: 'sku',
+              code: ERP1_DOMAIN_RULES.SKU_DUPLICATE,
+              message: 'SKU must be unique after normalization (BR-ERP1-01)',
+            },
+          ],
+          ERP1_DOMAIN_RULES.SKU_DUPLICATE
+        );
+      }
+
+      await this.assertCategoryExists(tx, input.categoryId ?? null);
+
+      const product = await tx.createProduct({
+        name: input.name,
+        sku: input.sku,
+        normalizedSku,
+        categoryId: input.categoryId ?? null,
+        unitOfMeasure: input.unitOfMeasure,
+        price: input.price,
+        currency: input.currency ?? 'USD',
+        taxRate: input.taxRate ?? '0.00',
+        sourceSystem: sourceSystemOf(input),
+        sourceId: sourceIdOf(input),
+      } satisfies NewErp1Product);
+
+      await this.ensureZeroStock(tx, product.id);
+
+      const receipt = await this.writeReceipt(tx, {
+        meta,
+        targetId: product.id,
+        targetEntity: 'product',
+        requestHash,
+        sourceSystem: sourceSystemOf(input),
+        sourceId: sourceIdOf(input),
+        payload: product,
+      });
+
+      return { entity: product, priorResult: false, ...(receipt && { receipt }) };
+    });
+  }
+
+  async updateProduct(id: string, input: UpdateProductInput): Promise<Product> {
+    return this.repo.transaction(async (tx) => {
+      const existing = await tx.getProductById(id);
+      if (!existing) {
+        throw new Erp1NotFoundError('Product', id);
+      }
+
+      let sku = input.sku;
+      let normalizedSku: string | undefined;
+      if (sku !== undefined) {
+        normalizedSku = normalizeSku(sku);
+        const duplicate = await tx.getProductByNormalizedSku(normalizedSku);
+        if (duplicate !== null && duplicate.id !== id) {
+          throw new Erp1ConflictError(
+            `A product with SKU '${sku}' already exists.`,
+            [
+              {
+                field: 'sku',
+                code: ERP1_DOMAIN_RULES.SKU_DUPLICATE,
+                message: 'SKU must be unique after normalization (BR-ERP1-01)',
+              },
+            ],
+            ERP1_DOMAIN_RULES.SKU_DUPLICATE
+          );
+        }
+      }
+
+      if (input.categoryId !== undefined) {
+        await this.assertCategoryExists(tx, input.categoryId);
+      }
+
+      return tx.updateProduct(id, {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(sku !== undefined && { sku }),
+        ...(normalizedSku !== undefined && { normalizedSku }),
+        ...(input.categoryId !== undefined && { categoryId: input.categoryId }),
+        ...(input.unitOfMeasure !== undefined && { unitOfMeasure: input.unitOfMeasure }),
+        ...(input.price !== undefined && { price: input.price }),
+        ...(input.currency !== undefined && { currency: input.currency }),
+        ...(input.taxRate !== undefined && { taxRate: input.taxRate }),
+      });
+    });
+  }
+
+  // ── Categories ────────────────────────────────────────────────────────────
+
+  async listCategories(query: CategoryListQuery): Promise<Erp1Page<Category>> {
+    return this.repo.listCategories(query);
+  }
+
+  async getCategoryById(id: string): Promise<Category> {
+    const category = await this.repo.getCategoryById(id);
+    if (!category) {
+      throw new Erp1NotFoundError('Category', id);
     }
-    return this.repository.setOpeningStock(stockInput);
+    return category;
+  }
+
+  async createCategory(input: CreateCategoryInput): Promise<Category> {
+    const result = await this.createCategoryWithIdempotency(input);
+    return result.entity;
+  }
+
+  async createCategoryWithIdempotency(
+    input: CreateCategoryInput
+  ): Promise<IdempotentResult<Category>> {
+    const meta = importMeta(input);
+    const businessPayload = { name: input.name, code: input.code };
+    const requestHash = computeRequestHash(businessPayload);
+
+    return this.repo.transaction(async (tx) => {
+      if (meta.idempotencyKey !== undefined) {
+        const replay = await this.replay<Category>(tx, meta.idempotencyKey, requestHash);
+        if (replay !== null) return replay;
+      }
+
+      if ((await tx.getCategoryByCode(input.code)) !== null) {
+        throw new Erp1ConflictError(
+          `A category with code '${input.code}' already exists.`,
+          [
+            {
+              field: 'code',
+              code: ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE,
+              message: 'Category code must be unique',
+            },
+          ],
+          ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE
+        );
+      }
+
+      const category = await tx.createCategory({
+        name: input.name,
+        code: input.code,
+      });
+
+      const receipt = await this.writeReceipt(tx, {
+        meta,
+        targetId: category.id,
+        targetEntity: 'category',
+        requestHash,
+        sourceSystem: sourceSystemOf(input),
+        sourceId: sourceIdOf(input),
+        payload: category,
+      });
+
+      return { entity: category, priorResult: false, ...(receipt && { receipt }) };
+    });
+  }
+
+  async updateCategory(id: string, input: UpdateCategoryInput): Promise<Category> {
+    return this.repo.transaction(async (tx) => {
+      const existing = await tx.getCategoryById(id);
+      if (!existing) {
+        throw new Erp1NotFoundError('Category', id);
+      }
+
+      if (input.code !== undefined) {
+        const duplicate = await tx.getCategoryByCode(input.code);
+        if (duplicate !== null && duplicate.id !== id) {
+          throw new Erp1ConflictError(
+            `A category with code '${input.code}' already exists.`,
+            [
+              {
+                field: 'code',
+                code: ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE,
+                message: 'Category code must be unique',
+              },
+            ],
+            ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE
+          );
+        }
+      }
+
+      return tx.updateCategory(id, {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.code !== undefined && { code: input.code }),
+      });
+    });
+  }
+
+  // ── Stock ─────────────────────────────────────────────────────────────────
+
+  async listStockLevels(query: StockLevelListQuery): Promise<Erp1Page<StockLevel>> {
+    return this.repo.listStockLevels(query);
+  }
+
+  /**
+   * Set the opening quantity for a product in the single V1 warehouse.
+   *
+   * A stable idempotency key is mandatory: the stock upsert and the durable
+   * receipt are committed together, so a Kit retry can never double-load the
+   * same opening balance.
+   */
+  async setOpeningStock(input: SetOpeningStockInput): Promise<OpeningStockResult> {
+    const meta = importMeta(input);
+    if (meta.idempotencyKey === undefined) {
+      throw new Erp1BadRequestError(
+        'Opening stock is a migration load and requires an Idempotency-Key header.',
+        [
+          {
+            field: 'idempotency_key',
+            code: ERP1_DOMAIN_RULES.IMPORT_PROVENANCE_REQUIRED,
+            message: 'A stable Idempotency-Key is required for opening-stock loads',
+          },
+        ],
+        ERP1_DOMAIN_RULES.IMPORT_PROVENANCE_REQUIRED
+      );
+    }
+
+    const requestHash = computeRequestHash({
+      productId: input.productId,
+      warehouseId: input.warehouseId ?? null,
+      quantity: input.quantity,
+    });
+
+    return this.repo.transaction(async (tx) => {
+      const replay = await this.replay<StockLevel>(tx, meta.idempotencyKey as string, requestHash);
+      if (replay !== null) {
+        return {
+          entity: replay.entity,
+          priorResult: true,
+          ...(replay.receipt && { receipt: replay.receipt }),
+        };
+      }
+
+      const product = await tx.getProductById(input.productId);
+      if (!product) {
+        throw new Erp1NotFoundError('Product', input.productId);
+      }
+
+      const warehouse = await this.resolveWarehouse(tx, input.warehouseId);
+
+      if (Number(input.quantity) < 0) {
+        throw new Erp1UnprocessableError(
+          'Stock quantity cannot become negative (BR-ERP1-02).',
+          [
+            {
+              field: 'quantity',
+              code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
+              message: 'Stock quantity cannot become negative (BR-ERP1-02)',
+            },
+          ],
+          ERP1_DOMAIN_RULES.NEGATIVE_STOCK
+        );
+      }
+
+      const level = await tx.upsertStockLevel({
+        id: randomUUID(),
+        productId: product.id,
+        warehouseId: warehouse.id,
+        quantity: input.quantity,
+      });
+
+      const receipt = await this.writeReceipt(tx, {
+        meta,
+        targetId: level.id,
+        targetEntity: 'stock_level',
+        requestHash,
+        sourceSystem: sourceSystemOf(input),
+        sourceId: sourceIdOf(input),
+        payload: level,
+      });
+
+      return { entity: level, priorResult: false, ...(receipt && { receipt }) };
+    });
+  }
+
+  /** Alias used by the Migration Kit adapter vocabulary. */
+  loadOpeningStock(input: SetOpeningStockInput): Promise<OpeningStockResult> {
+    return this.setOpeningStock(input);
+  }
+
+  // ── Internal helpers ──────────────────────────────────────────────────────
+
+  private async replay<T>(
+    tx: Erp1Repository,
+    idempotencyKey: string,
+    requestHash: string
+  ): Promise<IdempotentResult<T> | null> {
+    const existing = await tx.getImportReceiptByKey(idempotencyKey);
+    if (existing === null) return null;
+
+    if (existing.requestHash !== requestHash) {
+      throw new Erp1ConflictError(
+        `Idempotency key '${idempotencyKey}' was previously used with a different request payload.`,
+        [
+          {
+            field: 'idempotency_key',
+            code: ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT,
+            message: 'The idempotency key is already bound to another payload',
+          },
+        ],
+        ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT
+      );
+    }
+
+    const payload = parseReceiptPayload<T>(existing);
+    if (payload === null) {
+      throw new Erp1ConflictError(
+        'The original idempotent result is no longer available.',
+        [
+          {
+            field: 'idempotency_key',
+            code: ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT,
+            message: 'Receipt has no replayable result',
+          },
+        ],
+        ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT
+      );
+    }
+
+    return { entity: payload, priorResult: true, receipt: existing };
+  }
+
+  private async writeReceipt(
+    tx: Erp1Repository,
+    data: {
+      meta: ImportMeta;
+      targetId: string;
+      targetEntity: string;
+      requestHash: string;
+      sourceSystem?: string | null;
+      sourceId?: string | null;
+      payload: unknown;
+    }
+  ): Promise<Erp1ImportReceipt | undefined> {
+    if (data.meta.idempotencyKey === undefined) return undefined;
+
+    return tx.createImportReceipt({
+      batchId: data.meta.batchId,
+      sourceRow: data.meta.sourceRow,
+      targetId: data.targetId,
+      targetEntity: data.targetEntity,
+      idempotencyKey: data.meta.idempotencyKey,
+      requestHash: data.requestHash,
+      sourceSystem: data.sourceSystem ?? null,
+      sourceId: data.sourceId ?? null,
+      outcome: 'loaded',
+      responsePayload: JSON.stringify(data.payload),
+    } satisfies NewErp1ImportReceipt);
+  }
+
+  private async assertCategoryExists(
+    tx: Erp1Repository,
+    categoryId: string | null
+  ): Promise<void> {
+    if (categoryId === null) return;
+    const category = await tx.getCategoryById(categoryId);
+    if (!category) {
+      throw new Erp1UnprocessableError(
+        `Category with identifier "${categoryId}" does not exist.`,
+        [
+          {
+            field: 'categoryId',
+            code: ERP1_DOMAIN_RULES.CATEGORY_REQUIRED,
+            message: 'Referenced category does not exist',
+          },
+        ],
+        ERP1_DOMAIN_RULES.CATEGORY_REQUIRED
+      );
+    }
+  }
+
+  private async resolveWarehouse(
+    tx: Erp1Repository,
+    warehouseId: string | undefined
+  ): Promise<Warehouse> {
+    if (warehouseId !== undefined) {
+      const warehouse = await tx.getWarehouseById(warehouseId);
+      if (!warehouse) {
+        throw new Erp1UnprocessableError(
+          `Warehouse with identifier "${warehouseId}" does not exist.`,
+          [
+            {
+              field: 'warehouseId',
+              code: ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED,
+              message: 'Referenced warehouse does not exist',
+            },
+          ],
+          ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED
+        );
+      }
+      if (!warehouse.isDefault) {
+        throw new Erp1UnprocessableError(
+          'V1 supports exactly one default warehouse.',
+          [
+            {
+              field: 'warehouseId',
+              code: ERP1_DOMAIN_RULES.SINGLE_WAREHOUSE,
+              message: 'Stock may only be loaded into the default warehouse in V1',
+            },
+          ],
+          ERP1_DOMAIN_RULES.SINGLE_WAREHOUSE
+        );
+      }
+      return warehouse;
+    }
+
+    const warehouse = await tx.getDefaultWarehouse();
+    if (!warehouse) {
+      throw new Erp1UnprocessableError(
+        'No default warehouse is configured.',
+        [
+          {
+            field: 'warehouseId',
+            code: ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED,
+            message: 'A default warehouse is required before loading stock',
+          },
+        ],
+        ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED
+      );
+    }
+    return warehouse;
+  }
+
+  private async ensureZeroStock(tx: Erp1Repository, productId: string): Promise<void> {
+    const warehouse = await tx.getDefaultWarehouse();
+    if (!warehouse) return;
+    const existing = await tx.getStockLevel(productId, warehouse.id);
+    if (existing) return;
+    await tx.upsertStockLevel({
+      productId,
+      warehouseId: warehouse.id,
+      quantity: '0.00',
+    });
   }
 }

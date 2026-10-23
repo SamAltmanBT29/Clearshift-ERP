@@ -1,12 +1,10 @@
 /**
  * ERP-1 Products Routes
  *
- * Exposes:
- *   GET   /api/v1/erp-products/products
- *   POST  /api/v1/erp-products/products
- *   GET   /api/v1/erp-products/products/:id
- *   PATCH /api/v1/erp-products/products/:id
- *   GET   /api/v1/erp-products/products/:id/linked-records
+ * GET   /products      — search by name/SKU with bounded pagination
+ * GET   /products/{id} — read one product
+ * POST  /products      — create a product
+ * PATCH /products/{id} — edit editable product fields
  *
  * @module erp1/routes/products
  */
@@ -14,50 +12,66 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   CreateProductInputSchema,
-  UpdateProductInputSchema,
+  Erp1IdParamSchema,
   ProductListQuerySchema,
+  UpdateProductInputSchema,
 } from '@clearshift/contracts';
-import type { Erp1Service } from '../services/erp1.service.js';
+import { erp1IngestGuard, erp1ReadGuard, erp1WriteGuard } from './guard.js';
+import { parseWriteBody } from './parsing.js';
+import type { Erp1RouteOptions } from './types.js';
 
-export const productsRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = async (
-  fastify,
-  options
-) => {
-  const { erp1Service } = options;
+export const productsRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fastify, opts) => {
+  const { erp1Service } = opts;
 
-  // GET /products
-  fastify.get('/products', async (request, reply) => {
-    const query = ProductListQuerySchema.parse(request.query);
-    const result = await erp1Service.listProducts(query);
-    return reply.status(200).send(result);
-  });
+  fastify.get(
+    '/products',
+    { preHandler: erp1ReadGuard },
+    async (request, reply) => {
+      const query = ProductListQuerySchema.parse(request.query);
+      const page = await erp1Service.listProducts(query);
 
-  // POST /products
-  fastify.post('/products', async (request, reply) => {
-    const input = CreateProductInputSchema.parse(request.body);
-    const product = await erp1Service.createProduct(input);
-    return reply.status(201).send(product);
-  });
+      return reply.status(200).send({
+        items: page.items,
+        total: page.total,
+        page: query.page,
+        pageSize: query.pageSize,
+        totalPages: Math.ceil(page.total / query.pageSize),
+      });
+    }
+  );
 
-  // GET /products/:id
-  fastify.get('/products/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const product = await erp1Service.getProductById(id);
-    return reply.status(200).send(product);
-  });
+  fastify.get(
+    '/products/:id',
+    { preHandler: erp1ReadGuard },
+    async (request, reply) => {
+      const { id } = Erp1IdParamSchema.parse(request.params);
+      const product = await erp1Service.getProductById(id);
+      return reply.status(200).send(product);
+    }
+  );
 
-  // PATCH /products/:id
-  fastify.patch('/products/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const input = UpdateProductInputSchema.parse(request.body);
-    const updated = await erp1Service.updateProduct(id, input);
-    return reply.status(200).send(updated);
-  });
+  fastify.post(
+    '/products',
+    { preHandler: erp1IngestGuard },
+    async (request, reply) => {
+      const body = parseWriteBody(CreateProductInputSchema, request);
+      const result = await erp1Service.createProductWithIdempotency(body);
 
-  // GET /products/:id/linked-records
-  fastify.get('/products/:id/linked-records', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const linked = await erp1Service.getLinkedRecords(id);
-    return reply.status(200).send(linked);
-  });
+      return reply.status(result.priorResult ? 200 : 201).send({
+        ...result.entity,
+        prior_result: result.priorResult,
+      });
+    }
+  );
+
+  fastify.patch(
+    '/products/:id',
+    { preHandler: erp1WriteGuard },
+    async (request, reply) => {
+      const { id } = Erp1IdParamSchema.parse(request.params);
+      const body = UpdateProductInputSchema.parse(request.body ?? {});
+      const product = await erp1Service.updateProduct(id, body);
+      return reply.status(200).send(product);
+    }
+  );
 };

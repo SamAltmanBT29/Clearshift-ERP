@@ -1,62 +1,77 @@
 /**
  * ERP-1 Categories Routes
  *
- * Exposes:
- *   GET   /api/v1/erp-products/categories
- *   POST  /api/v1/erp-products/categories
- *   GET   /api/v1/erp-products/categories/:id
- *   PATCH /api/v1/erp-products/categories/:id
+ * GET   /categories      — list/search one-level categories
+ * GET   /categories/{id} — read one category
+ * POST  /categories      — create a category
+ * PATCH /categories/{id} — edit a category
  *
  * @module erp1/routes/categories
  */
 
 import type { FastifyPluginAsync } from 'fastify';
 import {
+  CategoryListQuerySchema,
   CreateCategoryInputSchema,
+  Erp1IdParamSchema,
   UpdateCategoryInputSchema,
 } from '@clearshift/contracts';
-import type { Erp1Service } from '../services/erp1.service.js';
-import { Erp1DomainError } from '../domain/rules.js';
+import { erp1IngestGuard, erp1ReadGuard, erp1WriteGuard } from './guard.js';
+import { parseWriteBody } from './parsing.js';
+import type { Erp1RouteOptions } from './types.js';
 
-export const categoriesRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = async (
-  fastify,
-  options
-) => {
-  const { erp1Service } = options;
+export const categoriesRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fastify, opts) => {
+  const { erp1Service } = opts;
 
-  // GET /categories
-  fastify.get('/categories', async (_request, reply) => {
-    const list = await erp1Service.listCategories();
-    return reply.status(200).send({
-      items: list,
-      total: list.length,
-      page: 1,
-      pageSize: Math.max(1, list.length),
-    });
-  });
+  fastify.get(
+    '/categories',
+    { preHandler: erp1ReadGuard },
+    async (request, reply) => {
+      const query = CategoryListQuerySchema.parse(request.query);
+      const page = await erp1Service.listCategories(query);
 
-  // POST /categories
-  fastify.post('/categories', async (request, reply) => {
-    const input = CreateCategoryInputSchema.parse(request.body);
-    const category = await erp1Service.createCategory(input);
-    return reply.status(201).send(category);
-  });
-
-  // GET /categories/:id
-  fastify.get('/categories/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const category = await erp1Service.getCategoryById(id);
-    if (!category) {
-      throw new Erp1DomainError(`Category "${id}" not found`, 'CATEGORY_NOT_FOUND', 404, 'id');
+      return reply.status(200).send({
+        items: page.items,
+        total: page.total,
+        page: query.page,
+        pageSize: query.pageSize,
+        totalPages: Math.ceil(page.total / query.pageSize),
+      });
     }
-    return reply.status(200).send(category);
-  });
+  );
 
-  // PATCH /categories/:id
-  fastify.patch('/categories/:id', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    const input = UpdateCategoryInputSchema.parse(request.body);
-    const updated = await erp1Service.updateCategory(id, input);
-    return reply.status(200).send(updated);
-  });
+  fastify.get(
+    '/categories/:id',
+    { preHandler: erp1ReadGuard },
+    async (request, reply) => {
+      const { id } = Erp1IdParamSchema.parse(request.params);
+      const category = await erp1Service.getCategoryById(id);
+      return reply.status(200).send(category);
+    }
+  );
+
+  fastify.post(
+    '/categories',
+    { preHandler: erp1IngestGuard },
+    async (request, reply) => {
+      const body = parseWriteBody(CreateCategoryInputSchema, request);
+      const result = await erp1Service.createCategoryWithIdempotency(body);
+
+      return reply.status(result.priorResult ? 200 : 201).send({
+        ...result.entity,
+        prior_result: result.priorResult,
+      });
+    }
+  );
+
+  fastify.patch(
+    '/categories/:id',
+    { preHandler: erp1WriteGuard },
+    async (request, reply) => {
+      const { id } = Erp1IdParamSchema.parse(request.params);
+      const body = UpdateCategoryInputSchema.parse(request.body ?? {});
+      const category = await erp1Service.updateCategory(id, body);
+      return reply.status(200).send(category);
+    }
+  );
 };

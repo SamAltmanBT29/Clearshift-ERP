@@ -1,52 +1,68 @@
 /**
  * ERP-1 Stock Routes
  *
- * Exposes:
- *   GET  /api/v1/erp-products/stock
- *   POST /api/v1/erp-products/stock/opening
+ * GET  /stock         — list stock levels with product/warehouse filters
+ * POST /stock/opening — idempotent opening-stock load for the Kit
  *
  * @module erp1/routes/stock
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import { SetOpeningStockInputSchema } from '@clearshift/contracts';
-import type { Erp1Service } from '../services/erp1.service.js';
-import { Erp1DomainError } from '../domain/rules.js';
+import {
+  SetOpeningStockInputSchema,
+  StockLevelListQuerySchema,
+} from '@clearshift/contracts';
+import { erp1IngestGuard, erp1ReadGuard } from './guard.js';
+import { parseWriteBody } from './parsing.js';
+import type { Erp1RouteOptions } from './types.js';
 
-export const stockRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = async (
-  fastify,
-  options
-) => {
-  const { erp1Service } = options;
+export const stockRoutes: FastifyPluginAsync<Erp1RouteOptions> = async (fastify, opts) => {
+  const { erp1Service } = opts;
 
-  // GET /stock
-  fastify.get('/stock', async (request, reply) => {
-    const query = request.query as { productId?: string; warehouseId?: string };
-    const list = await erp1Service.listStock(query);
-    return reply.status(200).send({
-      items: list,
-      total: list.length,
-      page: 1,
-      pageSize: Math.max(1, list.length),
-    });
-  });
+  fastify.get('/stock', { preHandler: erp1ReadGuard }, async (request, reply) => {
+    const query = StockLevelListQuerySchema.parse(request.query);
+    const page = await erp1Service.listStockLevels(query);
 
-  // POST /stock/opening
-  fastify.post('/stock/opening', async (request, reply) => {
-    const raw = request.body as Record<string, unknown> | undefined;
-    if (raw && typeof raw['quantity'] !== 'undefined') {
-      const qNum = typeof raw['quantity'] === 'number' ? raw['quantity'] : parseFloat(String(raw['quantity']));
-      if (!isNaN(qNum) && qNum < 0) {
-        throw new Erp1DomainError(
-          'Stock quantity cannot become negative (BR-ERP1-02)',
-          'NEGATIVE_STOCK',
-          422,
-          'quantity'
-        );
-      }
+    const response: Record<string, unknown> = {
+      items: page.items,
+      total: page.total,
+      page: query.page,
+      pageSize: query.pageSize,
+      totalPages: Math.ceil(page.total / query.pageSize),
+    };
+
+    // Backwards compatibility with the original single-product contract:
+    // a `productId` filter also exposes the matching level at the top level.
+    if (query.productId !== undefined && page.items.length === 1) {
+      Object.assign(response, page.items[0]);
     }
-    const input = SetOpeningStockInputSchema.parse(request.body);
-    const stock = await erp1Service.setOpeningStock(input);
-    return reply.status(200).send(stock);
+
+    return reply.status(200).send(response);
   });
+
+  fastify.post(
+    '/stock/opening',
+    { preHandler: erp1IngestGuard },
+    async (request, reply) => {
+      const body = parseWriteBody(SetOpeningStockInputSchema, request);
+      const result = await erp1Service.setOpeningStock(body);
+
+      return reply.status(200).send({
+        ...result.entity,
+        prior_result: result.priorResult,
+        ...(result.receipt !== undefined && {
+          import_receipt: {
+            id: result.receipt.id,
+            batch_id: result.receipt.batchId,
+            source_row: result.receipt.sourceRow,
+            target_id: result.receipt.targetId,
+            target_entity: result.receipt.targetEntity,
+            idempotency_key: result.receipt.idempotencyKey,
+            outcome: result.receipt.outcome,
+            created_at: result.receipt.createdAt,
+          },
+        }),
+      });
+    }
+  );
 };
