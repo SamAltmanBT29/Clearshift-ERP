@@ -18,6 +18,41 @@ paths:
           in: query
           required: false
           schema: { type: string, format: uuid }
+        - name: unitOfMeasure
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/UnitOfMeasure' }
+        - name: stockStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, in_stock, low_stock, out_of_stock]
+        - name: minPrice
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\d+(\.\d{1,4})?$'
+        - name: maxPrice
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\d+(\.\d{1,4})?$'
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name, sku, price, createdAt, quantity]
+        - name: sortDirection
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
         - name: page
           in: query
           required: false
