@@ -395,20 +395,25 @@ export class InMemoryHrRepository implements HrRepository {
     }
 
     // Stable order with the `id` as the deterministic tie-breaker.
+    const direction = query.sort_dir === 'desc' ? -1 : 1;
     rows.sort((a, b) => {
+      let cmp = 0;
       switch (query.sort) {
         case 'employee_no':
-          return a.employee_no.localeCompare(b.employee_no) || a.id.localeCompare(b.id);
+          cmp = a.employee_no.localeCompare(b.employee_no) || a.id.localeCompare(b.id);
+          break;
         case 'join_date':
-          return a.join_date.localeCompare(b.join_date) || a.id.localeCompare(b.id);
+          cmp = a.join_date.localeCompare(b.join_date) || a.id.localeCompare(b.id);
+          break;
         case 'name':
         default:
-          return (
+          cmp =
             a.last_name.localeCompare(b.last_name) ||
             a.first_name.localeCompare(b.first_name) ||
-            a.id.localeCompare(b.id)
-          );
+            a.id.localeCompare(b.id);
+          break;
       }
+      return cmp * direction;
     });
 
     return paginate(rows, query.page, query.pageSize);
@@ -430,11 +435,13 @@ export class InMemoryHrRepository implements HrRepository {
       rows = rows.filter((department) => department.parent_id === query.parent_id);
     }
 
+    const direction = query.sort_dir === 'desc' ? -1 : 1;
     rows.sort((a, b) => {
-      if (query.sort === 'code') {
-        return a.code.localeCompare(b.code) || a.id.localeCompare(b.id);
-      }
-      return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+      const cmp =
+        query.sort === 'code'
+          ? a.code.localeCompare(b.code) || a.id.localeCompare(b.id)
+          : a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+      return cmp * direction;
     });
 
     return paginate(rows, query.page, query.pageSize);
