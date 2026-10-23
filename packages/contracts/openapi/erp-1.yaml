@@ -958,8 +958,30 @@ components:
               reasons: { type: array, items: { type: string } }
         generated_at: { type: string, format: date-time }
 
+    RelationshipWarning:
+      type: object
+      description: |
+        An absent optional relationship. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["category"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["categoryId"]
+        code:
+          type: string
+          enum: [ERP1_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
 
-
+    ImportReceipt:
+      type: object
+      properties:
         id: { type: string, format: uuid }
         batch_id: { type: string, format: uuid }
         source_row: { type: integer, minimum: 0 }

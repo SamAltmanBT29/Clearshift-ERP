@@ -15,6 +15,7 @@ import {
   StandardErrorCodes,
 } from '@clearshift/contracts';
 import { Erp1ServiceError, type Erp1ErrorDetail } from './services/errors.js';
+import { Erp1DomainError } from './domain/rules.js';
 import { Erp1Service } from './services/erp1.service.js';
 import { InMemoryErp1Repository, type Erp1Repository } from './services/repository.js';
 import { erp1Routes } from './routes/index.js';
@@ -156,6 +157,25 @@ export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
         code: error.code,
         message: error.message,
         details: error.details,
+        correlation_id: correlationId,
+      });
+    }
+
+    if (error instanceof Erp1DomainError) {
+      const isUnprocessable = [
+        ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
+        ERP1_DOMAIN_RULES.INVALID_STATUS_TRANSITION,
+        ERP1_DOMAIN_RULES.SOURCE_IDENTITY_INCOMPLETE,
+        ERP1_DOMAIN_RULES.READ_MODEL_INCONSISTENT,
+        ERP1_DOMAIN_RULES.CROSS_MODULE_WRITE_FORBIDDEN,
+      ].includes(error.code as any);
+
+      return envelope(isUnprocessable ? 422 : 400, {
+        code: error.code,
+        message: error.message,
+        details: error.field
+          ? [{ field: error.field, message: error.message, code: error.code }]
+          : [],
         correlation_id: correlationId,
       });
     }

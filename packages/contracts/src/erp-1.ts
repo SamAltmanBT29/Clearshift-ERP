@@ -24,9 +24,93 @@ export const ERP1_DOMAIN_RULES = {
   IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
   IMPORT_PROVENANCE_REQUIRED: 'IMPORT_PROVENANCE_REQUIRED',
   PROTECTED_FIELD: 'ERP1_PROTECTED_FIELD',
+  SOURCE_IDENTITY_INCOMPLETE: 'SOURCE_IDENTITY_INCOMPLETE',
+  INVALID_UNIT_OF_MEASURE: 'INVALID_UNIT_OF_MEASURE',
+  INVALID_CURRENCY_CODE: 'INVALID_CURRENCY_CODE',
+  INVALID_STOCK_STATUS: 'INVALID_STOCK_STATUS',
+  INVALID_PRODUCT_STATUS: 'INVALID_PRODUCT_STATUS',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  READ_MODEL_INCONSISTENT: 'READ_MODEL_INCONSISTENT',
+  CROSS_MODULE_WRITE_FORBIDDEN: 'CROSS_MODULE_WRITE_FORBIDDEN',
 } as const;
 
 export type Erp1DomainRule = (typeof ERP1_DOMAIN_RULES)[keyof typeof ERP1_DOMAIN_RULES];
+
+/**
+ * An absent optional relationship is reported as an approved warning.
+ *
+ * The module never invents a synthetic or placeholder record to satisfy an optional link.
+ */
+export const ERP1_OPTIONAL_REFERENCE_ABSENT = 'ERP1_OPTIONAL_REFERENCE_ABSENT';
+
+export const Erp1RelationshipWarningSchema = z.object({
+  relationship: z.string(),
+  field: z.string(),
+  code: z.literal(ERP1_OPTIONAL_REFERENCE_ABSENT),
+  message: z.string(),
+});
+export type Erp1RelationshipWarning = z.infer<typeof Erp1RelationshipWarningSchema>;
+
+/**
+ * Approved units of measure per FR-ERP1-04.
+ */
+export const ERP1_UNITS_OF_MEASURE = [
+  'pcs',
+  'kg',
+  'g',
+  'litre',
+  'metre',
+  'box',
+] as const;
+
+/**
+ * Approved stock statuses derived from physical inventory level.
+ */
+export const ERP1_STOCK_STATUSES = [
+  'out_of_stock',
+  'low_stock',
+  'in_stock',
+] as const;
+export type StockStatus = (typeof ERP1_STOCK_STATUSES)[number];
+
+/**
+ * Allowed stock status transitions based on balance changes.
+ */
+export const ERP1_STOCK_STATUS_TRANSITIONS: Readonly<
+  Record<StockStatus, readonly StockStatus[]>
+> = {
+  out_of_stock: ['low_stock', 'in_stock'],
+  low_stock: ['out_of_stock', 'in_stock'],
+  in_stock: ['low_stock', 'out_of_stock'],
+};
+
+/**
+ * Product lifecycle statuses for enterprise master data cataloging.
+ */
+export const ERP1_PRODUCT_STATUSES = [
+  'draft',
+  'active',
+  'discontinued',
+  'archived',
+] as const;
+export type ProductLifecycleStatus = (typeof ERP1_PRODUCT_STATUSES)[number];
+
+export const ERP1_PRODUCT_TERMINAL_STATUSES: readonly ProductLifecycleStatus[] = [
+  'archived',
+];
+
+/**
+ * Allowed forward product lifecycle transitions.
+ * Archived is terminal.
+ */
+export const ERP1_PRODUCT_STATUS_TRANSITIONS: Readonly<
+  Record<ProductLifecycleStatus, readonly ProductLifecycleStatus[]>
+> = {
+  draft: ['active', 'archived'],
+  active: ['discontinued', 'archived'],
+  discontinued: ['active', 'archived'],
+  archived: [],
+};
 
 /**
  * Fields that are owned by the platform or the service layer. A browser edit
