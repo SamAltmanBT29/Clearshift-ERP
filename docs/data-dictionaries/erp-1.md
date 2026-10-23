@@ -246,6 +246,29 @@ cannot create a second stock row for the same pair.
 7. **Explicit currency.** Every product stores an uppercase ISO 4217 code; there is no implicit currency default.
 8. **Migration idempotency.** `idempotency_key` is unique and opening stock is unique per product/warehouse pair.
 
+### 8.1 Relationships, State Transitions & Read Model Consistency (ERP1-06)
+
+**Issue**: [#11](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/11) — `[ERP1-06] ERP-1 Products and Inventory: Relationships, state transitions and read-model consistency`
+**Implementation**: `apps/erp/modules/erp-1/src/domain/relationships.ts`, `apps/erp/modules/erp-1/src/domain/rules.ts`, `packages/contracts/src/erp-1.ts`, `tests/domain/relationships.test.ts`.
+
+#### Rules & Invariants:
+1. **Optional Relationship Handling (`handleOptionalRelationship`)**: When an optional relationship (e.g. `categoryId` on products) is absent, the module returns `null` along with the approved `ERP1_OPTIONAL_REFERENCE_ABSENT` warning code. It never fabricates synthetic or placeholder records.
+2. **Provenance Pair Completeness (`assertSourceIdentityIsComplete`)**: `source_system` and `source_id` must be supplied together. Supplying one without the other is rejected with `SOURCE_IDENTITY_INCOMPLETE`.
+3. **Fixed Enumeration Enforcement**:
+   - `unit_of_measure`: Strictly validated against `['pcs', 'kg', 'g', 'litre', 'metre', 'box']` (`INVALID_UNIT_OF_MEASURE`).
+   - `currency`: Validated against uppercase ISO 4217 3-letter codes (`INVALID_CURRENCY_CODE`).
+   - `stock_status`: Derived and validated against `['out_of_stock', 'low_stock', 'in_stock']` (`INVALID_STOCK_STATUS`).
+   - `product_status`: Validated against lifecycle statuses `['draft', 'active', 'discontinued', 'archived']` (`INVALID_PRODUCT_STATUS`).
+4. **State Transition Matrices**:
+   - **Stock Status Transitions**: Transitions between `out_of_stock`, `low_stock`, and `in_stock` are governed by authoritative physical stock balances. Any stock mutation resulting in negative quantities is strictly rejected with `NEGATIVE_STOCK` (BR-ERP1-02).
+   - **Product Lifecycle Transitions**: Forward transitions follow `draft -> active -> discontinued -> archived`. Identical status updates are idempotent no-ops. `archived` is a terminal status; transitions out of `archived` are rejected with `INVALID_STATUS_TRANSITION`.
+5. **Read Model Consistency**:
+   - **Products**: Persisted entity and read projection agree on `normalizedSku === normalizeSku(sku)`, non-negative price with scale <= 4, non-negative tax rate with scale <= 2, and explicit currency.
+   - **Stock Levels**: Quantity must be non-negative, and authoritative derived stock status matches `deriveStockStatus(quantity)`.
+   - **Categories**: Invariant of single-level categories enforced; nested parent relationships (`parentId`) are rejected.
+6. **Cross-Module Private Table Isolation**:
+   - Sibling private tables (`erp2.*`, `erp3.*`, `erp4.*`, `erp5.*`, `crm.*`) are strictly prohibited from being written to by ERP-1. Cross-module reads resolve through contract-safe public reference resolvers (`Erp1ReferenceResolver`).
+
 ---
 
 ## 9. Decision records
