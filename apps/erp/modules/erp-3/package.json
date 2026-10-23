@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@clearshift/contracts": "*",
-    "@clearshift/ui": "*",
+    "@cs/ui": "*",
     "@cs/kernel": "*",
     "@cs/core": "*",
     "@cs/kit": "*"
