@@ -23,10 +23,11 @@ import {
   departmentUpdateGuard,
 } from './guard.js';
 import { parseWriteBody } from './parsing.js';
-import type { HrRouteOptions } from './types.js';
+import type { HrRouteOptions, HrFastifyInstance } from './types.js';
 
 export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
   const { hrService } = opts;
+  const app = fastify as HrFastifyInstance;
 
   // GET /departments - List departments
   fastify.get(
@@ -55,7 +56,11 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   // POST /departments - Create a department
   fastify.post('/departments', { preHandler: departmentCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrDepartmentRequestSchema, request);
-    const result = await hrService.createDepartment(body);
+    const result = await hrService.createDepartment(
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(result.created ? 201 : 200).send({
       ...result.entity,
@@ -68,7 +73,12 @@ export const departmentsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fast
   fastify.patch('/departments/:id', { preHandler: departmentUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrDepartmentRequestSchema.parse(request.body ?? {});
-    const department = await hrService.updateDepartment(params.id, body);
+    const department = await hrService.updateDepartment(
+      params.id,
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(200).send(department);
   });

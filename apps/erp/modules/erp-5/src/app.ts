@@ -31,8 +31,10 @@ import { HrDomainError } from './domain/rules.js';
 import { HrServiceError, type HrErrorDetail } from './services/errors.js';
 import { HrService } from './services/hr.service.js';
 import { InMemoryHrRepository } from './services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import type { HrRepository } from './services/repository.js';
 import { erpHrRoutes } from './routes/index.js';
+import type { HrFastifyInstance } from './routes/types.js';
 
 export interface HrAppOptions {
   repository?: HrRepository | undefined;
@@ -161,11 +163,12 @@ export function mapZodIssues(error: ZodErrorLike): {
   };
 }
 
-export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
-  const app = fastify({ logger: false });
+export function buildHrApp(options: HrAppOptions = {}): HrFastifyInstance {
+  const app = fastify({ logger: false }) as unknown as HrFastifyInstance;
 
   const repository = options.repository ?? new InMemoryHrRepository(true);
-  const hrService = options.hrService ?? new HrService(repository);
+  const auditService = new AuditService(new InMemoryAuditRepository());
+  const hrService = options.hrService ?? new HrService(repository, auditService);
   const authRequired = options.authRequired ?? true;
 
   // ── Global Error Handler ───────────────────────────────────────────────────
@@ -225,6 +228,7 @@ export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
     // 5. Anything else is unexpected. The response never carries a SQL
     //    statement, a stack trace, a secret or a raw row — only a
     //    correlation id the operator can use to find the entry in the log.
+    console.error(`[SERVER ERROR] ${error}`);
     return envelope(500, {
       code: StandardErrorCodes.INTERNAL_SERVER_ERROR,
       message: 'An unexpected internal error occurred.',
@@ -280,6 +284,7 @@ export function buildHrApp(options: HrAppOptions = {}): FastifyInstance {
   });
 
   // ── Route Registration ─────────────────────────────────────────────────────
+  app.resolveCorrelationId = resolveCorrelationId;
   app.register(erpHrRoutes, {
     prefix: '/api/v1/erp-hr',
     hrService,
