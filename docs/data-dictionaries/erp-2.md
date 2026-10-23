@@ -12,7 +12,7 @@ For the canonical, detailed version see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors & Purchasing (Group 7) |
-| **Issue** | #16 — `[ERP2-01] ERP-2 Vendors and Purchasing schema, Drizzle models, and guarded migrations` |
+| **Issues** | #16: ERP2-01 (Schema & Migrations), #17: ERP2-02 (List/Read API), #18: ERP2-03 (Mutation API), #21: ERP2-06 (State Transitions), #22: ERP2-07 (Migration Adapter), #25: ERP2-10 (QA Evidence), #132: ERP2-16 (Frontend Route Registration) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -261,3 +261,34 @@ Notes:
 - Purchase order header and lines are written in one transaction.
 - The public API accepts prices with up to 2 decimals. `line_total = round_half_up(quantity x price, 2)` and the order total is the sum of the line totals.
 - Open defects and their issue links are tracked in the README "Known defects" table.
+
+---
+
+## 9. Frontend Route & Shell Registration Matrix (ERP2-16)
+
+### 9.1 Route Table Manifest
+
+| Route ID | Path (relative to `/erp2`) | Full Path | Document Title | Nav Group | Nav Label | Screen Purpose |
+|---|---|---|---|---|---|---|
+| `vendors` | `vendors` | `/erp2/vendors` | Vendors · ClearShift ERP | `purchasing` | Vendors | Supplier catalog list with search & paging |
+| `vendors-create` | `vendors/new` | `/erp2/vendors/new` | New vendor · ClearShift ERP | *None* | New vendor | Vendor creation form |
+| `vendors-detail` | `vendors/:vendorId` | `/erp2/vendors/:vendorId` | Vendor · ClearShift ERP | *None* | Vendor | Vendor profile & terms view |
+| `vendors-edit` | `vendors/:vendorId/edit` | `/erp2/vendors/:vendorId/edit` | Edit vendor · ClearShift ERP | *None* | Edit vendor | Vendor update form |
+| `purchase-orders` | `purchase-orders` | `/erp2/purchase-orders` | Purchase orders · ClearShift ERP | `purchasing` | Purchase orders | Purchase order list with status filter |
+| `purchase-orders-create` | `purchase-orders/new` | `/erp2/purchase-orders/new` | New purchase order · ClearShift ERP | *None* | New purchase order | PO creation with product picker |
+| `purchase-orders-detail` | `purchase-orders/:purchaseOrderId` | `/erp2/purchase-orders/:purchaseOrderId` | Purchase order · ClearShift ERP | *None* | Purchase order | PO details, line items & status transitions |
+| `import-receipts` | `import-receipts` | `/erp2/import-receipts` | Import receipts · ClearShift ERP | `integration` | Import receipts | Durable migration receipt audit (KIT-08) |
+
+### 9.2 Shell Layout & Accessibility Architecture
+
+1. **Accessibility Landmarks**:
+   - Skip Link: Targets `#erp2-main`, first in keyboard tab order.
+   - Banner Landmark: `<header role="banner" aria-label="Vendors & Purchasing">` with eyebrow and module title.
+   - Navigation Landmark: `<nav role="navigation" aria-label="Vendors and Purchasing">` with semantic groups.
+   - Breadcrumb Landmark: `<nav role="navigation" aria-label="Breadcrumb">` rendering `Vendors & Purchasing → <Resource> → <Sub-action>`.
+   - Main Content Landmark: `<main id="erp2-main" role="main" tabIndex={-1} aria-label="Vendors & Purchasing content">`.
+   - Heading Rules: Exactly one `<h1>` rendered per page component.
+
+2. **Route Guards & Session State**:
+   - `RequireAuth`: Inspects `clearshift.access_token` in `sessionStorage`. Missing or expired tokens redirect to `/login?returnTo=<encodedPath>` preserving the requested URL.
+

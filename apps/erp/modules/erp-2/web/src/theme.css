@@ -1,0 +1,186 @@
+/**
+ * ERP-2 Vendors & Purchasing — Module Shell Theme
+ *
+ * Layout rules for the module shell. Colours, typography, spacing, and radii
+ * are sourced from the design tokens of `@cs/ui` (PLT-08).
+ *
+ * @module erp2/web/theme
+ */
+
+@import '../../../../../../packages/ui/src/tokens/tokens.css';
+
+.cs-erp2-shell {
+  background-color: var(--cs-bg, #ffffff);
+  color: var(--cs-text, #111827);
+  font-family: var(--cs-font-sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  min-height: 100vh;
+  padding: var(--cs-s-6, 1.5rem);
+}
+
+.cs-erp2-skip-link {
+  position: absolute;
+  left: var(--cs-s-4, 1rem);
+  top: var(--cs-s-4, 1rem);
+  z-index: 50;
+  transform: translateY(-200%);
+  padding: var(--cs-s-2, 0.5rem) var(--cs-s-4, 1rem);
+  border-radius: var(--cs-r-md, 0.375rem);
+  border: 1px solid var(--cs-accent, #3b82f6);
+  background-color: var(--cs-bg, #ffffff);
+  color: var(--cs-accent, #3b82f6);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 120ms ease-in-out;
+}
+
+.cs-erp2-skip-link:focus {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cs-bg, #ffffff), 0 0 0 4px var(--cs-accent, #3b82f6);
+}
+
+.cs-erp2-banner {
+  border-bottom: 1px solid var(--cs-border, #e5e7eb);
+  padding-bottom: var(--cs-s-4, 1rem);
+  margin-bottom: var(--cs-s-6, 1.5rem);
+}
+
+.cs-erp2-eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted, #6b7280);
+}
+
+.cs-erp2-module-title {
+  margin: var(--cs-s-1, 0.25rem) 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--cs-text, #111827);
+}
+
+.cs-erp2-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--cs-s-8, 2rem);
+  align-items: start;
+}
+
+.cs-erp2-nav {
+  border: 1px solid var(--cs-border, #e5e7eb);
+  border-radius: var(--cs-r-lg, 0.5rem);
+  background-color: var(--cs-surface, #f9fafb);
+  padding: var(--cs-s-4, 1rem);
+}
+
+.cs-erp2-nav-group + .cs-erp2-nav-group {
+  margin-top: var(--cs-s-6, 1.5rem);
+  padding-top: var(--cs-s-4, 1rem);
+  border-top: 1px solid var(--cs-border, #e5e7eb);
+}
+
+.cs-erp2-nav-group-title {
+  margin: 0 0 var(--cs-s-2, 0.5rem);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted, #6b7280);
+}
+
+.cs-erp2-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-erp2-nav-item {
+  margin: 0;
+}
+
+.cs-erp2-nav-link {
+  display: flex;
+  align-items: center;
+  padding: var(--cs-s-2, 0.5rem) var(--cs-s-3, 0.75rem);
+  border-radius: var(--cs-r-md, 0.375rem);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--cs-text, #374151);
+  text-decoration: none;
+  transition: all 120ms ease;
+}
+
+.cs-erp2-nav-link:hover {
+  background-color: var(--cs-hover, #f3f4f6);
+  color: var(--cs-text, #111827);
+}
+
+.cs-erp2-nav-link.is-active,
+.cs-erp2-nav-link[aria-current='page'] {
+  background-color: var(--cs-accent-subtle, #eff6ff);
+  color: var(--cs-accent, #2563eb);
+  font-weight: 600;
+}
+
+.cs-erp2-content {
+  min-width: 0;
+}
+
+.cs-erp2-breadcrumb {
+  margin-bottom: var(--cs-s-4, 1rem);
+}
+
+.cs-erp2-main {
+  outline: none;
+}
+
+.cs-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-s-4, 1rem);
+}
+
+.cs-card {
+  border: 1px solid var(--cs-border, #e5e7eb);
+  border-radius: var(--cs-r-lg, 0.5rem);
+  background-color: var(--cs-bg, #ffffff);
+  padding: var(--cs-s-6, 1.5rem);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.cs-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cs-s-2, 0.5rem) var(--cs-s-4, 1rem);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--cs-r-md, 0.375rem);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.cs-button-primary {
+  background-color: var(--cs-accent, #2563eb);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.cs-button-primary:hover {
+  background-color: var(--cs-accent-hover, #1d4ed8);
+}
+
+.cs-button-secondary {
+  background-color: var(--cs-bg, #ffffff);
+  color: var(--cs-text, #374151);
+  border: 1px solid var(--cs-border, #d1d5db);
+}
+
+.cs-button-secondary:hover {
+  background-color: var(--cs-surface, #f9fafb);
+}
