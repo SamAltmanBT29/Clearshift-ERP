@@ -116,9 +116,21 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Target Mapping Template**: [`sample-data/erp-4/mapping-template.json`](../../sample-data/erp-4/mapping-template.json) specifies source-to-target schema projections, deterministic normalization policies, dependency-ordered loading sequences, and no-fuzzy-merge candidate review constraints.
 - **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/rules.test.ts`](../../apps/erp/modules/erp-4/tests/migration/rules.test.ts) provides 27 comprehensive tests asserting fixture checksums, non-mutation invariants (`BR-KIT-03`), domain invariants (`BR-ERP4-01`, `BR-ERP4-02`), and public API contract conformance.
 
+## Column Profiling Configuration & Expected-Result Assertions (Issue #182 / ERP4-26 / KIT-03)
+
+- **Shared Migration Kit Profiler**: Integrated with `@cs/kit` shared column profiler (`packages/kit/src/domain/profiler.ts`) providing column-level profiling metrics, exact duplicate candidate grouping, and formula-safe CSV export (`exportProfileReportToCsv`).
+- **Module Profiling Rules**: Configured in [`apps/erp/modules/erp-4/src/migration/profiling-config.ts`](../../apps/erp/modules/erp-4/src/migration/profiling-config.ts) for 24 module columns and exact duplicate keys (Account Code, Opening Balance, Journal Entry Number).
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/profiling.ts`](../../apps/erp/modules/erp-4/src/routes/profiling.ts):
+  - `GET /api/v1/erp-finance/migration/profile`
+  - `GET /api/v1/erp-finance/migration/profile/export`
+  - `POST /api/v1/erp-finance/migration/profile`
+- **Frontend Screen**: Accessible UI component [`DataHealthProfilePage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics, duplicate candidates review, and formula-safe CSV export.
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../../apps/erp/modules/erp-4/tests/migration/profiling.test.ts) (20 tests).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
 |---|---|---|---|---|
 | **`1.0.0`** | 2026-10-22 | Gate G1 Baseline Freeze | Group 9 / Role 2 (Issue #170) | Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published. Approved as frozen baseline for Gate G1. |
 | **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
+| **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |
