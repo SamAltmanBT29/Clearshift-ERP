@@ -226,3 +226,33 @@ Cleaning normalizes raw text without mutating source rows:
   - `GET /api/v1/erp-finance/migration/profile/export`: Downloads formula-safe CSV Data Health Report
   - `POST /api/v1/erp-finance/migration/profile`: In-memory non-destructive profiling of arbitrary CSV payload
 - UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx)
+
+---
+
+## 9. Cleaning Rules & Field-Level Change Audit (Issue #183 / ERP4-27 / KIT-04)
+
+### 9.1 Shared Migration Kit Cleaner Integration
+- Uses `@cs/kit` canonical cleaner domain (`packages/kit/src/domain/cleaner.ts`) complying with Migration Kit SDS §3.4 and §4.4 (FR-CL-01..05).
+- Implements the 12 approved V1 cleaning rules:
+  - `RL-TEXT-01`: Trim leading/trailing whitespace and collapse multiple inner spaces into one.
+  - `RL-TEXT-02`: Remove control characters and non-printable unicode artifacts.
+  - `RL-NAME-01`: Proper-case names with exception handling for particles (e.g. O'Brien, McDonald).
+  - `RL-EMAIL-01`: Normalize email structure (trim, lowercase, syntax check).
+  - `RL-PHONE-01`: Phone sanitization and default country code coercion (+91 / +1).
+  - `RL-DATE-01`: Coerce slash/hyphen dates to ISO 8601 (YYYY-MM-DD); reject invalid calendar dates.
+  - `RL-CURRENCY-01`: Remove currency symbols ($/€/₹) and thousands commas; parse exact decimal string.
+  - `RL-REQ-01`: Verify mandatory field presence; reject row if blank.
+  - `RL-FORMAT-01`: Check regex patterns and length boundaries.
+- Tracks per-field change audit logs (`kit_clean_log` shape):
+  - Every modified field generates an audit record: `source_row`, `field_name`, `original_value`, `cleaned_value`, `rule_id`, and `timestamp`.
+- Supports rule toggles (`FR-CL-05`) allowing operators to selectively enable/disable specific rules for a batch run.
+- Neutralizes spreadsheet formula injection in CSV export (`exportFieldAuditCsv`) using standard apostrophe prefixing (`'=`, `'+`, `'-`, `'@`).
+
+### 9.2 Configured Module Rules
+- Rules file: [`apps/erp/modules/erp-4/src/migration/cleaning-config.ts`](../src/migration/cleaning-config.ts)
+- Test suite: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../tests/migration/cleaning.test.ts) (20 automated tests)
+- Endpoints:
+  - `GET /api/v1/erp-finance/migration/clean`: Executes cleaning on canonical Dirty Data Pack fixture
+  - `GET /api/v1/erp-finance/migration/clean/audit/export`: Downloads formula-safe CSV field-level change audit log
+  - `POST /api/v1/erp-finance/migration/clean`: In-memory cleaning with rule toggles on uploaded CSV
+- UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx`](../web/src/pages/DataCleaningReviewPage.tsx)

@@ -127,6 +127,19 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Frontend Screen**: Accessible UI component [`DataHealthProfilePage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics, duplicate candidates review, and formula-safe CSV export.
 - **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../../apps/erp/modules/erp-4/tests/migration/profiling.test.ts) (20 tests).
 
+## Cleaning Rules & Field-Level Change Audit (Issue #183 / ERP4-27 / KIT-04)
+
+- **Shared Migration Kit Cleaner Engine**: Implemented in `@cs/kit` (`packages/kit/src/domain/cleaner.ts`) conforming to SDS §3.4 and §4.4 (FR-CL-01..05).
+- **Canonical Cleaners**: 12 V1 cleaning rules including `RL-TEXT-01` (whitespace trim/collapse), `RL-TEXT-02` (control characters), `RL-NAME-01` (proper case), `RL-EMAIL-01` (email normalize), `RL-PHONE-01` (phone normalize), `RL-DATE-01` (ISO 8601 date coercion), `RL-CURRENCY-01` (currency & decimal format), `RL-REQ-01` (required field check), and `RL-FORMAT-01` (domain format check).
+- **Field Change Audit Ledger**: Generates `kit_clean_log` records (`source_row`, `field_name`, `original_value`, `cleaned_value`, `rule_id`, `timestamp`) for every altered value.
+- **Rule Toggles**: Allows selective activation/deactivation of cleaning rules for a batch run (`FR-CL-05`).
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/cleaning.ts`](../../apps/erp/modules/erp-4/src/routes/cleaning.ts):
+  - `GET /api/v1/erp-finance/migration/clean`
+  - `GET /api/v1/erp-finance/migration/clean/audit/export`
+  - `POST /api/v1/erp-finance/migration/clean`
+- **Frontend Screen**: Accessible UI component [`DataCleaningReviewPage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx).
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../../apps/erp/modules/erp-4/tests/migration/cleaning.test.ts) (20 tests).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -134,3 +147,4 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.0.0`** | 2026-10-22 | Gate G1 Baseline Freeze | Group 9 / Role 2 (Issue #170) | Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published. Approved as frozen baseline for Gate G1. |
 | **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
 | **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |
+| **`1.3.0`** | 2026-10-23 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #183 / ERP4-27) | Implemented canonical 12 V1 cleaning rules (`@cs/kit`), field-level change audit ledger (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints, React review screen (`DataCleaningReviewPage`), and 20 automated tests. |
