@@ -1,0 +1,144 @@
+row_id,record_type,case_tags,source_id,parent_source_id,code,name,type,currency_code,parent_code,description,is_active,is_posting_account,balance_amount,as_of_date,entry_number,period_label,posting_date,debit_amount,credit_amount,line_narration,department_ref,expect_outcome,expect_reasons
+R001,account,account.source_id:valid|account.code:valid|account.name:valid|account.type:valid|account.currency_code:valid|account.is_posting_account:valid,ACC-SRC-001,,1000-ASSETS-HDR,Assets Header Account,asset,INR,,,,false,,,,,,,,,,accepted,
+R002,account,account.name:valid|account.code:valid|account.type:valid|account.currency_code:valid|account.parent_code:valid|account.description:valid|account.is_active:valid|account.is_posting_account:valid,ACC-SRC-002,,  1010-CASH ,  Cash   on  Hand , ASSET , inr , 1000-ASSETS-HDR ,Main liquid cash account,true,true,,,,,,,,,,accepted,
+R003,account,account.code:valid|account.name:valid|account.type:valid|account.currency_code:valid|account.parent_code:valid,ACC-SRC-003,,1020-BANK,Operating Bank Account,asset,INR,1000-ASSETS-HDR,,,true,,,,,,,,,,accepted,
+R004,account,account.code:valid|account.name:valid|account.type:valid|account.currency_code:valid,ACC-SRC-004,,2000-LIAB-HDR,Liabilities Header Account,liability,INR,,,,false,,,,,,,,,,accepted,
+R005,account,account.type:valid|account.parent_code:valid,ACC-SRC-005,,2010-AP,Accounts Payable,liability,INR,2000-LIAB-HDR,,,true,,,,,,,,,,accepted,
+R006,account,account.type:valid,ACC-SRC-006,,3000-CAPITAL,Owner Capital Equity,liability,INR,,,,true,,,,,,,,,,accepted,
+R007,account,account.type:valid,ACC-SRC-007,,4000-SALES,Product Sales Revenue,income,INR,,,,true,,,,,,,,,,accepted,
+R008,account,account.type:valid,ACC-SRC-008,,5000-COGS,Cost of Goods Sold,expense,INR,,,,true,,,,,,,,,,accepted,
+R009,account,account.type:valid,ACC-SRC-009,,5010-RENT,Office Rent Expense,expense,INR,,,,true,,,,,,,,,,accepted,
+R010,account,account.currency_code:valid,ACC-SRC-010,,1010-CASH-USD,USD Cash Account,asset,USD,,,,true,,,,,,,,,,accepted,
+R011,account,account.currency_code:valid,ACC-SRC-011,,4000-SALES-USD,USD Export Revenue,income,USD,,,,true,,,,,,,,,,accepted,
+R012,account,account.currency_code:valid,ACC-SRC-012,,1010-CASH-EUR,EUR Cash Account,asset,EUR,,,,true,,,,,,,,,,accepted,
+R013,account,account.currency_code:valid,ACC-SRC-013,,4000-SALES-EUR,EUR Export Revenue,income,EUR,,,,true,,,,,,,,,,accepted,
+R014,account,account.is_active:valid,ACC-SRC-014,,9999-INACTIVE,Archived Suspense Account,expense,INR,,,false,true,,,,,,,,,,accepted,
+R015,account,account.code:invalid,ACC-SRC-015,,,No Code Account,asset,INR,,,,,,,,,,,,,,rejected,ACCOUNT_CODE_REQUIRED
+R016,account,account.code:invalid,ACC-SRC-016,,1010 CASH!,Bad Code Account,asset,INR,,,,,,,,,,,,,,rejected,INVALID_ACCOUNT_CODE_FORMAT
+R017,account,account.code:invalid,ACC-SRC-017,,ACC-1234567890123456789012345678901,Too Long Code Account,asset,INR,,,,,,,,,,,,,,rejected,ACCOUNT_CODE_TOO_LONG
+R018,account,account.name:invalid,ACC-SRC-018,,1090-NONAME,,asset,INR,,,,,,,,,,,,,,rejected,ACCOUNT_NAME_REQUIRED
+R019,account,account.name:invalid,ACC-SRC-019,,1091-LONGNAME,NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN,asset,INR,,,,,,,,,,,,,,rejected,ACCOUNT_NAME_TOO_LONG
+R020,account,account.type:invalid,ACC-SRC-020,,1092-NOTYPE,No Type Account,,INR,,,,,,,,,,,,,,rejected,ACCOUNT_TYPE_REQUIRED
+R021,account,account.type:invalid,ACC-SRC-021,,1093-BADTYPE,Bad Type Account,revenue,INR,,,,,,,,,,,,,,rejected,INVALID_ACCOUNT_TYPE
+R022,account,account.currency_code:invalid,ACC-SRC-022,,1094-NOCUR,No Currency Account,asset,,,,,,,,,,,,,,,rejected,CURRENCY_REQUIRED
+R023,account,account.currency_code:invalid,ACC-SRC-023,,1095-BADCUR,Bad Currency Account,asset,XYZ1,,,,,,,,,,,,,,rejected,INVALID_CURRENCY
+R024,account,account.parent_code:invalid,ACC-SRC-024,,1096-SELFPARENT,Self Parent Account,asset,INR,1096-SELFPARENT,,,,,,,,,,,,,rejected,CYCLE_DETECTED
+R025,account,account.parent_code:invalid,ACC-SRC-025,,1097-ORPHANPARENT,Orphan Parent Account,asset,INR,9999-NOTFOUND,,,,,,,,,,,,,rejected,PARENT_ACCOUNT_NOT_FOUND
+R026,account,account.parent_code:invalid,ACC-SRC-026,,1098-CURMISMATCH,Parent Currency Mismatch,asset,USD,1000-ASSETS-HDR,,,,,,,,,,,,,rejected,CURRENCY_MISMATCH
+R027,account,account.description:invalid,ACC-SRC-027,,1099-LONGDESC,Long Desc Account,asset,INR,,DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD,,,,,,,,,,,,rejected,DESCRIPTION_TOO_LONG
+R028,account,account.is_active:invalid,ACC-SRC-028,,1088-BADACTIVE,Bad Active Bool,asset,INR,,,maybe,,,,,,,,,,,rejected,INVALID_BOOLEAN
+R029,account,account.is_posting_account:invalid,ACC-SRC-029,,1089-BADPOSTING,Bad Posting Bool,asset,INR,,,,not_a_bool,,,,,,,,,,rejected,INVALID_BOOLEAN
+R030,account,account.source_id:invalid,,,1087-NOSRC,No Source ID Account,asset,INR,,,,,,,,,,,,,,rejected,SOURCE_ID_REQUIRED
+R031,account,account.code:valid,ACC-SRC-031,,1010-CASH,Duplicate Cash Account,asset,INR,,,,,,,,,,,,,,review,DUPLICATE_ACCOUNT_CODE_REVIEW
+R032,opening_balance,opening_balance.source_id:valid|opening_balance.code:valid|opening_balance.currency_code:valid|opening_balance.balance_amount:valid|opening_balance.as_of_date:valid,OPB-SRC-001,,1010-CASH,,,INR,,FY2026 Cash Opening,,,50000.00,2026-04-01,,,,,,,,accepted,
+R033,opening_balance,opening_balance.balance_amount:valid|opening_balance.as_of_date:valid,OPB-SRC-002,,  1020-BANK ,,, inr ,,Bank Opening balance,,," 150,000.00 ",2026/04/01,,,,,,,,accepted,
+R034,opening_balance,opening_balance.balance_amount:valid,OPB-SRC-003,,2010-AP,,,INR,,AP Opening credit,,,-20000.00,2026-04-01,,,,,,,,accepted,
+R035,opening_balance,opening_balance.currency_code:valid,OPB-SRC-004,,1010-CASH-USD,,,USD,,USD Cash Opening,,,2500.00,2026-04-01,,,,,,,,accepted,
+R036,opening_balance,opening_balance.currency_code:valid,OPB-SRC-005,,1010-CASH-EUR,,,EUR,,EUR Cash Opening,,,1800.00,2026-04-01,,,,,,,,accepted,
+R037,opening_balance,opening_balance.source_id:invalid,,,1010-CASH,,,INR,,,,,100.00,2026-04-01,,,,,,,,rejected,SOURCE_ID_REQUIRED
+R038,opening_balance,opening_balance.code:invalid,OPB-SRC-038,,,,,INR,,,,,100.00,2026-04-01,,,,,,,,rejected,ACCOUNT_CODE_REQUIRED
+R039,opening_balance,opening_balance.code:invalid,OPB-SRC-039,,9999-NOTFOUND,,,INR,,,,,100.00,2026-04-01,,,,,,,,rejected,ACCOUNT_NOT_FOUND
+R040,opening_balance,opening_balance.currency_code:invalid,OPB-SRC-040,,1010-CASH,,,,,,,,100.00,2026-04-01,,,,,,,,rejected,CURRENCY_REQUIRED
+R041,opening_balance,opening_balance.currency_code:invalid,OPB-SRC-041,,1010-CASH,,,XYZ1,,,,,100.00,2026-04-01,,,,,,,,rejected,INVALID_CURRENCY
+R042,opening_balance,opening_balance.currency_code:invalid,OPB-SRC-042,,1010-CASH,,,USD,,,,,100.00,2026-04-01,,,,,,,,rejected,CURRENCY_MISMATCH
+R043,opening_balance,opening_balance.balance_amount:invalid,OPB-SRC-043,,1010-CASH,,,INR,,,,,,2026-04-01,,,,,,,,rejected,BALANCE_AMOUNT_REQUIRED
+R044,opening_balance,opening_balance.balance_amount:invalid,OPB-SRC-044,,1010-CASH,,,INR,,,,,one_hundred,2026-04-01,,,,,,,,rejected,INVALID_BALANCE_AMOUNT
+R045,opening_balance,opening_balance.balance_amount:invalid,OPB-SRC-045,,1010-CASH,,,INR,,,,,999999999999999999999.00,2026-04-01,,,,,,,,rejected,AMOUNT_OVERFLOW
+R046,opening_balance,opening_balance.balance_amount:invalid,OPB-SRC-046,,1010-CASH,,,INR,,,,,100.12345,2026-04-01,,,,,,,,rejected,EXCESS_DECIMAL_PLACES
+R047,opening_balance,opening_balance.as_of_date:invalid,OPB-SRC-047,,1010-CASH,,,INR,,,,,100.00,,,,,,,,,rejected,AS_OF_DATE_REQUIRED
+R048,opening_balance,opening_balance.as_of_date:invalid,OPB-SRC-048,,1010-CASH,,,INR,,,,,100.00,2026-02-31,,,,,,,,rejected,INVALID_DATE
+R049,opening_balance,opening_balance.as_of_date:invalid,OPB-SRC-049,,1010-CASH,,,INR,,,,,100.00,04/05/2026,,,,,,,,rejected,AMBIGUOUS_DATE_FORMAT
+R050,opening_balance,opening_balance.code:valid,OPB-SRC-050,,1010-CASH,,,INR,,,,,999.00,2026-04-01,,,,,,,,review,DUPLICATE_OPENING_BALANCE_REVIEW
+R051,journal_entry,journal_entry.source_id:valid|journal_entry.entry_number:valid|journal_entry.period_label:valid|journal_entry.posting_date:valid|journal_entry.currency_code:valid|journal_entry.description:valid|journal_entry.lines:valid,JE-SRC-001,,,,,INR,,Cash sales receipt,,,,,JV-2026-0001,2026-04,2026-04-10,,,,,accepted,
+R052,journal_line,journal_line.parent_source_id:valid|journal_line.code:valid|journal_line.debit_amount:valid|journal_line.mutual_exclusivity:valid|journal_line.line_narration:valid,,JE-SRC-001,1010-CASH,,,,,,,,,,,,,1000.00,0.00,Cash received,,accepted,
+R053,journal_line,journal_line.credit_amount:valid,,JE-SRC-001,4000-SALES,,,,,,,,,,,,,0.00,1000.00,Sales booked,,accepted,
+R054,journal_entry,journal_entry.lines:valid,JE-SRC-002,,,,, inr ,,  Rent   and   COGS   payment ,,,,,  jv-2026-0002 , 2026-04 ,2026/04/15,,,,,accepted,
+R055,journal_line,journal_line.department_ref:valid,,JE-SRC-002,5010-RENT,,,,,,,,,,,,,3000.00,0.00,,DEP-FIN,accepted,
+R056,journal_line,journal_line.department_ref:valid,,JE-SRC-002,5000-COGS,,,,,,,,,,,,,2000.00,0.00,,DEP-SALES,accepted,
+R057,journal_line,journal_line.credit_amount:valid,,JE-SRC-002,1020-BANK,,,,,,,,,,,,,0.00,5000.00,Bank settlement,,accepted,
+R058,journal_entry,journal_entry.currency_code:valid,JE-SRC-003,,,,,USD,,USD Consulting fee,,,,,JV-2026-0003,2026-04,2026-04-20,,,,,accepted,
+R059,journal_line,journal_line.debit_amount:valid,,JE-SRC-003,1010-CASH-USD,,,,,,,,,,,,,1250.50,0.00,,,accepted,
+R060,journal_line,journal_line.credit_amount:valid,,JE-SRC-003,4000-SALES-USD,,,,,,,,,,,,,0.00,1250.50,,,accepted,
+R061,journal_entry,journal_entry.currency_code:valid,JE-SRC-004,,,,,EUR,,EUR Export bill,,,,,JV-2026-0004,2026-04,2026-04-22,,,,,accepted,
+R062,journal_line,journal_line.debit_amount:valid,,JE-SRC-004,1010-CASH-EUR,,,,,,,,,,,,,800.00,0.00,,,accepted,
+R063,journal_line,journal_line.credit_amount:valid,,JE-SRC-004,4000-SALES-EUR,,,,,,,,,,,,,0.00,800.00,,,accepted,
+R064,journal_entry,journal_entry.source_id:invalid,,,,,,INR,,No source ID entry,,,,,JV-2026-0064,2026-04,2026-04-10,,,,,rejected,SOURCE_ID_REQUIRED
+R065,journal_line,journal_line.parent_source_id:valid,,,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_SOURCE_ID_REQUIRED
+R066,journal_line,journal_line.credit_amount:valid,,,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_SOURCE_ID_REQUIRED
+R067,journal_entry,journal_entry.entry_number:invalid,JE-SRC-067,,,,,INR,,No entry number,,,,,,2026-04,2026-04-10,,,,,rejected,ENTRY_NUMBER_REQUIRED
+R068,journal_line,journal_line.debit_amount:valid,,JE-SRC-067,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R069,journal_line,journal_line.credit_amount:valid,,JE-SRC-067,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R070,journal_entry,journal_entry.entry_number:invalid,JE-SRC-070,,,,,INR,,Long entry number,,,,,JV-2026-0070-LONG-NUMBER-123456789012345678901234567890123456789012,2026-04,2026-04-10,,,,,rejected,ENTRY_NUMBER_TOO_LONG
+R071,journal_line,journal_line.debit_amount:valid,,JE-SRC-070,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R072,journal_line,journal_line.credit_amount:valid,,JE-SRC-070,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R073,journal_entry,journal_entry.entry_number:valid,JE-SRC-073,,,,,INR,,Duplicate JV-2026-0001 candidate,,,,,JV-2026-0001,2026-04,2026-04-10,,,,,review,DUPLICATE_ENTRY_NUMBER_REVIEW
+R074,journal_line,journal_line.debit_amount:valid,,JE-SRC-073,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,review,PARENT_ENTRY_IN_REVIEW
+R075,journal_line,journal_line.credit_amount:valid,,JE-SRC-073,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,review,PARENT_ENTRY_IN_REVIEW
+R076,journal_entry,journal_entry.period_label:invalid,JE-SRC-076,,,,,INR,,No period label,,,,,JV-2026-0076,,2026-04-10,,,,,rejected,PERIOD_LABEL_REQUIRED
+R077,journal_line,journal_line.debit_amount:valid,,JE-SRC-076,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R078,journal_line,journal_line.credit_amount:valid,,JE-SRC-076,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R079,journal_entry,journal_entry.period_label:invalid,JE-SRC-079,,,,,INR,,Bad period format,,,,,JV-2026-0079,2026-Q1,2026-04-10,,,,,rejected,INVALID_PERIOD_FORMAT
+R080,journal_line,journal_line.debit_amount:valid,,JE-SRC-079,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R081,journal_line,journal_line.credit_amount:valid,,JE-SRC-079,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R082,journal_entry,journal_entry.period_label:invalid,JE-SRC-082,,,,,INR,,Locked period post attempt,,,,,JV-2026-0082,2026-01,2026-01-15,,,,,rejected,PERIOD_LOCKED
+R083,journal_line,journal_line.debit_amount:valid,,JE-SRC-082,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R084,journal_line,journal_line.credit_amount:valid,,JE-SRC-082,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R085,journal_entry,journal_entry.period_label:invalid,JE-SRC-085,,,,,INR,,Future unknown period,,,,,JV-2026-0085,2099-12,2099-12-15,,,,,rejected,PERIOD_NOT_FOUND
+R086,journal_line,journal_line.debit_amount:valid,,JE-SRC-085,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R087,journal_line,journal_line.credit_amount:valid,,JE-SRC-085,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R088,journal_entry,journal_entry.posting_date:invalid,JE-SRC-088,,,,,INR,,No posting date,,,,,JV-2026-0088,2026-04,,,,,,rejected,POSTING_DATE_REQUIRED
+R089,journal_line,journal_line.debit_amount:valid,,JE-SRC-088,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R090,journal_line,journal_line.credit_amount:valid,,JE-SRC-088,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R091,journal_entry,journal_entry.posting_date:invalid,JE-SRC-091,,,,,INR,,Bad calendar date,,,,,JV-2026-0091,2026-04,2026-04-35,,,,,rejected,INVALID_POSTING_DATE
+R092,journal_line,journal_line.debit_amount:valid,,JE-SRC-091,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R093,journal_line,journal_line.credit_amount:valid,,JE-SRC-091,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R094,journal_entry,journal_entry.description:invalid,JE-SRC-094,,,,,INR,,,,,,,JV-2026-0094,2026-04,2026-04-10,,,,,rejected,DESCRIPTION_REQUIRED
+R095,journal_line,journal_line.debit_amount:valid,,JE-SRC-094,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R096,journal_line,journal_line.credit_amount:valid,,JE-SRC-094,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R097,journal_entry,journal_entry.currency_code:invalid,JE-SRC-097,,,,,,,No currency entry,,,,,JV-2026-0097,2026-04,2026-04-10,,,,,rejected,CURRENCY_REQUIRED
+R098,journal_line,journal_line.debit_amount:valid,,JE-SRC-097,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R099,journal_line,journal_line.credit_amount:valid,,JE-SRC-097,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R100,journal_entry,journal_entry.currency_code:invalid,JE-SRC-100,,,,,ZZZ,,Bad currency entry,,,,,JV-2026-0100,2026-04,2026-04-10,,,,,rejected,INVALID_CURRENCY
+R101,journal_line,journal_line.debit_amount:valid,,JE-SRC-100,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R102,journal_line,journal_line.credit_amount:valid,,JE-SRC-100,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R103,journal_entry,journal_entry.lines:invalid,JE-SRC-103,,,,,INR,,Entry with no lines,,,,,JV-2026-0103,2026-04,2026-04-10,,,,,rejected,NO_LINES
+R104,journal_entry,journal_entry.lines:invalid,JE-SRC-104,,,,,INR,,Entry with only 1 line,,,,,JV-2026-0104,2026-04,2026-04-10,,,,,rejected,MINIMUM_LINES_REQUIRED
+R105,journal_line,journal_line.debit_amount:valid,,JE-SRC-104,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R106,journal_entry,journal_entry.lines:invalid,JE-SRC-106,,,,,INR,,Unbalanced journal entry,,,,,JV-2026-0106,2026-04,2026-04-10,,,,,rejected,UNBALANCED_JOURNAL_ENTRY
+R107,journal_line,journal_line.debit_amount:valid,,JE-SRC-106,1010-CASH,,,,,,,,,,,,,1000.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R108,journal_line,journal_line.credit_amount:valid,,JE-SRC-106,4000-SALES,,,,,,,,,,,,,0.00,800.00,,,rejected,PARENT_ENTRY_REJECTED
+R109,journal_entry,journal_entry.lines:invalid,JE-SRC-109,,,,,INR,,Unknown account in line,,,,,JV-2026-0109,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R110,journal_line,journal_line.code:invalid,,JE-SRC-109,9999-NOTFOUND,,,,,,,,,,,,,100.00,0.00,,,rejected,ACCOUNT_NOT_FOUND
+R111,journal_line,journal_line.credit_amount:valid,,JE-SRC-109,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R112,journal_entry,journal_entry.lines:invalid,JE-SRC-112,,,,,INR,,Inactive account in line,,,,,JV-2026-0112,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R113,journal_line,journal_line.code:invalid,,JE-SRC-112,9999-INACTIVE,,,,,,,,,,,,,100.00,0.00,,,rejected,ACCOUNT_INACTIVE
+R114,journal_line,journal_line.credit_amount:valid,,JE-SRC-112,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R115,journal_entry,journal_entry.lines:invalid,JE-SRC-115,,,,,INR,,Posting to header account,,,,,JV-2026-0115,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R116,journal_line,journal_line.code:invalid,,JE-SRC-115,1000-ASSETS-HDR,,,,,,,,,,,,,100.00,0.00,,,rejected,CANNOT_POST_TO_HEADER_ACCOUNT
+R117,journal_line,journal_line.credit_amount:valid,,JE-SRC-115,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R118,journal_entry,journal_entry.lines:invalid,JE-SRC-118,,,,,INR,,Line with debit and credit,,,,,JV-2026-0118,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R119,journal_line,journal_line.mutual_exclusivity:invalid,,JE-SRC-118,1010-CASH,,,,,,,,,,,,,100.00,50.00,,,rejected,LINE_DEBIT_AND_CREDIT
+R120,journal_line,journal_line.credit_amount:valid,,JE-SRC-118,4000-SALES,,,,,,,,,,,,,0.00,150.00,,,rejected,PARENT_ENTRY_REJECTED
+R121,journal_entry,journal_entry.lines:invalid,JE-SRC-121,,,,,INR,,Line with zero amounts,,,,,JV-2026-0121,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R122,journal_line,journal_line.mutual_exclusivity:invalid,,JE-SRC-121,1010-CASH,,,,,,,,,,,,,0.00,0.00,,,rejected,LINE_ZERO_AMOUNTS
+R123,journal_line,journal_line.credit_amount:valid,,JE-SRC-121,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R124,journal_entry,journal_entry.lines:invalid,JE-SRC-124,,,,,INR,,Negative debit line,,,,,JV-2026-0124,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R125,journal_line,journal_line.debit_amount:invalid,,JE-SRC-124,1010-CASH,,,,,,,,,,,,,-100.00,0.00,,,rejected,NEGATIVE_AMOUNT
+R126,journal_line,journal_line.credit_amount:valid,,JE-SRC-124,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R127,journal_entry,journal_entry.lines:invalid,JE-SRC-127,,,,,INR,,Negative credit line,,,,,JV-2026-0127,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R128,journal_line,journal_line.debit_amount:valid,,JE-SRC-127,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_ENTRY_REJECTED
+R129,journal_line,journal_line.credit_amount:invalid,,JE-SRC-127,4000-SALES,,,,,,,,,,,,,0.00,-100.00,,,rejected,NEGATIVE_AMOUNT
+R130,journal_entry,journal_entry.lines:invalid,JE-SRC-130,,,,,INR,,Line amount overflow,,,,,JV-2026-0130,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R131,journal_line,journal_line.debit_amount:invalid,,JE-SRC-130,1010-CASH,,,,,,,,,,,,,999999999999999999999.00,0.00,,,rejected,AMOUNT_OVERFLOW
+R132,journal_line,journal_line.credit_amount:valid,,JE-SRC-130,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R133,journal_entry,journal_entry.lines:invalid,JE-SRC-133,,,,,INR,,Line excess decimals,,,,,JV-2026-0133,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R134,journal_line,journal_line.debit_amount:invalid,,JE-SRC-133,1010-CASH,,,,,,,,,,,,,100.12345,0.00,,,rejected,EXCESS_DECIMAL_PLACES
+R135,journal_line,journal_line.credit_amount:valid,,JE-SRC-133,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R136,journal_entry,journal_entry.lines:invalid,JE-SRC-136,,,,,INR,,Line narration too long,,,,,JV-2026-0136,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R137,journal_line,journal_line.line_narration:invalid,,JE-SRC-136,1010-CASH,,,,,,,,,,,,,100.00,0.00,LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL,,rejected,LINE_NARRATION_TOO_LONG
+R138,journal_line,journal_line.credit_amount:valid,,JE-SRC-136,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R139,journal_entry,journal_entry.lines:invalid,JE-SRC-139,,,,,INR,,Unknown department ref,,,,,JV-2026-0139,2026-04,2026-04-10,,,,,rejected,LINE_REJECTED
+R140,journal_line,journal_line.department_ref:invalid,,JE-SRC-139,1010-CASH,,,,,,,,,,,,,100.00,0.00,,DEP-UNKNOWN,rejected,DEPARTMENT_NOT_FOUND
+R141,journal_line,journal_line.credit_amount:valid,,JE-SRC-139,4000-SALES,,,,,,,,,,,,,0.00,100.00,,,rejected,PARENT_ENTRY_REJECTED
+R142,journal_line,journal_line.parent_source_id:invalid,,JE-SRC-ORPHAN,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,ORPHAN_LINE
+R143,journal_line,journal_line.parent_source_id:invalid,,,1010-CASH,,,,,,,,,,,,,100.00,0.00,,,rejected,PARENT_SOURCE_ID_REQUIRED

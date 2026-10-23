@@ -352,3 +352,24 @@ When an optional relationship is absent, the system emits an approved warning ob
 
 ### 11.3 Versioned Change Control Log
 - **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
+- **Version 1.1.0 (2026-10-23)**: Sprint 3 / Gate G4 sign-off by Data / QA Lead (Issue #43). Defined module data quality rules catalogue, cleaning routines, 143-row synthetic dirty data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and automated migration test suite.
+
+---
+
+## 12. Migration Profiling, Cleaning, Mapping & Dirty Data Pack (Issue #43)
+
+### 12.1 Authoritative Migration Artifacts
+- **Data Quality Rules Specification**: [`apps/erp/modules/erp-4/docs/data-quality-rules.md`](./data-quality-rules.md)
+- **Rules Engine & Profile Calculator**: [`apps/erp/modules/erp-4/src/migration/rules.ts`](../src/migration/rules.ts)
+- **Synthetic Dirty Data Pack**: [`sample-data/erp-4/dirty-data-v1.csv`](../../../../sample-data/erp-4/dirty-data-v1.csv) (143 rows; immutable input, verified via SHA-256 manifest)
+- **Canonical Profile & Manifest**: [`sample-data/erp-4/expected-profile.json`](../../../../sample-data/erp-4/expected-profile.json)
+- **Target Mapping Template**: [`sample-data/erp-4/mapping-template.json`](../../../../sample-data/erp-4/mapping-template.json)
+- **Automated Test Suite**: [`apps/erp/modules/erp-4/tests/migration/rules.test.ts`](../tests/migration/rules.test.ts) (27 tests)
+
+### 12.2 Migration Policies & Invariants
+- **BR-KIT-03 Source File Immutability**: Raw input fixtures are never mutated or overwritten in-place during profiling or cleaning.
+- **BR-ERP4-01 Double-Entry Exact Balance**: Every journal entry must balance exactly (`SUM(debit) == SUM(credit)`) within currency precision. Unbalanced entries are rejected (`UNBALANCED_JOURNAL_ENTRY`).
+- **BR-ERP4-02 Period Posting Guard**: Closed and locked fiscal periods reject postings unconditionally (`PERIOD_LOCKED`, `PERIOD_SOFT_CLOSED`).
+- **No-Fuzzy-Merge / Review Policy**: V1 migration does NOT perform automated fuzzy merges. Exact duplicate candidate keys are flagged for explicit human review (`review` outcome) with reason codes `DUPLICATE_ACCOUNT_CODE_REVIEW`, `DUPLICATE_OPENING_BALANCE_REVIEW`, and `DUPLICATE_ENTRY_NUMBER_REVIEW`.
+- **100% Outcome Reconciliation**: Every source row evaluates to exactly one terminal outcome: accepted, rejected, or review (`unaccounted = 0`).
+- **Atomic Entry Invariant**: If any child line fails validation or if lines fail to balance, the entire journal entry is rejected (`LINE_REJECTED`) along with all peer lines (`PARENT_ENTRY_REJECTED`).
