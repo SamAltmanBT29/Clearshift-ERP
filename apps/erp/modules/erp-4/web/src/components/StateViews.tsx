@@ -45,16 +45,18 @@ export const SkeletonTable: React.FC<SkeletonTableProps> = ({ columns = 5, rows 
 };
 
 interface EmptyStateProps {
-  title?: string;
-  message?: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  icon?: React.ReactNode | undefined;
+  title?: string | undefined;
+  message?: string | undefined;
+  actionLabel?: string | undefined;
+  onAction?: (() => void) | undefined;
 }
 
 /**
  * 📄 Empty State: Polished zero-data view with clear action
  */
 export const EmptyState: React.FC<EmptyStateProps> = ({
+  icon,
   title = 'No records found',
   message = 'There are no accounts matching your current search or filter criteria.',
   actionLabel,
@@ -62,7 +64,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div className="cs-empty-state" role="region" aria-label="Empty state results">
-      <div className="cs-empty-icon" aria-hidden="true">📂</div>
+      <div className="cs-empty-icon" aria-hidden="true">{icon || '📂'}</div>
       <h3 className="cs-empty-title">{title}</h3>
       <p className="cs-empty-text">{message}</p>
       {actionLabel && onAction && (
@@ -112,6 +114,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
 };
 
 interface StatusBadgeProps {
+  status?: string;
   type?: AccountType | string;
   label?: string;
   variant?: 'asset' | 'liability' | 'equity' | 'income' | 'expense' | 'success' | 'error' | 'muted';
@@ -120,11 +123,16 @@ interface StatusBadgeProps {
 /**
  * Soft pill badge
  */
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, label, variant }) => {
-  const badgeClass = variant ? `cs-badge-${variant}` : type ? `cs-badge-${type.toLowerCase()}` : 'cs-badge-muted';
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ type, label, variant, status }) => {
+  const effectiveType = type || status;
+  const badgeClass = variant
+    ? `cs-badge-${variant}`
+    : effectiveType
+    ? `cs-badge-${effectiveType.toLowerCase()}`
+    : 'cs-badge-muted';
   return (
     <span className={`cs-badge ${badgeClass}`}>
-      {label || type}
+      {label || effectiveType}
     </span>
   );
 };

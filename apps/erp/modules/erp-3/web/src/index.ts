@@ -8,6 +8,8 @@ export * from './components/forms/ConfirmActionDialog.js';
 export * from './components/forms/OrderForm.js';
 export * from './components/forms/InvoiceForm.js';
 export * from './components/forms/PaymentModal.js';
+export * from './components/forms/OrderCreateModal.js';
+export * from './hooks/useOrderForm.js';
 export * from './pages/OrdersListPage.js';
 export * from './pages/OrderCreatePage.js';
 export * from './pages/OrderDetailPage.js';

@@ -28,11 +28,11 @@ export type VendorFormField =
 export type VendorFormErrors = Partial<Record<VendorFormField, string>>;
 
 export interface VendorFormProps {
-  initialData?: Partial<Vendor>;
-  isEdit?: boolean;
+  initialData?: Partial<Vendor> | undefined;
+  isEdit?: boolean | undefined;
   onSubmit: (data: VendorFormData) => Promise<void>;
   onCancel: () => void;
-  isLoading?: boolean;
+  isLoading?: boolean | undefined;
 }
 
 export const VendorForm: React.FC<VendorFormProps> = ({
@@ -59,18 +59,24 @@ export const VendorForm: React.FC<VendorFormProps> = ({
 
   const validateField = (name: VendorFormField, value: any): string | null => {
     if (name === 'name' && (!value || value.trim() === '')) {
-      return 'Vendor name is required';
+      return 'Name is required';
     }
     if (name === 'tax_number' && (!value || value.trim() === '')) {
       return 'Tax number is required';
     }
     if (name === 'email') {
-      if (!value || value.trim() === '') return 'Email is required';
+      if (!value || value.trim() === '') return 'Valid email is required';
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(value)) return 'Valid email is required';
     }
     if (name === 'currency' && value && !/^[A-Z]{3}$/.test(value)) {
       return 'Currency must be a 3-letter ISO code (e.g. USD)';
+    }
+    if (name === 'phone' && value && value.trim() !== '') {
+      const phoneRegex = /^\+?[0-9\s\-()]{7,25}$/;
+      if (!phoneRegex.test(value.trim())) {
+        return 'Phone number must be a valid format (min 7 digits, e.g. +1-555-0199)';
+      }
     }
     if (name === 'bank_details' && value && value.trim().length > 0 && value.trim().length < 4) {
       return 'Bank details must be at least 4 characters';
@@ -95,6 +101,20 @@ export const VendorForm: React.FC<VendorFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError(null);
+
+    // 1. Client-side field-level validation before submission (AC1)
+    const clientErrors: VendorFormErrors = {};
+    (['name', 'tax_number', 'email', 'phone', 'currency', 'bank_details'] as VendorFormField[]).forEach((field) => {
+      const err = validateField(field, formData[field]);
+      if (err) {
+        clientErrors[field] = err;
+      }
+    });
+
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      return;
+    }
 
     // Run schema validation
     const payload: Record<string, unknown> = {
@@ -133,15 +153,18 @@ export const VendorForm: React.FC<VendorFormProps> = ({
       await onSubmit(payload as unknown as VendorFormData);
     } catch (err: any) {
       setGeneralError(err?.message || 'Failed to save vendor. Please check inputs and try again.');
+      // Map server validation errors directly to input fields (AC3)
       if (err?.details && Array.isArray(err.details)) {
         const serverErrors: VendorFormErrors = {};
         err.details.forEach((issue: any) => {
-          const field = issue.path?.[0] as VendorFormField;
+          const field = (issue.path?.[0] || issue.field) as VendorFormField;
           if (field) {
             serverErrors[field] = issue.message;
           }
         });
         setFieldErrors((prev) => ({ ...prev, ...serverErrors }));
+      } else if (err?.fieldErrors && typeof err.fieldErrors === 'object') {
+        setFieldErrors((prev) => ({ ...prev, ...err.fieldErrors }));
       }
     }
   };
@@ -234,12 +257,19 @@ export const VendorForm: React.FC<VendorFormProps> = ({
           <input
             id="vendor-phone-input"
             type="tel"
-            className="cs-input"
+            className={`cs-input ${fieldErrors.phone ? 'cs-input-error' : ''}`}
             placeholder="e.g. +1-555-0199"
             value={formData.phone || ''}
             onChange={(e) => handleChange('phone', e.target.value)}
             disabled={isLoading}
+            aria-invalid={!!fieldErrors.phone}
+            aria-describedby={fieldErrors.phone ? 'vendor-phone-error' : undefined}
           />
+          {fieldErrors.phone && (
+            <span id="vendor-phone-error" className="cs-field-error" role="alert">
+              {fieldErrors.phone}
+            </span>
+          )}
         </div>
 
         {/* Currency */}
