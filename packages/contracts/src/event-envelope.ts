@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 /**
@@ -34,6 +33,20 @@ export type EventEnvelope = z.infer<typeof EventEnvelopeSchema> & {
 };
 
 /**
+ * Browser-safe UUID generation helper without node:crypto dependency
+ */
+function generateUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Factory for strongly-typed domain event envelopes
  */
 export function createEventEnvelopeSchema<T extends z.ZodTypeAny>(payloadSchema: T) {
@@ -67,7 +80,7 @@ export function createEventEnvelope<T>(params: {
   payload: T;
   metadata?: Record<string, unknown>;
 }): EventEnvelope {
-  const event_id = params.event_id ?? params.id ?? randomUUID();
+  const event_id = params.event_id ?? params.id ?? generateUUID();
   const event_type = params.event_type ?? params.eventType ?? '';
   const occurred_at = params.occurred_at ?? params.occurredAt ?? new Date().toISOString();
   const correlation_id = params.correlation_id ?? params.correlationId ?? '';
