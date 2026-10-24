@@ -1,3 +1,16 @@
+/**
+ * ERP-3 Sales Orders & Invoices — Main List Page
+ *
+ * Implements search, filters, and sorting controls for ERP3-18 (Issue #154):
+ *   - Debounced search bar (300ms) via SearchBar component (AC1)
+ *   - Faceted filter sidebar (status and currency for orders & invoices) (AC2)
+ *   - Active filter pill tags with individual clear + Clear All (AC3)
+ *   - Empty state with informative message and reset action (AC4)
+ *   - URL query parameter sync for search, status, currency, page, pageSize, sort, order
+ *
+ * @module erp3/web/pages/OrdersListPage
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import type {
   SalesOrder,
@@ -9,7 +22,10 @@ import { fetchSalesOrders, fetchInvoices } from '../api/erp-3.js';
 import { OrdersTable } from '../components/OrdersTable.js';
 import { InvoicesTable } from '../components/InvoicesTable.js';
 import { FilterBar, InvoiceFilterBar } from '../components/FilterBar.js';
-import { ErrorState, EmptyState } from '../components/StateViews.js';
+import { SalesOrderFilterSidebar, InvoiceFilterSidebar } from '../components/FilterSidebar.js';
+import { FilterPillTags } from '../components/FilterPillTags.js';
+import type { Erp3ActiveFilters, Erp3FilterKey } from '../components/FilterPillTags.js';
+import { ErrorState } from '../components/StateViews.js';
 import { OrderCreatePage } from './OrderCreatePage.js';
 import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
@@ -26,12 +42,82 @@ export interface OrdersListPageProps {
   initialTab?: 'orders' | 'invoices';
 }
 
+// ─── URL Query State Helpers ──────────────────────────────────────────────────
+
+function parseOrderFiltersFromUrl(): Partial<SalesOrdersFilterQuery> {
+  if (typeof window === 'undefined') return {};
+  const p = new URLSearchParams(window.location.search);
+  const q: Partial<SalesOrdersFilterQuery> = {};
+  const search = p.get('search');
+  if (search) q.search = search;
+  const status = p.get('status');
+  if (status) q.status = status as SalesOrdersFilterQuery['status'];
+  const currency = p.get('currency');
+  if (currency) q.currency = currency;
+  const customer_golden_id = p.get('customer_golden_id');
+  if (customer_golden_id) q.customer_golden_id = customer_golden_id;
+  const page = p.get('page');
+  if (page) q.page = Number(page);
+  const pageSize = p.get('pageSize');
+  if (pageSize) q.pageSize = Math.min(100, Number(pageSize));
+  return q;
+}
+
+function parseInvoiceFiltersFromUrl(): Partial<InvoicesFilterQuery> {
+  if (typeof window === 'undefined') return {};
+  const p = new URLSearchParams(window.location.search);
+  const q: Partial<InvoicesFilterQuery> = {};
+  const search = p.get('search');
+  if (search) q.search = search;
+  const status = p.get('status');
+  if (status) q.status = status as InvoicesFilterQuery['status'];
+  const currency = p.get('currency');
+  if (currency) q.currency = currency;
+  const customer_golden_id = p.get('customer_golden_id');
+  if (customer_golden_id) q.customer_golden_id = customer_golden_id;
+  const order_id = p.get('order_id');
+  if (order_id) q.order_id = order_id;
+  const page = p.get('page');
+  if (page) q.page = Number(page);
+  const pageSize = p.get('pageSize');
+  if (pageSize) q.pageSize = Math.min(100, Number(pageSize));
+  return q;
+}
+
+function parseInitialTabFromUrl(defaultTab: 'orders' | 'invoices'): 'orders' | 'invoices' {
+  if (typeof window === 'undefined') return defaultTab;
+  const p = new URLSearchParams(window.location.search);
+  const tab = p.get('tab');
+  if (tab === 'orders' || tab === 'invoices') return tab;
+  return defaultTab;
+}
+
+function updateUrl(params: Record<string, string | number | undefined>) {
+  if (typeof window === 'undefined') return;
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '' && v !== null) {
+      p.set(k, String(v));
+    }
+  }
+  const qs = p.toString();
+  window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'orders' }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(() =>
+    parseInitialTabFromUrl(initialTab)
+  );
   const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+
+  // Sidebar toggle state
+  const [orderSidebarOpen, setOrderSidebarOpen] = useState(true);
+  const [invoiceSidebarOpen, setInvoiceSidebarOpen] = useState(true);
 
   // Sales Orders state
   const [orders, setOrders] = useState<SalesOrder[]>([]);
@@ -40,12 +126,15 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
 
-  const [orderFilters, setOrderFilters] = useState<Partial<SalesOrdersFilterQuery>>({
+  const [orderFilters, setOrderFilters] = useState<Partial<SalesOrdersFilterQuery>>(() => ({
     page: 1,
     pageSize: 20,
     search: '',
     status: undefined,
-  });
+    currency: undefined,
+    customer_golden_id: undefined,
+    ...parseOrderFiltersFromUrl(),
+  }));
   const [orderSortField, setOrderSortField] = useState<string | undefined>(undefined);
   const [orderSortDirection, setOrderSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -56,15 +145,20 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
 
-  const [invoiceFilters, setInvoiceFilters] = useState<Partial<InvoicesFilterQuery>>({
+  const [invoiceFilters, setInvoiceFilters] = useState<Partial<InvoicesFilterQuery>>(() => ({
     page: 1,
     pageSize: 20,
     search: '',
     status: undefined,
-  });
+    currency: undefined,
+    customer_golden_id: undefined,
+    order_id: undefined,
+    ...parseInvoiceFiltersFromUrl(),
+  }));
   const [invoiceSortField, setInvoiceSortField] = useState<string | undefined>(undefined);
   const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // Sort handlers
   const handleOrderSortChange = (field: string) => {
     if (orderSortField === field) {
       setOrderSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -99,6 +193,66 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     }));
   };
 
+  // Pill tag handlers for orders
+  const orderActivePillFilters: Erp3ActiveFilters = {
+    search: orderFilters.search,
+    status: orderFilters.status,
+    currency: orderFilters.currency,
+    customer_golden_id: orderFilters.customer_golden_id,
+  };
+
+  const handleRemoveOrderFilter = useCallback((key: Erp3FilterKey) => {
+    setOrderFilters((prev) => ({
+      ...prev,
+      [key]: key === 'search' ? '' : undefined,
+      page: 1,
+    }));
+  }, []);
+
+  const handleClearAllOrderFilters = useCallback(() => {
+    setOrderFilters({
+      page: 1,
+      pageSize: 20,
+      search: '',
+      status: undefined,
+      currency: undefined,
+      customer_golden_id: undefined,
+    });
+    setOrderSortField(undefined);
+    setOrderSortDirection('asc');
+  }, []);
+
+  // Pill tag handlers for invoices
+  const invoiceActivePillFilters: Erp3ActiveFilters = {
+    search: invoiceFilters.search,
+    status: invoiceFilters.status,
+    currency: invoiceFilters.currency,
+    customer_golden_id: invoiceFilters.customer_golden_id,
+    order_id: invoiceFilters.order_id,
+  };
+
+  const handleRemoveInvoiceFilter = useCallback((key: Erp3FilterKey) => {
+    setInvoiceFilters((prev) => ({
+      ...prev,
+      [key]: key === 'search' ? '' : undefined,
+      page: 1,
+    }));
+  }, []);
+
+  const handleClearAllInvoiceFilters = useCallback(() => {
+    setInvoiceFilters({
+      page: 1,
+      pageSize: 20,
+      search: '',
+      status: undefined,
+      currency: undefined,
+      customer_golden_id: undefined,
+      order_id: undefined,
+    });
+    setInvoiceSortField(undefined);
+    setInvoiceSortDirection('asc');
+  }, []);
+
   // Load Sales Orders
   const loadOrders = useCallback(async (filters: Partial<SalesOrdersFilterQuery>) => {
     setIsOrdersLoading(true);
@@ -131,16 +285,50 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     }
   }, []);
 
-  // Effect to load on filter or tab change
+  // Effect to load on filter or tab change & sync URL query state
   useEffect(() => {
     if (viewMode === 'list') {
       if (activeTab === 'orders') {
+        updateUrl({
+          tab: 'orders',
+          search: orderFilters.search,
+          status: orderFilters.status,
+          currency: orderFilters.currency,
+          customer_golden_id: orderFilters.customer_golden_id,
+          page: orderFilters.page !== 1 ? orderFilters.page : undefined,
+          pageSize: orderFilters.pageSize !== 20 ? orderFilters.pageSize : undefined,
+          sort: orderSortField,
+          order: orderSortField ? orderSortDirection : undefined,
+        });
         loadOrders(orderFilters);
       } else {
+        updateUrl({
+          tab: 'invoices',
+          search: invoiceFilters.search,
+          status: invoiceFilters.status,
+          currency: invoiceFilters.currency,
+          customer_golden_id: invoiceFilters.customer_golden_id,
+          order_id: invoiceFilters.order_id,
+          page: invoiceFilters.page !== 1 ? invoiceFilters.page : undefined,
+          pageSize: invoiceFilters.pageSize !== 20 ? invoiceFilters.pageSize : undefined,
+          sort: invoiceSortField,
+          order: invoiceSortField ? invoiceSortDirection : undefined,
+        });
         loadInvoices(invoiceFilters);
       }
     }
-  }, [viewMode, activeTab, orderFilters, invoiceFilters, loadOrders, loadInvoices]);
+  }, [
+    viewMode,
+    activeTab,
+    orderFilters,
+    invoiceFilters,
+    orderSortField,
+    orderSortDirection,
+    invoiceSortField,
+    invoiceSortDirection,
+    loadOrders,
+    loadInvoices,
+  ]);
 
   // View dispatchers
   if (viewMode === 'create-order') {
@@ -270,77 +458,141 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
 
       {/* Main Tab Content */}
       {activeTab === 'orders' ? (
-        <div className="cs-tab-content">
-          <FilterBar
-            filters={orderFilters}
-            onFilterChange={(updated) => setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))}
-            onReset={() => setOrderFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
+        <div className="cs-tab-content cs-erp3-content-with-sidebar">
+          {/* Faceted Filter Sidebar (AC2) */}
+          <SalesOrderFilterSidebar
+            filters={{
+              status: orderFilters.status,
+              currency: orderFilters.currency,
+            }}
+            onFilterChange={(updated) =>
+              setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+            }
+            onResetFilters={handleClearAllOrderFilters}
             isLoading={isOrdersLoading}
+            isOpen={orderSidebarOpen}
+            onToggle={() => setOrderSidebarOpen((v) => !v)}
           />
 
-          {ordersError ? (
-            <ErrorState
-              title="Failed to Load Sales Orders"
-              message={ordersError}
-              onRetry={() => loadOrders(orderFilters)}
-            />
-          ) : (
-            <OrdersTable
-              orders={orders}
+          <div className="cs-erp3-content-main">
+            {/* Filter Bar with Debounced Search (AC1) */}
+            <FilterBar
+              filters={orderFilters}
+              onFilterChange={(updated) =>
+                setOrderFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+              }
+              onReset={handleClearAllOrderFilters}
               isLoading={isOrdersLoading}
-              total={ordersTotal}
-              page={orderFilters.page || 1}
-              pageSize={orderFilters.pageSize || 20}
-              totalPages={ordersTotalPages}
-              sortField={orderSortField}
-              sortDirection={orderSortDirection}
-              onSortChange={handleOrderSortChange}
-              onPageChange={(newPage) => setOrderFilters((prev) => ({ ...prev, page: newPage }))}
-              onPageSizeChange={handleOrderPageSizeChange}
-              onRefresh={() => setOrderFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
-              onSelectOrder={(ord) => {
-                setSelectedOrderId(ord.id);
-                setSelectedOrder(ord);
-                setViewMode('order-detail');
-              }}
+              onToggleSidebar={() => setOrderSidebarOpen((v) => !v)}
+              isSidebarOpen={orderSidebarOpen}
             />
-          )}
+
+            {/* Active Filter Pill Tags (AC3) */}
+            <FilterPillTags
+              filters={orderActivePillFilters}
+              onRemoveFilter={handleRemoveOrderFilter}
+              onClearAll={handleClearAllOrderFilters}
+              disabled={isOrdersLoading}
+            />
+
+            {ordersError ? (
+              <ErrorState
+                title="Failed to Load Sales Orders"
+                message={ordersError}
+                onRetry={() => loadOrders(orderFilters)}
+              />
+            ) : (
+              <OrdersTable
+                orders={orders}
+                isLoading={isOrdersLoading}
+                total={ordersTotal}
+                page={orderFilters.page || 1}
+                pageSize={orderFilters.pageSize || 20}
+                totalPages={ordersTotalPages}
+                sortField={orderSortField}
+                sortDirection={orderSortDirection}
+                onSortChange={handleOrderSortChange}
+                onPageChange={(newPage) =>
+                  setOrderFilters((prev) => ({ ...prev, page: newPage }))
+                }
+                onPageSizeChange={handleOrderPageSizeChange}
+                onRefresh={handleClearAllOrderFilters}
+                onSelectOrder={(ord) => {
+                  setSelectedOrderId(ord.id);
+                  setSelectedOrder(ord);
+                  setViewMode('order-detail');
+                }}
+              />
+            )}
+          </div>
         </div>
       ) : (
-        <div className="cs-tab-content">
-          <InvoiceFilterBar
-            filters={invoiceFilters}
-            onFilterChange={(updated) => setInvoiceFilters((prev) => ({ ...prev, ...updated, page: 1 }))}
-            onReset={() => setInvoiceFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
+        <div className="cs-tab-content cs-erp3-content-with-sidebar">
+          {/* Faceted Filter Sidebar for Invoices (AC2) */}
+          <InvoiceFilterSidebar
+            filters={{
+              status: invoiceFilters.status,
+              currency: invoiceFilters.currency,
+            }}
+            onFilterChange={(updated) =>
+              setInvoiceFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+            }
+            onResetFilters={handleClearAllInvoiceFilters}
             isLoading={isInvoicesLoading}
+            isOpen={invoiceSidebarOpen}
+            onToggle={() => setInvoiceSidebarOpen((v) => !v)}
           />
 
-          {invoicesError ? (
-            <ErrorState
-              title="Failed to Load Invoices"
-              message={invoicesError}
-              onRetry={() => loadInvoices(invoiceFilters)}
-            />
-          ) : (
-            <InvoicesTable
-              invoices={invoices}
+          <div className="cs-erp3-content-main">
+            {/* Filter Bar with Debounced Search for Invoices (AC1) */}
+            <InvoiceFilterBar
+              filters={invoiceFilters}
+              onFilterChange={(updated) =>
+                setInvoiceFilters((prev) => ({ ...prev, ...updated, page: 1 }))
+              }
+              onReset={handleClearAllInvoiceFilters}
               isLoading={isInvoicesLoading}
-              total={invoicesTotal}
-              page={invoiceFilters.page || 1}
-              pageSize={invoiceFilters.pageSize || 20}
-              totalPages={invoicesTotalPages}
-              sortField={invoiceSortField}
-              sortDirection={invoiceSortDirection}
-              onSortChange={handleInvoiceSortChange}
-              onPageChange={(newPage) => setInvoiceFilters((prev) => ({ ...prev, page: newPage }))}
-              onPageSizeChange={handleInvoicePageSizeChange}
-              onRefresh={() => setInvoiceFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
-              onSelectInvoice={(inv) => {
-                setSelectedInvoiceId(inv.id);
-                setViewMode('invoice-detail');
-              }}
+              onToggleSidebar={() => setInvoiceSidebarOpen((v) => !v)}
+              isSidebarOpen={invoiceSidebarOpen}
             />
-          )}
+
+            {/* Active Filter Pill Tags for Invoices (AC3) */}
+            <FilterPillTags
+              filters={invoiceActivePillFilters}
+              onRemoveFilter={handleRemoveInvoiceFilter}
+              onClearAll={handleClearAllInvoiceFilters}
+              disabled={isInvoicesLoading}
+            />
+
+            {invoicesError ? (
+              <ErrorState
+                title="Failed to Load Invoices"
+                message={invoicesError}
+                onRetry={() => loadInvoices(invoiceFilters)}
+              />
+            ) : (
+              <InvoicesTable
+                invoices={invoices}
+                isLoading={isInvoicesLoading}
+                total={invoicesTotal}
+                page={invoiceFilters.page || 1}
+                pageSize={invoiceFilters.pageSize || 20}
+                totalPages={invoicesTotalPages}
+                sortField={invoiceSortField}
+                sortDirection={invoiceSortDirection}
+                onSortChange={handleInvoiceSortChange}
+                onPageChange={(newPage) =>
+                  setInvoiceFilters((prev) => ({ ...prev, page: newPage }))
+                }
+                onPageSizeChange={handleInvoicePageSizeChange}
+                onRefresh={handleClearAllInvoiceFilters}
+                onSelectInvoice={(inv) => {
+                  setSelectedInvoiceId(inv.id);
+                  setViewMode('invoice-detail');
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
