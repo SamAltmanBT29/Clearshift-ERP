@@ -39,6 +39,7 @@
 25. [Module Authorization and Policy Integration (ERP1-15)](#27-module-authorization-and-policy-integration-erp1-15)
 26. [Module Route and Page Registration in Shared Shell (ERP1-16)](#28-module-route-and-page-registration-in-shared-shell-erp1-16)
 27. [Main Paginated Data Table (ERP1-17)](#29-main-paginated-data-table-erp1-17)
+28. [Profiling Configuration & Expected-Result Assertions (ERP1-26)](#28-profiling-configuration--expected-result-assertions-erp1-26)
 
 ---
 
@@ -1163,3 +1164,37 @@ The primary collection table screen renders entity rows with stable columns dire
    - Headers declare `aria-sort="ascending"`, `aria-sort="descending"`, or `aria-sort="none"`.
    - Accessible descriptions announce the current sort state and next action (`aria-label`).
    - Supports keyboard activation via `Enter` and `Space` (`tabIndex={0}`).
+
+---
+
+## 28. Profiling Configuration & Expected-Result Assertions (ERP1-26)
+
+**Issue Reference**: Resolves [#122](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/122) (ERP1-26 / KIT-03)  
+**Implementation**: `apps/erp/modules/erp-1/src/migration/profiling-config.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/migration/profiling.test.ts`  
+**Detailed Specification**: `docs/data-dictionaries/erp-1-profiling.md`  
+
+### 28.1 Shared Profiler Engine Integration (AC1 & AC4)
+ERP-1 integrates directly with the `@cs/kit` shared column profiler (`profileDataset`) and CSV report exporter (`exportProfileReportToCsv`) without duplicating platform infrastructure:
+- Accurately computes total rows (131), null counts, populated counts, distinct values, invalid format counts, and rates for all 4 owned entities (`category`, `warehouse`, `product`, `stock_level`).
+- Validates strict domain invariants:
+  - SKU uniqueness after documented normalization (`normalizeSku`).
+  - Unit of measure from fixed V1 list (`pcs`, `kg`, `g`, `litre`, `metre`, `box` per FR-ERP1-04).
+  - Price and tax rates use non-negative decimal types (FR-ERP1-02).
+  - Stock quantity may not become negative (BR-ERP1-01 / BR-ERP1-02).
+  - Single operating warehouse in V1 (`WH-01` per FR-ERP1-05).
+  - OWASP formula injection protection (`=`, `+`, `-`, `@`, `\t`, `\r`).
+- Validates all column invalid format counts match pre-calculated manifest numbers from `sample-data/erp-1/expected-profile.json`.
+
+### 28.2 Exact Duplicate Candidate Rules (AC2)
+Deterministic exact-key matching rules are configured for human review:
+- `category_code`: Trimmed uppercase category code (2 duplicate candidates: `R012`, `R013` matching `R001`).
+- `product_sku`: Normalized uppercase SKU (3 duplicate candidates: `R057`, `R058` matching `R022`, `R059` matching `R023`).
+- `stock_level_key`: Composite key `${sku}::${warehouse_code}` for valid stock lines (2 duplicate candidates: `R112`, `R113` matching `R087`).
+
+Total duplicate candidate count: 7 (100% parity with manifest `reconciliation.review = 7`). Zero fuzzy scoring rules; V2 auto-merge rollback sagas are strictly out of scope.
+
+### 28.3 Non-Destructive Guarantees & PII Masking (AC3)
+- Non-destructive operation: source CSV text, file bytes, and SHA-256 (`25040ea5a6c9ec820f21798f0f4014edb116844392fea024048e96537c39ee91`) remain completely untouched.
+- Sensitive fields `supplier_bank_account` and `employee_ssn` are never profiled and are masked before profiling, ensuring zero PII or financial number leakage in profile reports or formula-safe CSV exports.
+
