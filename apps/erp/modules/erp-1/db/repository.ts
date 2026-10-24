@@ -102,6 +102,7 @@ function toReceipt(row: Erp1ImportReceiptRow): Erp1ImportReceipt {
     requestHash: row.requestHash,
     sourceSystem: row.sourceSystem ?? null,
     sourceId: row.sourceId ?? null,
+    kind: (row.kind as 'created' | 'linked') ?? 'created',
     outcome: row.outcome,
     responsePayload: row.responsePayload ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -409,6 +410,7 @@ export class DrizzleErp1Repository implements Erp1Repository {
         requestHash: receipt.requestHash,
         sourceSystem: receipt.sourceSystem ?? null,
         sourceId: receipt.sourceId ?? null,
+        kind: receipt.kind ?? 'created',
         outcome: receipt.outcome ?? 'loaded',
         responsePayload: receipt.responsePayload ?? null,
       })

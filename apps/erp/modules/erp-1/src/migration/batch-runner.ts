@@ -2,13 +2,13 @@
  * ERP-1 Products & Inventory — Migration Batch Runner Utilities
  *
  * Implements chunked batch execution, transient exponential backoff retry,
- * and 10% failure rate stop threshold (ERP1-11 / ERP1-13 / KIT-08 / KIT-12):
+ * and 10% failure rate stop threshold (ERP1-07 / ERP1-11 / ERP1-13 / KIT-08 / KIT-12 / Decision C4):
  *
  *   1. Chunking: Partitions large row streams into sequential 500-row chunks.
  *   2. Bounded Exponential Retry: Retries transient infrastructure failures (503,
  *      deadlocks, timeouts) without altering or corrupting client idempotency keys.
  *   3. 10% Stop Threshold: Halts batch execution immediately when row failure rate
- *      exceeds 10% of attempted rows.
+ *      exceeds 10% of attempted rows (after a minimum sample of 10 rows).
  *   4. Prohibition of Rollback Sagas: Preserves committed rows and durable receipts;
  *      no destructive compensating sagas exist in ClearShift V1.
  *

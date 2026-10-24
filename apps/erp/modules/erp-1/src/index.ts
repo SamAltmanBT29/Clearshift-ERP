@@ -32,6 +32,8 @@ export * from './services/errors.js';
 export * from './services/erp1.service.js';
 export * from './services/repository.js';
 export * from './routes/index.js';
+export * from './migration/target-adapter.js';
+export * from '../db/import-receipts.js';
 
 /**
  * Creates a module definition whose reference resolver is backed by the
