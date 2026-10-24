@@ -165,6 +165,30 @@ export async function updateAccount(
   });
 }
 
+/**
+ * Fetch list of accounting periods.
+ */
+export async function fetchPeriods(query?: { status?: string; fiscal_year?: string; page?: number; pageSize?: number }): Promise<{
+  data: any[];
+  items: any[];
+  total: number;
+}> {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.fiscal_year) params.set('fiscal_year', query.fiscal_year);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.pageSize) params.set('pageSize', String(query.pageSize));
+
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const res = await request<any>(`/periods${qs}`);
+  const list = res.data || res.items || [];
+  return {
+    data: list,
+    items: list,
+    total: res.total ?? list.length,
+  };
+}
+
 export interface NormalizedTrialBalanceResponse {
   period: string;
   currencyCode: string;
@@ -236,8 +260,16 @@ export async function fetchJournalEntries(
 ): Promise<PaginatedJournalEntriesResponse> {
   const params = new URLSearchParams();
   if (query.page) params.set('page', String(query.page));
-  if (query.limit || query.pageSize) params.set('limit', String(query.limit || query.pageSize));
-  if (query.period) params.set('period', query.period);
+  if (query.limit !== undefined) {
+    params.set('limit', String(query.limit));
+  } else if (query.pageSize !== undefined) {
+    params.set('pageSize', String(query.pageSize));
+  }
+  if (query.period) {
+    params.set('period', query.period);
+  } else if ((query as any).periodId) {
+    params.set('periodId', (query as any).periodId);
+  }
   if (query.status) params.set('status', query.status);
   if (query.search) params.set('search', query.search);
   if (query.currencyCode) params.set('currencyCode', query.currencyCode);
@@ -285,10 +317,26 @@ export async function postJournalEntry(id: string): Promise<JournalEntry> {
 /**
  * Reverse posted journal entry.
  */
-export async function reverseJournalEntry(id: string): Promise<JournalEntry> {
+export async function reverseJournalEntry(
+  id: string,
+  reason?: string
+): Promise<JournalEntry> {
   return request<JournalEntry>(`/journal-entries/${id}/reverse`, {
     method: 'POST',
+    body: JSON.stringify(reason ? { reason } : {}),
   });
+}
+
+/**
+ * Fetch opening balances list.
+ */
+export async function fetchOpeningBalances(
+  periodId?: string
+): Promise<any> {
+  const params = new URLSearchParams();
+  if (periodId) params.set('periodId', periodId);
+  const qs = params.toString();
+  return request<any>(`/opening-balances${qs ? `?${qs}` : ''}`);
 }
 
 /**
