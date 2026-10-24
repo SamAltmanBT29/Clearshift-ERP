@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchRejects, exportRejectsCsv, type RejectRow } from '../api/migration-kit.js';
 import { SkeletonTable, EmptyState, ErrorState } from '@cs/ui';
+import { ReportDownload } from '../components/ReportDownload.js';
 
 export const RejectListPage: React.FC = () => {
   const { batchId } = useParams();
@@ -26,20 +27,6 @@ export const RejectListPage: React.FC = () => {
 
   useEffect(() => { load(); }, [batchId, page]);
 
-  const handleExport = async () => {
-    if (!batchId) return;
-    const csv = await exportRejectsCsv(batchId);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `rejects-${batchId}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   if (loading) return <div data-testid="rejects-loading"><SkeletonTable columns={3} rows={4} /></div>;
   if (error) return <ErrorState title="Unable to load rejects" message={error} onRetry={load} />;
   if (rows.length === 0) return <EmptyState title="No rejected rows" />;
@@ -47,7 +34,14 @@ export const RejectListPage: React.FC = () => {
   return (
     <div data-testid="reject-list-page">
       <h1>Reject List</h1>
-      <button data-testid="btn-export-rejects" onClick={handleExport}>Export CSV</button>
+      {batchId && (
+        <ReportDownload
+          batchId={batchId}
+          reportType="reject"
+          label="Export CSV"
+          dataTestId="btn-export-rejects"
+        />
+      )}
       <table data-testid="rejects-table">
         <tbody>
           {rows.map((r, i) => (
