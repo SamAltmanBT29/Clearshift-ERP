@@ -18,6 +18,7 @@ export interface AccountsTableProps {
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
+  onCreateAccount?: (() => void) | undefined;
 }
 
 /**
@@ -43,6 +44,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   onPageSizeChange,
   onSort: externalOnSort,
   onRefresh,
+  onCreateAccount,
 }) => {
   // Local sorting state if not controlled externally
   const [internalSortColumn, setInternalSortColumn] = useState<string>('code');

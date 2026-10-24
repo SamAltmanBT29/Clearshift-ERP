@@ -11,6 +11,8 @@ import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
 import { FilterBar } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
+import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
+import { Toast } from '../components/Toast.js';
 import { JournalEntryFormPage } from './JournalEntryFormPage.js';
 import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
 
@@ -18,6 +20,8 @@ export const AccountsListPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance' | 'journal-entries'>('accounts');
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Accounts List State
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -167,6 +171,12 @@ export const AccountsListPage: React.FC = () => {
   const assetCount = accounts.filter((a) => a.type === 'asset').length;
   const liabilityCount = accounts.filter((a) => a.type === 'liability').length;
 
+  const handleAccountCreated = (newAccount: Account) => {
+    setAccounts((prev) => [newAccount, ...prev.filter((a) => a.id !== newAccount.id)]);
+    setAccountsTotal((prev) => prev + 1);
+    setToastMessage(`Account ${newAccount.code} — ${newAccount.name} created successfully.`);
+  };
+
   // Render Form Page View
   if (currentView === 'create-journal') {
     return (
@@ -207,6 +217,14 @@ export const AccountsListPage: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="cs-btn cs-btn-secondary"
+            onClick={() => setIsCreateAccountModalOpen(true)}
+            aria-label="Create new account"
+          >
+            + New Account
+          </button>
           <button
             type="button"
             className="cs-btn cs-btn-primary"
@@ -316,6 +334,7 @@ export const AccountsListPage: React.FC = () => {
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
+              onCreateAccount={() => setIsCreateAccountModalOpen(true)}
             />
           )}
         </section>
@@ -416,6 +435,22 @@ export const AccountsListPage: React.FC = () => {
             </div>
           )}
         </section>
+      )}
+
+      {/* Account Creation Modal (ERP4-20) */}
+      <AccountCreateModal
+        isOpen={isCreateAccountModalOpen}
+        onClose={() => setIsCreateAccountModalOpen(false)}
+        onAccountCreated={handleAccountCreated}
+      />
+
+      {/* Confirmation Toast Notification (ERP4-20) */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
       )}
     </div>
   );

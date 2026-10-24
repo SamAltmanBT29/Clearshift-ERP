@@ -184,6 +184,21 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
 
+## 17. Create Form with Field-Level Validation (Issue #176 / ERP4-20)
+
+- **Account Creation Form (`AccountForm.tsx`)**:
+  - Bound to shared `@cs/ui` `FormField`, `Input`, `Select`, `Button`, and `Card` components.
+  - Real-time client-side field validation covering required fields (`code`, `name`, `type`, `currency_code`), email format, phone numbers, and decimal numeric ranges (`opening_balance >= 0.00` and `<= 999,999,999.99`).
+  - Strict submission guards preventing whitespace-only submissions, clearing field errors upon user edits.
+  - Inflight double-submission prevention (`isSubmitting` flag disables submit button and displays loading spinner).
+  - Direct mapping of HTTP 400 server validation errors: parses server response details (array or object formats) and attaches error messages directly to matching field inputs.
+- **Modal Lifecycle & Collection Cache Synchronization (`AccountCreateModal.tsx` & `AccountsListPage.tsx`)**:
+  - Encapsulated within accessible `@cs/ui` `Dialog` modal with keyboard dismissal (`Escape`) and clean backdrop handling.
+  - On successful creation, closes modal automatically, invokes `onAccountCreated` callback to prepend/update the table cache optimistically, and dispatches an accessible confirmation toast (`Toast.tsx` with `role="status"` and `aria-live="polite"`).
+  - Full-page alternative route supported at `/erp4/accounts/new` via `AccountCreatePage.tsx`.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx`](../../apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx) (9 comprehensive tests verifying field validation, decimal boundaries, double-submit guards, server error mapping, modal lifecycle, and table cache updates).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -195,5 +210,7 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
 | **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
+| **`1.7.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
+
 
 
