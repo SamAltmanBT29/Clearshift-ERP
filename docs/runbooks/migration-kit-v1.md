@@ -321,3 +321,66 @@ State-transition actions are disabled until prerequisites pass; load requires a 
 
 The CLI shares the same batch engine as the UI. See `docs/runbooks/cli.md` for command reference, flags, and exit codes.
 
+---
+
+## 9. Reject, Profiling and Reconciliation Reports with Formula-Safe CSV (KIT-16)
+
+**Traceability:** Issue #83 `[KIT-16]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; PLT-12 Export Protections.
+
+### 9.1 Report Architecture & Supported Exports
+
+ClearShift Migration Kit provides three standardized, downloadable CSV reports guaranteeing full auditability, mathematical row conservation, and zero spreadsheet formula execution vulnerabilities:
+
+| Report Type | Pipeline Stage | Primary Contents | Accounting Invariant |
+|---|---|---|---|
+| **Profiling Report** | Step 2 (Profile) | Column names, inferred types, empty counts, duplicate candidates, formula threats, null percentages. | Header metadata stamps source, loaded, rejected, merged, skipped, and unaccounted counts. |
+| **Rejection Report** | Post Step 3–5 (Clean / Validate / Load) | Source row, entity, reason code, safe message, rule ID, module. | Paged rejects match the durable outcome ledger; sensitive raw values omitted/redacted. |
+| **Reconciliation Report** | Step 7 (Reconcile) | Exact row conservation equation, signoff permission, summary metrics table, and detailed outcome ledger. | $\text{source} = \text{loaded} + \text{rejected} + \text{merged} + \text{skipped}$; $\text{unaccounted} = 0$. |
+
+### 9.2 OWASP Formula Injection Neutralization
+
+Per PLT-12 and SDS §11.8, CSV exports must neutralize dangerous formula prefixes without modifying canonical database records or in-memory domain models:
+
+1. **Trigger Characters:** Any string beginning (after optional leading whitespace) with `=`, `+`, `-`, `@`, `\t`, or `\r`.
+2. **Neutralization Rule:** The trigger character is prefixed with a single quote `'` in the exported CSV string:
+   - `=cmd|' /C calc'!A0` $\rightarrow$ `'=cmd|' /C calc'!A0`
+   - `@SUM(A1:A10)` $\rightarrow$ `'@SUM(A1:A10)`
+   - `+2+2=4` $\rightarrow$ `'+2+2=4`
+   - `  =2+2` $\rightarrow$ `"  '=2+2"`
+3. **Inert Text Rendering:** Spreadsheet viewers (Microsoft Excel, LibreOffice Calc, Google Sheets) parse single-quote prefixed cells strictly as inert string literals, neutralizing Dynamic Data Exchange (DDE) and formula injection attacks.
+4. **RFC 4180 Escaping:** Cells containing quotes, commas, newlines, tabs, or padding spaces are wrapped in standard RFC 4180 double quotes with internal double quotes escaped as `""`.
+5. **Canonical Immutability:** Original database rows, receipt payloads, and ledger outcome records remain 100% unaltered.
+
+### 9.3 Sensitive Data Protection & Redaction Policies
+
+Per PLT-12, raw secrets or unmasked PII must never leave the system in exported files:
+
+1. **Sensitive Field Detection:** Fields matching `/password|secret|token|api_?key|bank_?account|account_?no|iban|routing_?number|ssn|social_?security|salary|wage|credit_?card/i` are automatically sanitized.
+2. **Redaction Placeholder:** All sensitive values are replaced with `[REDACTED]`.
+3. **Safe Messages:** Error messages and exception strings are scrubbed for sensitive patterns (e.g. 9-digit SSNs `\d{3}-\d{2}-\d{4}` or 16-digit payment card numbers).
+4. **Raw Snippets:** If raw row snippets are attached to reject reports, all sensitive fields inside the payload are deeply redacted before serialization.
+
+### 9.4 Exact Row Conservation & Reconciliation Accounting
+
+Every parsed source row must receive exactly one terminal outcome in the append-only ledger (`platform.kit_row_outcomes`):
+
+$$\text{sourceCount} = \text{loadedCount} + \text{rejectedCount} + \text{mergedCount} + \text{skippedCount}$$
+$$\text{unaccountedCount} = \text{sourceCount} - (\text{loadedCount} + \text{rejectedCount} + \text{mergedCount} + \text{skippedCount}) = 0$$
+
+- **Status `OK`:** Only when formula holds and $\text{unaccountedCount} = 0$. Signoff is enabled (`signoffAllowed: true`).
+- **Status `reconciliation_failed`:** If any mismatch exists or unaccounted rows $> 0$, status is set to `reconciliation_failed`, signoff is disabled (`signoffAllowed: false`), and diagnostic failure reasons are stamped in the report.
+
+### 9.5 UI & CLI Gateways
+
+- **UI (`ReportDownload.tsx`):** A shared, accessible React component in `apps/migration-kit/web/src/components/ReportDownload.tsx` integrated into the Profile Report (`/kit/batches/:batchId/profile`), Reconciliation (`/kit/batches/:batchId/reconciliation`), and Rejections (`/kit/batches/:batchId/rejects`) pages. Generates an RFC 4180 UTF-8 CSV Blob and triggers client-side download.
+- **CLI (`cs-kit report`):**
+  ```bash
+  # Export reconciliation report
+  cs-kit report reconcile --batch B-00001 --out ./reports/recon.csv
+
+  # Export dataset profiling report
+  cs-kit report profile --batch B-00001 --out ./reports/profile.csv
+
+  # Export rejection report
+  cs-kit report reject --batch B-00001 --out ./reports/rejects.csv
+  ```
