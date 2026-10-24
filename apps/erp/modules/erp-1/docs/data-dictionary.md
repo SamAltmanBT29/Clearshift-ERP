@@ -205,6 +205,11 @@ cannot create a second stock row for the same pair.
 | `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
 | `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
 | `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `source_system` | `VARCHAR(64)` | `z.string().optional()` | NULLABLE | — | Source system identifier | Audit | `'legacy_erp'` |
+| `source_id` | `VARCHAR(128)` | `z.string().optional()` | NULLABLE | — | Source record identifier | Audit | `'LEG-1001'` |
+| `request_hash` | `VARCHAR(64)` | `z.string()` | NOT NULL | `''` | SHA-256 hash of canonical request | KIT-08 | `'e3b0c442...'` |
+| `outcome` | `VARCHAR(16)` | `enum('loaded','rejected','merged','skipped')` | NOT NULL | `'loaded'` | Row outcome classification | KIT-08 | `'loaded'` |
+| `response_payload` | `TEXT` | `z.string().optional()` | NULLABLE | — | Serialized JSON response for idempotent replay | KIT-08 | `'{"id":"..."}'` |
 | `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
