@@ -1,0 +1,112 @@
+{
+  "profile_schema_version": 1,
+  "module": "erp5",
+  "source_system": "SYNTH-ERP5-DIRTY-V1",
+  "fixture": {
+    "path": "sample-data/erp-5/dirty-data-v1.csv",
+    "sha256": "af37a293b5109c3874bee91b059486cdaa1e81bae289881becfde512917d3be5",
+    "row_count": 130,
+    "columns": [
+      "row_id",
+      "record_type",
+      "case_tags",
+      "source_id",
+      "department_code",
+      "department_name",
+      "parent_code",
+      "employee_no",
+      "first_name",
+      "last_name",
+      "birth_date",
+      "join_date",
+      "job_title",
+      "salary",
+      "currency_code",
+      "leave_type",
+      "date_from",
+      "date_to",
+      "leave_reason",
+      "leave_status",
+      "month",
+      "gross_total",
+      "net_total",
+      "employee_count",
+      "source_system",
+      "expect_outcome",
+      "expect_reasons"
+    ]
+  },
+  "reconciliation": {
+    "source_row_count": 130,
+    "accepted": 42,
+    "rejected": 78,
+    "review": 10,
+    "skipped": 0,
+    "unaccounted": 0,
+    "is_balanced": true
+  },
+  "by_record_type": {
+    "department": {
+      "accepted": 8,
+      "rejected": 10,
+      "review": 2,
+      "skipped": 0,
+      "total": 20
+    },
+    "employee": {
+      "accepted": 18,
+      "rejected": 38,
+      "review": 4,
+      "skipped": 0,
+      "total": 60
+    },
+    "leave": {
+      "accepted": 10,
+      "rejected": 18,
+      "review": 2,
+      "skipped": 0,
+      "total": 30
+    },
+    "payroll_total": {
+      "accepted": 6,
+      "rejected": 12,
+      "review": 2,
+      "skipped": 0,
+      "total": 20
+    }
+  },
+  "by_reason_code": {
+    "DEPARTMENT_CODE_REQUIRED": 2,
+    "DEPARTMENT_NAME_REQUIRED": 2,
+    "DEPARTMENT_SELF_PARENT": 1,
+    "DEPARTMENT_CYCLE_DETECTED": 2,
+    "PARENT_DEPARTMENT_NOT_FOUND": 1,
+    "FORMULA_INJECTION_REJECTED": 12,
+    "DUPLICATE_DEPARTMENT_CODE_REVIEW": 2,
+    "EMPLOYEE_NO_REQUIRED": 1,
+    "EMPLOYEE_NAME_REQUIRED": 2,
+    "BIRTH_DATE_REQUIRED": 5,
+    "JOIN_DATE_REQUIRED": 3,
+    "DEPARTMENT_NOT_FOUND": 9,
+    "JOIN_DATE_BEFORE_BIRTH_DATE": 4,
+    "NEGATIVE_SALARY": 6,
+    "INVALID_CURRENCY": 5,
+    "DUPLICATE_EMPLOYEE_NO_REVIEW": 4,
+    "EMPLOYEE_NOT_FOUND": 4,
+    "LEAVE_TYPE_REQUIRED": 1,
+    "DATE_FROM_REQUIRED": 1,
+    "DATE_TO_REQUIRED": 1,
+    "INVALID_LEAVE_TYPE": 1,
+    "INVALID_LEAVE_DATES": 4,
+    "INVALID_LEAVE_STATUS": 2,
+    "INVALID_LEAVE_STATUS_TRANSITION": 2,
+    "DUPLICATE_LEAVE_REQUEST_REVIEW": 2,
+    "MONTH_REQUIRED": 1,
+    "INVALID_MONTH_FORMAT": 1,
+    "NEGATIVE_GROSS_TOTAL": 1,
+    "NET_EXCEEDS_GROSS": 1,
+    "NEGATIVE_EMPLOYEE_COUNT": 1,
+    "EMPLOYEE_LINES_FORBIDDEN": 2,
+    "DUPLICATE_PAYROLL_TOTAL_REVIEW": 2
+  }
+}
