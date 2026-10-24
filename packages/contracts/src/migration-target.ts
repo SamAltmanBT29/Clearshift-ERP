@@ -2304,3 +2304,130 @@ export const DirtyDataPackManifestSchema = z.object({
   boundaryFixtures: z.record(BoundaryFixtureTypeSchema, BoundaryFixtureItemSchema),
 });
 export type DirtyDataPackManifest = z.infer<typeof DirtyDataPackManifestSchema>;
+
+// ============================================================================
+// KIT-18: Migration Engine Performance, Limits and Security Evidence
+// ============================================================================
+
+export const MAX_MIGRATION_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MiB (SDS §4.4)
+export const MAX_MIGRATION_COLUMN_COUNT = 100;
+export const MAX_MIGRATION_CELL_SIZE_BYTES = 64 * 1024; // 64 KiB
+export const BENCHMARK_ROW_CEILING_V1 = 10000;
+export const BENCHMARK_MAX_DURATION_MS = 10 * 60 * 1000; // 10 minutes (SDS TS-15 / NFR-01)
+export const MAX_FAILURE_RATE_THRESHOLD_PERCENT = 10.0; // 10% circuit breaker (STP-01)
+
+export const MachineProfileSchema = z.object({
+  os: z.string().min(1),
+  arch: z.string().min(1),
+  nodeVersion: z.string().min(1),
+  cpus: z.number().int().min(1),
+  memoryTotalMb: z.number().int().min(1),
+  disclaimer: z.literal(
+    'ClearShift does not promise a universal memory limit; measured peak RSS depends on hardware profile, OS allocator, and chunk concurrency.'
+  ),
+});
+export type MachineProfile = z.infer<typeof MachineProfileSchema>;
+
+export const MigrationPerformanceResultSchema = z.object({
+  catalogId: z.literal('KIT-18'),
+  fileType: z.enum(['csv', 'xlsx']),
+  totalRows: z.number().int().min(1),
+  fileSizeBytes: z.number().int().min(1),
+  fileChecksumSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  workerConcurrency: z.number().int().min(1),
+  chunkSize: z.number().int().min(1).default(500),
+  durationMs: z.number().min(0),
+  durationSeconds: z.number().min(0),
+  peakRssMb: z.number().min(0),
+  throughputRowsPerSec: z.number().min(0),
+  errorCounts: z.object({
+    emptyRequired: z.number().int().min(0),
+    badFormats: z.number().int().min(0),
+    duplicates: z.number().int().min(0),
+    unaccounted: z.literal(0),
+  }),
+  machineProfile: MachineProfileSchema,
+  reconciliation: ReportAccountingCountsSchema,
+  passedSdsTarget: z.boolean(),
+});
+export type MigrationPerformanceResult = z.infer<typeof MigrationPerformanceResultSchema>;
+
+export const BoundaryLimitType = {
+  FILE_SIZE_LIMIT_EXCEEDED: 'FILE_SIZE_LIMIT_EXCEEDED',
+  COLUMN_LIMIT_EXCEEDED: 'COLUMN_LIMIT_EXCEEDED',
+  CELL_SIZE_LIMIT_EXCEEDED: 'CELL_SIZE_LIMIT_EXCEEDED',
+  ARCHIVE_TRAVERSAL_DETECTED: 'ARCHIVE_TRAVERSAL_DETECTED',
+  ARCHIVE_EXPANSION_LIMIT_EXCEEDED: 'ARCHIVE_EXPANSION_LIMIT_EXCEEDED',
+  CIRCUIT_BREAKER_HALT: 'CIRCUIT_BREAKER_HALT',
+} as const;
+export type BoundaryLimitTypeValue = (typeof BoundaryLimitType)[keyof typeof BoundaryLimitType];
+
+export class BoundaryLimitError extends Error {
+  public readonly statusCode: number;
+  public readonly code: BoundaryLimitTypeValue;
+
+  constructor(code: BoundaryLimitTypeValue, message: string, statusCode = 400) {
+    super(message);
+    this.name = 'BoundaryLimitError';
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
+export const K6StageConfigSchema = z.object({
+  duration: z.string().min(1),
+  target: z.number().int().min(0),
+});
+export type K6StageConfig = z.infer<typeof K6StageConfigSchema>;
+
+export const K6RunProfileSchema = z.object({
+  testName: z.string().min(1),
+  catalogId: z.literal('KIT-18'),
+  vus: z.number().int().min(1),
+  stages: z.array(K6StageConfigSchema),
+  thresholds: z.record(z.array(z.string())),
+  targetEndpoints: z.array(z.string()),
+  metrics: z.object({
+    httpReqDurationP95Ms: z.number().min(0),
+    httpReqDurationP99Ms: z.number().min(0),
+    httpReqFailedRate: z.number().min(0).max(1),
+    totalIterations: z.number().int().min(0),
+    concurrencyPeak: z.number().int().min(1),
+  }),
+});
+export type K6RunProfile = z.infer<typeof K6RunProfileSchema>;
+
+export function redactSensitiveLogMessage(msg: string): string {
+  if (!msg) return '';
+  return msg
+    .replace(/(password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*['"]?[^\s,'"]+/gi, '$1=[REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
+    .replace(/\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g, '****-****-****-****')
+    .replace(/\b\d{3}-\d{2}-\d{4}\b/g, '***-**-****')
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g, (email) => {
+      const parts = email.split('@');
+      const name = parts[0] ?? '';
+      const domain = parts[1] ?? '';
+      const safeName = (name.length > 2) ? `${name[0]}***${name[name.length - 1]}` : '***';
+      return `${safeName}@${domain}`;
+    });
+}
+
+export function redactSensitiveRowPayload<T extends Record<string, unknown>>(data: T): T {
+  const SENSITIVE_KEYS = new Set([
+    'password', 'password_hash', 'secret', 'token', 'access_token', 'api_key',
+    'bank_account', 'iban', 'ssn', 'tax_id', 'credit_card', 'salary',
+  ]);
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if (SENSITIVE_KEYS.has(lowerKey)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof val === 'string' && (lowerKey.includes('email') || val.includes('@'))) {
+      sanitized[key] = redactSensitiveLogMessage(val);
+    } else {
+      sanitized[key] = val;
+    }
+  }
+  return sanitized as T;
+}
