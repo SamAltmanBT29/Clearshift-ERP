@@ -35,4 +35,5 @@ export {
   type TenantScopedEntity,
   type UserScopedEntity,
 } from './interface/authz.js';
+export * from './kit/rejection-context.js';
 
