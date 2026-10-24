@@ -1,5 +1,5 @@
 /**
- * ERP-4 Finance & Accounting — Authentication Route Guard
+ * ERP-4 Finance and Accounting — Authentication Route Guard
  *
  * Enforces session authentication across all ERP-4 routes.
  * If the session is missing or expired, redirects the user to the Hub login

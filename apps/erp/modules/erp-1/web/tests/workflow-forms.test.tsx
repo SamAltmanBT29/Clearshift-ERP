@@ -468,7 +468,7 @@ describe('[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow an
       await screen.findByRole('heading', { name: mockProduct.name });
 
       // Stock status badge
-      expect(screen.getByText('In Stock (85)')).toBeDefined();
+      expect(await screen.findByText('In Stock (85)')).toBeDefined();
 
       // Linked inventory stock level sub-table
       expect(await screen.findByText('Main Warehouse')).toBeDefined();

@@ -20,17 +20,29 @@ import {
   SalesOrderListQuerySchema,
   UpdateSalesOrderStatusRequestSchema,
 } from "@clearshift/contracts";
+import {
+  requireErp3Policy,
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+  registerEntityCreator,
+} from "../policies/authorization.js";
+import { auditRequest, type Erp3AuditService } from "../services/audit.js";
 import type { Erp3Service } from "../services/erp3.service.js";
 
 const STRICT_UPDATE_STATUS_SCHEMA = UpdateSalesOrderStatusRequestSchema.strict();
 
 export const salesOrderRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
+  auditService: Erp3AuditService;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+  const auditService = opts.auditService;
 
   // GET /sales-orders (paginated list/search)
-  fastify.get("/sales-orders", async (request, reply) => {
+  fastify.get("/sales-orders", {
+    preHandler: [requireErp3Policy("SALES_ORDERS_READ", auditService)],
+  }, async (request, reply) => {
     const parsedQuery = SalesOrderListQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
       const correlationId =
@@ -56,7 +68,9 @@ export const salesOrderRoutes: FastifyPluginAsync<{
   });
 
   // Minimal by-ID read-back for mutation verification (list/search is #27 scope)
-  fastify.get("/sales-orders/:id", async (request, reply) => {
+  fastify.get("/sales-orders/:id", {
+    preHandler: [requireErp3Policy("SALES_ORDERS_READ", auditService)],
+  }, async (request, reply) => {
     const parsedParams = Erp3IdParamSchema.safeParse(request.params);
     if (!parsedParams.success) {
       const correlationId =
@@ -78,11 +92,15 @@ export const salesOrderRoutes: FastifyPluginAsync<{
     }
 
     const order = await service.getSalesOrderById(parsedParams.data.id);
+    const requestTenantId = (request.headers["x-tenant-id"] as string | undefined)?.trim();
+    assertTenantAccess(request.user, order, requestTenantId);
     return reply.status(200).send(order);
   });
 
   // POST /sales-orders
-  fastify.post("/sales-orders", async (request, reply) => {
+  fastify.post("/sales-orders", {
+    preHandler: [requireErp3Policy("SALES_ORDERS_CREATE", auditService)],
+  }, async (request, reply) => {
     const idempotencyHeader = request.headers["idempotency-key"] as
       | string
       | undefined;
@@ -131,15 +149,46 @@ export const salesOrderRoutes: FastifyPluginAsync<{
         record: parsed.data as unknown as Record<string, unknown>,
       });
       const order = await service.getSalesOrderById(importRes.target_id);
+      if (!importRes.prior_result) {
+        await auditRequest(auditService, request, {
+          action: "load.requested",
+          targetEntity: "sales_order",
+          targetId: order.id,
+          batchId: parsed.data.batch_id,
+          result: "success",
+          metadata: { module: "erp-3", rowCount: 1 },
+        });
+      }
       return reply.status(importRes.prior_result ? 200 : 201).send(order);
     }
 
     const created = await service.createSalesOrder(parsed.data);
+    const creatorId =
+      request.user?.sub ??
+      (request.headers["x-actor-id"] as string | undefined)?.trim();
+    const requestTenantId = (
+      request.headers["x-tenant-id"] as string | undefined
+    )?.trim();
+    if (creatorId) {
+      registerEntityCreator(created.id, creatorId);
+    }
+    if (requestTenantId) {
+      registerEntityTenant(created.id, requestTenantId);
+    }
+
+    await auditRequest(auditService, request, {
+      action: "erp.sales_order.created",
+      targetEntity: "sales_order",
+      targetId: created.id,
+      result: "success",
+    });
     return reply.status(201).send(created);
   });
 
   // PATCH /sales-orders/:id (allowed status transition only)
-  fastify.patch("/sales-orders/:id", async (request, reply) => {
+  fastify.patch("/sales-orders/:id", {
+    preHandler: [requireErp3Policy("SALES_ORDERS_UPDATE", auditService)],
+  }, async (request, reply) => {
     const parsedParams = Erp3IdParamSchema.safeParse(request.params);
     if (!parsedParams.success) {
       const correlationId =
@@ -159,6 +208,12 @@ export const salesOrderRoutes: FastifyPluginAsync<{
         correlation_id: correlationId,
       });
     }
+
+    const existingOrder = await service.getSalesOrderById(parsedParams.data.id);
+    const requestTenantId = (
+      request.headers["x-tenant-id"] as string | undefined
+    )?.trim();
+    assertObjectMutationAccess(request.user, existingOrder, requestTenantId);
 
     const parsedBody = STRICT_UPDATE_STATUS_SCHEMA.safeParse(request.body);
     if (!parsedBody.success) {
@@ -186,6 +241,13 @@ export const salesOrderRoutes: FastifyPluginAsync<{
       parsedParams.data.id,
       parsedBody.data.status,
     );
+    await auditRequest(auditService, request, {
+      action: "erp.sales_order.status_changed",
+      targetEntity: "sales_order",
+      targetId: updated.id,
+      result: "success",
+      metadata: { status: updated.status },
+    });
     return reply.status(200).send(updated);
   });
 };

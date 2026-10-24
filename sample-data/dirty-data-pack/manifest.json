@@ -1,0 +1,97 @@
+{
+  "packName": "ClearShift Canonical Dirty Data Pack V1",
+  "version": "1.0.0",
+  "catalogId": "KIT-17",
+  "relativeFilePath": "sample-data/dirty-data-pack/dirty-data-1000.csv",
+  "checksumSha256": "757621767c4bb33ca33126ea8d26fa9ab0f8532a8de35478cbf7622b824e5661",
+  "totalRows": 1000,
+  "rulesVersion": "1.0.0",
+  "traceability": {
+    "sds": "ClearShift Migration Kit v2.0 §§3-4, §4.14 (TS-01-TS-08), §11.1-11.9",
+    "projectPlan": "Project Plan v3.0 §§9, 11, 17",
+    "issue": "#84 [KIT-17]"
+  },
+  "defects": {
+    "knownDuplicates": 80,
+    "badFormats": 60,
+    "emptyRequiredFields": 50,
+    "totalDefectFindings": 190
+  },
+  "expectedReconciliation": {
+    "source": 1000,
+    "loaded": 810,
+    "rejected": 110,
+    "merged": 80,
+    "skipped": 0,
+    "unaccounted": 0,
+    "formulaHolds": true,
+    "status": "OK"
+  },
+  "testScenariosProof": {
+    "TS-01": "A 1,000-row CSV runs through all 7 steps in one command line",
+    "TS-02": "The profile finds exactly 80 duplicates, 60 bad formats, 50 empty required fields",
+    "TS-03": "Exact duplicates inside the file are merged; the merge count equals 80",
+    "TS-04": "Dry run changes nothing in target tables",
+    "TS-05": "A row with an invalid email is rejected with \"Email is not valid: value has no @ sign\"",
+    "TS-06": "Reconciliation is exact: 1000 = 810 (loaded) + 110 (rejected) + 80 (merged) + 0 (skipped); unaccounted = 0; status OK",
+    "TS-07": "Raw tables and source file remain unchanged (SHA-256 verified)",
+    "TS-08": "A file with 40% broken rows stops load at 10% failures with STP-01 circuit breaker"
+  },
+  "boundaryFixtures": {
+    "forty_percent_invalid": {
+      "fixtureName": "40% Invalid Dry-Run & Circuit Breaker",
+      "fileName": "boundary-40-percent-invalid.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-40-percent-invalid.csv",
+      "checksumSha256": "41777bb14ee2acd20c8055edeb5565359d3f387e0994d9c62d01b03e6c040481",
+      "totalRows": 50,
+      "invalidRows": 20,
+      "description": "Preflight predicts 40% invalid rows without mutating target DB; real load trips 10% circuit breaker (STP-01)",
+      "expectedBehavior": "Preflight 40% rejects in dry-run; Load halts at failure threshold > 10% with STOP_THRESHOLD_EXCEEDED and 0 unaccounted rows"
+    },
+    "unresolved_transient_failure": {
+      "fixtureName": "Unresolved Transient Failure & Bounded Retry",
+      "fileName": "boundary-unresolved-transient.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-unresolved-transient.csv",
+      "checksumSha256": "3ae9b0a3c2b9832ee8bccbcb2b7ec61a75a32d6d34084c2e9f7b6122d77f3d6b",
+      "totalRows": 20,
+      "description": "Simulates network partition / database lock timeout exhausting bounded retries",
+      "expectedBehavior": "Batch halts safely; preserves durable receipt state; no partial corrupt mutations or dropped rows"
+    },
+    "duplicate_delivery": {
+      "fixtureName": "At-Least-Once Duplicate Delivery & Idempotency Replay",
+      "fileName": "boundary-duplicate-delivery.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-duplicate-delivery.csv",
+      "checksumSha256": "7829adeb2290fc2afe41ea60450020eb882d0453a7f73f718720dd65cfa3f265",
+      "totalRows": 20,
+      "description": "At-least-once message delivery with repeated identical rows and payload drift check",
+      "expectedBehavior": "Subsequent deliveries return prior target IDs (isExisting: true); drifted payloads return 409 Conflict"
+    },
+    "missing_parent": {
+      "fixtureName": "Missing Parent Entity Referential Integrity Rejection",
+      "fileName": "boundary-missing-parent.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-missing-parent.csv",
+      "checksumSha256": "69ae9c7ae9c1498904d0644171ff12a5e4971d2570f56b8a3f7fd43c699b0f4a",
+      "totalRows": 20,
+      "description": "Child records referencing non-existent parent company UUIDs",
+      "expectedBehavior": "Deterministic rejection with PARENT_NOT_FOUND / FOREIGN_KEY_NOT_FOUND"
+    },
+    "invalid_enum": {
+      "fixtureName": "Invalid Enum Domain Constraint Rejection",
+      "fileName": "boundary-invalid-enum.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-invalid-enum.csv",
+      "checksumSha256": "d18822f523f3ed05ce85e1e9d5eafd5c700a818d2c6e52627b8a7b11cb240cd0",
+      "totalRows": 20,
+      "description": "Records with unknown enum status values",
+      "expectedBehavior": "Deterministic rejection with INVALID_ENUM_VALUE"
+    },
+    "protected_opt_out": {
+      "fixtureName": "Protected Opt-Out Privacy Suppression",
+      "fileName": "boundary-protected-opt-out.csv",
+      "relativeFilePath": "sample-data/dirty-data-pack/boundary-protected-opt-out.csv",
+      "checksumSha256": "e174f3b923ecd558b1d41fe937281667f00fb2153337e8f52dae8b6799f9bb9b",
+      "totalRows": 20,
+      "description": "Contacts with explicit GDPR/privacy opt-out flags",
+      "expectedBehavior": "Safely protected/skipped with PROTECTED_OPT_OUT reason; zero outbound marketing delivery"
+    }
+  }
+}

@@ -25,7 +25,15 @@ import { VendorFilterBar, PurchaseOrderFilterBar } from '../components/FilterBar
 import { VendorFilterSidebar, POFilterSidebar } from '../components/FilterSidebar.js';
 import { FilterPillTags } from '../components/FilterPillTags.js';
 import type { Erp2ActiveFilters, Erp2FilterKey } from '../components/FilterPillTags.js';
-import { ErrorState, AccessDeniedState } from '../components/StateViews.js';
+import {
+  ErrorState,
+  AccessDeniedState,
+  VendorsLoadingSkeleton,
+  PurchaseOrdersLoadingSkeleton,
+  sanitizeErrorMessage,
+} from '../components/StateViews.js';
+import { VendorCreateModal, PurchaseOrderCreateModal } from '../components/forms/index.js';
+import { VendorImportPage } from './VendorImportPage.js';
 
 // ─── URL param helpers ─────────────────────────────────────────────────────────
 
@@ -81,10 +89,36 @@ interface SortState {
 const DEFAULT_VENDOR_SORT: SortState = { field: undefined, direction: 'asc' };
 const DEFAULT_ORDER_SORT: SortState = { field: undefined, direction: 'asc' };
 
+export interface VendorsListPageProps {
+  onCreateVendor?: (() => void) | undefined;
+  onCreatePurchaseOrder?: (() => void) | undefined;
+  onNavigateImport?: (() => void) | undefined;
+  onNavigateRejections?: (() => void) | undefined;
+  initialView?: 'list' | 'import' | undefined;
+}
+
+interface PageErrorInfo {
+  message: string;
+  isForbidden: boolean;
+  correlationId?: string | undefined;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const VendorsListPage: React.FC = () => {
+export const VendorsListPage: React.FC<VendorsListPageProps> = ({
+  onCreateVendor,
+  onCreatePurchaseOrder,
+  onNavigateImport,
+  onNavigateRejections,
+  initialView = 'list',
+}) => {
   const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
+  const [isImportView, setIsImportView] = useState<boolean>(initialView === 'import');
+
+  // ── Modal & Toast states (AC4) ──
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [isPoModalOpen, setIsPoModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // ── Vendor sidebar collapse ──
   const [vendorSidebarOpen, setVendorSidebarOpen] = useState(true);
@@ -94,8 +128,8 @@ export const VendorsListPage: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsTotal, setVendorsTotal] = useState(0);
   const [vendorsTotalPages, setVendorsTotalPages] = useState(1);
-  const [isVendorsLoading, setIsVendorsLoading] = useState(false);
-  const [vendorsError, setVendorsError] = useState<{ message: string; isForbidden: boolean } | null>(null);
+  const [isVendorsLoading, setIsVendorsLoading] = useState(true);
+  const [vendorsError, setVendorsError] = useState<PageErrorInfo | null>(null);
 
   const [vendorFilters, setVendorFilters] = useState<VendorListQuery & { currency?: string | undefined }>(() => ({
     page: 1,
@@ -110,7 +144,7 @@ export const VendorsListPage: React.FC = () => {
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
-  const [ordersError, setOrdersError] = useState<{ message: string; isForbidden: boolean } | null>(null);
+  const [ordersError, setOrdersError] = useState<PageErrorInfo | null>(null);
 
   const [orderFilters, setOrderFilters] = useState<PurchaseOrderListQuery>(() => ({
     page: 1,
@@ -152,11 +186,13 @@ export const VendorsListPage: React.FC = () => {
       setVendors(items);
       setVendorsTotal(response.total || 0);
       setVendorsTotalPages(response.totalPages || 1);
-    } catch (err: any) {
-      const isForbidden = err instanceof ApiError ? err.status === 403 : err?.status === 403;
+    } catch (err: unknown) {
+      const isForbidden = err instanceof ApiError ? err.status === 403 : (err as { status?: number })?.status === 403;
+      const correlationId = (err as { correlationId?: string })?.correlationId;
       setVendorsError({
-        message: err?.message || 'Failed to fetch vendors from server.',
+        message: sanitizeErrorMessage(err),
         isForbidden,
+        correlationId,
       });
     } finally {
       setIsVendorsLoading(false);
@@ -188,11 +224,13 @@ export const VendorsListPage: React.FC = () => {
       setOrders(items);
       setOrdersTotal(response.total || 0);
       setOrdersTotalPages(response.totalPages || 1);
-    } catch (err: any) {
-      const isForbidden = err instanceof ApiError ? err.status === 403 : err?.status === 403;
+    } catch (err: unknown) {
+      const isForbidden = err instanceof ApiError ? err.status === 403 : (err as { status?: number })?.status === 403;
+      const correlationId = (err as { correlationId?: string })?.correlationId;
       setOrdersError({
-        message: err?.message || 'Failed to fetch purchase orders from server.',
+        message: sanitizeErrorMessage(err),
         isForbidden,
+        correlationId,
       });
     } finally {
       setIsOrdersLoading(false);
@@ -281,17 +319,119 @@ export const VendorsListPage: React.FC = () => {
     setOrderSort(DEFAULT_ORDER_SORT);
   }, []);
 
+  const handleCreateVendor = useCallback(() => {
+    if (onCreateVendor) {
+      onCreateVendor();
+    } else if (typeof window !== 'undefined' && window.location) {
+      window.location.href = '/erp2/vendors/new';
+    }
+  }, [onCreateVendor]);
+
+  const handleCreatePurchaseOrder = useCallback(() => {
+    if (onCreatePurchaseOrder) {
+      onCreatePurchaseOrder();
+    } else if (typeof window !== 'undefined' && window.location) {
+      window.location.href = '/erp2/purchase-orders/new';
+    }
+  }, [onCreatePurchaseOrder]);
+
   // ─── Render ──────────────────────────────────────────────────────────────────
+
+  if (isImportView) {
+    return (
+      <VendorImportPage
+        onNavigateBack={() => setIsImportView(false)}
+      />
+    );
+  }
 
   return (
     <div className="cs-module-root">
       {/* Page Header */}
       <header className="cs-page-header">
-        <h1 className="cs-page-title">Vendors &amp; Purchasing</h1>
-        <p className="cs-page-description">
-          Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
-        </p>
+        <div className="cs-page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 className="cs-page-title">Vendors &amp; Purchasing</h1>
+            <p className="cs-page-description">
+              Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
+            </p>
+          </div>
+          <div className="cs-page-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="cs-btn-secondary"
+              data-testid="btn-view-rejections"
+              onClick={() => onNavigateRejections?.()}
+              aria-label="View Migration Rejections"
+              title="Review rejected rows from most recent import batch"
+            >
+              View Rejections
+            </button>
+            <button
+              type="button"
+              className="cs-btn-secondary cs-import-btn"
+              data-testid="btn-import-data"
+              onClick={() => {
+                setIsImportView(true);
+                onNavigateImport?.();
+              }}
+              aria-label="Import Data"
+              title="Import data through shared Migration Kit wizard"
+            >
+              Import Data
+            </button>
+            {activeTab === 'vendors' ? (
+              vendorsTotal > 0 && (
+                <button
+                  type="button"
+                  className="cs-btn-primary"
+                  onClick={onCreateVendor ?? (() => setIsVendorModalOpen(true))}
+                  aria-label="Add Vendor"
+                >
+                  + Add Vendor
+                </button>
+              )
+            ) : (
+              ordersTotal > 0 && (
+                <button
+                  type="button"
+                  className="cs-btn-primary"
+                  onClick={onCreatePurchaseOrder ?? (() => setIsPoModalOpen(true))}
+                  aria-label="New Purchase Order"
+                >
+                  + New Purchase Order
+                </button>
+              )
+            )}
+          </div>
+        </div>
       </header>
+
+      {/* Confirmation Toast Notification (AC4) */}
+      {toastMessage && (
+        <div
+          className="cs-erp2-toast-container"
+          role="status"
+          aria-live="polite"
+          style={{ marginBottom: '16px' }}
+        >
+          <div className="cs-erp2-toast" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--color-bg-surface, #f0fdf4)', border: '1px solid var(--color-border-success, #86efac)', borderRadius: '6px', color: 'var(--color-text-success, #166534)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="cs-erp2-toast-icon" aria-hidden="true">✓</span>
+              <span className="cs-erp2-toast-text" style={{ fontWeight: 500 }}>{toastMessage}</span>
+            </div>
+            <button
+              type="button"
+              className="cs-erp2-toast-close"
+              aria-label="Close notification"
+              onClick={() => setToastMessage(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '4px' }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <nav className="cs-tabs-container" aria-label="Vendors and purchase order views">
@@ -358,14 +498,18 @@ export const VendorsListPage: React.FC = () => {
                 <AccessDeniedState
                   title="Access Denied"
                   message="You do not have permission to view vendor profiles. Please check your role assignments."
+                  requiredCapability="module.read"
                 />
               ) : (
                 <ErrorState
                   title="Failed to Load Vendors"
                   message={vendorsError.message}
+                  correlationId={vendorsError.correlationId}
                   onRetry={() => loadVendors(vendorFilters, vendorSort)}
                 />
               )
+            ) : isVendorsLoading ? (
+              <VendorsLoadingSkeleton />
             ) : (
               <VendorsTable
                 vendors={vendors}
@@ -374,6 +518,8 @@ export const VendorsListPage: React.FC = () => {
                 page={vendorFilters.page || 1}
                 pageSize={vendorFilters.pageSize || 20}
                 totalPages={vendorsTotalPages}
+                hasActiveFilters={Boolean(vendorFilters.search || vendorFilters.currency)}
+                onCreateVendor={onCreateVendor}
                 onPageChange={(newPage: number) =>
                   setVendorFilters((prev) => ({
                     ...prev,
@@ -424,14 +570,18 @@ export const VendorsListPage: React.FC = () => {
                 <AccessDeniedState
                   title="Access Denied"
                   message="You do not have permission to view purchase orders. Please check your role assignments."
+                  requiredCapability="module.read"
                 />
               ) : (
                 <ErrorState
                   title="Failed to Load Purchase Orders"
                   message={ordersError.message}
+                  correlationId={ordersError.correlationId}
                   onRetry={() => loadOrders(orderFilters, orderSort)}
                 />
               )
+            ) : isOrdersLoading ? (
+              <PurchaseOrdersLoadingSkeleton />
             ) : (
               <PurchaseOrdersTable
                 purchaseOrders={orders}
@@ -440,6 +590,8 @@ export const VendorsListPage: React.FC = () => {
                 page={orderFilters.page || 1}
                 pageSize={orderFilters.pageSize || 20}
                 totalPages={ordersTotalPages}
+                hasActiveFilters={Boolean(orderFilters.status || orderFilters.vendor_id)}
+                onCreatePurchaseOrder={onCreatePurchaseOrder}
                 onPageChange={(newPage: number) =>
                   setOrderFilters((prev) => ({
                     ...prev,
@@ -452,6 +604,32 @@ export const VendorsListPage: React.FC = () => {
           </div>
         </main>
       )}
+
+      {/* Vendor Creation Modal (AC4) */}
+      <VendorCreateModal
+        isOpen={isVendorModalOpen}
+        onClose={() => setIsVendorModalOpen(false)}
+        onVendorCreated={(created) => {
+          // Update table cache
+          setVendors((prev) => [created, ...prev]);
+          setVendorsTotal((prev) => prev + 1);
+          // Show confirmation toast
+          setToastMessage(`Vendor "${created.name}" created successfully.`);
+        }}
+      />
+
+      {/* Purchase Order Creation Modal (AC4) */}
+      <PurchaseOrderCreateModal
+        isOpen={isPoModalOpen}
+        onClose={() => setIsPoModalOpen(false)}
+        onOrderCreated={(created) => {
+          // Update table cache
+          setOrders((prev) => [created, ...prev]);
+          setOrdersTotal((prev) => prev + 1);
+          // Show confirmation toast
+          setToastMessage(`Purchase Order "${created.po_number}" created successfully.`);
+        }}
+      />
     </div>
   );
 };

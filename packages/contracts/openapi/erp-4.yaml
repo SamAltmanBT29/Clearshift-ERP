@@ -40,6 +40,8 @@ tags:
     description: Period-scoped trial balance report
   - name: Opening Balances
     description: One-time opening balance loads
+  - name: Migration Import
+    description: Target adapter contract and durable import receipts (KIT-08)
 
 security:
   - BearerAuth: []
@@ -969,6 +971,52 @@ paths:
       security:
         - BearerAuth: [finance:periods:write]
 
+  # ── Migration Import ───────────────────────────────────────────────────────
+  /import:
+    post:
+      operationId: importRow
+      tags: [Migration Import]
+      summary: Import row via KIT-08 target adapter contract with durable receipts
+      description: |
+        Imports an entity row (account, journal_entry, opening_balance) via the KIT-08 target
+        adapter contract. Atomic local transaction persists the target mutation and durable receipt together.
+        Idempotent: same Idempotency-Key + same payload returns prior result; different payload returns 409.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRowRequest"
+      responses:
+        "201":
+          description: Target row and receipt committed atomically
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "200":
+          description: Idempotent replay of identical prior import
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+      security:
+        - BearerAuth: [finance:migration:write]
+
 # ────────────────────────────────────────────────────────────────────────────
 # Components
 # ────────────────────────────────────────────────────────────────────────────
@@ -1029,6 +1077,24 @@ components:
             $ref: "#/components/schemas/ApiError"
     InternalError:
       description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    Conflict:
+      description: Conflict or idempotency key payload mismatch
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UnprocessableEntity:
+      description: Domain rule invariant validation failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServiceUnavailable:
+      description: Temporary infrastructure error (retryable)
       content:
         application/json:
           schema:
@@ -1773,4 +1839,131 @@ components:
           type: string
         field:
           type: string
+
+    ImportRowRequest:
+      type: object
+      required:
+        - batch_id
+        - source_row
+        - idempotency_key
+        - entity
+        - record
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        idempotency_key:
+          type: string
+          maxLength: 128
+        correlation_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        entity:
+          type: string
+          maxLength: 64
+          enum: [account, journal_entry, opening_balance]
+        record:
+          type: object
+          description: Cleaned domain record mapped to the target shape
+
+    ImportRowResponse:
+      type: object
+      required:
+        - target_id
+        - target_version
+        - outcome
+        - receipt
+        - prior_result
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        target_version:
+          oneOf:
+            - type: integer
+            - type: string
+          default: 1
+        outcome:
+          type: string
+          enum: [loaded, rejected, merged, skipped]
+          default: loaded
+        receipt:
+          $ref: "#/components/schemas/ImportReceiptRecord"
+        prior_result:
+          type: boolean
+          default: false
+
+    ImportReceiptRecord:
+      type: object
+      required:
+        - id
+        - batch_id
+        - source_row
+        - entity
+        - schema_version
+        - idempotency_key
+        - request_hash
+        - target_id
+        - kind
+        - outcome
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        entity:
+          type: string
+          maxLength: 64
+        schema_version:
+          type: integer
+          minimum: 1
+        idempotency_key:
+          type: string
+          maxLength: 128
+        request_hash:
+          type: string
+          maxLength: 64
+        target_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [created, linked]
+          default: created
+        outcome:
+          type: string
+          enum: [loaded, rejected, merged, skipped]
+          default: loaded
+        response_payload:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
 

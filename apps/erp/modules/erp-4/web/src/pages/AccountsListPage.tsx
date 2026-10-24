@@ -1,37 +1,61 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import type { SortDirection } from '@cs/ui';
 import type {
   Account,
+  AccountType,
   AccountsFilterQuery,
-  TrialBalanceResponse,
   JournalEntry,
 } from '@clearshift/contracts';
+import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
-import { FilterBar } from '../components/FilterBar.js';
+import { FilterBar, type FilterUpdate } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
+import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
+import { Toast } from '../components/Toast.js';
 import { JournalEntryFormPage } from './JournalEntryFormPage.js';
 import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
-import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
 
 export const AccountsListPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance' | 'journal-entries'>('accounts');
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Accounts List State
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTotal, setAccountsTotal] = useState(0);
   const [accountsTotalPages, setAccountsTotalPages] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string>('code');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<unknown | null>(null);
 
-  const [filters, setFilters] = useState<AccountsFilterQuery>({
-    page: 1,
-    limit: 20,
-    search: '',
-    type: undefined,
-    isActive: undefined,
+  // Initialize filters from URL query parameters (ERP4-18)
+  const [filters, setFilters] = useState<AccountsFilterQuery>(() => {
+    const page = Number(searchParams.get('page')) || 1;
+    const limit = Number(searchParams.get('limit') || searchParams.get('pageSize')) || 20;
+    const search = searchParams.get('search') || '';
+    const type = (searchParams.get('type') as AccountType) || undefined;
+    const rawActive = searchParams.get('isActive');
+    const isActive = rawActive === 'true' ? true : rawActive === 'false' ? false : undefined;
+    const currencyCode = searchParams.get('currencyCode') || undefined;
+
+    const initial: AccountsFilterQuery = { page, limit, search };
+    if (type) initial.type = type;
+    if (isActive !== undefined) {
+      initial.isActive = isActive;
+      initial.is_active = isActive;
+    }
+    if (currencyCode) {
+      initial.currencyCode = currencyCode;
+      initial.currency_code = currencyCode;
+    }
+    return initial;
   });
 
   // Trial Balance State
@@ -40,14 +64,14 @@ export const AccountsListPage: React.FC = () => {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
-  const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
+  const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
-  const [tbError, setTbError] = useState<string | null>(null);
+  const [tbError, setTbError] = useState<unknown | null>(null);
 
   // Journal Entries State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [isEntriesLoading, setIsEntriesLoading] = useState(false);
-  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<unknown | null>(null);
   const [entriesTotal, setEntriesTotal] = useState(0);
 
   // Fetch Accounts from real API
@@ -59,8 +83,8 @@ export const AccountsListPage: React.FC = () => {
       setAccounts(response.items);
       setAccountsTotal(response.total);
       setAccountsTotalPages(response.totalPages);
-    } catch (err: any) {
-      setAccountsError(err?.message || 'Failed to fetch chart of accounts');
+    } catch (err: unknown) {
+      setAccountsError(err);
     } finally {
       setIsAccountsLoading(false);
     }
@@ -73,8 +97,8 @@ export const AccountsListPage: React.FC = () => {
     try {
       const response = await fetchTrialBalance(currentPeriod);
       setTrialBalanceData(response);
-    } catch (err: any) {
-      setTbError(err?.message || 'Failed to fetch trial balance report');
+    } catch (err: unknown) {
+      setTbError(err);
     } finally {
       setIsTbLoading(false);
     }
@@ -87,9 +111,9 @@ export const AccountsListPage: React.FC = () => {
     try {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
       setJournalEntries(response.items || (response as any).data || []);
-      setEntriesTotal(response.total || 0);
-    } catch (err: any) {
-      setEntriesError(err?.message || 'Failed to fetch journal entries');
+      setEntriesTotal(response.total ?? 0);
+    } catch (err: unknown) {
+      setEntriesError(err);
     } finally {
       setIsEntriesLoading(false);
     }
@@ -116,24 +140,74 @@ export const AccountsListPage: React.FC = () => {
     }
   }, [activeTab, currentView, loadJournalEntries]);
 
+  const syncUrlParams = (updatedFilters: AccountsFilterQuery) => {
+    const params = new URLSearchParams();
+    if (updatedFilters.page && updatedFilters.page > 1) params.set('page', String(updatedFilters.page));
+    if (updatedFilters.limit && updatedFilters.limit !== 20) params.set('limit', String(updatedFilters.limit));
+    if (updatedFilters.search) params.set('search', updatedFilters.search);
+    if (updatedFilters.type) params.set('type', updatedFilters.type);
+    if (typeof updatedFilters.isActive === 'boolean') {
+      params.set('isActive', String(updatedFilters.isActive));
+    } else if (typeof updatedFilters.is_active === 'boolean') {
+      params.set('isActive', String(updatedFilters.is_active));
+    }
+    if (updatedFilters.currencyCode) params.set('currencyCode', updatedFilters.currencyCode);
+    setSearchParams(params, { replace: true });
+  };
+
   // Handle filter changes (strictly resets to page 1 as mandated by acceptance criteria)
-  const handleFilterChange = (updated: Partial<AccountsFilterQuery>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...updated,
-      page: 1, // Reset pagination to page 1 on search or filter change
-    }));
+  const handleFilterChange = (updated: FilterUpdate) => {
+    setFilters((prev) => {
+      const next: AccountsFilterQuery = { ...prev, page: 1 };
+      if ('search' in updated) {
+        if (updated.search) next.search = updated.search;
+        else delete next.search;
+      }
+      if ('type' in updated) {
+        if (updated.type) next.type = updated.type;
+        else delete next.type;
+      }
+      if ('isActive' in updated) {
+        if (updated.isActive !== undefined) {
+          next.isActive = updated.isActive;
+          next.is_active = updated.isActive;
+        } else {
+          delete next.isActive;
+          delete next.is_active;
+        }
+      }
+      if ('currencyCode' in updated) {
+        if (updated.currencyCode) {
+          next.currencyCode = updated.currencyCode;
+          next.currency_code = updated.currencyCode;
+        } else {
+          delete next.currencyCode;
+          delete next.currency_code;
+        }
+      }
+      syncUrlParams(next);
+      return next;
+    });
   };
 
   const handleResetFilters = () => {
-    setFilters({
+    const reset: AccountsFilterQuery = {
       page: 1,
       limit: 20,
       search: '',
-      type: undefined,
-      isActive: undefined,
-    });
+    };
+    setFilters(reset);
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
+
+  const hasActiveFilters = Boolean(
+    filters.search ||
+    filters.type ||
+    typeof filters.isActive === 'boolean' ||
+    typeof filters.is_active === 'boolean' ||
+    filters.currencyCode ||
+    filters.currency_code
+  );
 
   const handlePageChange = (newPage: number) => {
     setFilters((prev) => ({
@@ -142,17 +216,38 @@ export const AccountsListPage: React.FC = () => {
     }));
   };
 
+  const handlePageSizeChange = (newPageSize: number) => {
+    setFilters((prev) => ({
+      ...prev,
+      limit: Math.min(100, Math.max(1, newPageSize)),
+      page: 1,
+    }));
+  };
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('asc');
+    }
+  };
+
   // Switch to detail view for a specific journal entry
   const handleViewDetail = (id: string) => {
     setSelectedEntryId(id);
     setCurrentView('detail-journal');
   };
 
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-
   // Derive high-level stats
   const assetCount = accounts.filter((a) => a.type === 'asset').length;
   const liabilityCount = accounts.filter((a) => a.type === 'liability').length;
+
+  const handleAccountCreated = (newAccount: Account) => {
+    setAccounts((prev) => [newAccount, ...prev.filter((a) => a.id !== newAccount.id)]);
+    setAccountsTotal((prev) => prev + 1);
+    setToastMessage(`Account ${newAccount.code} — ${newAccount.name} created successfully.`);
+  };
 
   // Render Form Page View
   if (currentView === 'create-journal') {
@@ -197,7 +292,7 @@ export const AccountsListPage: React.FC = () => {
           <button
             type="button"
             className="cs-btn cs-btn-secondary"
-            onClick={() => setIsAccountModalOpen(true)}
+            onClick={() => setIsCreateAccountModalOpen(true)}
             aria-label="Create new account"
           >
             + New Account
@@ -288,12 +383,12 @@ export const AccountsListPage: React.FC = () => {
             onFilterChange={handleFilterChange}
             onReset={handleResetFilters}
             isLoading={isAccountsLoading}
+            totalResults={accountsTotal}
           />
 
           {accountsError ? (
             <ErrorState
-              title="Unable to load Chart of Accounts"
-              message={accountsError}
+              error={accountsError}
               onRetry={() => loadAccounts(filters)}
             />
           ) : (
@@ -303,8 +398,17 @@ export const AccountsListPage: React.FC = () => {
               total={accountsTotal}
               page={filters.page || 1}
               totalPages={accountsTotalPages}
+              pageSize={filters.limit || 20}
+              pageSizeOptions={[10, 20, 50, 100]}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              hasActiveFilters={hasActiveFilters}
+              onSort={handleSort}
               onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
+              onClearFilters={handleResetFilters}
+              onCreateAccount={() => setIsCreateAccountModalOpen(true)}
             />
           )}
         </section>
@@ -314,8 +418,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-trial-balance" role="tabpanel" aria-labelledby="tab-trial-balance">
           {tbError ? (
             <ErrorState
-              title="Unable to generate Trial Balance"
-              message={tbError}
+              error={tbError}
               onRetry={() => loadTrialBalance(period)}
             />
           ) : (
@@ -334,8 +437,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-journal-entries" role="tabpanel" aria-labelledby="tab-journal-entries">
           {entriesError ? (
             <ErrorState
-              title="Unable to load journal entries"
-              message={entriesError}
+              error={entriesError}
               onRetry={loadJournalEntries}
             />
           ) : isEntriesLoading ? (
@@ -406,16 +508,21 @@ export const AccountsListPage: React.FC = () => {
           )}
         </section>
       )}
-      {/* Quick Account Creation Modal */}
+      {/* Account Creation Modal (ERP4-20) */}
       <AccountCreateModal
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
-        onSuccess={(newAcc) => {
-          setIsAccountModalOpen(false);
-          setAccounts((prev) => [newAcc, ...prev]);
-          setAccountsTotal((prev) => prev + 1);
-        }}
+        isOpen={isCreateAccountModalOpen}
+        onClose={() => setIsCreateAccountModalOpen(false)}
+        onAccountCreated={handleAccountCreated}
       />
+
+      {/* Confirmation Toast Notification (ERP4-20) */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
+      )}
     </div>
   );
 };

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "rulesetVersion": 1,
+  "fixture": {
+    "file": "dirty-data-v1.csv",
+    "sha256": "63db7e77a072fb9fda42ad6d3a9132c455a0a11de2f7f618e774577b89179362",
+    "bytes": 114836,
+    "rows": 1000
+  },
+  "knownProblems": {
+    "emptyRequiredCount": 50,
+    "formatErrorCount": 60,
+    "duplicateCount": 80,
+    "totalProblemCount": 190
+  },
+  "columns": {
+    "id": {
+      "emptyCount": 0,
+      "invalidCount": 0,
+      "inferredType": "uuid"
+    },
+    "first_name": {
+      "emptyCount": 30,
+      "invalidCount": 0,
+      "inferredType": "string"
+    },
+    "last_name": {
+      "emptyCount": 0,
+      "invalidCount": 0,
+      "inferredType": "string"
+    },
+    "email": {
+      "emptyCount": 0,
+      "invalidCount": 25,
+      "inferredType": "email"
+    },
+    "phone": {
+      "emptyCount": 0,
+      "invalidCount": 20,
+      "inferredType": "phone"
+    },
+    "company": {
+      "emptyCount": 20,
+      "invalidCount": 0,
+      "inferredType": "string"
+    },
+    "country": {
+      "emptyCount": 0,
+      "invalidCount": 0,
+      "inferredType": "string"
+    },
+    "annual_revenue": {
+      "emptyCount": 0,
+      "invalidCount": 15,
+      "inferredType": "decimal"
+    }
+  }
+}

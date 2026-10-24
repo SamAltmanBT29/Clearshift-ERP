@@ -507,11 +507,16 @@ export const erp4ImportReceipts = erp4Schema.table(
 
     batch_id: uuid('batch_id').notNull(),
     source_row: integer('source_row').notNull(),
+    source_system: varchar('source_system', { length: 64 }),
+    source_id: varchar('source_id', { length: 128 }),
     entity: varchar('entity', { length: 64 }).notNull(),
     schema_version: integer('schema_version').notNull().default(1),
     idempotency_key: varchar('idempotency_key', { length: 128 }).notNull(),
+    request_hash: varchar('request_hash', { length: 64 }).notNull().default(''),
     target_id: uuid('target_id').notNull(),
     kind: varchar('kind', { length: 16 }).notNull().default('created'),
+    outcome: varchar('outcome', { length: 16 }).notNull().default('loaded'),
+    response_payload: text('response_payload'),
 
     created_at: timestamp('created_at', { withTimezone: true })
       .notNull()
