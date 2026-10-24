@@ -508,6 +508,7 @@ export const AccountsListPage: React.FC = () => {
           )}
         </section>
       )}
+
       {/* Account Creation Modal (ERP4-20) */}
       <AccountCreateModal
         isOpen={isCreateAccountModalOpen}
