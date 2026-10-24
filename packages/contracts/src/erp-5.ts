@@ -607,6 +607,7 @@ export const HrImportReceiptSchema = z.object({
   entity: z.string().min(1).max(64),
   schema_version: z.number().int().positive().default(1),
   idempotency_key: z.string().min(1).max(128),
+  request_hash: z.string().max(64).optional(),
   target_id: HrUuid,
   kind: z.enum(['created', 'linked']).default('created'),
   created_at: z.string().datetime(),

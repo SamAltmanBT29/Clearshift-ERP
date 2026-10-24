@@ -337,6 +337,7 @@ export class DrizzleHrRepository implements HrRepository {
         entity: receipt.entity,
         schema_version: receipt.schema_version ?? 1,
         idempotency_key: receipt.idempotency_key,
+        request_hash: receipt.request_hash ?? '',
         target_id: receipt.target_id,
         kind: receipt.kind ?? 'created',
       })
@@ -618,6 +619,7 @@ function toHrImportReceipt(row: typeof erp5ImportReceipts.$inferSelect): HrImpor
     entity: row.entity,
     schema_version: row.schema_version,
     idempotency_key: row.idempotency_key,
+    request_hash: row.request_hash,
     target_id: row.target_id,
     kind: row.kind as 'created' | 'linked',
     created_at: toIso(row.created_at),
