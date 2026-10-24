@@ -29,8 +29,13 @@ export const moduleDefinition = {
   name: 'Vendors & Purchasing',
   version: '1.0.0',
   description: 'Vendor management, purchase orders, duplicate detection, and migration ingest',
-  routes: erpVendorsRoutes,
+  schema: 'erp2',
+  routePrefix: '/api/v1/erp-vendors',
+  referenceResolvers: erp2Resolver,
   resolver: erp2Resolver,
+  routes: erpVendorsRoutes,
 };
 
 export const erp2Descriptor = moduleDefinition;
+
+export default moduleDefinition;
