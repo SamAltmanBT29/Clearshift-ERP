@@ -33,8 +33,12 @@ interface E2ePlugin {
 const REPO_ROOT = process.cwd();
 const CONTRACTS_INDEX = path.resolve(REPO_ROOT, 'packages/contracts/src/index.ts');
 const UI_INDEX = path.resolve(REPO_ROOT, 'packages/ui/src/index.ts');
+const CORE_INDEX = path.resolve(REPO_ROOT, 'packages/core/src/index.ts');
+const KIT_INDEX = path.resolve(REPO_ROOT, 'packages/kit/src/index.ts');
 const BROWSER_CONTRACTS = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/contracts-browser.ts');
 const BROWSER_UI = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/ui-browser.ts');
+const BROWSER_CORE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/core-browser.ts');
+const BROWSER_KIT = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/kit-browser.ts');
 const APP_MODULE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/src/app.ts');
 const REPOSITORY_MODULE = path.resolve(
   REPO_ROOT,
@@ -82,6 +86,8 @@ function erp4E2eApi(): E2ePlugin {
       if (options?.ssr) return null;
       if (source === '@clearshift/contracts' || source === CONTRACTS_INDEX) return BROWSER_CONTRACTS;
       if (source === '@cs/ui' || source === UI_INDEX) return BROWSER_UI;
+      if (source === '@cs/core' || source === CORE_INDEX) return BROWSER_CORE;
+      if (source === '@cs/kit' || source === KIT_INDEX) return BROWSER_KIT;
       return null;
     },
     configureServer(server: DevServerLike) {

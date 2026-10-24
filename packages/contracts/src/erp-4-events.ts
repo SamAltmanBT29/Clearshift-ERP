@@ -24,7 +24,7 @@ import {
   PeriodStatusEnum,
   UuidSchema,
 } from './erp-4.js';
-import { createEventEnvelopeSchema, createEventEnvelope, type EventEnvelope } from './events.js';
+import { createEventEnvelopeSchema, createEventEnvelope, type EventEnvelope } from './event-envelope.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Type Constants

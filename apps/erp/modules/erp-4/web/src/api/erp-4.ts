@@ -146,7 +146,6 @@ export async function createAccount(data: CreateAccountInput): Promise<Account> 
 }
 
 /**
-/**
  * Fetch a single account by ID.
  */
 export async function fetchAccountById(id: string): Promise<Account> {

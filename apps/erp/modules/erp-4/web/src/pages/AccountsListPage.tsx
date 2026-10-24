@@ -110,9 +110,8 @@ export const AccountsListPage: React.FC = () => {
     setEntriesError(null);
     try {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
-      const items = response.items || (response as any).data || [];
-      setJournalEntries(items);
-      setEntriesTotal(response.total ?? items.length);
+      setJournalEntries(response.items || (response as any).data || []);
+      setEntriesTotal(response.total ?? 0);
     } catch (err: unknown) {
       setEntriesError(err);
     } finally {

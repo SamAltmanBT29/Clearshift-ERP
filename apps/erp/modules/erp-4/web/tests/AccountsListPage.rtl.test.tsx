@@ -118,8 +118,15 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
     vi.clearAllMocks();
   });
 
+  const renderComponent = () =>
+    render(
+      <MemoryRouter>
+        <AccountsListPage />
+      </MemoryRouter>
+    );
+
   it('renders page header, metric cards, and accounts table on mount', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     expect(screen.getByText('Finance & Accounting (ERP-4)')).toBeDefined();
 
@@ -131,7 +138,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('handles search input change and calls fetchAccounts with query', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -146,7 +153,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('handles account type filter selection', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -161,7 +168,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('switches between Chart of Accounts, Trial Balance, and Journal Entries tabs', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -185,7 +192,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('navigates to create new journal entry view when clicking + New Journal Entry', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -206,7 +213,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('opens account create modal when clicking + New Account', async () => {
-    render(<MemoryRouter><AccountsListPage /></MemoryRouter>);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -214,7 +221,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
     fireEvent.click(createAccBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Create (General Ledger|GL) Account/i)).toBeDefined();
+      expect(screen.getByText('Create General Ledger Account')).toBeDefined();
     });
   });
 });
