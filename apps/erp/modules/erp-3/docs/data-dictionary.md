@@ -834,3 +834,26 @@ Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines 
    - Order lines cascade delete when the parent sales order is deleted (`ON DELETE CASCADE`).
    - Invoice lines cascade delete when the parent invoice is deleted (`ON DELETE CASCADE`).
    - Cross-module relationships use logical UUID columns without DB-level foreign keys.
+
+---
+
+## 17. Exact Duplicate Key Policy & Human Review Specification (ERP3-12 / KIT-10 / Issue #148)
+
+ERP-3 Sales Orders & Invoices enforces a deterministic, exact duplicate matching policy in accordance with ClearShift V1 core invariants:
+
+1. **Deterministic Matching Only**: Duplicate detection relies strictly on exact normalized string equality (`confidence = 1.0`). Probabilistic scoring, fuzzy string matching (Levenshtein, Jaro-Winkler), and distance metrics are strictly out of scope for V1.
+2. **Strict Prohibition of Fuzzy Auto-Merge**: Automated target-side merge sagas are prohibited in V1. Any duplicate consolidation requires explicit operator review and authorization.
+3. **Key Normalization Rules**:
+   - `normalizeOrderNumber(order_number)`: Trims whitespace, uppercase, strips `[\s\-_/]`.
+   - `normalizeInvoiceNumber(invoice_number)`: Trims whitespace, uppercase, strips `[\s\-_/]`.
+   - `normalizePaymentReference(reference)`: Trims whitespace, uppercase, strips `[\s\-_/]`.
+4. **Collision Classification**:
+   - `EXACT_DUPLICATE`: Incoming key exactly matches an existing record. Held for human review (`status: PENDING_REVIEW`, `confidence: 1.0`).
+   - `AMBIGUOUS_CANDIDATE`: Incoming key conflicts across related entities (e.g. identical order number but different customer Golden ID). Held for human review.
+   - `UNIQUE`: No matching keys.
+5. **Audited Human Review**:
+   - `POST /api/v1/erp-orders/duplicates/check`: Scans incoming batch records for collisions.
+   - `GET /api/v1/erp-orders/duplicates/candidates`: Retrieves held candidate queue.
+   - `GET /api/v1/erp-orders/duplicates/candidates/:id`: Inspects candidate record details.
+   - `POST /api/v1/erp-orders/duplicates/review`: Submits operator merge decision (`MERGE`, `REJECT`, `KEEP_BOTH`), requiring distinct `kept_id` and `merged_id` for merges and a minimum 5-character rationale. Logs immutable audit trail with action `merge.decided`.
+

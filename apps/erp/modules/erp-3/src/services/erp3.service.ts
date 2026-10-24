@@ -46,6 +46,11 @@ import {
   type SalesOrderListQuery,
   type SalesOrderListResponse,
   type SalesOrderStatus,
+  type Erp3CheckDuplicatesRequest,
+  type Erp3CheckDuplicatesResponse,
+  type Erp3DuplicateCandidateRecord,
+  type Erp3ReviewDuplicateRequest,
+  type Erp3ReviewDuplicateResponse,
 } from "@clearshift/contracts";
 import {
   ERP3_DOMAIN_ERROR_CODES,
@@ -57,6 +62,13 @@ import {
   parseScaledDecimal4Dp,
   resolveInvoiceStatus,
 } from "../domain/rules.js";
+import {
+  classifySalesOrderCandidate,
+  classifyInvoiceCandidate,
+  classifyPaymentCandidate,
+  assertNoFuzzyAutoMerge,
+  assertValidHumanMergeDecision,
+} from "../domain/duplicate-policy.js";
 import {
   assertInvoiceReadConsistency,
   assertInvoiceStatusTransition,
@@ -74,10 +86,12 @@ import {
   computeRequestHash,
   type Erp3Repository,
 } from "./repository.js";
+import type { Erp3AuditService } from "./audit.js";
 
 export interface Erp3ServiceOptions {
   repository: Erp3Repository;
   referenceResolver?: ReferenceResolver | undefined;
+  auditService?: Erp3AuditService | undefined;
   /**
    * Optional clock override (`YYYY-MM-DD`) for deterministic overdue status evaluation in tests.
    */
@@ -147,6 +161,18 @@ export class NotFoundError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message: string) {
+    super("FORBIDDEN", message, 403, [
+      {
+        code: "FORBIDDEN",
+        message,
+      },
+    ]);
+    this.name = "ForbiddenError";
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(message: string, field?: string) {
     super("VALIDATION_ERROR", message, 400, [
@@ -180,6 +206,7 @@ function stripImportMetadata(
 export class Erp3Service {
   private readonly repo: Erp3Repository;
   private readonly resolver?: ReferenceResolver | undefined;
+  private readonly auditService?: Erp3AuditService | undefined;
   private readonly nowUtcDate: () => string;
   private readonly strictDr1Exact4Dp: boolean;
   private readonly allowDirectOpenToClosed: boolean;
@@ -187,11 +214,13 @@ export class Erp3Service {
   constructor(options: Erp3ServiceOptions) {
     this.repo = options.repository;
     this.resolver = options.referenceResolver;
+    this.auditService = options.auditService;
     this.nowUtcDate =
       options.nowUtcDate ?? (() => new Date().toISOString().slice(0, 10));
     this.strictDr1Exact4Dp = options.strictDr1Exact4Dp ?? false;
     this.allowDirectOpenToClosed = options.allowDirectOpenToClosed ?? true;
   }
+
 
   private async verifyCustomerGoldenId(customerGoldenId: string): Promise<void> {
     try {
@@ -753,4 +782,171 @@ export class Erp3Service {
       };
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Exact Duplicate Key Policy & Human Review (ERP3-12 / KIT-10 / Issue #148)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  public duplicateCandidates = new Map<string, Erp3DuplicateCandidateRecord>();
+
+  seedDuplicateCandidate(candidate: Erp3DuplicateCandidateRecord): void {
+    this.duplicateCandidates.set(candidate.candidate_id, candidate);
+  }
+
+  async getDuplicateCandidates(
+    entity?: "sales_order" | "invoice" | "payment",
+  ): Promise<Erp3DuplicateCandidateRecord[]> {
+    const all = Array.from(this.duplicateCandidates.values());
+    if (!entity) return all;
+    return all.filter((c) => c.entity === entity);
+  }
+
+  async getDuplicateCandidateById(
+    candidateId: string,
+  ): Promise<Erp3DuplicateCandidateRecord | null> {
+    return this.duplicateCandidates.get(candidateId) ?? null;
+  }
+
+  async checkDuplicates(
+    request: Erp3CheckDuplicatesRequest,
+  ): Promise<Erp3CheckDuplicatesResponse> {
+    assertNoFuzzyAutoMerge({ isAutoMerge: false, confidence: 1.0 });
+
+    const foundCandidates: Erp3DuplicateCandidateRecord[] = [];
+
+    if (request.entity === "sales_order") {
+      const res = await this.listSalesOrders({
+        page: 1,
+        pageSize: 100,
+      });
+      const existingOrders = res.data ?? [];
+      for (const record of request.records) {
+        const result = classifySalesOrderCandidate(record, existingOrders);
+        if (result.candidate) {
+          this.duplicateCandidates.set(
+            result.candidate.candidate_id,
+            result.candidate,
+          );
+          foundCandidates.push(result.candidate);
+        }
+      }
+    } else if (request.entity === "invoice") {
+      const res = await this.listInvoices({
+        page: 1,
+        pageSize: 100,
+      });
+      const existingInvoices = res.data ?? [];
+      for (const record of request.records) {
+        const result = classifyInvoiceCandidate(record, existingInvoices);
+        if (result.candidate) {
+          this.duplicateCandidates.set(
+            result.candidate.candidate_id,
+            result.candidate,
+          );
+          foundCandidates.push(result.candidate);
+        }
+      }
+    } else if (request.entity === "payment") {
+      const res = await this.listPayments({
+        page: 1,
+        pageSize: 100,
+      });
+      const existingPayments = res.data ?? [];
+      for (const record of request.records) {
+        const result = classifyPaymentCandidate(record, existingPayments);
+        if (result.candidate) {
+          this.duplicateCandidates.set(
+            result.candidate.candidate_id,
+            result.candidate,
+          );
+          foundCandidates.push(result.candidate);
+        }
+      }
+    } else {
+
+      throw new ValidationError(
+        `Unsupported entity for duplicate check: '${request.entity}'`,
+        "entity",
+      );
+    }
+
+    return {
+      entity: request.entity,
+      total_checked: request.records.length,
+      duplicates_found: foundCandidates.length,
+      candidates: foundCandidates,
+    };
+  }
+
+  async reviewDuplicateCandidate(
+    request: Erp3ReviewDuplicateRequest,
+    operator: {
+      id: string;
+      role?: string | undefined;
+      correlationId?: string | undefined;
+    },
+  ): Promise<Erp3ReviewDuplicateResponse> {
+    const allowedRoles = ["admin", "migration_runner", "editor", "system"];
+    if (operator.role && !allowedRoles.includes(operator.role)) {
+      throw new ForbiddenError(
+        `Role '${operator.role}' is not authorized to decide duplicate merges. Required: admin, migration_runner, or editor.`,
+      );
+    }
+
+    assertNoFuzzyAutoMerge({ isAutoMerge: false, confidence: 1.0 });
+    assertValidHumanMergeDecision(request);
+
+    const candidate = this.duplicateCandidates.get(request.candidate_id);
+    if (!candidate) {
+      throw new NotFoundError("Duplicate candidate", request.candidate_id);
+    }
+
+    const correlationId = operator.correlationId ?? randomUUID();
+    const nowIso = new Date().toISOString();
+    const auditRecordId = randomUUID();
+
+    const newStatus =
+      request.decision === "MERGE"
+        ? "MERGED"
+        : request.decision === "REJECT"
+          ? "REJECTED"
+          : "KEPT_BOTH";
+
+    candidate.status = newStatus;
+    candidate.decided_at = nowIso;
+    candidate.decided_by = operator.id;
+    candidate.decision = request.decision;
+    candidate.rationale = request.rationale;
+
+    await this.auditService?.record({
+      actor: operator.id,
+      actorRole: operator.role ?? "editor",
+      action: "merge.decided",
+      targetEntity: `erp3_${candidate.entity}`,
+      targetId: request.kept_id ?? candidate.candidate_id,
+      correlationId,
+      result: "success",
+      metadata: {
+        candidate_id: candidate.candidate_id,
+        decision: request.decision,
+        kept_id: request.kept_id,
+        merged_id: request.merged_id,
+        match_kind: candidate.match_kind,
+        matching_key: candidate.matching_key,
+        rationale: request.rationale,
+      },
+    });
+
+    return {
+      candidate_id: candidate.candidate_id,
+      decision: request.decision,
+      status: newStatus,
+      kept_id: request.kept_id,
+      merged_id: request.merged_id,
+      actor_id: operator.id,
+      timestamp: nowIso,
+      audit_record_id: auditRecordId,
+    };
+  }
 }
+

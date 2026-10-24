@@ -13,6 +13,7 @@ import { salesOrderRoutes } from "./sales-orders.js";
 import { invoiceRoutes } from "./invoices.js";
 import { paymentRoutes } from "./payments.js";
 import { importRoutes } from "./import.js";
+import { duplicateRoutes } from "./duplicates.js";
 
 export interface Erp3RouteOptions {
   erp3Service: Erp3Service;
@@ -39,4 +40,9 @@ export const erpOrdersRoutes: FastifyPluginAsync<Erp3RouteOptions> = async (
     erp3Service: opts.erp3Service,
     auditService: opts.auditService,
   });
+  await fastify.register(duplicateRoutes, {
+    erp3Service: opts.erp3Service,
+    auditService: opts.auditService,
+  });
 };
+

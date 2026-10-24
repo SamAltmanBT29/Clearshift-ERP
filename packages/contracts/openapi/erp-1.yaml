@@ -767,14 +767,16 @@ components:
         updatedAt: { type: string, format: date-time }
 
     CategoryListResponse:
-      allOf:
-        - type: object
-          required: [items]
-          properties:
-            items:
-              type: array
-              items: { $ref: '#/components/schemas/Category' }
-        - $ref: '#/components/schemas/PaginationFields'
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     CategoryMutationResponse:
       allOf:
@@ -830,14 +832,16 @@ components:
         updatedAt: { type: string, format: date-time }
 
     ProductListResponse:
-      allOf:
-        - type: object
-          required: [items]
-          properties:
-            items:
-              type: array
-              items: { $ref: '#/components/schemas/Product' }
-        - $ref: '#/components/schemas/PaginationFields'
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     ProductMutationResponse:
       allOf:
