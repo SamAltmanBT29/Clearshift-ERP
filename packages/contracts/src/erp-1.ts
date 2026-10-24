@@ -24,9 +24,93 @@ export const ERP1_DOMAIN_RULES = {
   IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH',
   IMPORT_PROVENANCE_REQUIRED: 'IMPORT_PROVENANCE_REQUIRED',
   PROTECTED_FIELD: 'ERP1_PROTECTED_FIELD',
+  SOURCE_IDENTITY_INCOMPLETE: 'SOURCE_IDENTITY_INCOMPLETE',
+  INVALID_UNIT_OF_MEASURE: 'INVALID_UNIT_OF_MEASURE',
+  INVALID_CURRENCY_CODE: 'INVALID_CURRENCY_CODE',
+  INVALID_STOCK_STATUS: 'INVALID_STOCK_STATUS',
+  INVALID_PRODUCT_STATUS: 'INVALID_PRODUCT_STATUS',
+  INVALID_STATUS_TRANSITION: 'INVALID_STATUS_TRANSITION',
+  READ_MODEL_INCONSISTENT: 'READ_MODEL_INCONSISTENT',
+  CROSS_MODULE_WRITE_FORBIDDEN: 'CROSS_MODULE_WRITE_FORBIDDEN',
 } as const;
 
 export type Erp1DomainRule = (typeof ERP1_DOMAIN_RULES)[keyof typeof ERP1_DOMAIN_RULES];
+
+/**
+ * An absent optional relationship is reported as an approved warning.
+ *
+ * The module never invents a synthetic or placeholder record to satisfy an optional link.
+ */
+export const ERP1_OPTIONAL_REFERENCE_ABSENT = 'ERP1_OPTIONAL_REFERENCE_ABSENT';
+
+export const Erp1RelationshipWarningSchema = z.object({
+  relationship: z.string(),
+  field: z.string(),
+  code: z.literal(ERP1_OPTIONAL_REFERENCE_ABSENT),
+  message: z.string(),
+});
+export type Erp1RelationshipWarning = z.infer<typeof Erp1RelationshipWarningSchema>;
+
+/**
+ * Approved units of measure per FR-ERP1-04.
+ */
+export const ERP1_UNITS_OF_MEASURE = [
+  'pcs',
+  'kg',
+  'g',
+  'litre',
+  'metre',
+  'box',
+] as const;
+
+/**
+ * Approved stock statuses derived from physical inventory level.
+ */
+export const ERP1_STOCK_STATUSES = [
+  'out_of_stock',
+  'low_stock',
+  'in_stock',
+] as const;
+export type StockStatus = (typeof ERP1_STOCK_STATUSES)[number];
+
+/**
+ * Allowed stock status transitions based on balance changes.
+ */
+export const ERP1_STOCK_STATUS_TRANSITIONS: Readonly<
+  Record<StockStatus, readonly StockStatus[]>
+> = {
+  out_of_stock: ['low_stock', 'in_stock'],
+  low_stock: ['out_of_stock', 'in_stock'],
+  in_stock: ['low_stock', 'out_of_stock'],
+};
+
+/**
+ * Product lifecycle statuses for enterprise master data cataloging.
+ */
+export const ERP1_PRODUCT_STATUSES = [
+  'draft',
+  'active',
+  'discontinued',
+  'archived',
+] as const;
+export type ProductLifecycleStatus = (typeof ERP1_PRODUCT_STATUSES)[number];
+
+export const ERP1_PRODUCT_TERMINAL_STATUSES: readonly ProductLifecycleStatus[] = [
+  'archived',
+];
+
+/**
+ * Allowed forward product lifecycle transitions.
+ * Archived is terminal.
+ */
+export const ERP1_PRODUCT_STATUS_TRANSITIONS: Readonly<
+  Record<ProductLifecycleStatus, readonly ProductLifecycleStatus[]>
+> = {
+  draft: ['active', 'archived'],
+  active: ['discontinued', 'archived'],
+  discontinued: ['active', 'archived'],
+  archived: [],
+};
 
 /**
  * Fields that are owned by the platform or the service layer. A browser edit
@@ -95,6 +179,7 @@ function normalizeDecimalInput(
  * Normalizes SKU strings for exact deterministic matching (uppercase, trimmed).
  */
 export function normalizeSku(sku: string): string {
+  if (!sku || typeof sku !== 'string') return '';
   return sku.trim().toUpperCase();
 }
 
@@ -659,6 +744,101 @@ export const PaginatedStockLevelsResponseSchema =
 export type PaginatedStockLevelsResponse = z.infer<
   typeof PaginatedStockLevelsResponseSchema
 >;
+
+/**
+ * Nature of the match between candidate and target record for ERP-1.
+ */
+export const Erp1DuplicateMatchKindEnum = z.enum([
+  'EXACT_SKU',
+  'EXACT_NAME',
+  'EXACT_CATEGORY_CODE',
+  'NORMALIZED_EXACT',
+  'EXACT',
+  'AMBIGUOUS_MULTI_MATCH',
+  'AMBIGUOUS',
+]);
+export type Erp1DuplicateMatchKind = z.infer<typeof Erp1DuplicateMatchKindEnum>;
+
+/**
+ * Review state of an ERP-1 duplicate candidate.
+ */
+export const Erp1DuplicateCandidateStatusEnum = z.enum([
+  'PENDING_REVIEW',
+  'MERGED',
+  'REJECTED',
+  'KEPT_BOTH',
+]);
+export type Erp1DuplicateCandidateStatus = z.infer<typeof Erp1DuplicateCandidateStatusEnum>;
+
+/**
+ * Permitted human merge decisions for ERP-1 in V1.
+ */
+export const Erp1MergeDecisionTypeEnum = z.enum([
+  'MERGE',
+  'REJECT',
+  'KEEP_BOTH',
+]);
+export type Erp1MergeDecisionType = z.infer<typeof Erp1MergeDecisionTypeEnum>;
+
+/**
+ * Exact duplicate candidate record presented for human review in ERP-1.
+ */
+export const Erp1DuplicateCandidateRecordSchema = z.object({
+  candidate_id: z.string().uuid(),
+  entity: z.enum(['product', 'category']),
+  match_kind: Erp1DuplicateMatchKindEnum,
+  status: Erp1DuplicateCandidateStatusEnum.default('PENDING_REVIEW'),
+  matching_key: z.string(),
+  matching_value: z.string(),
+  incoming_record: z.record(z.unknown()),
+  existing_record: z.record(z.unknown()),
+  confidence: z.literal(1.0), // V1 invariant: exact matches only (1.0). Fuzzy scoring prohibited.
+  created_at: z.string(),
+  decided_at: z.string().optional().nullable(),
+  decided_by: z.string().optional().nullable(),
+  decision: Erp1MergeDecisionTypeEnum.optional().nullable(),
+  rationale: z.string().optional().nullable(),
+});
+export type Erp1DuplicateCandidateRecord = z.infer<typeof Erp1DuplicateCandidateRecordSchema>;
+
+/** POST /api/v1/erp-products/duplicates/check — request. */
+export const CheckErp1DuplicatesRequestSchema = z.object({
+  entity: z.enum(['product', 'category']),
+  records: z.array(z.record(z.unknown())).min(1, 'At least one record is required'),
+});
+export type CheckErp1DuplicatesRequest = z.infer<typeof CheckErp1DuplicatesRequestSchema>;
+
+/** POST /api/v1/erp-products/duplicates/check — response. */
+export const CheckErp1DuplicatesResponseSchema = z.object({
+  entity: z.enum(['product', 'category']),
+  total_checked: z.number().int().nonnegative(),
+  duplicates_found: z.number().int().nonnegative(),
+  candidates: z.array(Erp1DuplicateCandidateRecordSchema),
+});
+export type CheckErp1DuplicatesResponse = z.infer<typeof CheckErp1DuplicatesResponseSchema>;
+
+/** POST /api/v1/erp-products/duplicates/review — request. */
+export const ReviewErp1DuplicateRequestSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: Erp1MergeDecisionTypeEnum,
+  kept_id: z.string().uuid().optional(),
+  merged_id: z.string().uuid().optional(),
+  rationale: z.string().min(5, 'Review rationale must be at least 5 characters'),
+});
+export type ReviewErp1DuplicateRequest = z.infer<typeof ReviewErp1DuplicateRequestSchema>;
+
+/** POST /api/v1/erp-products/duplicates/review — response. */
+export const ReviewErp1DuplicateResponseSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: Erp1MergeDecisionTypeEnum,
+  status: Erp1DuplicateCandidateStatusEnum,
+  kept_id: z.string().uuid().optional(),
+  merged_id: z.string().uuid().optional(),
+  actor_id: z.string(),
+  timestamp: z.string(),
+  audit_record_id: z.string().uuid(),
+});
+export type ReviewErp1DuplicateResponse = z.infer<typeof ReviewErp1DuplicateResponseSchema>;
 
 export { ErrorEnvelopeSchema };
 

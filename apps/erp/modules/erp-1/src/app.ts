@@ -8,13 +8,20 @@ import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { AppError } from '@cs/kernel';
 import { ROLE_CAPABILITIES } from '@cs/rbac';
-import type { RoleType } from '@cs/identity';
+import { verifyAccessToken, type RoleType, type HubTokenClaims } from '@cs/identity';
+
+export const DISABLED_USER_IDS = new Set<string>([
+  'user-disabled-01',
+  'disabled@clearshift.internal',
+  'disabled-user',
+]);
 import {
   ERP1_DOMAIN_RULES,
   ERP1_PROTECTED_FIELD_NAMES,
   StandardErrorCodes,
 } from '@clearshift/contracts';
 import { Erp1ServiceError, type Erp1ErrorDetail } from './services/errors.js';
+import { Erp1DomainError } from './domain/rules.js';
 import { Erp1Service } from './services/erp1.service.js';
 import { InMemoryErp1Repository, type Erp1Repository } from './services/repository.js';
 import { erp1Routes } from './routes/index.js';
@@ -160,6 +167,25 @@ export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
       });
     }
 
+    if (error instanceof Erp1DomainError) {
+      const isUnprocessable = [
+        ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
+        ERP1_DOMAIN_RULES.INVALID_STATUS_TRANSITION,
+        ERP1_DOMAIN_RULES.SOURCE_IDENTITY_INCOMPLETE,
+        ERP1_DOMAIN_RULES.READ_MODEL_INCONSISTENT,
+        ERP1_DOMAIN_RULES.CROSS_MODULE_WRITE_FORBIDDEN,
+      ].includes(error.code as any);
+
+      return envelope(isUnprocessable ? 422 : 400, {
+        code: error.code,
+        message: error.message,
+        details: error.field
+          ? [{ field: error.field, message: error.message, code: error.code }]
+          : [],
+        correlation_id: correlationId,
+      });
+    }
+
     if (error instanceof AppError) {
       return envelope(error.statusCode, {
         code: error.code,
@@ -237,14 +263,62 @@ export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
       } satisfies Erp1ErrorEnvelope);
     }
 
-    request.user = {
-      iss: 'clearshift-erp-local',
-      aud: 'clearshift-erp',
-      sub: 'ffffffff-0001-0001-0001-000000000001',
-      jti: randomUUID(),
-      exp: Math.floor(Date.now() / 1000) + 3600,
-      roles: resolveTokenRoles(token),
-    };
+    // Support real Hub signed JWT tokens
+    if (token.includes('.')) {
+      try {
+        const claims = await verifyAccessToken(token);
+        const tenantId =
+          (request.headers['x-tenant-id'] as string | undefined) ??
+          (claims as unknown as { tenant_id?: string }).tenant_id;
+        request.user = {
+          ...claims,
+          ...(tenantId ? { tenant_id: tenantId } : {}),
+        } as HubTokenClaims;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Token verification failed';
+        return reply.status(401).send({
+          code: StandardErrorCodes.UNAUTHORIZED,
+          message: `Invalid or expired bearer token: ${msg}`,
+          details: [
+            {
+              field: 'authorization',
+              message: msg,
+              code: 'TOKEN_INVALID',
+            },
+          ],
+          correlation_id: correlationId,
+        } satisfies Erp1ErrorEnvelope);
+      }
+    } else {
+      const headerTenantId = request.headers['x-tenant-id'] as string | undefined;
+      const headerActorId =
+        (request.headers['x-actor-id'] as string | undefined) ??
+        (request.headers['x-user-id'] as string | undefined);
+      request.user = {
+        iss: 'clearshift-erp-local',
+        aud: 'clearshift-erp',
+        sub: headerActorId ?? 'ffffffff-0001-0001-0001-000000000001',
+        jti: randomUUID(),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        roles: resolveTokenRoles(token),
+        ...(headerTenantId ? { tenant_id: headerTenantId } : {}),
+      } as unknown as HubTokenClaims;
+    }
+
+    if (DISABLED_USER_IDS.has(request.user?.sub ?? '')) {
+      return reply.status(401).send({
+        code: StandardErrorCodes.UNAUTHORIZED,
+        message: `User account '${request.user?.sub}' is disabled`,
+        details: [
+          {
+            field: 'authorization',
+            message: 'User account is disabled or revoked',
+            code: 'USER_DISABLED',
+          },
+        ],
+        correlation_id: correlationId,
+      } satisfies Erp1ErrorEnvelope);
+    }
   });
 
   app.register(erp1Routes, {

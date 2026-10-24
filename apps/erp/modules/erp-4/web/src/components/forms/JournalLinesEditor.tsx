@@ -10,16 +10,16 @@ export interface EditableJournalLine {
   lineNarration: string;
   debitAmount: string;
   creditAmount: string;
-  error?: string;
+  error?: string | undefined;
 }
 
 interface JournalLinesEditorProps {
   lines: EditableJournalLine[];
   accounts: Account[];
   currencyCode: string;
-  readOnly?: boolean;
+  readOnly?: boolean | undefined;
   onChange: (updatedLines: EditableJournalLine[]) => void;
-  onOpenCreateAccount?: () => void;
+  onOpenCreateAccount?: (() => void) | undefined;
 }
 
 export const JournalLinesEditor: React.FC<JournalLinesEditorProps> = ({
