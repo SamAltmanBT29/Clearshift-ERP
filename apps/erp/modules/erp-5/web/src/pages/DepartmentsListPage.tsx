@@ -10,8 +10,10 @@
 
 import React, { useMemo, useState } from 'react';
 import { PageTitle, Pagination } from '@cs/ui';
+import { useSearchParams } from 'react-router-dom';
 import {
   HR_PAGE_SIZE_DEFAULT,
+  HR_PAGE_SIZE_MAX,
   type HrDepartment,
   type HrDepartmentListQuery,
 } from '@clearshift/contracts';
@@ -41,11 +43,22 @@ const SORT_COLUMN: Readonly<Record<DepartmentSort, string>> = {
 };
 
 export const DepartmentsListPage: React.FC = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<DepartmentSort>('name');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const p = Number(searchParams.get('pageSize'));
+    return Number.isFinite(p) && p >= 1 && p <= HR_PAGE_SIZE_MAX ? p : HR_PAGE_SIZE_DEFAULT;
+  });
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [sort, setSort] = useState<DepartmentSort>(
+    () => (searchParams.get('sort') as DepartmentSort | null) ?? 'name'
+  );
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    () => (searchParams.get('sort_dir') === 'desc' ? 'desc' : 'asc')
+  );
 
   const debouncedSearch = useDebouncedValue(search);
   const departmentLookup = useDepartmentLookup();
@@ -60,6 +73,16 @@ export const DepartmentsListPage: React.FC = () => {
     }),
     [page, pageSize, sort, sortDir, debouncedSearch]
   );
+
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (page !== 1) params.set('page', String(page));
+    if (pageSize !== HR_PAGE_SIZE_DEFAULT) params.set('pageSize', String(pageSize));
+    if (search.trim()) params.set('search', search.trim());
+    if (sort !== 'name') params.set('sort', sort);
+    if (sortDir !== 'asc') params.set('sort_dir', sortDir);
+    setSearchParams(params, { replace: true });
+  }, [page, pageSize, search, sort, sortDir, setSearchParams]);
 
   const { items, meta, isLoading, error, reload } = useHrList<
     HrDepartment,
@@ -116,6 +139,11 @@ export const DepartmentsListPage: React.FC = () => {
         onReset={handleReset}
         resetLabel="Clear filters"
         isLoading={isLoading}
+        activeFilters={
+          search.trim()
+            ? [{ id: 'search', label: `Search: ${search.trim()}`, onRemove: () => { setSearch(''); setPage(1); } }]
+            : []
+        }
       />
 
       <ListStateBoundary

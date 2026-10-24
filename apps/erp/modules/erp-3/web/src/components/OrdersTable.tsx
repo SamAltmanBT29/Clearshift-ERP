@@ -1,6 +1,12 @@
 import React from 'react';
 import type { SalesOrder } from '@clearshift/contracts';
-import { StatusBadge, SkeletonTable, EmptyState } from './StateViews.js';
+import {
+  StatusBadge,
+  SkeletonTable,
+  EmptyState,
+  EmptySalesOrdersView,
+  SalesOrdersLoadingSkeleton,
+} from './StateViews.js';
 
 export interface OrdersTableProps {
   orders: SalesOrder[];
@@ -16,6 +22,9 @@ export interface OrdersTableProps {
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onRefresh?: (() => void) | undefined;
   onSelectOrder?: ((order: SalesOrder) => void) | undefined;
+  hasActiveFilters?: boolean | undefined;
+  onCreateOrder?: (() => void) | undefined;
+  onClearFilters?: (() => void) | undefined;
 }
 
 function computeOrderBreakdown(order: SalesOrder): { subtotal: number; taxTotal: number; total: number } {
@@ -43,18 +52,20 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
   onPageSizeChange,
   onRefresh,
   onSelectOrder,
+  hasActiveFilters,
+  onCreateOrder,
+  onClearFilters,
 }) => {
   if (isLoading) {
-    return <SkeletonTable columns={8} rows={pageSize > 10 ? 8 : pageSize} />;
+    return <SalesOrdersLoadingSkeleton columns={8} rows={pageSize > 10 ? 8 : pageSize} />;
   }
 
   if (orders.length === 0) {
     return (
-      <EmptyState
-        title="No sales orders found"
-        message="No orders match your current filter selection or search query."
-        actionLabel={onRefresh ? 'Clear Filters & Reload' : undefined}
-        onAction={onRefresh}
+      <EmptySalesOrdersView
+        hasActiveFilters={Boolean(hasActiveFilters)}
+        onClearFilters={onClearFilters || onRefresh || (() => {})}
+        onCreateOrder={onCreateOrder}
       />
     );
   }
