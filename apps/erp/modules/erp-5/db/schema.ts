@@ -370,6 +370,7 @@ export const erp5ImportReceipts = erp5Schema.table(
     entity: varchar('entity', { length: 64 }).notNull(),
     schema_version: integer('schema_version').notNull().default(1),
     idempotency_key: varchar('idempotency_key', { length: 128 }).notNull(),
+    request_hash: varchar('request_hash', { length: 64 }).notNull().default(''),
     target_id: uuid('target_id').notNull(),
     kind: varchar('kind', { length: 16 }).notNull().default('created'),
 

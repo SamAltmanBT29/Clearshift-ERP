@@ -1,3 +1,5 @@
+import { computeCanonicalPayloadHash } from "@clearshift/contracts";
+import { HrTargetAdapter } from "../migration/target-adapter.js";
 /**
  * ERP-5 HR & Employees — Domain Service
  *
@@ -96,6 +98,7 @@ export interface HrImportProvenance {
   batch_id: string;
   source_row: number;
   idempotency_key: string;
+  request_hash: string;
 }
 
 /** Target entity names stored on `erp5.import_receipts.entity`. */
@@ -138,6 +141,7 @@ export function resolveImportProvenance(input: {
   batch_id?: string | undefined;
   source_row?: number | undefined;
   idempotency_key?: string | undefined;
+  record?: any;
 }): HrImportProvenance | null {
   const present = [input.batch_id, input.source_row, input.idempotency_key].filter(
     (value) => value !== undefined
@@ -166,6 +170,7 @@ export function resolveImportProvenance(input: {
     batch_id: input.batch_id as string,
     source_row: input.source_row as number,
     idempotency_key: input.idempotency_key as string,
+    request_hash: computeCanonicalPayloadHash(input.record || {}),
   };
 }
 
@@ -282,7 +287,7 @@ function guard(rule: () => void): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class HrService {
-  private readonly repository: HrRepository;
+  public readonly repository: HrRepository;
   private readonly auditService: AuditService;
 
   constructor(repository: HrRepository, auditService: AuditService) {
@@ -496,7 +501,46 @@ export class HrService {
     return result;
   }
 
-  // ── Employees (FR-ERP5-01/02, BR-ERP5-01/02) ─────────────────────────────
+    async importRow(
+    input: {
+      batch_id: string;
+      source_row: number;
+      entity: string;
+      idempotency_key: string;
+      record: Record<string, unknown>;
+      upsert?: boolean;
+    }
+  ): Promise<{
+    prior_result: boolean;
+    entity: any;
+    receipt: any;
+  }> {
+    const adapter = new HrTargetAdapter(this.repository);
+    adapter.setEntity(input.entity);
+
+    const result = await adapter.importRow(
+      input.batch_id,
+      input.source_row,
+      input.idempotency_key,
+      input.record
+    );
+
+    if (!result.ok) {
+      if (result.error?.reasonCode === 'IDEMPOTENCY_CONFLICT') {
+        const conflictError = new Error('Idempotency conflict');
+        (conflictError as any).reasonCode = 'IDEMPOTENCY_CONFLICT';
+        throw conflictError;
+      }
+      throw new Error(result.error?.message || 'Import failed');
+    }
+
+    return {
+      prior_result: result.value.isExisting ?? false,
+      entity: result.value.targetId, // Returning ID for simplicity in this shim
+      receipt: result.value.receipt,
+    };
+  }
+
 
   async createEmployee(
     input: CreateHrEmployeeRequest,
@@ -1180,6 +1224,7 @@ export class HrService {
       entity,
       schema_version: HR_TARGET_SCHEMA_VERSION,
       idempotency_key: provenance.idempotency_key,
+      request_hash: provenance.request_hash,
       target_id: targetId,
       kind: 'created',
     });
