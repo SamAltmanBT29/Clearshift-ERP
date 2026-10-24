@@ -714,6 +714,7 @@ Every functional requirement, domain rule, and platform architectural invariant 
 | **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
 | **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
 | **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **ERP1-09** | Issue #14 | Authorization, sensitive-field protection, audit and safe logging | `apps/erp/modules/erp-1/tests/security/authorization.test.ts`<br>`apps/erp/modules/erp-1/tests/api/authorization-and-policy.test.ts` | **Verified** |
 
 ---
 
@@ -890,5 +891,28 @@ Total duplicate candidates = 7, exactly matching manifest `review: 7`. Zero fuzz
 ### 23.3 Non-Destructive Guarantee & Sensitive Data Masking
 - Source data immutability: input CSV text and parsed objects are never mutated. SHA-256 digest is verified against manifest `fixture_sha256`.
 - Sensitive fields `supplier_bank_account` and `employee_ssn` are excluded from column rules and masked before profiling; zero raw financial/personal numbers in reports or formula-safe CSV exports.
+
+---
+
+## 24. Authorization, Sensitive-Field Protection, Audit and Safe Logging (ERP1-09)
+
+**Issue Reference**: Resolves [#14](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/14) (`[ERP1-09] ERP-1 Products and Inventory: Authorization, sensitive-field protection, audit and safe logging`)  
+**Specification Reference**: `apps/erp/modules/erp-1/docs/security.md`  
+**Fastify Plugins & Policies**: `apps/erp/modules/erp-1/src/plugins/auth.ts`, `apps/erp/modules/erp-1/src/policies/authorization.ts`, `apps/erp/modules/erp-1/src/policies/field-masking.ts`  
+**Audit Service**: `apps/erp/modules/erp-1/src/services/audit.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/security/authorization.test.ts`  
+
+### 24.1 Hub Identity & Route Authorization
+- Implements EdDSA JWT access-token verification via `@cs/identity` (`verifyAccessToken`).
+- Validates token expiration, issuer (`clearshift-hub`), audience (`clearshift`), and role claims against the 5 standard Hub roles (`viewer`, `editor`, `analyst`, `admin`, `migration_runner`).
+- Rejects unauthenticated calls with HTTP 401; rejects unauthorized calls with HTTP 403; immediately terminates revoked or disabled accounts (`user-disabled-01` or via `isUserDisabled`).
+
+### 24.2 Sensitive Field Masking & Safe Logging (PLT-10 / PLT-12)
+- Fastify `onSend` hook automatically masks sensitive response fields before JSON transmission:
+  - Bank account numbers: `XXXX-XXXX-7890` (terminal 4 digits preserved) or `XXXX-XXXX-XXXX`.
+  - Salary and compensation values: `XX,XXX` unless caller possesses the `admin` role.
+  - Secret credentials and tokens: `[REDACTED]`.
+- Append-only audit trail captures actor, role, action, target entity, correlation ID, timestamp, and result while strictly excluding credentials, tokens, or raw unmasked records.
+
 
 

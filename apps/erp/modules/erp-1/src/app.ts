@@ -7,30 +7,30 @@
 import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { AppError } from '@cs/kernel';
-import { ROLE_CAPABILITIES } from '@cs/rbac';
-import { verifyAccessToken, type RoleType, type HubTokenClaims } from '@cs/identity';
-
-export const DISABLED_USER_IDS = new Set<string>([
-  'user-disabled-01',
-  'disabled@clearshift.internal',
-  'disabled-user',
-]);
 import {
   ERP1_DOMAIN_RULES,
   ERP1_PROTECTED_FIELD_NAMES,
   StandardErrorCodes,
+  type RoleType,
 } from '@clearshift/contracts';
 import { Erp1ServiceError, type Erp1ErrorDetail } from './services/errors.js';
 import { Erp1DomainError } from './domain/rules.js';
 import { Erp1Service } from './services/erp1.service.js';
 import { InMemoryErp1Repository, type Erp1Repository } from './services/repository.js';
 import { erp1Routes } from './routes/index.js';
+import { Erp1AuditService } from './services/audit.js';
+import { erp1AuthPlugin, DISABLED_USER_IDS, resolveTokenRoles } from './plugins/auth.js';
+import { erp1FieldMaskingPlugin } from './policies/field-masking.js';
+
+export { DISABLED_USER_IDS, resolveTokenRoles };
 
 export interface Erp1AppOptions {
   repository?: Erp1Repository | undefined;
   erp1Service?: Erp1Service | undefined;
+  auditService?: Erp1AuditService | undefined;
   /** When true (the default) a request without a bearer token is rejected. */
   authRequired?: boolean | undefined;
+  isUserDisabled?: ((userId: string) => boolean | Promise<boolean>) | undefined;
 }
 
 export interface Erp1ErrorEnvelope {
@@ -40,7 +40,6 @@ export interface Erp1ErrorEnvelope {
   correlation_id: string;
 }
 
-const SHARED_ROLE_NAMES: readonly string[] = Object.keys(ROLE_CAPABILITIES);
 
 interface ZodIssueLike {
   code: string;
@@ -132,23 +131,12 @@ export function mapZodIssues(error: ZodErrorLike): {
   };
 }
 
-/**
- * Extracts roles from the local test token format `Bearer role:<role>`.
- * In production the platform JWT plugin validates the token and fills
- * `request.user.roles`; this module only consumes the roles.
- */
-export function resolveTokenRoles(token: string): RoleType[] {
-  const match = /role:([a-z_]+)/.exec(token);
-  if (!match || !match[1]) return [];
-  const role = match[1];
-  return SHARED_ROLE_NAMES.includes(role) ? [role as RoleType] : [];
-}
-
 export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
   const app = fastify({ logger: false });
 
+  const auditService = options.auditService ?? new Erp1AuditService();
   const repository = options.repository ?? new InMemoryErp1Repository(true);
-  const erp1Service = options.erp1Service ?? new Erp1Service({ repository });
+  const erp1Service = options.erp1Service ?? new Erp1Service({ repository, auditService: auditService.auditService });
   const authRequired = options.authRequired ?? true;
 
   app.setErrorHandler((error: unknown, request, reply) => {
@@ -190,7 +178,7 @@ export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
       return envelope(error.statusCode, {
         code: error.code,
         message: error.message,
-        details: error.details as Erp1ErrorDetail[],
+        details: (error.details ?? []) as Erp1ErrorDetail[],
         correlation_id: correlationId,
       });
     }
@@ -228,98 +216,15 @@ export function buildApp(options: Erp1AppOptions = {}): FastifyInstance {
   app.addHook('onRequest', async (request, reply) => {
     const correlationId = resolveCorrelationId(request);
     reply.header('x-correlation-id', correlationId);
-
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader) {
-      if (authRequired) {
-        return reply.status(401).send({
-          code: StandardErrorCodes.UNAUTHORIZED,
-          message: 'Missing Authorization header. Bearer token required.',
-          details: [],
-          correlation_id: correlationId,
-        } satisfies Erp1ErrorEnvelope);
-      }
-      request.user = defaultUser();
-      return;
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      return reply.status(401).send({
-        code: StandardErrorCodes.UNAUTHORIZED,
-        message: 'Invalid Authorization header format. Expected "Bearer <token>".',
-        details: [],
-        correlation_id: correlationId,
-      } satisfies Erp1ErrorEnvelope);
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
-      return reply.status(401).send({
-        code: StandardErrorCodes.UNAUTHORIZED,
-        message: 'Invalid or expired bearer token.',
-        details: [],
-        correlation_id: correlationId,
-      } satisfies Erp1ErrorEnvelope);
-    }
-
-    // Support real Hub signed JWT tokens
-    if (token.includes('.')) {
-      try {
-        const claims = await verifyAccessToken(token);
-        const tenantId =
-          (request.headers['x-tenant-id'] as string | undefined) ??
-          (claims as unknown as { tenant_id?: string }).tenant_id;
-        request.user = {
-          ...claims,
-          ...(tenantId ? { tenant_id: tenantId } : {}),
-        } as HubTokenClaims;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Token verification failed';
-        return reply.status(401).send({
-          code: StandardErrorCodes.UNAUTHORIZED,
-          message: `Invalid or expired bearer token: ${msg}`,
-          details: [
-            {
-              field: 'authorization',
-              message: msg,
-              code: 'TOKEN_INVALID',
-            },
-          ],
-          correlation_id: correlationId,
-        } satisfies Erp1ErrorEnvelope);
-      }
-    } else {
-      const headerTenantId = request.headers['x-tenant-id'] as string | undefined;
-      const headerActorId =
-        (request.headers['x-actor-id'] as string | undefined) ??
-        (request.headers['x-user-id'] as string | undefined);
-      request.user = {
-        iss: 'clearshift-erp-local',
-        aud: 'clearshift-erp',
-        sub: headerActorId ?? 'ffffffff-0001-0001-0001-000000000001',
-        jti: randomUUID(),
-        exp: Math.floor(Date.now() / 1000) + 3600,
-        roles: resolveTokenRoles(token),
-        ...(headerTenantId ? { tenant_id: headerTenantId } : {}),
-      } as unknown as HubTokenClaims;
-    }
-
-    if (DISABLED_USER_IDS.has(request.user?.sub ?? '')) {
-      return reply.status(401).send({
-        code: StandardErrorCodes.UNAUTHORIZED,
-        message: `User account '${request.user?.sub}' is disabled`,
-        details: [
-          {
-            field: 'authorization',
-            message: 'User account is disabled or revoked',
-            code: 'USER_DISABLED',
-          },
-        ],
-        correlation_id: correlationId,
-      } satisfies Erp1ErrorEnvelope);
-    }
   });
+
+  app.register(erp1AuthPlugin, {
+    authRequired,
+    auditService,
+    isUserDisabled: options.isUserDisabled,
+  });
+
+  app.register(erp1FieldMaskingPlugin);
 
   app.register(erp1Routes, {
     prefix: '/api/v1/erp-products',

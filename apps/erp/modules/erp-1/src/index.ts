@@ -30,6 +30,9 @@ export * from './domain/duplicate-policy.js';
 export * from './services/errors.js';
 export * from './services/erp1.service.js';
 export * from './services/repository.js';
+export * from './services/audit.js';
+export * from './plugins/auth.js';
+export * from './policies/index.js';
 export * from './routes/index.js';
 
 /**
