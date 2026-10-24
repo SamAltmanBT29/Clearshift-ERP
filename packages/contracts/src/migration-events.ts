@@ -3,7 +3,6 @@
  */
 
 import { z } from 'zod';
-import { createHash } from 'node:crypto';
 import {
   createEventEnvelopeSchema,
   createEventEnvelope,
@@ -28,8 +27,15 @@ export const MIGRATION_EVENT_TYPES = KIT_EVENT_TYPES;
 export const MIGRATION_KIT_EVENT_TYPES = KIT_EVENT_TYPES;
 
 export function stableMigrationEventId(key: string): string {
-  const hex = createHash('sha256').update(key, 'utf8').digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  // Browser-safe deterministic UUID-like id (no node:crypto dependency).
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const hex = (hash >>> 0).toString(16).padStart(8, '0');
+  const base = (hex + hex + hex + hex).slice(0, 32);
+  return `${base.slice(0, 8)}-${base.slice(8, 12)}-4${base.slice(13, 16)}-a${base.slice(17, 20)}-${base.slice(20, 32)}`;
 }
 
 function makeDual<T>(obj: T): T {
