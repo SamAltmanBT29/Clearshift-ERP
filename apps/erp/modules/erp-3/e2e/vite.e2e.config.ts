@@ -72,7 +72,11 @@ interface Erp3TestApp {
 }
 
 interface Erp3AppModule {
-  buildApp(options: { repository: unknown; referenceResolver: unknown }): Erp3TestApp;
+  buildApp(options: {
+    repository: unknown;
+    referenceResolver: unknown;
+    authRequired?: boolean;
+  }): Erp3TestApp;
 }
 
 interface Erp3RepositoryModule {
@@ -124,6 +128,7 @@ function erp3E2eApi(): E2ePlugin {
         const next = appModule.buildApp({
           repository: new repositoryModule.InMemoryErp3Repository(false),
           referenceResolver,
+          authRequired: false,
         });
         await next.ready();
         app = next;
@@ -148,7 +153,12 @@ function erp3E2eApi(): E2ePlugin {
           const payload = await readBody(req);
           const headers: Record<string, string> = {};
           for (const [key, value] of Object.entries(req.headers)) {
-            if (typeof value === 'string' && key !== 'host' && key !== 'connection') {
+            if (
+              typeof value === 'string' &&
+              key !== 'host' &&
+              key !== 'connection' &&
+              key !== 'authorization'
+            ) {
               headers[key] = value;
             }
           }

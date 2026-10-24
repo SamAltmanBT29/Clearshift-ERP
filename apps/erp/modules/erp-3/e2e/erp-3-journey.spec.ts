@@ -57,10 +57,12 @@ async function createOrderThroughForm(
   await expect(page).toHaveURL(/\/erp3\/sales-orders\/[0-9a-f-]{36}$/);
 }
 
-test('redirects an unauthenticated visitor to the Hub login with returnTo', async ({ page }) => {
-  await page.addInitScript(() => window.sessionStorage.clear());
+test('redirects an unauthenticated visitor to the Hub login with returnTo', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
   await page.goto('/erp3/sales-orders');
   await expect(page).toHaveURL(/\/login\?returnTo=%2Ferp3%2Fsales-orders$/);
+  await context.close();
 });
 
 test('sales order journey: empty list, create, detail view, list, and search filter', async ({
