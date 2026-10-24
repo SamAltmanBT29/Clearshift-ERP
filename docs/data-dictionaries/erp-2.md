@@ -580,7 +580,7 @@ In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions i
 - **Sent -> Received**: Confirms delivery of goods without modifying ERP-1 inventory (in V1).
 - **Received -> Closed**: Terminates order lifecycle.
 - **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
-- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.
+- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id`.
 
 ---
 
@@ -745,14 +745,91 @@ To prevent lost updates in distributed operational environments:
 
 ---
 
-## 18. Shared Migration Kit Wizard Integration & Module Metadata Specification (ERP2-22 / Issue #138)
+## 18. Module Authorization & Policy Integration Specification (ERP2-15 / Issue #131)
 
-### 18.1 Overview & Architecture Boundaries
+### 18.1 Overview & Architecture Integration
+
+In accordance with SDS §4.2, §4.9 and ADR-0006, ERP-2 Vendors & Purchasing integrates zero duplicate identity or authorization infrastructure. All authentication and authorization decisions delegate directly to the platform identity (`@cs/identity`, PLT-05) and access control (`@cs/rbac`, PLT-06) primitives.
+
+- **Authentication**: Hub Ed25519 signed JWT access tokens (`verifyAccessToken`), verifying issuer (`clearshift-hub`), audience (`clearshift`), signature, and token expiration. Inactive and revoked accounts are rejected (`401 Unauthorized`).
+- **Authorization**: Pre-handler route guards enforcing capability requirements mapped from assigned roles. Requests lacking permissions fail closed (`403 Forbidden`).
+- **Object-Level Boundaries**: Explicit multi-tenant boundary checks (`assertTenantAccess`) and record modification ownership checks (`assertObjectMutationAccess`).
+
+### 18.2 Five-Role Capability Matrix across ERP-2 Endpoints
+
+The module capability matrix maps the standard roles to operational permissions:
+
+| Endpoint | HTTP Method | Required Capability / Action | Allowed Roles | Default Deny Roles |
+|---|---|---|---|---|
+| `/vendors` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/vendors/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/vendors` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/vendors/:id` | `PATCH` | `write` (`records:write`, `system:admin`) | Editor, Admin | Viewer, Migration Runner, Analyst |
+| `/purchase-orders` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/purchase-orders/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/purchase-orders` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/purchase-orders/:id` | `PATCH` | `write` (`records:write`, `system:admin`) | Editor, Admin | Viewer, Migration Runner, Analyst |
+| `/duplicates/check` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/candidates` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/candidates/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/review` | `POST` | `review` (`duplicates:review`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/import` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/import/batch` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+
+### 18.3 Default Deny & Standard Error Envelope
+
+All authentication and authorization failures return HTTP 401 and 403 status codes conforming strictly to the ClearShift unified error envelope:
+
+```json
+{
+  "statusCode": 401,
+  "error": "Unauthorized",
+  "code": "UNAUTHORIZED",
+  "message": "Missing Authorization header. Bearer token required.",
+  "details": [],
+  "correlation_id": "a9a38ffb-d36c-4b68-98e3-0d33e5c9ef01"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "error": "Forbidden",
+  "code": "FORBIDDEN",
+  "message": "Role does not have permission to execute this operation. Required capability: records:write.",
+  "details": [
+    {
+      "field": "authorization",
+      "message": "Role does not have permission to execute this operation",
+      "code": "FORBIDDEN"
+    }
+  ],
+  "correlation_id": "a9a38ffb-d36c-4b68-98e3-0d33e5c9ef01"
+}
+```
+
+### 18.4 Multi-Tenant Boundary Enforcement
+
+Multi-tenant isolation is enforced on every operation:
+- If a tenant context is established (via `x-tenant-id` header or JWT `tenant_id` claim), operations attempting to access or mutate records belonging to a different tenant are rejected with `403 Forbidden` (`code: TENANT_MISMATCH`).
+- Ingestion endpoints (`/vendors`, `/purchase-orders`, `/import`) bind target records and dual-write receipts to the active tenant ID.
+
+### 18.5 Object-Level Cross-User Mutation Safety
+
+Mutation safety prevents unauthorized cross-user modifications:
+- When a non-admin user attempts to update a record (`PATCH /vendors/:id` or `PATCH /purchase-orders/:id`), the user must either be an `admin` or the recorded creator of the entity (`assertObjectMutationAccess`).
+- Non-admin attempts to overwrite another user's draft or record are rejected with `403 Forbidden` (`code: FORBIDDEN`).
+
+---
+
+## 19. Shared Migration Kit Wizard Integration & Module Metadata Specification (ERP2-22 / Issue #138)
+
+### 19.1 Overview & Architecture Boundaries
 
 In strict compliance with Gate G4 requirements and the "Zero duplicate wizards" architecture rule (H2), ERP-2 Vendors and Purchasing supplies its target schema metadata directly to the shared Migration Kit wizard (`MigrationKitWizard` from `@cs/ui`) via the central `migrationKitRegistry` (`@cs/kit`).
 No custom import mapping wizard or duplicate UI components are created; the module defines rich schema definitions, human-readable labels, enum options, and required constraints that dynamically drive the wizard.
 
-### 18.2 Registered Target Entities & Field Definitions (AC1, AC2)
+### 19.2 Registered Target Entities & Field Definitions (AC1, AC2)
 
 The module registers target schema metadata across all 3 owned domain entities (`vendors`, `purchase_orders`, `po_lines`):
 
@@ -801,14 +878,14 @@ The module registers target schema metadata across all 3 owned domain entities (
   - `price`: decimal, required, label: "Unit Price", rules: `FR-ERP2-03`, `BR-ERP2-03`.
   - `line_total`: decimal, required, label: "Line Total", rules: `FR-ERP2-03`, `BR-ERP2-03`.
 
-### 18.3 Incompatible Source Type Detection & Warning Alerts (AC3)
+### 19.3 Incompatible Source Type Detection & Warning Alerts (AC3)
 
 The shared Migration Kit wizard integrates `checkTypeCompatibility` to analyze incoming source columns against target field types:
 - **Type Incompatibilities**: Mapping non-coercible source types (such as `date` to numeric `decimal` total/price, or `boolean` to `enum` status) immediately triggers an operator warning banner (`[data-testid="type-incompatibility-warning"]`) and field-row warning callout.
 - **Coercion Notices**: Mapping raw text columns to numeric or date fields renders informational notes explaining standard decimal parsing or ISO-8601 expectations.
 - **Preset Staging**: Pre-configured synthetic datasets (`standard_vendors_csv`, `standard_purchase_orders_csv`, `incompatible_types_csv`, `incomplete_vendors_csv`) facilitate testing and operator validation.
 
-### 18.4 Guard Blocking Unmapped Required Fields (AC4)
+### 19.4 Guard Blocking Unmapped Required Fields (AC4)
 
 To guarantee that incomplete mappings never proceed to destructive operations or invalid runs:
 - The wizard validates all required target fields across the active entity (`name`, `tax_number`, `email`, `currency` for vendors; `po_number`, `vendor_id`, `order_date`, `status`, `currency`, `total` for POs; `po_id`, `product_id`, `line_number`, `quantity`, `price`, `line_total` for PO lines).
@@ -817,7 +894,10 @@ To guarantee that incomplete mappings never proceed to destructive operations or
   - "Proceed to Dry-Run" and "Start Migration Load" action buttons are strictly disabled (`disabled` and `aria-disabled="true"`).
 - Once all required fields are mapped, the proceed actions become active and dispatch the validated mapping payload.
 
-### 18.5 Host Page Integration (`VendorImportPage` & `VendorsListPage`)
+### 19.5 Host Page Integration (`VendorImportPage` & `VendorsListPage`)
 
 - **Component**: `VendorImportPage` (`apps/erp/modules/erp-2/web/src/pages/VendorImportPage.tsx`) wraps `MigrationKitWizard` with module metadata, synthetic presets, and back navigation.
 - **Navigation**: `VendorsListPage` exposes an "Import Data" button (`data-testid="btn-import-data"`) in the header actions bar that seamlessly switches to `VendorImportPage`.
+
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Authorization Policy | Role 3 / Mahek Yadav (Issue #131 / ERP2-15) | Integrated module authorization and access control policy conforming to SDS §4.2, §4.9, and ADR-0006. Enforced 5-role capability matrix, Ed25519 Hub JWT validation, multi-tenant isolation, object-level creator mutation guards, and standard error envelopes. |
+| **`1.9.0`** | 2026-10-24 | Sprint 4 / Migration Kit Metadata | Role 3 / Ninad Deodhare (Issue #138 / ERP2-22) | Integrated ERP-2 target schema metadata with shared Migration Kit wizard (`MigrationKitWizard`), dynamic field rendering, type compatibility checking, unmapped required fields guard, and `VendorImportPage`. |
