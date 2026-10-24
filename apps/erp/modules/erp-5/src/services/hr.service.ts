@@ -283,7 +283,7 @@ function guard(rule: () => void): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class HrService {
-  private readonly repository: HrRepository;
+  readonly repository: HrRepository;
   private readonly auditService: AuditService;
 
   constructor(repository: HrRepository, auditService: AuditService) {
