@@ -66,8 +66,8 @@ export const VendorsTable: React.FC<VendorsTableProps> = ({
       <EmptyState
         title="No vendors found"
         message="No vendor profiles match your current search criteria. Try modifying your search term."
-        actionLabel={onRefresh ? 'Reset Search' : undefined}
-        onAction={onRefresh}
+        actionLabel={onCreateVendor ? 'Add Vendor' : onRefresh ? 'Reset Search' : undefined}
+        onAction={onCreateVendor || onRefresh}
       />
     );
   }

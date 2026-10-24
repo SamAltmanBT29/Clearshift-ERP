@@ -5,8 +5,10 @@ import { JournalEntryForm } from '../components/forms/JournalEntryForm.js';
 import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
 import { SkeletonTable, ErrorState, StatusBadge } from '../components/StateViews.js';
 
+import { useNavigate } from 'react-router-dom';
+
 interface JournalEntryFormPageProps {
-  onBackToList: () => void;
+  onBackToList?: () => void;
   onViewEntryDetail?: (entryId: string) => void;
 }
 
@@ -14,6 +16,10 @@ export const JournalEntryFormPage: React.FC<JournalEntryFormPageProps> = ({
   onBackToList,
   onViewEntryDetail,
 }) => {
+  const navigate = useNavigate();
+  const handleBack = onBackToList || (() => navigate('/erp4/journal-entries'));
+  const handleViewDetail = onViewEntryDetail || ((id: string) => navigate(`/erp4/journal-entries/${id}`));
+
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [accountsError, setAccountsError] = useState<string | null>(null);
@@ -90,19 +96,17 @@ export const JournalEntryFormPage: React.FC<JournalEntryFormPageProps> = ({
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {onViewEntryDetail && (
-              <button
-                type="button"
-                className="cs-btn cs-btn-primary cs-btn-sm"
-                onClick={() => onViewEntryDetail(createdEntry.id)}
-              >
-                View Entry Details →
-              </button>
-            )}
+            <button
+              type="button"
+              className="cs-btn cs-btn-primary cs-btn-sm"
+              onClick={() => handleViewDetail(createdEntry.id)}
+            >
+              View Entry Details →
+            </button>
             <button
               type="button"
               className="cs-btn cs-btn-secondary cs-btn-sm"
-              onClick={onBackToList}
+              onClick={handleBack}
             >
               Return to Ledger List
             </button>
@@ -123,7 +127,7 @@ export const JournalEntryFormPage: React.FC<JournalEntryFormPageProps> = ({
         <JournalEntryForm
           accounts={accounts}
           onSuccess={handleFormSuccess}
-          onCancel={onBackToList}
+          onCancel={handleBack}
           onOpenCreateAccount={() => setIsAccountModalOpen(true)}
         />
       )}
