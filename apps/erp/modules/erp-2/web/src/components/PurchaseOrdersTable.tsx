@@ -66,8 +66,8 @@ export const PurchaseOrdersTable: React.FC<PurchaseOrdersTableProps> = ({
       <EmptyState
         title="No purchase orders found"
         message="No purchase orders match your current filter criteria."
-        actionLabel={onRefresh ? 'Reset Filters' : undefined}
-        onAction={onRefresh}
+        actionLabel={onCreatePurchaseOrder ? 'New Purchase Order' : onRefresh ? 'Reset Filters' : undefined}
+        onAction={onCreatePurchaseOrder || onRefresh}
       />
     );
   }
