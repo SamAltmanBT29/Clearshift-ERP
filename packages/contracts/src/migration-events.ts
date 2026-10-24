@@ -70,13 +70,27 @@ export const BatchProfiledPayloadSchema = z
     invalidCount: z.number().int().nonnegative().optional(),
     duplicate_count: z.number().int().nonnegative().optional(),
     duplicateCount: z.number().int().nonnegative().optional(),
+    totalRows: z.number().int().nonnegative().optional(),
+    columnsCount: z.number().int().nonnegative().optional(),
+    rulesetVersion: z.number().int().optional(),
   })
   .transform((v) => {
     const batch_id = v.batch_id ?? v.batchId ?? '';
     const empty_count = v.empty_count ?? v.emptyCount ?? 0;
     const invalid_count = v.invalid_count ?? v.invalidCount ?? 0;
     const duplicate_count = v.duplicate_count ?? v.duplicateCount ?? 0;
-    return { batch_id, batchId: batch_id, module: v.module, empty_count, emptyCount: empty_count, invalid_count, invalidCount: invalid_count, duplicate_count, duplicateCount: duplicate_count };
+    return {
+      ...v,
+      batch_id,
+      batchId: batch_id,
+      module: v.module,
+      empty_count,
+      emptyCount: empty_count,
+      invalid_count,
+      invalidCount: invalid_count,
+      duplicate_count,
+      duplicateCount: duplicate_count,
+    };
   })
   .refine((v) => v.batch_id.length > 0, { message: 'batch_id is required' });
 
@@ -86,12 +100,28 @@ export const BatchCleanedPayloadSchema = z
   .object({
     batch_id: z.string().min(1).optional(),
     batchId: z.string().min(1).optional(),
-    cleaned: z.number().int().nonnegative(),
-    rejected: z.number().int().nonnegative(),
+    module: z.string().optional(),
+    cleaned: z.number().int().nonnegative().optional(),
+    cleanedRows: z.number().int().nonnegative().optional(),
+    rejected: z.number().int().nonnegative().optional(),
+    rejectedRows: z.number().int().nonnegative().optional(),
+    totalRows: z.number().int().nonnegative().optional(),
+    durationMs: z.number().int().nonnegative().optional(),
+    ruleVersion: z.string().optional(),
   })
   .transform((v) => {
     const batch_id = v.batch_id ?? v.batchId ?? '';
-    return { batch_id, batchId: batch_id, cleaned: v.cleaned, rejected: v.rejected };
+    const cleaned = v.cleaned ?? v.cleanedRows ?? 0;
+    const rejected = v.rejected ?? v.rejectedRows ?? 0;
+    return {
+      ...v,
+      batch_id,
+      batchId: batch_id,
+      cleaned,
+      cleanedRows: cleaned,
+      rejected,
+      rejectedRows: rejected,
+    };
   })
   .refine((v) => v.batch_id.length > 0, { message: 'batch_id is required' });
 
@@ -101,14 +131,30 @@ export const BatchMappedPayloadSchema = z
   .object({
     batch_id: z.string().min(1).optional(),
     batchId: z.string().min(1).optional(),
-    mapped: z.number().int().nonnegative(),
+    module: z.string().optional(),
+    mapped: z.number().int().nonnegative().optional(),
+    mappedRows: z.number().int().nonnegative().optional(),
     missing_required: z.number().int().nonnegative().optional(),
     missingRequired: z.number().int().nonnegative().optional(),
+    templateId: z.string().optional(),
+    templateName: z.string().optional(),
+    targetEntity: z.string().optional(),
+    totalRows: z.number().int().nonnegative().optional(),
+    durationMs: z.number().int().nonnegative().optional(),
   })
   .transform((v) => {
     const batch_id = v.batch_id ?? v.batchId ?? '';
     const missing_required = v.missing_required ?? v.missingRequired ?? 0;
-    return { batch_id, batchId: batch_id, mapped: v.mapped, missing_required, missingRequired: missing_required };
+    const mapped = v.mapped ?? v.mappedRows ?? 0;
+    return {
+      ...v,
+      batch_id,
+      batchId: batch_id,
+      mapped,
+      mappedRows: mapped,
+      missing_required,
+      missingRequired: missing_required,
+    };
   })
   .refine((v) => v.batch_id.length > 0, { message: 'batch_id is required' });
 
