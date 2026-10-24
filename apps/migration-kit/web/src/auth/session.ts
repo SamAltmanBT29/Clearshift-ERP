@@ -1,8 +1,20 @@
 export const ACCESS_TOKEN_STORAGE_KEY = 'cs_access_token';
 
+function getStorage(): Storage | null {
+  if (typeof window !== 'undefined') {
+    if (window.sessionStorage) return window.sessionStorage;
+    if (window.localStorage) return window.localStorage;
+  }
+  try {
+    return typeof sessionStorage !== 'undefined' ? sessionStorage : (typeof localStorage !== 'undefined' ? localStorage : null);
+  } catch {
+    return null;
+  }
+}
+
 export function readAccessToken(): string | null {
   try {
-    return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+    return getStorage()?.getItem(ACCESS_TOKEN_STORAGE_KEY) ?? null;
   } catch {
     return null;
   }
@@ -10,7 +22,7 @@ export function readAccessToken(): string | null {
 
 export function writeAccessToken(token: string): void {
   try {
-    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+    getStorage()?.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
   } catch {
     // ignore
   }
@@ -18,7 +30,7 @@ export function writeAccessToken(token: string): void {
 
 export function clearAccessToken(): void {
   try {
-    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    getStorage()?.removeItem(ACCESS_TOKEN_STORAGE_KEY);
   } catch {
     // ignore
   }
