@@ -149,36 +149,22 @@ For the canonical, detailed version see:
 
 ## 6A. V1 Data-Quality & Migration Rules
 
-Full catalogue: `apps/erp/modules/erp-2/docs/data-quality-rules.md` (rule catalogue version 1.0.0, 62 rules).
+Full catalogue: `apps/erp/modules/erp-2/docs/data-quality-rules.md` (rule catalogue version 1.0.0, 45 rules). The rules are implemented once, in `apps/erp/modules/erp-2/src/migration/dirty-data-plan.ts` (ERP2-25); this section and the catalogue document describe them.
 
 | Item | Value |
 |---|---|
-| Synthetic Dirty Data Pack | `sample-data/erp-2/dirty-data-v1.csv` (86 rows), SHA-256 `754c2740163de9d9ec8e8bdd5deee5cd87a7b4ddac0cde335388f7e7d076b725`, schema version 1 |
-| Expected outcomes / manifest | `sample-data/erp-2/expected-profile.json` |
+| Synthetic Dirty Data Pack | `sample-data/erp-2/dirty-data-v1.csv` (173 rows: 46 vendors, 44 purchase orders, 83 lines), SHA-256 `acc5a3b3c9785f97b59cdabfaf64f626afad26e8d2cbcd5990c93549352ed65b`, schema version 1 |
+| Expected outcomes / manifest | `sample-data/erp-2/expected-profile.json` (94 accepted, 68 rejected, 11 review, 0 skipped) |
 | Source-to-target mapping | `sample-data/erp-2/mapping-template.json` |
-| Rules and tests | `apps/erp/modules/erp-2/src/migration/rules.ts`, `apps/erp/modules/erp-2/tests/migration/rules.test.ts` |
+| Rules and tests | `apps/erp/modules/erp-2/src/migration/dirty-data-plan.ts`, `apps/erp/modules/erp-2/tests/migration/dirty-data-plan.test.ts` |
 
-| Field | Required | Normalization | Accepted values / limits | Reject reason codes |
-|---|---|---|---|---|
-| `vendors.name` | yes | trim, collapse spaces | ≤ 255 chars | `VENDOR_NAME_REQUIRED`, `NAME_TOO_LONG` |
-| `vendors.tax_number` | yes | strip spaces, upper-case | `^[A-Z0-9-]{3,64}$`; exact duplicate → review | `TAX_NUMBER_REQUIRED`, `INVALID_TAX_NUMBER_FORMAT`, `DUPLICATE_TAX_NUMBER_REVIEW` |
-| `vendors.email` | yes | trim, lower-case | local@domain.tld, ≤ 255 | `EMAIL_REQUIRED`, `INVALID_EMAIL_FORMAT` |
-| `vendors.phone` | no | strip separators | 7–15 digits, optional `+` | `INVALID_PHONE_FORMAT` |
-| `vendors.address_line / city / country` | no | trim, collapse spaces | ≤ 255 / 100 / 64 | `ADDRESS_TOO_LONG`, `CITY_TOO_LONG`, `COUNTRY_TOO_LONG` |
-| `vendors.bank_details` | no | strip spaces and dashes | 4–34 alphanumerics, ≥ 4 digits; reported masked only | `INVALID_BANK_DETAILS_FORMAT` |
-| `vendors.currency` | yes (explicit) | trim, upper-case | USD, EUR, GBP | `CURRENCY_REQUIRED`, `INVALID_CURRENCY` |
-| `purchase_orders.po_number` | no | strip spaces, upper-case | ≤ 64; exact duplicate → review | `PO_NUMBER_TOO_LONG`, `DUPLICATE_PO_NUMBER_REVIEW` |
-| `purchase_orders.vendor_ref` | yes | strip spaces, upper-case | must match an accepted vendor tax number | `VENDOR_REF_REQUIRED`, `VENDOR_NOT_FOUND`, `VENDOR_REJECTED` |
-| `purchase_orders.order_date` | yes | `YYYY/MM/DD` → `YYYY-MM-DD` | real calendar date; ambiguous formats rejected | `ORDER_DATE_REQUIRED`, `INVALID_ORDER_DATE`, `AMBIGUOUS_DATE_FORMAT` |
-| `purchase_orders.status` | yes | trim, fix case | Draft, Sent, Received, Closed; no cancellation | `STATUS_REQUIRED`, `INVALID_STATUS` |
-| `purchase_orders.currency` | yes (explicit) | trim, upper-case | USD, EUR, GBP | `CURRENCY_REQUIRED`, `INVALID_CURRENCY` |
-| `purchase_orders.total` | derived | — | sum of line totals, must fit NUMERIC(18,2); source value ignored | `TOTAL_OVERFLOW` |
-| `po_lines.product_id` | yes | trim, lower-case | UUID that exists in ERP-1 (ReferenceResolver) | `PRODUCT_ID_REQUIRED`, `INVALID_PRODUCT_ID_FORMAT`, `UNKNOWN_PRODUCT` |
-| `po_lines.quantity` | yes | remove thousands commas, 2 decimals | > 0, ≤ 2 decimals, ≤ 10 integer digits | `QUANTITY_REQUIRED`, `INVALID_QUANTITY_FORMAT`, `NEGATIVE_AMOUNT`, `EXCESS_DECIMAL_PLACES`, `QUANTITY_NOT_POSITIVE`, `AMOUNT_OVERFLOW` |
-| `po_lines.price` | yes | remove thousands commas, 2 decimals | ≥ 0, ≤ 2 decimals, ≤ 16 integer digits | `PRICE_REQUIRED`, `INVALID_PRICE_FORMAT`, `NEGATIVE_AMOUNT`, `EXCESS_DECIMAL_PLACES`, `AMOUNT_OVERFLOW` |
-| `po_lines.*` (relationship) | — | — | line must attach to an accepted order | `ORPHAN_LINE`, `PARENT_PO_REJECTED`, `PARENT_PO_IN_REVIEW` |
+| Entity | Required | Optional (validated when supplied) | Key enumerations and limits |
+|---|---|---|---|
+| Vendor | `vendor_code`, `vendor_name`, `currency` | `tax_number`, `email`, `payment_terms_days`, `bank_account` | currency USD, EUR, GBP, INR; vendor code at most 64 characters; payment terms 0 to 365 days; bank account reported masked only |
+| Purchase order | `po_number`, `po_vendor_code`, `po_status`, `po_date`, `currency`, `po_total`, at least one valid line | `expected_date`, `status_path` | status Draft, Sent, Received, Closed (one step at a time); ISO `YYYY-MM-DD` dates; PO currency equals vendor currency; total equals the sum of rounded line totals |
+| PO line | `po_number`, `line_no`, `product_sku`, `quantity`, `unit_price` | `line_total` | SKU must exist in ERP-1; quantity above 0, up to 3 places; unit price 0 or more, up to 4 places; `ROUND_HALF_UP` to 2 places |
 
-Policies: raw input is never changed; no fuzzy matching; no automatic merge (duplicates are held for explicit review); an order loads whole or not at all.
+Exact duplicate vendor codes, tax numbers, PO numbers and line keys are held for human review. There is no fuzzy matching and no automatic merge.
 
 ---
 
