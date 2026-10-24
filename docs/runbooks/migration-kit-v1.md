@@ -189,3 +189,85 @@ $$\text{unaccountedRows} = \text{sourceRows} - (\text{loaded} + \text{rejected} 
   - **Verdict `OK`:** Formula holds and `unaccountedRows === 0`. The batch status transitions to `reconciled` and operator signoff is enabled.
   - **Verdict `reconciliation_failed`:** If `unaccountedRows !== 0`, counts do not match, or double-count duplicates exist, the batch status remains `reconciliation_failed` and signoff is strictly disabled (`signoffAllowed: false`).
 - **Formula-Safe Export Defense:** All reconciliation summary and outcome CSV exports sanitize dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`), neutralizing CSV injection attacks per OWASP guidelines.
+
+---
+
+## 5. Step 5b: Resumable Compensating-Saga Rollback with Conflict Preflight (KIT-12)
+
+**Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; Issue #79 `[KIT-12]`.
+
+### 5.1 Non-Distributed ACID & Saga Principles
+
+In multi-module ERP systems, rollback is **not distributed ACID**. A load cannot simply execute a global SQL transaction rollback once external systems or multi-entity transactions commit. Instead, ClearShift Migration Kit implements a **resumable compensating saga** with **conflict preflight** and **append-only journaling**:
+
+```
+                       [ Operator Rollback Request ]
+                                    │
+                                    ▼
+                     ┌─────────────────────────────┐
+                     │  Conflict Preflight Check   │
+                     │  - Durable receipt check    │
+                     │  - Target version match     │
+                     │  - Child reference guard    │
+                     └──────────────┬──────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+             Conflict Detected                 Clean / Passed
+                    │                               │
+                    ▼                               ▼
+       ┌────────────────────────┐      ┌─────────────────────────┐
+       │ Status:                │      │ Status:                 │
+       │ rollback_blocked       │      │ in_progress             │
+       │ - Zero mutations       │      │ - Stop new writes       │
+       │ - Blocked items logged │      │ - Reverse order (LIFO)  │
+       └────────────────────────┘      └────────────┬────────────┘
+                                                    │
+                                                    ▼
+                                       ┌─────────────────────────┐
+                                       │ Compensating Actions    │
+                                       │ - remove_created        │
+                                       │ - restore_updated       │
+                                       │ - Log to journal        │
+                                       └────────────┬────────────┘
+                                                    │
+                                                    ▼
+                                       ┌─────────────────────────┐
+                                       │ Status: rolled_back     │
+                                       │ (100% actions confirmed)│
+                                       └─────────────────────────┘
+```
+
+### 5.2 Conflict Preflight Invariants
+
+Before any target table mutation occurs, the `RollbackPreflightChecker` inspects all records associated with the batch:
+1. **Receipt Completeness:** Asserts that every loaded row has a durable import receipt recorded in `<module>.import_receipts`.
+2. **Child Reference Guard (`CHILD_REFERENCES_EXIST`):** Created records can be removed **only when no downstream child references exist** (e.g., invoice lines referencing orders, inventory moves referencing products).
+3. **Version & Later Edits Guard (`TARGET_VERSION_MISMATCH`):** Updated records can be restored **only when current target version still matches post-load version**. If an external user or service edited the target row after migration, rollback is strictly blocked.
+4. **Blocking Semantics (`rollback_blocked`):** If any conflict is detected:
+   - Rollback immediately halts without mutating target business tables.
+   - Batch status transitions to `rollback_blocked`.
+   - All conflicts are durably recorded in `platform.kit_rollback_journal` as `blocked` with explicit diagnostic error reasons.
+
+### 5.3 Reverse Dependency Order Execution (LIFO)
+
+When preflight succeeds, compensations execute in strict reverse dependency order (descending `sourceRow` / reverse load position):
+- **LIFO Compensation:** Dependent child entities loaded in later rows are compensated before parent entities loaded in earlier rows.
+- **Created Records (`remove_created`):** The target business record is deleted from the module domain table.
+- **Updated Records (`restore_updated`):** The target record is restored to its exact `beforeState` payload.
+
+### 5.4 Append-Only Rollback Journal (`platform.kit_rollback_journal`)
+
+Every compensation decision is audited durably in PostgreSQL:
+- **Columns:** `id`, `batch_id`, `module`, `entity`, `target_id`, `source_row`, `action`, `target_version`, `before_state`, `after_state`, `actor`, `status`, `idempotency_key`, `error_reason`, `position`, `executed_at`, `created_at`.
+- **Status Lifecycle:** `pending` -> `compensated` | `blocked` | `failed`.
+- **Idempotency Guarantee:** Unique constraint on `(batch_id, idempotency_key, action)` prevents duplicate journal actions.
+
+### 5.5 Idempotency & Resumable Recovery Workflows
+
+1. **Repeated Requests (Idempotent):** If an operator or automated retry triggers rollback on an already-rolled-back batch (`status === 'rolled_back'`), the engine returns the existing completed summary immediately with `isExisting: true`. Zero duplicate database mutations are performed.
+2. **Worker Interruption & Partial Recovery (Resumable):**
+   - If worker crashes or network fails mid-saga, the batch status remains `failed` or `in_progress`.
+   - Completed compensation actions remain stamped `compensated` in the append-only journal.
+   - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
+   - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
