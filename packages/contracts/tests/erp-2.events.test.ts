@@ -20,7 +20,7 @@ import {
   PurchaseOrderCreatedEnvelopeSchema,
   PurchaseOrderStatusChangedEnvelopeSchema,
   PurchaseOrderReceivedEnvelopeSchema,
-  InboundVendorBillPostedEnvelopeSchema,
+  Erp2InboundVendorBillPostedEnvelopeSchema,
   createErp2Event,
 } from '../src/erp-2-events.js';
 
@@ -306,7 +306,7 @@ describe('ERP-2 Domain Event Envelopes (PLT-04 / PLT-09)', () => {
         postedAt: '2026-04-15T11:00:00.000Z',
       },
     };
-    const result = InboundVendorBillPostedEnvelopeSchema.safeParse(raw);
+    const result = Erp2InboundVendorBillPostedEnvelopeSchema.safeParse(raw);
     expect(result.success, JSON.stringify(result)).toBe(true);
   });
 

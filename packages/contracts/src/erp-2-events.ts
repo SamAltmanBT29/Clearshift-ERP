@@ -177,8 +177,11 @@ export type PurchaseOrderReceivedPayload = z.infer<typeof PurchaseOrderReceivedP
 /**
  * Inbound payload from ERP-4 when a vendor bill is posted.
  * ERP-2 consumes this to mark the associated PO as billed (reference only).
+ *
+ * Prefixed `Erp2` to distinguish from the ERP-4-owned `InboundVendorBillPostedPayloadSchema`
+ * which carries accounting fields (expense_account_id, liability_account_id).
  */
-export const InboundVendorBillPostedPayloadSchema = z.object({
+export const Erp2InboundVendorBillPostedPayloadSchema = z.object({
   vendorBillId: UuidSchema,
   purchaseOrderId: UuidSchema.optional(),
   vendorId: UuidSchema,
@@ -187,7 +190,7 @@ export const InboundVendorBillPostedPayloadSchema = z.object({
   postedAt: z.string().datetime(),
   journalEntryId: UuidSchema.optional(),
 });
-export type InboundVendorBillPostedPayload = z.infer<typeof InboundVendorBillPostedPayloadSchema>;
+export type Erp2InboundVendorBillPostedPayload = z.infer<typeof Erp2InboundVendorBillPostedPayloadSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Envelope Schemas
@@ -204,8 +207,8 @@ export const PurchaseOrderStatusChangedEnvelopeSchema = createEventEnvelopeSchem
 export const PurchaseOrderReceivedEnvelopeSchema = createEventEnvelopeSchema(
   PurchaseOrderReceivedPayloadSchema
 );
-export const InboundVendorBillPostedEnvelopeSchema = createEventEnvelopeSchema(
-  InboundVendorBillPostedPayloadSchema
+export const Erp2InboundVendorBillPostedEnvelopeSchema = createEventEnvelopeSchema(
+  Erp2InboundVendorBillPostedPayloadSchema
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
