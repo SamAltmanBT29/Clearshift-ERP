@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type {
   Account,
   AccountsFilterQuery,
-  TrialBalanceResponse,
   JournalEntry,
 } from '@clearshift/contracts';
+import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
@@ -29,8 +29,6 @@ export const AccountsListPage: React.FC = () => {
     page: 1,
     limit: 20,
     search: '',
-    type: undefined,
-    isActive: undefined,
   });
 
   // Trial Balance State
@@ -39,7 +37,7 @@ export const AccountsListPage: React.FC = () => {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
-  const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
+  const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
   const [tbError, setTbError] = useState<string | null>(null);
 
@@ -129,8 +127,6 @@ export const AccountsListPage: React.FC = () => {
       page: 1,
       limit: 20,
       search: '',
-      type: undefined,
-      isActive: undefined,
     });
   };
 
