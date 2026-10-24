@@ -1,36 +1,78 @@
 /**
- * ERP-2 Vendors & Purchasing — Authorization & RBAC Policies (PLT-06 / ERP2-15)
+ * ERP-2 Role-Based Access Control (RBAC) Policies & Object Boundary Guards
  *
  * Implements:
- *   - Route-level capability guards consuming @cs/rbac (Read, Write, Ingest, Review, Admin)
- *   - Object-level authorization guards preventing unauthorized multi-tenant
- *     or cross-user record mutations (ERP2-15 / Issue #131).
- *
- * Policy Invariant: DEFAULT DENY.
+ *   - SDS ClearShift ERP v2.0 endpoint role permissions matrix
+ *   - Central capability mappings (PLT-06 / SDS §4.2, §4.9)
+ *   - Multi-tenant boundary isolation and creator mutation safety
  *
  * @module erp2/policies/rbac
  */
 
 import { AppError } from '@cs/kernel';
-import { Capabilities, hasCapability, requireCapability } from '@cs/rbac';
-import { Roles, type RoleType, type HubTokenClaims } from '@cs/identity';
+import {
+  Capabilities,
+  requireCapability,
+  hasCapability,
+} from '@cs/rbac';
+import {
+  Roles,
+  type RoleType,
+  type HubTokenClaims,
+} from '@cs/identity';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Endpoint Role Permissions Matrix (ERP2-09)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ERP2_ENDPOINT_ROLES = {
+  // GET /api/v1/erp-vendors/vendors
+  LIST_VENDORS: [Roles.VIEWER, Roles.EDITOR, Roles.ANALYST, Roles.ADMIN] as RoleType[],
+
+  // POST /api/v1/erp-vendors/vendors
+  CREATE_VENDOR: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN] as RoleType[],
+
+  // PATCH /api/v1/erp-vendors/vendors/:id
+  UPDATE_VENDOR: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN] as RoleType[],
+
+  // GET /api/v1/erp-vendors/purchase-orders
+  LIST_PURCHASE_ORDERS: [Roles.VIEWER, Roles.EDITOR, Roles.ANALYST, Roles.ADMIN] as RoleType[],
+
+  // GET /api/v1/erp-vendors/purchase-orders/:id
+  GET_PURCHASE_ORDER: [Roles.VIEWER, Roles.EDITOR, Roles.ANALYST, Roles.ADMIN] as RoleType[],
+
+  // POST /api/v1/erp-vendors/purchase-orders
+  CREATE_PURCHASE_ORDER: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN] as RoleType[],
+
+  // PATCH /api/v1/erp-vendors/purchase-orders/:id
+  UPDATE_PURCHASE_ORDER_STATUS: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN] as RoleType[],
+} as const;
+
+export function isRoleAllowed(userRoles: string[], allowedRoles: readonly string[]): boolean {
+  if (!userRoles || userRoles.length === 0) {
+    return false;
+  }
+  // Admin always has universal access across all endpoints
+  if (userRoles.includes(Roles.ADMIN)) {
+    return true;
+  }
+
+  return userRoles.some((r) => allowedRoles.includes(r as RoleType));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical Capability Policies (ERP2-15)
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const Erp2Policies = {
-  // ── Vendors ─────────────────────────────────────────────────────────────
   VENDORS_READ: 'vendors.read',
   VENDORS_CREATE: 'vendors.create',
   VENDORS_UPDATE: 'vendors.update',
-
-  // ── Purchase Orders ─────────────────────────────────────────────────────
   PURCHASE_ORDERS_READ: 'purchase_orders.read',
   PURCHASE_ORDERS_CREATE: 'purchase_orders.create',
   PURCHASE_ORDERS_UPDATE: 'purchase_orders.update',
-
-  // ── Duplicate Candidates & Review ───────────────────────────────────────
   DUPLICATES_READ: 'duplicates.read',
   DUPLICATES_REVIEW: 'duplicates.review',
-
-  // ── Ingestion & Migration ───────────────────────────────────────────────
   IMPORT_LOAD: 'import.load',
 } as const;
 
