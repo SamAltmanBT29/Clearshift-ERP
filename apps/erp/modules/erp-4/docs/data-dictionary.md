@@ -354,6 +354,8 @@ When an optional relationship is absent, the system emits an approved warning ob
 - **Version 1.0.0 (2026-10-22)**: Gate G1 baseline sign-off by Integration Lead. Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published.
 - **Version 1.1.0 (2026-10-23)**: Sprint 3 / Gate G4 sign-off by Data / QA Lead (Issue #43). Defined module data quality rules catalogue, cleaning routines, 143-row synthetic dirty data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and automated migration test suite.
 - **Version 1.2.0 (2026-10-23)**: Sprint 2 / Gate G2 sign-off by Data / QA Lead (Issue #182 / ERP4-26). Delivered shared profiler integration (`@cs/kit` / `KIT-03`), module column profiling rules, exact duplicate candidate assertions, formula-safe CSV data health export, Fastify 5 endpoints (`/api/v1/erp-finance/migration/profile`), React UI screen (`DataHealthProfilePage`), and 20 automated assertion tests.
+- **Version 1.3.0 (2026-10-23)**: Sprint 3 / Gate G3 sign-off by Data / QA Lead (Issue #183 / ERP4-27 / KIT-04). Implemented canonical 12 V1 cleaning rules (`@cs/kit/domain/cleaner.ts`), field-level change audit tracking (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints (`/api/v1/erp-finance/migration/clean`), React review screen (`DataCleaningReviewPage`), and automated test suite.
+- **Version 1.4.0 (2026-10-24)**: Sprint 3 / Gate G3 sign-off by Data / QA Lead (Issue #184 / ERP4-28 / KIT-05). Implemented source-to-target field mapping configuration (`mapping-config.ts`), strict type coercions (dates to ISO-8601, numeric currency decimals to 4-dp strings, booleans), enum translation tables (`account_type`, `currency_code`, `status`), required target column enforcement guards blocking unmapped dry-run/load execution, named reproducible templates (`ERP4_DEFAULT_MAPPING_TEMPLATES`), Fastify 5 REST routes (`/api/v1/erp-finance/migration/mapping`), and React UI mapping screen (`DataMappingConfigPage.tsx`).
 
 ---
 
@@ -395,3 +397,53 @@ When an optional relationship is absent, the system emits an approved warning ob
   - `POST /api/v1/erp-finance/migration/profile` (in-memory non-destructive profiling on uploaded CSV)
 - **Frontend Screen**: Accessible React component [`DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx) displaying quality metrics table, duplicate review candidates, and formula-safe CSV download.
 - **Automated Assertions**: [`apps/erp/modules/erp-4/tests/migration/profiling.test.ts`](../tests/migration/profiling.test.ts) (20 tests) asserting all column metrics and duplicate candidate numbers match the manifest.
+
+---
+
+## 14. Cleaning Rules & Field-Level Change Audit (Issue #183 / ERP4-27 / KIT-04)
+
+### 14.1 Shared Migration Kit Cleaning & Audit Engine
+- Domain cleaner and change accumulator implemented in `@cs/kit` (`packages/kit/src/domain/cleaner.ts`) complying with SDS §3.4 and §4.4 (FR-CL-01..05).
+- Canonical 12 V1 rules: `RL-TEXT-01` (whitespace trim/collapse), `RL-TEXT-02` (control chars), `RL-NAME-01` (proper case), `RL-EMAIL-01` (email normalize), `RL-PHONE-01` (phone strip/prefix), `RL-DATE-01` (date coerce ISO), `RL-CURRENCY-01` (currency symbol/comma strip), `RL-REQ-01` (required field check), `RL-FORMAT-01` (pattern format check), `RL-DUP-01` (exact normalized duplicate detection).
+- Per-field audit log (`kit_clean_log` shape): records `source_row`, `field_name`, `original_value`, `cleaned_value`, `rule_id`, and timestamp for every altered value.
+- Rule toggle management (`FR-CL-05`): allows selective activation/deactivation of cleaning rules for a batch run.
+- Formula-safe CSV audit export: protects against formula injection attacks using standard apostrophe prefixing (`'=`, `'+`, `'-`, `'@`).
+
+### 14.2 ERP-4 Cleaning Configuration & Artifacts
+- **Module Cleaning Configuration**: [`apps/erp/modules/erp-4/src/migration/cleaning-config.ts`](../src/migration/cleaning-config.ts) binds accounts, opening balances, journal entries, and journal lines to standard cleaning rules.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/cleaning.ts`](../src/routes/cleaning.ts):
+  - `GET /api/v1/erp-finance/migration/clean` (executes cleaning on canonical Dirty Data Pack)
+  - `GET /api/v1/erp-finance/migration/clean/audit/export` (downloads formula-safe CSV field change audit trail)
+  - `POST /api/v1/erp-finance/migration/clean` (in-memory cleaning with rule toggles on uploaded CSV)
+- **Frontend Screen**: Accessible React component [`DataCleaningReviewPage.tsx`](../web/src/pages/DataCleaningReviewPage.tsx) featuring audit change inspection table, row previews with outcome badges, and rule toggle checklist.
+- **Automated Test Suite**: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../tests/migration/cleaning.test.ts) (20 tests) verifying standard cleaner execution, field change audit generation, required field anomaly rejection, rule toggles, and security guards.
+
+---
+
+## 15. Mapping & Value Translation Configuration (Issue #184 / ERP4-28 / KIT-05)
+
+### 15.1 Shared Migration Kit Mapping Engine & Integration
+- Implements Step 4 of the Migration Kit pipeline complying with SDS §4.5 (FR-MP-01 to FR-MP-05).
+- Type coercion engine enforcing pure transformations:
+  - Dates coerced to ISO-8601 (`YYYY-MM-DD`).
+  - Monetary values stripped of currency symbols, commas, and formatted to signed decimal strings (`NUMERIC(20,4)`).
+  - Booleans coerced from truthy/falsy literals (`true`, `1`, `yes` -> `true`).
+  - Alphanumeric keys normalized and uppercased (`ACC-001`).
+- Enum translation tables mapping heterogeneous legacy values to canonical allowlists:
+  - Account Type (`ACCOUNT_TYPE_TRANSLATION_MAP`): e.g. `Current Asset` -> `asset`, `COGS` -> `expense`.
+  - Currency Code (`CURRENCY_CODE_TRANSLATION_MAP`): e.g. `₹`, `rs.` -> `INR`, `$` -> `USD`.
+  - Period Status (`PERIOD_STATUS_TRANSLATION_MAP`): e.g. `Soft Closed` -> `soft_closed`.
+- Required Target Field Enforcement Guards (`validateErp4Mapping` / `validateFieldMapping`): Blocks progression to dry-run (Step 5) and load if any required schema field is unmapped.
+- Zero duplicate wizard rule (H2): Consumes `@cs/ui` `MigrationKitWizard` pre-bound with module metadata registered in `MigrationKitRegistry`.
+
+### 15.2 ERP-4 Mapping Configuration & Artifacts
+- **Module Mapping Configuration**: [`apps/erp/modules/erp-4/src/migration/mapping-config.ts`](../src/migration/mapping-config.ts) defines entity schemas, target field definitions, enum dictionaries, coercion logic, and named versioned templates.
+- **Web Metadata Bridge**: [`apps/erp/modules/erp-4/web/src/kit-metadata.ts`](../web/src/kit-metadata.ts) exposing metadata to UI components.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/mapping.ts`](../src/routes/mapping.ts):
+  - `GET /api/v1/erp-finance/migration/mapping/templates` (lists named templates)
+  - `GET /api/v1/erp-finance/migration/mapping/templates/:id` (retrieves specific named template)
+  - `GET /api/v1/erp-finance/migration/mapping/schema` (inspects module target entity schemas)
+  - `POST /api/v1/erp-finance/migration/mapping/validate` (validates field mapping and checks required target constraints)
+  - `POST /api/v1/erp-finance/migration/mapping/transform` (applies mapping, enum translation, and coercions to rows)
+- **Frontend Screen**: Accessible React component [`DataMappingConfigPage.tsx`](../web/src/pages/DataMappingConfigPage.tsx) featuring shared `MigrationKitWizard`, enum translation explorer, named template loader/saver, and synthetic test presets.
+- **Automated Test Suite**: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../tests/migration/mapping.test.ts) (26 tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../web/tests/DataMappingConfigPage.test.tsx) (3 tests) covering coercions, enum dictionaries, required field guards, Fastify endpoints, and UI views.

@@ -107,6 +107,8 @@ export const ERP2_DOMAIN_RULES = {
   DUPLICATE_CANDIDATE_NOT_FOUND: 'DUPLICATE_CANDIDATE_NOT_FOUND',
   INVALID_MERGE_DECISION: 'INVALID_MERGE_DECISION',
   MERGE_TARGET_IDENTICAL: 'MERGE_TARGET_IDENTICAL',
+  EXCESSIVE_FAILURES_HALTED: 'EXCESSIVE_FAILURES_HALTED',
+  ROLLBACK_SAGA_PROHIBITED: 'ROLLBACK_SAGA_PROHIBITED',
 } as const;
 
 export interface Erp2RelationshipWarning {
@@ -520,3 +522,95 @@ export const ReviewDuplicateResponseSchema = z.object({
   audit_record_id: z.string().uuid(),
 });
 export type ReviewDuplicateResponse = z.infer<typeof ReviewDuplicateResponseSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Idempotent Retry & Partial-Load Stop Behavior (ERP2-13 / KIT-12 / Issue #129)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Standard batch chunk processing size (ERP2-13 / Core Rules).
+ */
+export const DEFAULT_CHUNK_SIZE = 500;
+
+/**
+ * Failure rate threshold (10%) that halts batch execution immediately.
+ */
+export const DEFAULT_FAILURE_THRESHOLD = 0.10;
+
+/**
+ * Minimum attempted rows before failure rate threshold check activates.
+ */
+export const DEFAULT_MIN_ATTEMPTED_ROWS = 10;
+
+/**
+ * Default bounded retry configuration for transient errors.
+ */
+export const DEFAULT_RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 50,
+  backoffFactor: 2,
+} as const;
+
+/**
+ * Terminal status of a chunked batch execution.
+ */
+export const BatchExecutionStatusEnum = z.enum([
+  'COMPLETED',
+  'STOPPED_EXCESSIVE_FAILURES',
+]);
+export type BatchExecutionStatus = z.infer<typeof BatchExecutionStatusEnum>;
+
+/**
+ * Outcome of an individual row during batch processing.
+ */
+export const BatchRowOutcomeEnum = z.enum([
+  'loaded',
+  'rejected',
+  'unattempted',
+]);
+export type BatchRowOutcome = z.infer<typeof BatchRowOutcomeEnum>;
+
+/**
+ * Result of an individual row in a batch.
+ */
+export const LoadBatchRowResultSchema = z.object({
+  sourceRow: z.number().int().nonnegative(),
+  idempotencyKey: z.string(),
+  outcome: BatchRowOutcomeEnum,
+  result: z.unknown().optional(),
+  error: z.unknown().optional(),
+  attempts: z.number().int().positive().default(1),
+});
+export type LoadBatchRowResult = z.infer<typeof LoadBatchRowResultSchema>;
+
+/**
+ * Aggregate result of a chunked loadBatch execution.
+ */
+export const LoadBatchResultSchema = z.object({
+  batchId: z.string().uuid(),
+  status: BatchExecutionStatusEnum,
+  total: z.number().int().nonnegative(),
+  attempted: z.number().int().nonnegative(),
+  loaded: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  unattempted: z.number().int().nonnegative(),
+  chunksProcessed: z.number().int().nonnegative(),
+  stoppedReason: z.string().nullable().optional(),
+  rows: z.array(LoadBatchRowResultSchema),
+});
+export type LoadBatchResult = z.infer<typeof LoadBatchResultSchema>;
+
+/**
+ * Asserts that V1 does not execute compensating rollback sagas or destructive data deletion.
+ */
+export function assertNoRollbackSaga(options?: { isRollbackRequested?: boolean } | unknown): void {
+  if (
+    options === true ||
+    options === 'ROLLBACK' ||
+    (typeof options === 'object' && options !== null && (options as any).isRollbackRequested)
+  ) {
+    throw new Error(
+      'Compensating rollback sagas are strictly out of scope for ClearShift V1 (deferred to V2). On failure, stop safely and preserve durable receipts.'
+    );
+  }
+}

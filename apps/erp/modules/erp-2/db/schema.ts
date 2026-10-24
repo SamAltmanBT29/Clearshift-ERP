@@ -264,8 +264,3 @@ export type NewErp2PoLine = typeof erp2PoLines.$inferInsert;
 
 export type Erp2ImportReceipt = typeof erp2ImportReceipts.$inferSelect;
 export type NewErp2ImportReceipt = typeof erp2ImportReceipts.$inferInsert;
-
-export const vendors = erp2Vendors;
-export const purchaseOrders = erp2PurchaseOrders;
-export const poLines = erp2PoLines;
-export const importReceipts = erp2ImportReceipts;

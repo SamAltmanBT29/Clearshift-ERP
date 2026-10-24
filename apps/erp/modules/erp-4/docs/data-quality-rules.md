@@ -226,3 +226,67 @@ Cleaning normalizes raw text without mutating source rows:
   - `GET /api/v1/erp-finance/migration/profile/export`: Downloads formula-safe CSV Data Health Report
   - `POST /api/v1/erp-finance/migration/profile`: In-memory non-destructive profiling of arbitrary CSV payload
 - UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataHealthProfilePage.tsx`](../web/src/pages/DataHealthProfilePage.tsx)
+
+---
+
+## 9. Cleaning Rules & Field-Level Change Audit (Issue #183 / ERP4-27 / KIT-04)
+
+### 9.1 Shared Migration Kit Cleaner Integration
+- Uses `@cs/kit` canonical cleaner domain (`packages/kit/src/domain/cleaner.ts`) complying with Migration Kit SDS §3.4 and §4.4 (FR-CL-01..05).
+- Implements the 12 approved V1 cleaning rules:
+  - `RL-TEXT-01`: Trim leading/trailing whitespace and collapse multiple inner spaces into one.
+  - `RL-TEXT-02`: Remove control characters and non-printable unicode artifacts.
+  - `RL-NAME-01`: Proper-case names with exception handling for particles (e.g. O'Brien, McDonald).
+  - `RL-EMAIL-01`: Normalize email structure (trim, lowercase, syntax check).
+  - `RL-PHONE-01`: Phone sanitization and default country code coercion (+91 / +1).
+  - `RL-DATE-01`: Coerce slash/hyphen dates to ISO 8601 (YYYY-MM-DD); reject invalid calendar dates.
+  - `RL-CURRENCY-01`: Remove currency symbols ($/€/₹) and thousands commas; parse exact decimal string.
+  - `RL-REQ-01`: Verify mandatory field presence; reject row if blank.
+  - `RL-FORMAT-01`: Check regex patterns and length boundaries.
+- Tracks per-field change audit logs (`kit_clean_log` shape):
+  - Every modified field generates an audit record: `source_row`, `field_name`, `original_value`, `cleaned_value`, `rule_id`, and `timestamp`.
+- Supports rule toggles (`FR-CL-05`) allowing operators to selectively enable/disable specific rules for a batch run.
+- Neutralizes spreadsheet formula injection in CSV export (`exportFieldAuditCsv`) using standard apostrophe prefixing (`'=`, `'+`, `'-`, `'@`).
+
+### 9.2 Configured Module Rules
+- Rules file: [`apps/erp/modules/erp-4/src/migration/cleaning-config.ts`](../src/migration/cleaning-config.ts)
+- Test suite: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../tests/migration/cleaning.test.ts) (20 automated tests)
+- Endpoints:
+  - `GET /api/v1/erp-finance/migration/clean`: Executes cleaning on canonical Dirty Data Pack fixture
+  - `GET /api/v1/erp-finance/migration/clean/audit/export`: Downloads formula-safe CSV field-level change audit log
+  - `POST /api/v1/erp-finance/migration/clean`: In-memory cleaning with rule toggles on uploaded CSV
+- UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx`](../web/src/pages/DataCleaningReviewPage.tsx)
+
+---
+
+## 10. Mapping & Value Translation Configuration (Issue #184 / ERP4-28 / KIT-05)
+
+### 10.1 Shared Migration Kit Mapping Integration
+- Implements Step 4 of the Migration Kit pipeline complying with Migration Kit SDS §4.5 (FR-MP-01 to FR-MP-05).
+- Features:
+  - Source-to-target field projection rules with strict type coercion:
+    - String-encoded decimals to `NUMERIC(20,4)` precision (e.g., ` $ 150,000.50 ` -> `150000.5000`).
+    - Standardized date coercion to ISO 8601 (`YYYY-MM-DD`).
+    - Boolean normalization (`true`/`1`/`yes` -> `true`).
+    - Code trimming and uppercase normalization.
+  - Enum translation tables:
+    - Account classification allowlist: `asset`, `liability`, `income`, `expense`.
+    - Currency code allowlist: `INR`, `USD`, `EUR`.
+    - Accounting period status: `open`, `soft_closed`, `locked`.
+  - Required target field enforcement guards:
+    - Evaluates field mapping completeness prior to execution (`validateErp4Mapping`).
+    - Blocks dry-run and real load operations if mandatory target attributes are missing.
+  - Named, versioned, reproducible templates:
+    - `erp4-canonical-v1` (Version 1.0.0, Schema Version 1) mapping accounts, opening balances, journal entries, and lines.
+
+### 10.2 Configured Module Mapping Artifacts
+- Module Mapping Engine: [`apps/erp/modules/erp-4/src/migration/mapping-config.ts`](../src/migration/mapping-config.ts)
+- Web Metadata Bridge: [`apps/erp/modules/erp-4/web/src/kit-metadata.ts`](../web/src/kit-metadata.ts)
+- Endpoints:
+  - `GET /api/v1/erp-finance/migration/mapping/templates`: List named versioned templates
+  - `GET /api/v1/erp-finance/migration/mapping/templates/:id`: Retrieve specific named template
+  - `GET /api/v1/erp-finance/migration/mapping/schema`: Inspect ERP-4 target entity definitions
+  - `POST /api/v1/erp-finance/migration/mapping/validate`: Validate mapping config and missing required target fields
+  - `POST /api/v1/erp-finance/migration/mapping/transform`: In-memory projection, enum translation, and type coercion
+- UI Screen: [`apps/erp/modules/erp-4/web/src/pages/DataMappingConfigPage.tsx`](../web/src/pages/DataMappingConfigPage.tsx)
+- Test Suite: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../tests/migration/mapping.test.ts) (26 automated tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../web/tests/DataMappingConfigPage.test.tsx) (3 automated tests)

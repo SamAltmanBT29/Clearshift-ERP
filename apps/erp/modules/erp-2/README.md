@@ -15,6 +15,7 @@ Data dictionary: [`docs/data-dictionary.md`](docs/data-dictionary.md) - contract
 | POST | /purchase-orders | total recomputed server-side; every line product validated via ERP-1 |
 | PATCH | /purchase-orders/{id} | status transition only |
 | POST | /import | Migration Kit row import (KIT-08) |
+| POST | /import/batch | Batch row import with 500-row chunking, transient retry, and 10% stop threshold (ERP2-13 / KIT-12) |
 | POST | /duplicates/check | Deterministic exact duplicate scanner (ERP2-12 / KIT-10) |
 | GET | /duplicates/candidates | List held duplicate candidates with entity/status filtering |
 | GET | /duplicates/candidates/{id} | Retrieve duplicate candidate details and diffs |
@@ -58,6 +59,14 @@ npm run db:reset                                                                
 | Normalized exact keys only (`tax_number`, `email`, `po_number`), confidence strictly 1.0 | `tests/domain/duplicate-policy.test.ts`, `tests/api/duplicates.test.ts` |
 | Fuzzy duplicate matching and automated merge sagas prohibited in V1 | `tests/domain/duplicate-policy.test.ts`, `tests/api/duplicates.test.ts` |
 | Human review decisions (`MERGE`, `REJECT`, `KEEP_BOTH`) immutably logged with `merge.decided`, actor ID, timestamp, kept ID, and merged ID | `tests/api/duplicates.test.ts`, `web/tests/duplicate-review.test.tsx` |
+| Batch load chunking bounded at 500 rows (`CHUNK_SIZE = 500`) | `tests/migration/batch-retry-stop.test.ts` |
+| Bounded exponential backoff retries for transient errors while strictly preserving idempotency key | `tests/migration/batch-retry-stop.test.ts` |
+| Batch execution halts immediately when row failure rate exceeds 10% (`> 0.10`) after minimum 10 attempted rows | `tests/migration/batch-retry-stop.test.ts` |
+| Committed target records and receipts remain durable on halt; unattempted rows audited; rollback sagas prohibited | `tests/migration/batch-retry-stop.test.ts` |
+| Main paginated data table displays entity rows with stable columns matching data dictionary | `web/tests/paginated-data-table.test.tsx` |
+| Pagination controls bind to API page and pageSize query parameters (10, 20, 50, 100) | `web/tests/paginated-data-table.test.tsx` |
+| Sorting by column headers toggles ascending/descending order predictably with aria-sort | `web/tests/paginated-data-table.test.tsx` |
+| Bounded pagination (pageSize <= 100) prevents DOM performance degradation | `web/tests/paginated-data-table.test.tsx` |
 
 ## Known defects (file each as an issue and link it here before closing ERP2-10)
 | # | Sev | Defect | Status |

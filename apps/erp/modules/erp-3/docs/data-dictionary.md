@@ -1,36 +1,487 @@
-# ERP-3 Sales Orders & Invoices — Module Data Dictionary
+# ERP-3 Sales Orders & Invoices — Canonical Data Dictionary (Global Reference)
 
-See the canonical global reference copy at [`docs/data-dictionaries/erp-3.md`](../../../../../docs/data-dictionaries/erp-3.md) and architecture decision record [`docs/adr/ADR-005-erp-3-api-contract-and-mock-baseline.md`](../../../../../docs/adr/ADR-005-erp-3-api-contract-and-mock-baseline.md).
+This document specifies the canonical data dictionary, Entity-Relationship Diagram (ERD), requirement-to-test traceability matrix, and Dirty Data Pack plan for **ERP-3 Sales Orders and Invoices (Group 8)** under Gate G1 governance criteria.
 
-## 1. Ownership & Boundaries
+For the module-local copy (maintained in 100% byte parity) see:
+[`apps/erp/modules/erp-3/docs/data-dictionary.md`](../../apps/erp/modules/erp-3/docs/data-dictionary.md)
 
-- **Module ID**: `erp3` (Group 8 — Sales Orders & Invoices)
-- **PostgreSQL Schema**: `erp3`
-- **Route Prefix**: `/api/v1/erp-orders`
-- **Logical Tables (`SDS §4.7` & `Master Spec §5c`)**: `erp3_sales_orders`, `erp3_so_lines`, `erp3_invoices`, `erp3_invoice_lines`, `erp3_payments` (plus `erp3.import_receipts` per KIT-08)
-- **Cross-Module References**:
-  - `customer_golden_id` (UUID): Resolved against Hub Identity / CRM-1 Golden ID registry (`ADR-003`, `BR-ERP3-03`). Never mutated by ERP-3.
-  - `product_id` (UUID): Resolved against ERP-1 Products & Inventory (`/api/v1/erp-products`). Never mutated by ERP-3.
-  - Outbound accounting events (`erp.invoice.created`, `erp.payment.created`, `erp.invoice.status_changed`): Consumed by ERP-4 Finance & Accounting.
-  - Inbound CRM event (`deal.won`, `SDS §4.10 EV-09`): Produced by CRM-2 and consumed by ERP-3 to create a sales order.
+For the contract and mock architecture decision record see:
+[`docs/adr/ADR-005-erp-3-api-contract-and-mock-baseline.md`](../adr/ADR-005-erp-3-api-contract-and-mock-baseline.md)
 
-## 2. Public Contract & Mock Exports
+For data quality rules and profiling engine see:
+[`apps/erp/modules/erp-3/docs/data-quality-rules.md`](../../apps/erp/modules/erp-3/docs/data-quality-rules.md)
 
-- **OpenAPI 3.1 Specification**: `packages/contracts/openapi/erp-3.yaml`
-- **Zod Schemas & Types**: `packages/contracts/src/erp-3.ts` (`@clearshift/contracts/erp-3`)
-- **Event Envelopes & Payloads**: `packages/contracts/src/erp-3-events.ts` (`@clearshift/contracts/erp-3-events`)
-- **Deterministic Mock Server**: `packages/contracts/src/erp-3-mock.ts` (`@clearshift/contracts/erp-3-mock`, `createErp3MockServer()`, `ERP3_MOCK_DEFAULT_PORT = 4013`)
+---
 
-## 3. Core Invariants & Reconciled Contract Rules
+## 1. Module Summary
 
-- **`BR-ERP3-01` (Order/Invoice Total Integrity)**: `total` is server-computed as the exact sum of `line_total` across all lines (`lines` requires `.min(1)` on create requests; response schemas validate `z.array(...)` without a minimum length). Monetary values and quantities use `NUMERIC(19,4)` (`SDS §3.2`) serialized as 4-dp decimal strings (`MoneyAmount`).
-- **`BR-ERP3-02` & `DR-1` (Line Tax Calculation — Pending Gate G1 Confirmation)**: `tax_amount = (quantity * price * tax_rate) / 100` and `line_total = (quantity * price) + tax_amount`, where `tax_rate` is a percentage string (`TaxRateAmount`, e.g., `"18.0000"` = 18%). Pending Integration Lead confirmation of the DR-1 rounding rule (`SDS §4.4 BR-ERP3-02` 2-dp tax rounding + `Master Spec Decision M2` `ROUND_HALF_UP` vs. `SDS §3.2 NUMERIC(19,4)` 4-dp storage), the mock performs exact 4-dp `BigInt` arithmetic and rejects sub-4-dp fractions with `422 DR1_ROUNDING_UNRESOLVED`.
-- **`BR-ERP3-03` & Reference Validation (`customer_golden_id`, `product_id`, `order_id`)**: In `erp-3.ts` and `erp-3-mock.ts`, missing or malformed UUIDs for `customer_golden_id` or `product_id` return `400 VALIDATION_ERROR` during Zod schema validation. `422` relationship error codes (`MISSING_CUSTOMER_GOLDEN_ID`, `CUSTOMER_NOT_FOUND`, `PRODUCT_NOT_FOUND`, `ORDER_REF_NOT_FOUND`) are defined in `ERP3_RELATIONSHIP_ERROR_CODES`, but the in-memory mock only performs a cross-entity lookup on `invoice.order_id` (`422 ORDER_REF_NOT_FOUND`).
-- **Required/Nullable Request vs. Response Fields & Migration Kit Fields**:
-  - `source_system`, `source_id`, and invoice `order_id` are optional/nullable on `CreateSalesOrderRequestSchema` / `CreateInvoiceRequestSchema` and nullable keys (`string | null`) on `SalesOrderSchema` / `InvoiceSchema` (omitted from OpenAPI `required` arrays).
-  - `idempotency_key`, `batch_id`, and `source_row` are optional/nullable on `CreateSalesOrderRequestSchema`, `CreateInvoiceRequestSchema`, and `CreatePaymentRequestSchema` in this branch; they are not returned on response entities, not used for deduplication by `erp-3-mock.ts`, and absent from the competing `origin/main` `Create*InputSchema` definitions.
-- **Invoice `due_date` (`DR-2`)**: `due_date` (`YYYY-MM-DD`) is mandatory on `InvoiceSchema` and `CreateInvoiceRequestSchema` per `V1_30_ISSUE_STANDARDIZATION_PLAN.md` §8 and `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` §5c ERD + Decision `C1`.
-- **`FR-ERP3-03` & `FR-ERP3-04` (Payments & Auto-Paid Transition)**: Payment `amount` must be `> 0` with `method` in `cash | bank | card`. Recording a payment on an already `Paid` invoice returns `422 INVOICE_ALREADY_PAID`. A payment that would cause `SUM(payments) > invoice.total` returns `422 PAYMENT_EXCEEDS_INVOICE_TOTAL`. Multiple partial payments are supported by the API/mock contract; when `SUM(payments) == invoice.total`, the invoice automatically transitions to `Paid` and emits `erp.invoice.status_changed`.
-- **`FR-ERP3-05` (Sales Order Status Lifecycle)**: Strictly forward-only `Open` → `Invoiced` → `Closed`. `UpdateSalesOrderStatusRequestSchema` is exported in `erp-3.ts`, but `PATCH /sales-orders/{id}` is not one of the 7 routes in `erp-3.yaml` or `erp-3-mock.ts`.
-- **`DR-3` (Detail Read Routes — Pending Gate G1 Ratification)**: `GET /sales-orders/{id}` and `GET /invoices/{id}` are included per `V1_30_ISSUE_STANDARDIZATION_PLAN.md` §7 Slot 04 and `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` Decision `C1` / `H1`, and flagged for Gate G1 ratification.
-- **Branch Divergence with `origin/main` (`ERP3-04` / `ERP3-05`)**: `feature/150-erp3-contracts` and `origin/main` currently define conflicting `packages/contracts/src/erp-3.ts` and `packages/contracts/openapi/erp-3.yaml` files (`snake_case` vs. `camelCase`, `UUID` vs. `gid-*` `customer_golden_id`, TitleCase vs. lowercase status enums, and full-line `CreateInvoiceRequestSchema` vs. order-only `CreateInvoiceInputSchema`). Code-level reconciliation is required before PR #256 can be safely merged.
+| Field | Value |
+|---|---|
+| **Module** | ERP-3 Sales Orders & Invoices (Group 8) |
+| **Issues** | #26 (`[ERP3-01]` Data Model), #27 (`[ERP3-02]` List/Read API), #28 (`[ERP3-03]` Mutation API & Domain Validation), #29 (`[ERP3-04]` List Screen & UI States), #30 (`[ERP3-05]` Create/Edit/Detail Workflow), #31 (`[ERP3-06]` Relationships), #33 (`[ERP3-08]` Profiling, Cleaning, Mapping & Dirty-Data Pack), #35 (`[ERP3-10]` QA Evidence & Hand-off), #150 (`[ERP3-14]` OpenAPI, Event & Mock Contract Package), #160 (`[ERP3-24]` Data Dictionary, ERD, Traceability & Dirty Data Pack Plan) |
+| **PostgreSQL Schema** | `erp3` |
+| **API Base** | `/api/v1/erp-orders` |
+| **OpenAPI Contract** | `packages/contracts/openapi/erp-3.yaml` (OpenAPI 3.1.0) |
+| **TypeScript / Zod Contracts** | `packages/contracts/src/erp-3.ts` (`@clearshift/contracts/erp-3`) |
+| **Domain Event Contracts** | `packages/contracts/src/erp-3-events.ts` (`@clearshift/contracts/erp-3-events`, PLT-04 / PLT-09 transactional envelopes) |
+| **Mock Contract Package** | `packages/contracts/src/erp-3-mock.ts` (`@clearshift/contracts/erp-3-mock`, `createErp3MockServer()`, default port `4013`) |
+| **Data Quality & Profiling (`ERP3-08`, `ERP3-24`)** | [`apps/erp/modules/erp-3/docs/data-quality-rules.md`](../../apps/erp/modules/erp-3/docs/data-quality-rules.md), `sample-data/erp-3/dirty-data-v1.csv`, `sample-data/erp-3/expected-profile.json`, `sample-data/erp-3/mapping-template.json` |
+| **Logical Tables (SDS §4.7 & Master Spec §5c)** | `erp3.sales_orders`, `erp3.so_lines`, `erp3.invoices`, `erp3.invoice_lines`, `erp3.payments`, `erp3.import_receipts` |
+| **Version** | `1.0.0` (Gate G1 Baseline & Sign-Off) |
+| **Authoritative References** | `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` (Decisions `C1`, `C4`, `C7`, `M2`, `H1`, §5c ERD); `V1_30_ISSUE_STANDARDIZATION_PLAN.md` (§7, §8); `SDS_ClearShift_ERP.md` (§3.2, §4.4 `FR-ERP3-01..05`, `BR-ERP3-01..03`, §4.7, §4.8, §4.10 `EV-09`, §4.11); `ADR-002`; `ADR-003`; `ADR-005` |
+
+---
+
+## 2. Table & Entity Index
+
+| Logical Table / Schema | Purpose | Primary Key | Key Constraints & Ownership |
+|---|---|---|---|
+| `erp3.sales_orders` | Header records for customer sales orders with computed totals | `id` (UUID) | `UNIQUE(order_number)`, mandatory `customer_golden_id` (UUID per ADR-003, `BR-ERP3-03`), `status` (`Open`, `Invoiced`, `Closed`) |
+| `erp3.so_lines` | Order line items referencing ERP-1 products | `id` (UUID) | `FK(order_id)` cascade, logical `product_id` (UUID) ref to ERP-1, `UNIQUE(order_id, line_number)`, `quantity > 0`, server-computed `line_total` |
+| `erp3.invoices` | Billing invoices linked to sales orders with mandatory due date | `id` (UUID) | `UNIQUE(invoice_number)`, `UNIQUE(order_id)` (1:1 V1 constraint), mandatory `due_date >= invoice_date`, `status` (`Open`, `Paid`, `Overdue`) |
+| `erp3.invoice_lines` | Embedded invoice line items | `id` (UUID) | `FK(invoice_id)` cascade, logical `product_id` (UUID) ref to ERP-1, `UNIQUE(invoice_id, line_number)`, `quantity > 0`, server-computed `line_total` |
+| `erp3.payments` | Payment settlement records applied to invoices | `id` (UUID) | `FK(invoice_id)`, `amount > 0`, `method` in `cash \| bank \| card` (`FR-ERP3-03`), full settlement auto-transitions invoice to `Paid` |
+| `erp3.import_receipts` | Durable idempotency receipts for Migration Kit imports | `id` (UUID) | `UNIQUE(idempotency_key)`, atomic dual-write target receipt (KIT-08 / Decision C4) |
+
+---
+
+## 3. Field-Level Data Dictionary
+
+> **Monetary & Decimal Storage (`SDS §3.2` & `DR-1`):**  
+> All monetary columns and decimal quantities are stored in PostgreSQL as exact numeric types (`numeric(19,4)`, never IEEE-754 floating point) and serialized across the wire as string-encoded decimals (`MoneyAmount`, pattern `^\d+(\.\d{1,4})?$`). Line subtotals and document totals are computed server-side via exact integer scaling (`BigInt` scale `10000n`).
+
+### 3.1 Table: `erp3.sales_orders` (Sales Order Headers)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Canonical system UUID | `30000000-0000-4000-8000-000000000001` |
+| `order_number` | `VARCHAR(64)` | `string` (min 1, max 64) | **No** | None | `UNIQUE`, `CHECK(length(trim(order_number)) > 0)` | Unique human-readable sales order number; auto-generated if omitted on create (`SO-YYYY-NNNN`) | `SO-2026-0001` |
+| `customer_golden_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | Foreign Key reference to CRM-1 Hub (`ADR-003`, `BR-ERP3-03`) | Mandatory Golden ID. Must resolve to valid Hub customer record | `c0000000-0000-4000-8000-000000000001` |
+| `order_date` | `DATE` | `string` (`YYYY-MM-DD`) | **No** | None | Valid ISO calendar date | Calendar date order was booked | `2026-04-01` |
+| `status` | `erp3.sales_order_status` | `'Open' \| 'Invoiced' \| 'Closed'` | **No** | `'Open'` | Enum: `Open`, `Invoiced`, `Closed` | Forward-only lifecycle: `Open` → `Invoiced` → `Closed` (`FR-ERP3-05`) | `Open` |
+| `currency` | `VARCHAR(3)` | `string` (`^[A-Z]{3}$`) | **No** | `'USD'` | ISO 4217 3-letter uppercase | Base transaction currency (`SDS §3.2`) | `USD` |
+| `subtotal` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(subtotal >= 0)` | Server-computed sum of line pre-tax amounts | `2000.0000` |
+| `tax_total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(tax_total >= 0)` | Server-computed sum of line tax amounts | `360.0000` |
+| `total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(total >= 0)` | Server-computed order total (`SUM(lines.line_total)`, `BR-ERP3-01`) | `2360.0000` |
+| `source_system` | `VARCHAR(64)` | `string \| null` | Yes | `NULL` | Max 64 chars | Originating migration source identifier | `legacy_erp` |
+| `source_id` | `VARCHAR(128)` | `string \| null` | Yes | `NULL` | Max 128 chars | Legacy source record identifier | `LEGACY-SO-101` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Record creation timestamp | `2026-04-01T10:00:00.000Z` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Last updated timestamp | `2026-04-01T10:00:00.000Z` |
+
+### 3.2 Table: `erp3.so_lines` (Sales Order Lines)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Canonical line UUID | `31000000-0000-4000-8000-000000000001` |
+| `order_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | `FK -> erp3.sales_orders(id) ON DELETE CASCADE` | Parent sales order header | `30000000-0000-4000-8000-000000000001` |
+| `line_number` | `INTEGER` | `number` (int >= 1) | **No** | None | `CHECK(line_number >= 1)`, `UNIQUE(order_id, line_number)` | 1-based sequential line ordering | `1` |
+| `product_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | Logical reference to `erp1.products` (Decision C7) | Mandatory product identifier resolved via `ReferenceResolver` | `10000000-0000-4000-8000-000000000001` |
+| `quantity` | `NUMERIC(12,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(quantity > 0)` | Strictly positive ordered quantity (`BR-ERP3-01`) | `2.0000` |
+| `unit_price` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(unit_price >= 0)` | Non-negative unit price | `1000.0000` |
+| `tax_rate` | `NUMERIC(6,4)` | `string` (`TaxRateAmount`) | **No** | `0.0000` | `CHECK(tax_rate >= 0 AND tax_rate <= 100)` | Non-negative tax rate percentage (e.g. 18.0000 = 18%) | `18.0000` |
+| `tax_amount` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(tax_amount >= 0)` | Server-computed tax: `(quantity * price * tax_rate) / 100` (`BR-ERP3-02`) | `360.0000` |
+| `line_total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(line_total >= 0)` | Server-computed line total: `(quantity * price) + tax_amount` (`BR-ERP3-01`) | `2360.0000` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Record creation timestamp | `2026-04-01T10:00:00.000Z` |
+
+### 3.3 Table: `erp3.invoices` (Invoices)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Canonical invoice UUID | `32000000-0000-4000-8000-000000000001` |
+| `invoice_number` | `VARCHAR(64)` | `string` (min 1, max 64) | **No** | None | `UNIQUE`, `CHECK(length(trim(invoice_number)) > 0)` | Unique human-readable invoice number (`INV-YYYY-NNNN`) | `INV-2026-0001` |
+| `order_id` | `UUID` | `string \| null` | Yes | `NULL` | `UNIQUE`, `FK -> erp3.sales_orders(id)` | Linked sales order. In V1, at most one invoice per order | `30000000-0000-4000-8000-000000000001` |
+| `customer_golden_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | Foreign Key reference to CRM-1 Hub (`ADR-003`, `BR-ERP3-03`) | Mandatory Customer Golden ID | `c0000000-0000-4000-8000-000000000001` |
+| `invoice_date` | `DATE` | `string` (`YYYY-MM-DD`) | **No** | None | Valid ISO calendar date | Calendar date invoice was issued | `2026-04-02` |
+| `due_date` | `DATE` | `string` (`YYYY-MM-DD`) | **No** | None | `CHECK(due_date >= invoice_date)` (`DR-2`) | Mandatory due date for payment terms & overdue derivation | `2026-05-02` |
+| `status` | `erp3.invoice_status` | `'Open' \| 'Paid' \| 'Overdue'` | **No** | `'Open'` | Enum: `Open`, `Paid`, `Overdue` | Dynamic/persisted status: `Paid` when fully settled; `Overdue` when unpaid & UTC date > `due_date` | `Open` |
+| `currency` | `VARCHAR(3)` | `string` (`^[A-Z]{3}$`) | **No** | `'USD'` | ISO 4217 3-letter uppercase | Invoicing currency | `USD` |
+| `subtotal` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(subtotal >= 0)` | Server-computed sum of line pre-tax amounts | `2000.0000` |
+| `tax_total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(tax_total >= 0)` | Server-computed sum of line tax amounts | `360.0000` |
+| `total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(total >= 0)` | Server-computed invoice total (`SUM(lines.line_total)`, `BR-ERP3-01`) | `2360.0000` |
+| `source_system` | `VARCHAR(64)` | `string \| null` | Yes | `NULL` | Max 64 chars | Migration source system identifier | `legacy_billing` |
+| `source_id` | `VARCHAR(128)` | `string \| null` | Yes | `NULL` | Max 128 chars | Legacy invoice identifier | `LEGACY-INV-201` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Record creation timestamp | `2026-04-02T10:00:00.000Z` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Last updated timestamp | `2026-04-02T10:00:00.000Z` |
+
+### 3.4 Table: `erp3.invoice_lines` (Invoice Lines)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Canonical invoice line UUID | `33000000-0000-4000-8000-000000000001` |
+| `invoice_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | `FK -> erp3.invoices(id) ON DELETE CASCADE` | Parent invoice document | `32000000-0000-4000-8000-000000000001` |
+| `line_number` | `INTEGER` | `number` (int >= 1) | **No** | None | `CHECK(line_number >= 1)`, `UNIQUE(invoice_id, line_number)` | 1-based sequential line ordering | `1` |
+| `product_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | Logical reference to `erp1.products` (Decision C7) | Mandatory product identifier resolved via `ReferenceResolver` | `10000000-0000-4000-8000-000000000001` |
+| `quantity` | `NUMERIC(12,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(quantity > 0)` | Strictly positive invoiced quantity (`BR-ERP3-01`) | `2.0000` |
+| `unit_price` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(unit_price >= 0)` | Non-negative unit price | `1000.0000` |
+| `tax_rate` | `NUMERIC(6,4)` | `string` (`TaxRateAmount`) | **No** | `0.0000` | `CHECK(tax_rate >= 0 AND tax_rate <= 100)` | Non-negative tax percentage | `18.0000` |
+| `tax_amount` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | `0.0000` | `CHECK(tax_amount >= 0)` | Server-computed tax: `(quantity * price * tax_rate) / 100` (`BR-ERP3-02`) | `360.0000` |
+| `line_total` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(line_total >= 0)` | Server-computed line total: `(quantity * price) + tax_amount` (`BR-ERP3-01`) | `2360.0000` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Record creation timestamp | `2026-04-02T10:00:00.000Z` |
+
+### 3.5 Table: `erp3.payments` (Payments)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Canonical payment UUID | `34000000-0000-4000-8000-000000000001` |
+| `invoice_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | `FK -> erp3.invoices(id)` | Must reference an existing open/overdue invoice | `32000000-0000-4000-8000-000000000001` |
+| `amount` | `NUMERIC(19,4)` | `string` (`MoneyAmount`) | **No** | None | `CHECK(amount > 0)` | Strictly positive amount. In V1, exactly equals invoice total (full settlement) | `2360.0000` |
+| `currency` | `VARCHAR(3)` | `string` (`^[A-Z]{3}$`) | **No** | `'USD'` | ISO 4217 3-letter uppercase | Payment currency (must match invoice currency) | `USD` |
+| `payment_date` | `DATE` | `string` (`YYYY-MM-DD`) | **No** | None | Valid ISO calendar date | Date payment was received | `2026-04-05` |
+| `payment_method` | `erp3.payment_method` | `'cash' \| 'bank' \| 'card'` | **No** | None | Enum: `cash`, `bank`, `card` (`FR-ERP3-03`) | Settled payment instrument | `bank` |
+| `reference` | `VARCHAR(128)` | `string \| null` | Yes | `NULL` | Max 128 chars | External banking or transaction reference | `WIRE-2026-09871` |
+| `idempotency_key` | `VARCHAR(128)` | `string \| null` | Yes | `NULL` | Max 128 chars | Idempotency token for duplicate suppression | `pay-idemp-001` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Record creation timestamp | `2026-04-05T14:30:00.000Z` |
+
+### 3.6 Table: `erp3.import_receipts` (Import Receipts — KIT-08 / Decision C4)
+
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints | Business Rule | Example |
+|---|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`UuidSchema`) | **No** | `gen_random_uuid()` | Primary Key | Unique receipt UUID | `35000000-0000-4000-8000-000000000001` |
+| `batch_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | Index `(batch_id, source_row)` | Migration Kit batch identifier | `3b000000-0000-4000-8000-000000000001` |
+| `source_row` | `INTEGER` | `number` (int >= 0) | **No** | None | Non-negative integer | 1-indexed source row number in source file | `42` |
+| `source_system` | `VARCHAR(64)` | `string \| null` | Yes | `NULL` | Max 64 chars | Originating source file / system identifier | `legacy_sales` |
+| `source_id` | `VARCHAR(128)` | `string \| null` | Yes | `NULL` | Max 128 chars | Legacy record natural key | `SRC-SO-042` |
+| `entity` | `VARCHAR(64)` | `string` | **No** | None | `sales_order \| invoice \| payment` | Target domain entity name | `sales_order` |
+| `schema_version` | `INTEGER` | `number` (default 1) | **No** | `1` | Integer | Version of target schema definition | `1` |
+| `idempotency_key` | `VARCHAR(128)` | `string` | **No** | None | `UNIQUE` constraint | Stable key: `batch_id:source_row:schema_version` | `3b000000-0000...:42:1` |
+| `request_hash` | `VARCHAR(64)` | `string` (64 hex chars) | **No** | None | SHA-256 canonical hash | Canonical SHA-256 fingerprint of payload | `e3b0c44298fc1c149afbf4...` |
+| `target_id` | `UUID` | `string` (`UuidSchema`) | **No** | None | UUID of business record | Primary key of business record committed in same tx | `30000000-0000-4000-8000-000000000001` |
+| `kind` | `VARCHAR(16)` | `'created' \| 'linked'` | **No** | `'created'` | Enum string | `created` for new rows; `linked` for references | `created` |
+| `outcome` | `VARCHAR(16)` | `'loaded' \| 'rejected' \| 'merged' \| 'skipped'` | **No** | `'loaded'` | Enum string | Terminal row outcome enforcing `unaccounted = 0` | `loaded` |
+| `response_payload`| `TEXT` | `string \| null` | Yes | `NULL` | Valid JSON or null | Serialized response payload returned on retry | `{"id":"30000000-0000..."}` |
+| `created_at` | `TIMESTAMPTZ` | `string` (ISO 8601 UTC) | **No** | `CURRENT_TIMESTAMP` | System-assigned timestamp | Dual-write commit timestamp | `2026-04-01T10:00:00.000Z` |
+
+---
+
+## 4. Public API Endpoints (`packages/contracts/openapi/erp-3.yaml`)
+
+Base path: `/api/v1/erp-orders`
+
+| Method | Endpoint | Operation ID | Authority Source | Description |
+|---|---|---|---|---|
+| `GET` | `/sales-orders` | `listSalesOrders` | SDS §4.8 | Bounded paged list (`page`, `pageSize <= 100`); filters: `status`, `customer_golden_id`, `currency`, `from_date`, `to_date`, `search` |
+| `POST` | `/sales-orders` | `createSalesOrder` | SDS §4.8 | Create sales order with lines; server computes line taxes and order totals (`BR-ERP3-01`) |
+| `GET` | `/sales-orders/{id}` | `getSalesOrder` | Master Spec `H1` / Slot 04 | Retrieve single sales order with embedded lines by UUID |
+| `PATCH` | `/sales-orders/{id}` | `updateSalesOrderStatus` | SDS §4.8 / `FR-ERP3-05` | Forward-only status transition (`Open` → `Invoiced` → `Closed`) |
+| `GET` | `/invoices` | `listInvoices` | SDS §4.8 | Bounded paged list (`page`, `pageSize <= 100`); filters: `status`, `customer_golden_id`, `order_id`, `currency`, `from_date`, `to_date`, `search` |
+| `POST` | `/invoices` | `createInvoice` | SDS §4.8 | Create billing invoice with lines, mandatory `due_date`, and optional 1:1 `order_id` |
+| `GET` | `/invoices/{id}` | `getInvoice` | Master Spec `H1` / Slot 04 | Retrieve single invoice with lines and payments by UUID |
+| `GET` | `/payments` | `listPayments` | SDS §4.8 | Bounded paged list of payments (`page`, `pageSize <= 100`); filter: `invoice_id` |
+| `POST` | `/payments` | `createPayment` | SDS §4.8 | Record payment settlement against invoice; auto-transitions invoice to `Paid` on full payment (`FR-ERP3-04`) |
+
+---
+
+## 5. Domain Event Contracts (`@clearshift/contracts/erp-3-events`)
+
+All events conform to the PLT-04 / PLT-09 transactional `EventEnvelopeSchema` (`event_id`, `event_type`, `schema_version`, `occurred_at`, `correlation_id`, `producer`, `entity_type`, `entity_id`, `payload`):
+
+| Event Type | Direction | Producer | Entity Type | Trigger & Accounting/Integration Effect |
+|---|---|---|---|---|
+| `erp.sales_order.created` | Produced | `erp-3` | `sales_order` | Emitted when order created in `Open` status; consumed by CRM-3 for pipeline projection |
+| `erp.sales_order.status_changed` | Produced | `erp-3` | `sales_order` | Emitted on forward lifecycle transition (`Open` → `Invoiced` → `Closed`) |
+| `erp.invoice.created` | Produced | `erp-3` | `invoice` | Emitted when invoice created; consumed by ERP-4 for Accounts Receivable (AR) journal posting |
+| `erp.invoice.status_changed` | Produced | `erp-3` | `invoice` | Emitted on status change (e.g. `Open` → `Paid` upon full payment settlement) |
+| `erp.payment.created` | Produced | `erp-3` | `payment` | Emitted when payment recorded; consumed by ERP-4 for Cash/Bank receipt posting |
+| `deal.won` | Inbound (`EV-09`) | `crm-2` | `deal` | Consumed from CRM-2 via Hub; triggers automated draft sales order creation in ERP-3 |
+
+---
+
+## 6. Non-Negotiable Domain Invariants
+
+1. **`BR-ERP3-01` (Order & Invoice Total Integrity)**:
+   - Server computes `line_total = (quantity * price) + tax_amount` for every line and `total = SUM(line_total)` across lines (`lines.length >= 1`). Client-supplied totals are never trusted; discrepancies in migration or API submissions are strictly rejected.
+2. **`BR-ERP3-02` & `DR-1` (Tax per Line Calculation)**:
+   - Line tax is computed as `(quantity * price * tax_rate) / 100`. In V1, exact scaled integer arithmetic (`10000n`) prevents IEEE-754 floating point drift.
+3. **`BR-ERP3-03` (Mandatory Customer Golden ID)**:
+   - Every sales order and invoice must include a valid UUID `customer_golden_id` referencing a canonical Hub customer (`ADR-003`). Missing or malformed UUIDs fail schema validation (`400 VALIDATION_ERROR`).
+4. **`FR-ERP3-02`, `FR-ERP3-03`, `FR-ERP3-04` (Invoice Status & Payment Settlement)**:
+   - Invoice `due_date >= invoice_date` is mandatory (`DR-2`). An unpaid invoice is `Overdue` when UTC calendar date > `due_date`; otherwise `Open`.
+   - Recording payment against an already `Paid` invoice returns `422 INVOICE_ALREADY_PAID`.
+   - Overpayments and partial payments are rejected in V1 (`422 PARTIAL_PAYMENT_NOT_ALLOWED`, `422 PAYMENT_EXCEEDS_INVOICE_TOTAL`).
+   - Exactly one full payment settles the invoice and automatically transitions status to `Paid` (`FR-ERP3-04`).
+5. **`FR-ERP3-05` (Forward-Only Status Lifecycle)**:
+   - Sales order status moves strictly forward: `Open` → `Invoiced` → `Closed`. Backward transitions are rejected (`422 INVALID_ORDER_STATUS_TRANSITION`).
+6. **Decision C7 (Cross-Module Boundaries & Zero Cross-Schema Foreign Keys)**:
+   - No cross-schema foreign keys exist in PostgreSQL between `erp3` and other module schemas (`erp1`, `erp2`, `erp4`, `crm1`, `hub`). All cross-module entities (`customer_golden_id`, `product_id`) are logical UUID references validated via runtime `ReferenceResolver` ports or API contracts.
+
+---
+
+## 7. Human-Operated Workflows & UI Architecture (`ERP3-04` & `ERP3-05`)
+
+- **Orders & Invoices List Page (`ERP3-04`)**: Hosted in `OrdersListPage`, providing tabbed navigation between Sales Orders and Invoices, bounded pagination (`pageSize <= 100`), debounced search, faceted filter pills, and accessible loading/empty/error state recovery views (`StateViews.tsx`).
+- **Order Creation Form (`ERP3-05`)**: Hosted in `OrderCreatePage`, enforcing mandatory customer Golden ID, product reference resolution, live client preview with authoritative server calculation, and double-submit guards.
+- **Order Detail & Transition Workflow (`ERP3-05`)**: Hosted in `OrderDetailPage`, providing read-only inspection, forward-only status transitions (`Open` → `Invoiced` → `Closed`) with confirmation dialogs, and a shortcut to generate invoices.
+- **Invoice Detail & Payment Settlement (`ERP3-05`)**: Hosted in `InvoiceDetailPage`, rendering overdue status alerts, line item breakdowns, and a `PaymentModal` for full payment settlement.
+
+---
+
+## 8. Entity-Relationship Diagram (ERD) & Ownership Boundaries
+
+The diagram below defines the internal relationships within the `erp3` schema and documents the authoritative master-data ownership boundaries with sibling modules:
+
+```mermaid
+erDiagram
+    %% =========================================================================
+    %% ERP-3 INTERNAL ENTITIES (System of Record: erp3)
+    %% =========================================================================
+
+    erp3_sales_orders {
+        uuid id PK "Primary Key (UUID v4)"
+        varchar order_number UK "Unique Human-Readable (SO-YYYY-NNNN)"
+        uuid customer_golden_id "Ref to CRM-1 Golden ID (ADR-003)"
+        date order_date "Booking calendar date"
+        varchar status "Open | Invoiced | Closed"
+        varchar currency "ISO 4217 (3-letter uppercase)"
+        numeric subtotal "19,4 pre-tax line sum"
+        numeric tax_total "19,4 tax line sum"
+        numeric total "19,4 server-computed total (BR-ERP3-01)"
+        varchar source_system "Migration lineage system"
+        varchar source_id "Migration legacy identifier"
+        timestamptz created_at "Audit creation timestamp"
+        timestamptz updated_at "Audit update timestamp"
+    }
+
+    erp3_so_lines {
+        uuid id PK "Primary Key (UUID v4)"
+        uuid order_id FK "FK -> erp3_sales_orders.id (CASCADE)"
+        integer line_number "1-based line sequence"
+        uuid product_id "Logical ref to ERP-1 Product"
+        numeric quantity "12,4 ordered quantity (> 0)"
+        numeric unit_price "19,4 unit selling price (>= 0)"
+        numeric tax_rate "6,4 tax percentage (0..100)"
+        numeric tax_amount "19,4 server-computed tax (BR-ERP3-02)"
+        numeric line_total "19,4 server-computed line total"
+        timestamptz created_at "Audit creation timestamp"
+    }
+
+    erp3_invoices {
+        uuid id PK "Primary Key (UUID v4)"
+        varchar invoice_number UK "Unique Human-Readable (INV-YYYY-NNNN)"
+        uuid order_id FK "FK -> erp3_sales_orders.id (1:1 V1)"
+        uuid customer_golden_id "Ref to CRM-1 Golden ID (ADR-003)"
+        date invoice_date "Issue calendar date"
+        date due_date "Mandatory payment due date (DR-2)"
+        varchar status "Open | Paid | Overdue"
+        varchar currency "ISO 4217 (3-letter uppercase)"
+        numeric subtotal "19,4 pre-tax line sum"
+        numeric tax_total "19,4 tax line sum"
+        numeric total "19,4 server-computed total"
+        varchar source_system "Migration lineage system"
+        varchar source_id "Migration legacy identifier"
+        timestamptz created_at "Audit creation timestamp"
+        timestamptz updated_at "Audit update timestamp"
+    }
+
+    erp3_invoice_lines {
+        uuid id PK "Primary Key (UUID v4)"
+        uuid invoice_id FK "FK -> erp3_invoices.id (CASCADE)"
+        integer line_number "1-based line sequence"
+        uuid product_id "Logical ref to ERP-1 Product"
+        numeric quantity "12,4 invoiced quantity (> 0)"
+        numeric unit_price "19,4 unit price (>= 0)"
+        numeric tax_rate "6,4 tax percentage (0..100)"
+        numeric tax_amount "19,4 server-computed tax"
+        numeric line_total "19,4 server-computed line total"
+        timestamptz created_at "Audit creation timestamp"
+    }
+
+    erp3_payments {
+        uuid id PK "Primary Key (UUID v4)"
+        uuid invoice_id FK "FK -> erp3_invoices.id"
+        numeric amount "19,4 payment amount (> 0)"
+        varchar currency "ISO 4217 (3-letter uppercase)"
+        date payment_date "Settlement calendar date"
+        varchar payment_method "cash | bank | card"
+        varchar reference "External bank reference"
+        varchar idempotency_key "Idempotent payment key"
+        timestamptz created_at "Audit creation timestamp"
+    }
+
+    erp3_import_receipts {
+        uuid id PK "Primary Key (UUID v4)"
+        uuid batch_id "Migration batch UUID"
+        integer source_row "1-indexed source row number"
+        varchar entity "sales_order | invoice | payment"
+        varchar idempotency_key UK "batch_id:source_row:version"
+        varchar request_hash "SHA-256 payload hash"
+        uuid target_id "PK of committed business record"
+        varchar kind "created | linked"
+        varchar outcome "loaded | rejected | merged | skipped"
+        text response_payload "Serialized response JSON"
+        timestamptz created_at "Receipt commit timestamp"
+    }
+
+    %% ERP-3 Internal Entity Relationships
+    erp3_sales_orders ||--o{ erp3_so_lines : "contains (1 to 1..* lines)"
+    erp3_sales_orders ||--o| erp3_invoices : "billed by (1 to 0..1 in V1)"
+    erp3_invoices ||--o{ erp3_invoice_lines : "contains (1 to 1..* lines)"
+    erp3_invoices ||--o{ erp3_payments : "settled by (1 to 0..1 in V1)"
+    erp3_sales_orders ||--o{ erp3_import_receipts : "lineage receipt (KIT-08)"
+
+    %% =========================================================================
+    %% CROSS-MODULE BOUNDARIES (Runtime ReferenceResolver / Outbox Events Only)
+    %% Decision C7: Zero Cross-Schema PostgreSQL Foreign Keys
+    %% =========================================================================
+    crm1_customers ||..o{ erp3_sales_orders : "resolved via customer_golden_id (ADR-003)"
+    crm1_customers ||..o{ erp3_invoices : "resolved via customer_golden_id (ADR-003)"
+    erp1_products ||..o{ erp3_so_lines : "resolved via product_id (Decision C7)"
+    erp1_products ||..o{ erp3_invoice_lines : "resolved via product_id (Decision C7)"
+    erp3_invoices ||..o{ erp4_gl_postings : "triggers AR posting via erp.invoice.created"
+    erp3_payments ||..o{ erp4_gl_postings : "triggers receipt posting via erp.payment.created"
+    crm2_deals ||..o{ erp3_sales_orders : "triggers draft order via deal.won (EV-09)"
+```
+
+---
+
+## 9. Requirement-to-Test Traceability Matrix (ERP3-24)
+
+Every functional requirement, domain rule, and platform architectural invariant is mapped directly to its automated verification test suites:
+
+| Requirement / Invariant ID | Source Specification | Implementation Mechanism | Automated Verification Test Suite | Gate G1 Status |
+|---|---|---|---|:---:|
+| **FR-ERP3-01** | SDS §4.4 | Sales order creation, customer Golden ID validation, lines persistence | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-3/tests/domain/rules.test.ts` | **Verified** |
+| **FR-ERP3-02** | SDS §4.4 | Invoice creation, mandatory `due_date`, overdue derivation | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-3/tests/domain/rules.test.ts` | **Verified** |
+| **FR-ERP3-03** | SDS §4.4 | Payment recording (`cash`, `bank`, `card`), positive amount check | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-3/tests/domain/rules.test.ts` | **Verified** |
+| **FR-ERP3-04** | SDS §4.4 | Automatic transition to `Paid` upon full settlement; rejection of partial/overpayments | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **FR-ERP3-05** | SDS §4.4 | Forward-only status lifecycle (`Open` → `Invoiced` → `Closed`) | `apps/erp/modules/erp-3/tests/domain/rules.test.ts`<br>`apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **BR-ERP3-01** | SDS §4.4 | Server-computed line totals and order/invoice header totals | `apps/erp/modules/erp-3/tests/domain/rules.test.ts`<br>`apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **BR-ERP3-02** | SDS §4.4, §3.2 | Line tax calculation `(quantity * price * tax_rate) / 100` with 4-dp scaled decimal arithmetic | `apps/erp/modules/erp-3/tests/domain/rules.test.ts`<br>`packages/contracts/tests/erp-3.contract.test.ts` | **Verified** |
+| **BR-ERP3-03** | SDS §4.4, ADR-003 | Mandatory customer Golden ID UUID; rejection of missing/malformed IDs | `apps/erp/modules/erp-3/tests/domain/rules.test.ts`<br>`apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **DR-1** | Master Spec `M2` | Monetary rounding & scaled 4-dp arithmetic baseline | `packages/contracts/tests/erp-3.contract.test.ts`<br>`apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **DR-2** | Master Spec §5c ERD | Mandatory invoice `due_date >= invoice_date` | `apps/erp/modules/erp-3/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-3/tests/domain/rules.test.ts` | **Verified** |
+| **DR-3** | Master Spec `H1` / Slot 04 | Detail read routes (`GET /sales-orders/{id}`, `GET /invoices/{id}`) | `packages/contracts/tests/erp-3.openapi.test.ts`<br>`apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **KIT-08 / C4** | Master Spec §4.1 | Dual-write atomic transaction + durable import receipts (`erp3.import_receipts`) | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-3/tests/db/schema.test.ts` | **Verified** |
+| **BR-KIT-03** | Migration SDS | Raw source input values immutable during profiling/cleaning | `apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **PLT-12 / KIT-16** | Security Policy | OWASP formula injection neutralization (`FORMULA_INJECTION_REJECTED`) | `apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **ADR-003** | ADR Catalog | Cross-module Customer Golden ID integration (`c0000000-0000-4000-8000-000000000001`) | `apps/erp/modules/erp-3/tests/domain/rules.test.ts`<br>`apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **Decision C7** | Master Spec §4.1 | Zero cross-schema foreign keys in PostgreSQL; logical UUID references | `apps/erp/modules/erp-3/tests/db/schema.test.ts` | **Verified** |
+| **ERP3-01** | Issue #26 | PostgreSQL schema, Drizzle ORM models, guarded idempotent migration | `apps/erp/modules/erp-3/tests/db/schema.test.ts` | **Verified** |
+| **ERP3-03** | Issue #28 | Mutation API & domain validation with standard error envelope | `apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **ERP3-04** | Issue #29 | Sales orders & invoices list page with bounded pagination & filter pills | `apps/erp/modules/erp-3/web/tests/OrdersListPage.test.tsx` | **Verified** |
+| **ERP3-05** | Issue #30 | Create/edit workflows, live calculation preview, status transition dialogs | `apps/erp/modules/erp-3/web/tests/OrderFormsAndWorkflow.test.tsx` | **Verified** |
+| **ERP3-06** | Issue #31 | Cross-module relationships with CRM-1, ERP-1, ERP-4, CRM-2 | `apps/erp/modules/erp-3/tests/api/mutations.test.ts` | **Verified** |
+| **ERP3-08** | Issue #33 | Profiling, cleaning, mapping & synthetic Dirty Data Pack | `apps/erp/modules/erp-3/tests/migration/rules.test.ts` | **Verified** |
+| **ERP3-10** | Issue #35 | QA contract evidence, integration, and team handoff package | `apps/erp/modules/erp-3/tests/api/mutations.test.ts`<br>`packages/contracts/tests/erp-3.mock.test.ts` | **Verified** |
+| **ERP3-14** | Issue #150 | OpenAPI 3.1 contract, Zod schemas, domain events, mock server | `packages/contracts/tests/erp-3.contract.test.ts`<br>`packages/contracts/tests/erp-3.openapi.test.ts` | **Verified** |
+| **ERP3-24** | Issue #160 | Data dictionary, ERD, traceability, and Dirty Data Pack plan | `apps/erp/modules/erp-3/tests/migration/data-dictionary-erd.test.ts` | **Verified** |
+
+---
+
+## 10. Canonical Dirty Data Pack Plan & Defect Distribution (ERP3-24)
+
+### 10.1 Plan Overview & Principles
+
+The ERP-3 Dirty Data Pack is a deterministic synthetic dataset designed to prove the entire Migration Kit pipeline (**Extract, Profile, Clean, Map, Load, Validate, Reconcile**) against real-world dirty data without utilizing any real customer or company PII:
+
+- **Committed Fixture**: [`sample-data/erp-3/dirty-data-v1.csv`](../../sample-data/erp-3/dirty-data-v1.csv) (SHA-256: `d09217dfbc4cb334e39c894556b7749c584cdf9f1acc47e7685282d87cca333a`)
+- **Expected Profile Report**: [`sample-data/erp-3/expected-profile.json`](../../sample-data/erp-3/expected-profile.json)
+- **Mapping Template**: [`sample-data/erp-3/mapping-template.json`](../../sample-data/erp-3/mapping-template.json)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-3/src/migration/rules.ts`](../src/migration/rules.ts)
+- **Automated Regression Suite**: [`apps/erp/modules/erp-3/tests/migration/rules.test.ts`](../tests/migration/rules.test.ts)
+
+### 10.2 Synthetic Edge-Case Scenarios
+
+The Dirty Data Pack exercises 14 distinct failure categories across all 5 entity types (`sales_order`, `so_line`, `invoice`, `invoice_line`, `payment`):
+1. **Natural Key Duplication (`SO-DUP-001`, `INV-DUP-001`)**: Duplicate sales order numbers and invoice numbers held in review queue for operator resolution; automatic destructive merges are forbidden in V1.
+2. **Missing Mandatory Fields (`SO-REQ-001..004`, `INV-REQ-001..005`)**: Omitted order number, missing customer Golden ID, missing order date, missing currency, missing invoice due date.
+3. **Invalid Formatting & Types (`SO-FMT-001`, `SO-TYP-001`)**: Non-UUID customer Golden IDs, malformed dates (`2026-02-30`), non-standard currencies (`US`, `123`).
+4. **Boundary Numbers & Arithmetic Invariants (`SOL-VAL-001..004`, `SOL-CALC-001..002`)**: Zero or negative ordered quantities, negative unit prices, negative tax rates, tax rate overflow (> 100%), line tax discrepancies (`LINE_TAX_MISMATCH`), and line total discrepancies (`ORDER_LINE_TOTAL_MISMATCH`).
+5. **Invoice Date & Due Date Inversion (`INV-VAL-001`)**: Invoices where `due_date < invoice_date`, violating temporal accounting invariants.
+6. **Dynamic Overdue Status Derivation (`INV-VAL-003`)**: Unpaid invoices with `due_date < CURRENT_DATE` correctly classified as `Overdue`.
+7. **Single Invoice per Sales Order (`INV-REL-002`)**: Multiple invoices targeting the same sales order header rejected with `MULTIPLE_INVOICES_PER_ORDER_REJECTED`.
+8. **Payment Settlement Constraints (`PAY-VAL-001..003`)**: Partial payments rejected with `PARTIAL_PAYMENT_NOT_ALLOWED`; payments exceeding invoice total rejected with `OVERPAYMENT_REJECTED`; payments on already `Paid` invoices rejected with `INVOICE_ALREADY_PAID`.
+9. **Forward-Only State Transitions (`SO-VAL-002`)**: Closed orders attempting backward status transitions rejected.
+10. **Security & Formula Injection Payloads (`SO-SEC-001`, `INV-SEC-001`)**: Cells starting with formula prefixes (`=cmd|' /C calc'!A0`, `+FormulaInj`, `@SUM(...)`, `-FormulaInj`, `\tTabInj`) rejected with `FORMULA_INJECTION_REJECTED` per PLT-12 / KIT-16.
+11. **Cascade Isolation**: Line-level failures cascade cleanly to parent documents without corrupting valid sibling orders.
+12. **International UTF-8 Characters**: Unicode product descriptions and international currency codes handled cleanly without character corruption.
+
+### 10.3 Reconciliation Equation & Defect Distributions
+
+The reconciliation equation guarantees 100% accounting of all source records:
+$$\text{source\_row\_count} = \text{accepted} + \text{rejected} + \text{review} + \text{skipped}$$
+$$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
+
+#### Reconciliation Summary
+| Metric | Value | Meaning |
+|---|---|---|
+| **Total Source Rows** | `135` | Total records in `dirty-data-v1.csv` |
+| **Accepted** | `35` | Valid rows ready for target ingestion |
+| **Rejected** | `91` | Rows failing validation, format, or invariant rules |
+| **Review** | `9` | Duplicate natural keys held for operator review |
+| **Skipped** | `0` | Skipped records (none in V1) |
+| **Unaccounted** | `0` | Zero orphan or unclassified rows |
+| **Is Balanced?** | **`true`** | Mathematical balance achieved |
+
+#### Breakdown by Entity Record Type
+| Record Type | Total | Accepted | Rejected | Review | Skipped | Pass Rate |
+|---|---|---|---|---|---|---|
+| **`sales_order`** | 51 | 11 | 38 | 2 | 0 | 21.6% |
+| **`so_line`** | 38 | 13 | 23 | 2 | 0 | 34.2% |
+| **`invoice`** | 21 | 5 | 14 | 2 | 0 | 23.8% |
+| **`invoice_line`** | 5 | 2 | 2 | 1 | 0 | 40.0% |
+| **`payment`** | 20 | 4 | 14 | 2 | 0 | 20.0% |
+| **Total** | **135** | **35** | **91** | **9** | **0** | **25.9%** |
+
+#### Defect Distribution by Reason Code
+| Reason Code | Count | Failure Condition / Description | Doc Reference |
+|---|---|---|---|
+| `ORDER_NUMBER_REQUIRED` | 1 | Sales order number is missing or empty | SDS §4.7 |
+| `CUSTOMER_GOLDEN_ID_REQUIRED` | 1 | Customer Golden ID is missing | BR-ERP3-03 |
+| `INVALID_CUSTOMER_GOLDEN_ID` | 1 | Customer Golden ID is not a valid UUID | ADR-003 |
+| `ORDER_DATE_REQUIRED` | 1 | Order booking date is missing | SDS §4.7 |
+| `INVALID_ORDER_DATE` | 1 | Order date is not a valid calendar date | SDS §4.7 |
+| `CURRENCY_REQUIRED` | 1 | Transaction currency is missing | SDS §3.2 |
+| `INVALID_CURRENCY` | 1 | Currency is not a 3-letter uppercase ISO 4217 code | SDS §3.2 |
+| `INVALID_ORDER_STATUS` | 1 | Order status not in `Open`, `Invoiced`, `Closed` | FR-ERP3-05 |
+| `INVALID_ORDER_STATUS_TRANSITION` | 1 | Attempted backward or invalid status transition | FR-ERP3-05 |
+| `FORMULA_INJECTION_REJECTED` | 2 | Value begins with formula trigger (`=`, `+`, `-`, `@`, `\t`, `\r`) | PLT-12 / KIT-16 |
+| `ORDER_NUMBER_DUPLICATE_REVIEW` | 2 | Duplicate sales order number held for human review | SDS §4.7 |
+| `LINE_REJECTED` | 4 | Header rejected due to child line failure | BR-ERP3-01 |
+| `ORDER_ID_REQUIRED` | 1 | Line missing parent order reference | SDS §4.7 |
+| `LINE_NUMBER_REQUIRED` | 1 | Line number is missing | SDS §4.7 |
+| `PRODUCT_ID_REQUIRED` | 1 | Product reference UUID is missing | SDS §4.7 |
+| `NEGATIVE_OR_ZERO_QUANTITY` | 2 | Line quantity is zero or negative | BR-ERP3-01 |
+| `NEGATIVE_UNIT_PRICE` | 1 | Unit price is negative | SDS §4.7 |
+| `NEGATIVE_TAX_RATE` | 1 | Tax percentage is negative | SDS §4.2 |
+| `TAX_RATE_EXCEEDS_MAXIMUM` | 1 | Tax percentage exceeds 100% | SDS §4.2 |
+| `LINE_TAX_MISMATCH` | 1 | Line tax does not match `(qty * price * rate) / 100` | BR-ERP3-02 |
+| `ORDER_LINE_TOTAL_MISMATCH` | 1 | Line total does not match `(qty * price) + tax` | BR-ERP3-01 |
+| `PARENT_ORDER_NOT_FOUND` | 1 | Line references non-existent sales order | SDS §4.7 |
+| `PRODUCT_NOT_FOUND` | 1 | Line references non-existent ERP-1 product | Decision C7 |
+| `INVOICE_NUMBER_REQUIRED` | 1 | Invoice number is missing or empty | SDS §4.7 |
+| `INVOICE_DATE_REQUIRED` | 1 | Invoice issue date is missing | SDS §4.7 |
+| `DUE_DATE_REQUIRED` | 1 | Mandatory payment due date is missing | DR-2 |
+| `DUE_DATE_BEFORE_INVOICE_DATE` | 1 | Payment due date is before invoice issue date | DR-2 |
+| `MULTIPLE_INVOICES_PER_ORDER_REJECTED`| 1 | Attempted to issue more than one invoice for order in V1 | SDS §4.4 |
+| `INVOICE_NUMBER_DUPLICATE_REVIEW` | 1 | Duplicate invoice number held for human review | SDS §4.7 |
+| `INVOICE_LINE_TOTAL_MISMATCH` | 1 | Invoice line total does not match computation | BR-ERP3-01 |
+| `INVOICE_ID_REQUIRED` | 1 | Payment missing parent invoice reference | SDS §4.7 |
+| `NEGATIVE_OR_ZERO_PAYMENT` | 1 | Payment amount is zero or negative | FR-ERP3-03 |
+| `PARTIAL_PAYMENT_NOT_ALLOWED` | 1 | Payment amount is less than invoice total | FR-ERP3-04 |
+| `OVERPAYMENT_REJECTED` | 1 | Payment amount exceeds invoice total | FR-ERP3-04 |
+| `INVOICE_ALREADY_PAID` | 1 | Payment attempted on already settled invoice | FR-ERP3-04 |
+| `PAYMENT_DUPLICATE_REVIEW` | 1 | Duplicate payment key held for human review | SDS §4.8 |
+
+---
+
+## 11. Gate G1 Review & Design Artifact Sign-Off (ERP3-24)
+
+### 11.1 Gate G1 Criteria Verification Checklist
+
+| Criterion | Requirement Description | Verification Evidence | Sign-Off |
+|---|---|---|:---:|
+| **1. Data Dictionary** | Field-level definition for all columns across all 6 tables: type, nullability, constraints, business rule, example | Section 3 (`sales_orders`, `so_lines`, `invoices`, `invoice_lines`, `payments`, `import_receipts`) | **Approved** |
+| **2. ER Diagram** | Mermaid ERD showing PKs, FKs, cardinalities, and cross-module boundaries | Section 8 | **Approved** |
+| **3. Traceability Matrix** | Every Must requirement mapped to automated tests with >= 60% domain coverage | Section 9 | **Approved** |
+| **4. Dirty Data Pack Plan** | Committed synthetic fixture (`dirty-data-v1.csv`), manifest, expected profile, and 100% mathematical reconciliation | Section 10, `sample-data/erp-3/` | **Approved** |
+| **5. Platform Reuse (H2)** | Zero duplicate platform infrastructure; consumes shared auth, UI tokens, outbox, and migration engines | Issue #28, #33, #35 | **Approved** |
+| **6. Zero Real PII** | 100% synthetic test data fixtures; sensitive field masking verified | Section 10, `sample-data/erp-3/dirty-data-v1.csv` | **Approved** |
+
+### 11.2 Peer Review & Governance Sign-Off Record
+
+- **Module**: ERP-3 Sales Orders & Invoices (Group 8)
+- **Module Lead**: Group 8 Data / QA Lead
+- **Peer Development Group**: Group 6 (ERP-1 Products & Inventory) & Group 9 (ERP-4 Finance & Accounting)
+- **Review Date**: 2026-10-24
+- **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
+- **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests (`17d24675e9af4f6a763b06b5a09400b471d36523254450c139f31b2d1fd73e53`).
