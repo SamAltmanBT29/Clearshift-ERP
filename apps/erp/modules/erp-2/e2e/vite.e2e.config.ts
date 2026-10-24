@@ -35,6 +35,8 @@ interface E2ePlugin {
 const REPO_ROOT = process.cwd();
 const CONTRACTS_INDEX = path.resolve(REPO_ROOT, 'packages/contracts/src/index.ts');
 const UI_INDEX = path.resolve(REPO_ROOT, 'packages/ui/src/index.ts');
+const KIT_INDEX = path.resolve(REPO_ROOT, 'packages/kit/src/index.ts');
+const KIT_METADATA = path.resolve(REPO_ROOT, 'packages/kit/src/domain/metadata.ts');
 const BROWSER_CONTRACTS = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-2/e2e/host/contracts-browser.ts');
 const BROWSER_UI = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-2/e2e/host/ui-browser.ts');
 const APP_MODULE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-2/src/app.ts');
@@ -101,6 +103,7 @@ function erp2E2eApi(): E2ePlugin {
       // The shared alias list has already rewritten the bare names to these index files.
       if (source === '@clearshift/contracts' || source === CONTRACTS_INDEX) return BROWSER_CONTRACTS;
       if (source === '@cs/ui' || source === UI_INDEX) return BROWSER_UI;
+      if (source === '@cs/kit' || source === KIT_INDEX) return KIT_METADATA;
       return null;
     },
     configureServer(server: DevServerLike) {
