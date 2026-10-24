@@ -685,9 +685,67 @@ When the server returns an HTTP 400 Bad Request:
 
 ---
 
+## 17. Detail/Edit Workflow, Audit Metadata, and Linked Records Specification (ERP2-21 / Issue #137)
+
+### 17.1 Overview & Architecture
+
+Issue #137 (`[ERP2-21]`) implements production-grade entity detail views, inline and drawer-based editing workflows, audit metadata panels, and cross-module linked record sub-tables for ERP-2 Vendors and Purchasing in accordance with SDS ClearShift ERP v2.0 §4.3 and §4.9:
+- **Canonical Master Views**: Detail pages render primary entity attributes, server-masked bank coordinates, system timestamps, and cross-module Golden IDs (`GID-VENDOR-XXXX`).
+- **Controlled Mutation Workflows**: Operators can update allowlisted fields via inline form controls or a dedicated edit drawer (`VendorEditDrawer`), strictly protected by RBAC permissions (`erp:vendors:write` / `vendors:write` / `admin`).
+- **Downstream & Cross-Module Traceability**: Linked entity sub-tables expose related purchase orders in ERP-2, line item references to ERP-1 product master records (`/erp1/products/:id`), and downstream accounts payable vendor bills in ERP-4 (`/erp4/bills`).
+- **Concurrent Conflict Protection (HTTP 409)**: Simultaneous edits by multiple operators or background batch syncs trigger an accessible conflict banner prompting the operator to refresh latest state and re-apply changes safely.
+
+### 17.2 Primary Attributes, Timestamps & Canonical Golden ID Resolution (AC1)
+
+The detail view displays all primary attributes alongside immutable system metadata:
+- **Primary Attributes**: Legal name, Tax Number / EIN, procurement email, phone number, default currency, street address, city, country, and server-masked bank details (`XXXX-XXXX-7890`).
+- **System Timestamps**: Formatted `created_at` and `updated_at` timestamps sourced directly from PostgreSQL timestamp columns.
+- **Audit Panel (`VendorAuditPanel`)**: Dedicated component displaying internal record UUID, source system, source ID, and PCI/GDPR compliance status.
+- **Canonical Golden ID Resolution (`resolveVendorGoldenId`)**:
+  - If `vendor.golden_id` is present on the record, it is rendered directly.
+  - If `vendor.source_id` is present, formats as `GID-VENDOR-${source_id.toUpperCase()}`.
+  - Otherwise, derives deterministically from the internal UUID: `GID-VENDOR-${id.slice(0, 8).toUpperCase()}`.
+  - Styled with a dedicated golden pill badge (`.cs-badge-golden`) for cross-module recognition across ERP-1, ERP-2, and ERP-4.
+
+### 17.3 Inline Edit & Drawer Forms with Permission Enforcement (AC2)
+
+Updating vendor attributes is supported through two flexible, accessible workflows:
+- **Allowlisted Mutable Fields**: Operators can modify legal name, tax number, email, phone number, currency, address line, city, and country. Immutable fields (record UUID, Golden ID, `created_at`, `updated_at`, bank mask) are protected from accidental alteration.
+- **Inline Edit Mode**: Toggled on `VendorDetailPage` via `Inline Edit`. Converts detail text items into validated input controls within the main card, with client-side validation rules, an active editing badge, and `Save Changes` / `Cancel` actions.
+- **Slide-Over Drawer (`VendorEditDrawer`)**: Provides a slide-over modal for focused editing without losing page context.
+- **RBAC Permission Gate**:
+  - Evaluates session claims for write capabilities (`erp:vendors:write`, `vendors:write`, `admin`, `procurement_manager`).
+  - When write permission is absent (`canEdit === false`), edit buttons are replaced with a read-only badge (`Permission: erp:vendors:write required`), drawer displays an access-denied message, and mutation requests are halted.
+- **Double-Submit Locking**: Both inline and drawer submit buttons lock during flight (`disabled={isSubmitting}`) to prevent duplicate network calls.
+
+### 17.4 Linked Entity Sub-Tables & Cross-Module Navigation (AC3)
+
+Detail screens integrate linked entity sub-tables with explicit navigation paths across module boundaries:
+- **Linked Purchase Orders (`VendorLinkedOrdersTable`)**:
+  - Fetches and displays purchase orders associated with the vendor (`GET /purchase-orders?vendor_id=:id`).
+  - Renders PO number, order date, status badge, line item count, and server-computed total.
+  - Provides direct navigation links to `/erp2/purchase-orders/:id` and a "+ New Purchase Order" button.
+  - Displays a clean zero-data state when no purchase orders exist yet.
+- **Owning Module Links in Purchase Orders (`PurchaseOrderDetailPage`)**:
+  - Owning vendor link navigates back to `/erp2/vendors/:vendor_id` with an `ERP-2 Master` badge.
+  - Line items table explicitly links each `product_id` to the owning module catalog: `/erp1/products/:product_id` with an `ERP-1 Product` badge.
+- **Downstream ERP-4 Finance & Bills Reference**:
+  - Both vendor and purchase order detail pages render an ERP-4 downstream reference panel (`.cs-cross-module-panel`).
+  - Provides direct deep links to matched vendor bills in ERP-4: `/erp4/bills?vendor_id=:id` and `/erp4/bills?po_number=:po_number`.
+
+### 17.5 Concurrent Modification Conflicts (HTTP 409) & Refresh Action (AC4)
+
+To prevent lost updates in distributed operational environments:
+- When a `PATCH` request to update a vendor or purchase order fails with HTTP 409 Conflict:
+  - An accessible alert banner (`.cs-conflict-banner` with `role="alert"`) displays prominently at the top of the detail page.
+  - Diagnostic copy explains: *"Concurrent Modification Conflict (HTTP 409): This record was updated by another operator or background job while you were editing. To prevent data corruption, your changes were not applied."*
+- **Actionable Refresh (`handleRefreshRecord`)**:
+  - The banner renders an explicit action button: `🔄 Refresh Record and Re-apply Changes` (`data-testid="conflict-refresh-btn"`).
+  - Clicking refresh calls `fetchVendorById(id)` to synchronize the latest canonical record from the server, clears the conflict error state, and displays a confirmation toast notifying the operator that current server state has been restored.
+
 ## 17. Module Authorization & Policy Integration Specification (ERP2-15 / Issue #131)
 
-### 17.1 Overview & Architecture Integration
+### 18.1 Overview & Architecture Integration
 
 In accordance with SDS §4.2, §4.9 and ADR-0006, ERP-2 Vendors & Purchasing integrates zero duplicate identity or authorization infrastructure. All authentication and authorization decisions delegate directly to the platform identity (`@cs/identity`, PLT-05) and access control (`@cs/rbac`, PLT-06) primitives.
 
@@ -695,7 +753,7 @@ In accordance with SDS §4.2, §4.9 and ADR-0006, ERP-2 Vendors & Purchasing int
 - **Authorization**: Pre-handler route guards enforcing capability requirements mapped from assigned roles. Requests lacking permissions fail closed (`403 Forbidden`).
 - **Object-Level Boundaries**: Explicit multi-tenant boundary checks (`assertTenantAccess`) and record modification ownership checks (`assertObjectMutationAccess`).
 
-### 17.2 Five-Role Capability Matrix across ERP-2 Endpoints
+### 18.2 Five-Role Capability Matrix across ERP-2 Endpoints
 
 The module capability matrix maps the standard roles to operational permissions:
 
@@ -716,7 +774,7 @@ The module capability matrix maps the standard roles to operational permissions:
 | `/import` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
 | `/import/batch` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
 
-### 17.3 Default Deny & Standard Error Envelope
+### 18.3 Default Deny & Standard Error Envelope
 
 All authentication and authorization failures return HTTP 401 and 403 status codes conforming strictly to the ClearShift unified error envelope:
 
@@ -748,14 +806,15 @@ All authentication and authorization failures return HTTP 401 and 403 status cod
 }
 ```
 
-### 17.4 Multi-Tenant Boundary Enforcement
+### 18.4 Multi-Tenant Boundary Enforcement
 
 Multi-tenant isolation is enforced on every operation:
 - If a tenant context is established (via `x-tenant-id` header or JWT `tenant_id` claim), operations attempting to access or mutate records belonging to a different tenant are rejected with `403 Forbidden` (`code: TENANT_MISMATCH`).
 - Ingestion endpoints (`/vendors`, `/purchase-orders`, `/import`) bind target records and dual-write receipts to the active tenant ID.
 
-### 17.5 Object-Level Cross-User Mutation Safety
+### 18.5 Object-Level Cross-User Mutation Safety
 
 Mutation safety prevents unauthorized cross-user modifications:
 - When a non-admin user attempts to update a record (`PATCH /vendors/:id` or `PATCH /purchase-orders/:id`), the user must either be an `admin` or the recorded creator of the entity (`assertObjectMutationAccess`).
 - Non-admin attempts to overwrite another user's draft or record are rejected with `403 Forbidden` (`code: FORBIDDEN`).
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Authorization Policy | Role 3 / Mahek Yadav (Issue #131 / ERP2-15) | Integrated module authorization and access control policy conforming to SDS §4.2, §4.9, and ADR-0006. Enforced 5-role capability matrix, Ed25519 Hub JWT validation, multi-tenant isolation, object-level creator mutation guards, and standard error envelopes. |
