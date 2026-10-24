@@ -1,11 +1,15 @@
 import React from 'react';
 import type { InvoiceStatus, InvoicesFilterQuery } from '@clearshift/contracts';
+import { SearchBar } from './SearchBar.js';
 
 export interface InvoiceFilterBarProps {
   filters: Partial<InvoicesFilterQuery>;
   onFilterChange: (updated: Partial<InvoicesFilterQuery>) => void;
   onReset: () => void;
   isLoading?: boolean;
+  debounceMs?: number;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 export const InvoiceFilterBar: React.FC<InvoiceFilterBarProps> = ({
@@ -13,22 +17,35 @@ export const InvoiceFilterBar: React.FC<InvoiceFilterBarProps> = ({
   onFilterChange,
   onReset,
   isLoading = false,
+  debounceMs = 300,
+  onToggleSidebar,
+  isSidebarOpen,
 }) => {
+  const hasActiveFilters = Boolean(filters.search?.trim()) || Boolean(filters.status);
+
   return (
     <div className="cs-filter-bar" role="search" aria-label="Filter invoices">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          className="cs-btn-secondary cs-sidebar-toggle-btn"
+          onClick={onToggleSidebar}
+          aria-expanded={isSidebarOpen}
+          aria-label={isSidebarOpen ? 'Hide filter sidebar' : 'Show filter sidebar'}
+        >
+          {isSidebarOpen ? 'Hide Filters' : 'Filters'}
+        </button>
+      )}
+
       <div className="cs-search-input-wrapper">
-        <label htmlFor="invoice-search-input" className="sr-only">
-          Search invoices
-        </label>
-        <input
-          id="invoice-search-input"
-          type="text"
-          className="cs-input"
-          placeholder="Search by invoice #, order ID, or customer Golden ID (UUID)..."
+        <SearchBar
           value={filters.search || ''}
-          onChange={(e) => onFilterChange({ search: e.target.value, page: 1 })}
+          onChange={(val) => onFilterChange({ search: val, page: 1 })}
+          placeholder="Search by invoice #, order ID, or customer Golden ID (UUID)..."
           disabled={isLoading}
-          aria-label="Search invoices by invoice number, order ID, or customer Golden ID"
+          debounceMs={debounceMs}
+          inputId="invoice-search-input"
+          ariaLabel="Search invoices by invoice number, order ID, or customer Golden ID"
         />
       </div>
 
@@ -58,7 +75,7 @@ export const InvoiceFilterBar: React.FC<InvoiceFilterBarProps> = ({
         type="button"
         className="cs-btn-secondary"
         onClick={onReset}
-        disabled={isLoading}
+        disabled={isLoading || !hasActiveFilters}
         aria-label="Reset invoice filters"
       >
         Reset Filters
