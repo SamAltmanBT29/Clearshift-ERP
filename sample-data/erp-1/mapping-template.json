@@ -258,5 +258,203 @@
         }
       ]
     }
-  }
+  },
+  "templates": [
+    {
+      "name": "erp1-categories-import",
+      "version": "1.0.0",
+      "entity": "category",
+      "fields": [
+        {
+          "source": "code",
+          "target": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "is_default",
+          "target": "is_default",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "enumTranslations": {}
+    },
+    {
+      "name": "erp1-warehouses-import",
+      "version": "1.0.0",
+      "entity": "warehouse",
+      "fields": [
+        {
+          "source": "code",
+          "target": "code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "is_default",
+          "target": "is_default",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "source": "notification_email",
+          "target": "notification_email",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "contact_phone",
+          "target": "contact_phone",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "enumTranslations": {}
+    },
+    {
+      "name": "erp1-products-import",
+      "version": "1.0.0",
+      "entity": "product",
+      "fields": [
+        {
+          "source": "sku",
+          "target": "sku",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "name",
+          "target": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "category_code",
+          "target": "category_code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "unit_of_measure",
+          "target": "unit_of_measure",
+          "type": "enum",
+          "required": true,
+          "enumTable": "unit_of_measure"
+        },
+        {
+          "source": "price",
+          "target": "price",
+          "type": "decimal",
+          "required": true,
+          "decimalScale": 2
+        },
+        {
+          "source": "currency",
+          "target": "currency",
+          "type": "enum",
+          "required": true,
+          "enumTable": "currency"
+        },
+        {
+          "source": "tax_rate",
+          "target": "tax_rate",
+          "type": "decimal",
+          "required": false,
+          "decimalScale": 4
+        }
+      ],
+      "enumTranslations": {
+        "unit_of_measure": {
+          "allowed": [
+            "pcs",
+            "kg",
+            "g",
+            "litre",
+            "metre",
+            "box"
+          ],
+          "map": {
+            "pcs": "pcs",
+            "piece": "pcs",
+            "pieces": "pcs",
+            "kg": "kg",
+            "kilogram": "kg",
+            "g": "g",
+            "gram": "g",
+            "litre": "litre",
+            "liter": "litre",
+            "metre": "metre",
+            "meter": "metre",
+            "box": "box",
+            "boxes": "box"
+          }
+        },
+        "currency": {
+          "allowed": [
+            "USD",
+            "EUR",
+            "GBP",
+            "INR"
+          ],
+          "map": {
+            "USD": "USD",
+            "EUR": "EUR",
+            "GBP": "GBP",
+            "INR": "INR",
+            "usd": "USD",
+            "eur": "EUR",
+            "gbp": "GBP",
+            "inr": "INR"
+          }
+        }
+      }
+    },
+    {
+      "name": "erp1-stock-levels-import",
+      "version": "1.0.0",
+      "entity": "stock_level",
+      "fields": [
+        {
+          "source": "sku",
+          "target": "sku",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "warehouse_code",
+          "target": "warehouse_code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "quantity",
+          "target": "quantity",
+          "type": "decimal",
+          "required": true,
+          "decimalScale": 4
+        },
+        {
+          "source": "as_of_date",
+          "target": "as_of_date",
+          "type": "date",
+          "required": true,
+          "dateFormat": "iso"
+        }
+      ],
+      "enumTranslations": {}
+    }
+  ]
 }
