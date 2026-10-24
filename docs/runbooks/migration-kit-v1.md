@@ -286,3 +286,9 @@ The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides
 8. Reject list with paged, formula-safe CSV export (`/kit/batches/:batchId/rejects`).
 
 State-transition actions are disabled until prerequisites pass; load requires a current dry-run pass and operator role permission. Synthetic data only.
+
+---
+
+## 7. CLI Usage (KIT-15)
+
+The CLI shares the same batch engine as the UI. See `docs/runbooks/cli.md` for command reference, flags, and exit codes.
