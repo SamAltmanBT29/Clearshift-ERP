@@ -535,3 +535,75 @@ When an API endpoint responds with HTTP 403 Forbidden:
   - Explains the missing permission: displays `Required permission: orders:read (or orders:manage)`.
   - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
   - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+
+---
+
+## 13. Sales Order Detail, Inline/Drawer Editing, and Linked Records Specification (ERP3-21 / Issue #157)
+
+### 13.1 Overview & Architecture
+
+ERP-3 Sales Orders & Invoices delivers a comprehensive detail, editing, and cross-module traceability workflow conforming to the ClearShift V1 Master Architecture Specification, SDS §4.4, §4.7, §4.9, and ADR-003. The implementation adheres to the following core tenets:
+- **System of Record Invariants**: Core business attributes (`order_number`, `customer_golden_id`) remain permanently immutable post-creation (BR-ERP3-01). Lifecycle status transitions (`Open` → `Invoiced` → `Closed`) are strictly forward-only (FR-ERP3-05).
+- **Dual-Mode Modification**: Supports both inline editing within the detail card for rapid field updates and slide-over modal drawer editing (`OrderEditDrawer`) for structured field validation.
+- **Cross-Module Traceability**: Displays linked master data records across module boundaries (CRM-1 Customer Profile, ERP-1 Product Catalog, ERP-3 Billing Invoices, ERP-4 Payment Postings) with explicit deep-linking navigation without cross-schema foreign keys (Decision C7).
+- **Optimistic Concurrency Control**: Uses HTTP `If-Match` conditional headers containing the record's version or ISO timestamp to detect concurrent modifications, offering deterministic conflict recovery via user-prompted refresh (AC4).
+
+### 13.2 Primary Attributes & System Audit Panel (AC1)
+
+The detail view (`OrderDetailPage`) displays all authoritative header fields, audit timestamps, and identity resolution metadata:
+- **Primary Attributes Grid**:
+  - `Order Number`: Canonical human-readable sales order key (`SO-YYYY-NNNN`).
+  - `Customer Golden ID`: Universal Hub UUID identity linking the order to CRM-1 customer records (`ADR-003`).
+  - `Order Date`: ISO-8601 calendar date (`YYYY-MM-DD`).
+  - `Currency`: ISO 4217 3-letter currency code (`USD`, `EUR`, `GBP`, etc.).
+  - `Total Amount`: Authoritative server-computed order total formatted with currency (`BR-ERP3-01`).
+  - `Lifecycle Status`: Visual status badge indicating `Open`, `Invoiced`, or `Closed`.
+  - `Created At` & `Updated At`: ISO-8601 audit timestamps recording initial creation and most recent update.
+- **Audit & Identity Panel (`OrderAuditPanel`)**:
+  - Displays canonical customer Golden ID with resolution badge (`Canonical` vs `Deterministic Synthetic Fallback` via `resolveGoldenId()`).
+  - Displays internal PostgreSQL entity UUID (`id`) for administrative debugging.
+  - Displays migration source system and source row ID traceability (`source_system` / `source_id`).
+
+### 13.3 Inline & Drawer Editing with Permission Checking (AC2)
+
+Operators with write privileges can modify allowlisted fields on open orders:
+- **Role & Permission Enforcement**:
+  - Requires `orders:write` or `orders:manage` permission. Users with read-only permissions (`orders:read`) see edit actions disabled with explanatory tooltips ("Insufficient permissions (orders:write required)").
+  - Modification is strictly restricted to orders in `Open` status. Orders in `Invoiced` or `Closed` status disable editing ("Only Open orders can be modified").
+- **Allowlisted vs Immutable Fields**:
+  - *Immutable Keys*: `order_number` and `customer_golden_id` are permanently locked.
+  - *Allowlisted Modifiable Fields*: `order_date` (ISO date validation), `currency` (3-letter uppercase ISO code), `customer_email` (RFC-compliant email format), `customer_phone` (international phone format), and `notes`.
+- **Inline Editing Form**:
+  - Toggled via `Inline Edit` button. Displays input fields directly within the detail layout.
+  - Double-submit prevention disables the save button and activates `aria-busy="true"` during asynchronous submission.
+- **Drawer Form (`OrderEditDrawer`)**:
+  - Toggled via `Edit in Drawer` button. Provides an accessible slide-over dialog with client-side field validation, formatted error messages, and keyboard navigation.
+
+### 13.4 Cross-Module Linked Entity Sub-Tables (AC3)
+
+The linked records section (`OrderLinkedRecordsTable`) projects related operational records without establishing cross-schema foreign keys in PostgreSQL:
+1. **CRM-1 Customer Profile**:
+   - Master Data: Name, canonical Golden ID, billing email, customer tier.
+   - Cross-Module Link: Navigates to `/crm/customers/{customerGoldenId}` via `onNavigateModule('crm-1', id)`.
+2. **ERP-1 Catalog Products**:
+   - Master Data: Line-by-line product references, SKU, product name, ordered quantity, unit price.
+   - Cross-Module Link: Navigates to `/erp/products/{productId}` via `onNavigateModule('erp-1', id)`.
+3. **ERP-3 Billing Invoices**:
+   - Transaction Data: Generated invoices, invoice number, status (`Open`, `Paid`, `Overdue`), due date, total.
+   - Deep Link: Navigates to `/erp/invoices/{invoiceId}` via `onNavigateModule('erp-3', id)`.
+4. **ERP-4 Accounting & Payments**:
+   - Transaction Data: Payment receipts, payment number, method (`Bank Transfer`, `Card`, `Cash`), settlement timestamp, amount.
+   - Cross-Module Link: Navigates to `/erp/payments/{paymentId}` via `onNavigateModule('erp-4', id)`.
+- **Tab Filtering**: Allows filtering by entity category (`All Linked Records`, `CRM-1 Customer`, `ERP-1 Products`, `Billing Invoices`, `ERP-4 Payments`) with item count badges.
+
+### 13.5 Optimistic Concurrency Control & 409 Conflict Recovery (AC4)
+
+To prevent lost updates in multi-operator environments, order updates enforce optimistic concurrency control:
+- **`If-Match` Request Header**:
+  - Mutation requests (`PATCH /api/v1/erp-orders/sales-orders/{id}`) pass the client's cached record version or `updated_at` timestamp in the `If-Match` HTTP header.
+- **Conflict Detection (HTTP 409 Conflict)**:
+  - When the server detects that another session has modified the order, it returns HTTP 409 with standard error envelope (`CONCURRENT_MODIFICATION_CONFLICT`).
+- **Conflict Banner & Recovery Action**:
+  - Displays a prominent alert banner: "Concurrent Modification Conflict (409): this order was modified by another user or session. Please refresh and re-apply changes."
+  - Provides a single-click action button: `Refresh & Re-apply Changes` (`data-testid="conflict-refresh-btn"`).
+  - Clicking refresh re-fetches the latest server state via `fetchSalesOrderById()`, clears the conflict error, resets form state, and presents a success toast ("Latest order data refreshed successfully.").
