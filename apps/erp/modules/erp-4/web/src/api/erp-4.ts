@@ -339,3 +339,54 @@ export async function downloadCleanAuditCsv(): Promise<string> {
   }
   return await response.text();
 }
+
+export interface MappingTemplatesResponse {
+  success: boolean;
+  data: any[];
+}
+
+/**
+ * Fetch available named mapping templates.
+ */
+export async function fetchMappingTemplates(): Promise<any[]> {
+  const res = await request<MappingTemplatesResponse>('/migration/mapping/templates');
+  return res.data;
+}
+
+/**
+ * Fetch a specific named mapping template by ID.
+ */
+export async function fetchMappingTemplate(templateId: string): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>(`/migration/mapping/templates/${templateId}`);
+  return res.data;
+}
+
+/**
+ * Validate a field mapping configuration against an entity schema.
+ */
+export async function validateMappingConfig(
+  entity: string,
+  mapping: Record<string, string>,
+  sourceTypes?: Record<string, string>
+): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>('/migration/mapping/validate', {
+    method: 'POST',
+    body: JSON.stringify({ entity, mapping, sourceTypes }),
+  });
+  return res.data;
+}
+
+/**
+ * Transform dataset rows using field mapping and value translations.
+ */
+export async function transformDatasetRows(
+  entity: string,
+  mapping: Record<string, string>,
+  rows: Record<string, unknown>[]
+): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>('/migration/mapping/transform', {
+    method: 'POST',
+    body: JSON.stringify({ entity, mapping, rows }),
+  });
+  return res.data;
+}

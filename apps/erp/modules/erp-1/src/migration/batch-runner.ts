@@ -2,7 +2,7 @@
  * ERP-1 Products & Inventory — Migration Batch Runner Utilities
  *
  * Implements chunked batch execution, transient exponential backoff retry,
- * and 10% failure rate stop threshold (KIT-08 / KIT-12 / Decision C4):
+ * and 10% failure rate stop threshold (ERP1-07 / ERP1-11 / ERP1-13 / KIT-08 / KIT-12 / Decision C4):
  *
  *   1. Chunking: Partitions large row streams into sequential 500-row chunks.
  *   2. Bounded Exponential Retry: Retries transient infrastructure failures (503,

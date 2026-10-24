@@ -1,0 +1,1112 @@
+{
+  "profile_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp2",
+  "fixture": "sample-data/erp-2/dirty-data-v1.csv",
+  "fixture_sha256": "acc5a3b3c9785f97b59cdabfaf64f626afad26e8d2cbcd5990c93549352ed65b",
+  "total_rows": 173,
+  "reconciliation": {
+    "total_source_rows": 173,
+    "accepted": 94,
+    "rejected": 68,
+    "review": 11,
+    "skipped": 0,
+    "unaccounted": 0,
+    "is_balanced": true
+  },
+  "by_record_type": {
+    "vendor": {
+      "accepted": 26,
+      "rejected": 15,
+      "review": 5,
+      "skipped": 0,
+      "total": 46
+    },
+    "purchase_order": {
+      "accepted": 22,
+      "rejected": 18,
+      "review": 4,
+      "skipped": 0,
+      "total": 44
+    },
+    "po_line": {
+      "accepted": 46,
+      "rejected": 35,
+      "review": 2,
+      "skipped": 0,
+      "total": 83
+    }
+  },
+  "by_reason_code": {
+    "VENDOR_CODE_REQUIRED": 1,
+    "VENDOR_NAME_REQUIRED": 1,
+    "VENDOR_CODE_TOO_LONG": 1,
+    "CURRENCY_REQUIRED": 2,
+    "INVALID_CURRENCY": 3,
+    "INVALID_EMAIL": 1,
+    "INVALID_TAX_NUMBER": 1,
+    "INVALID_PAYMENT_TERMS": 1,
+    "PAYMENT_TERMS_OUT_OF_RANGE": 3,
+    "INVALID_BANK_DETAILS": 1,
+    "FORMULA_INJECTION_DETECTED": 4,
+    "DUPLICATE_VENDOR_CODE_REVIEW": 3,
+    "DUPLICATE_TAX_NUMBER_REVIEW": 3,
+    "PO_NUMBER_REQUIRED": 2,
+    "PO_VENDOR_REQUIRED": 1,
+    "VENDOR_NOT_FOUND": 3,
+    "PO_STATUS_REQUIRED": 1,
+    "INVALID_PO_STATUS": 2,
+    "INVALID_STATUS_TRANSITION": 1,
+    "PO_DATE_REQUIRED": 1,
+    "INVALID_DATE": 1,
+    "EXPECTED_DATE_BEFORE_ORDER_DATE": 1,
+    "CURRENCY_MISMATCH": 1,
+    "PO_TOTAL_REQUIRED": 1,
+    "INVALID_PO_TOTAL": 1,
+    "PO_TOTAL_MISMATCH": 1,
+    "EMPTY_ORDER_LINES": 1,
+    "AMBIGUOUS_DATE_FORMAT_REVIEW": 2,
+    "DUPLICATE_PO_NUMBER_REVIEW": 2,
+    "PO_NOT_FOUND": 19,
+    "INVALID_LINE_NUMBER": 2,
+    "SKU_REQUIRED": 1,
+    "UNKNOWN_PRODUCT": 1,
+    "QUANTITY_REQUIRED": 1,
+    "QUANTITY_MUST_BE_POSITIVE": 3,
+    "INVALID_QUANTITY": 2,
+    "PRICE_REQUIRED": 1,
+    "PRICE_MUST_BE_NON_NEGATIVE": 2,
+    "INVALID_PRICE": 1,
+    "LINE_TOTAL_MISMATCH": 1,
+    "DUPLICATE_LINE_REVIEW": 2
+  },
+  "rows": {
+    "R001": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R002": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R003": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R004": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R005": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R006": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R007": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R008": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R009": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R010": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R011": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R012": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R013": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R014": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R015": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R016": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R017": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R018": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R019": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R020": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R021": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R022": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R023": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R024": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R025": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R026": {
+      "record_type": "vendor",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R027": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_CODE_REQUIRED"
+      ]
+    },
+    "R028": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NAME_REQUIRED"
+      ]
+    },
+    "R029": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_CODE_TOO_LONG"
+      ]
+    },
+    "R030": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R031": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R032": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_EMAIL"
+      ]
+    },
+    "R033": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_TAX_NUMBER"
+      ]
+    },
+    "R034": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PAYMENT_TERMS"
+      ]
+    },
+    "R035": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "PAYMENT_TERMS_OUT_OF_RANGE"
+      ]
+    },
+    "R036": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "PAYMENT_TERMS_OUT_OF_RANGE"
+      ]
+    },
+    "R037": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_BANK_DETAILS"
+      ]
+    },
+    "R038": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R039": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R040": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R041": {
+      "record_type": "vendor",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY",
+        "PAYMENT_TERMS_OUT_OF_RANGE"
+      ]
+    },
+    "R042": {
+      "record_type": "vendor",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_VENDOR_CODE_REVIEW",
+        "DUPLICATE_TAX_NUMBER_REVIEW"
+      ]
+    },
+    "R043": {
+      "record_type": "vendor",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_VENDOR_CODE_REVIEW"
+      ]
+    },
+    "R044": {
+      "record_type": "vendor",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_TAX_NUMBER_REVIEW"
+      ]
+    },
+    "R045": {
+      "record_type": "vendor",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_TAX_NUMBER_REVIEW"
+      ]
+    },
+    "R046": {
+      "record_type": "vendor",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_VENDOR_CODE_REVIEW"
+      ]
+    },
+    "R047": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R048": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R049": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R050": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R051": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R052": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R053": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R054": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R055": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R056": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R057": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R058": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R059": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R060": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R061": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R062": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R063": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R064": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R065": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R066": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R067": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R068": {
+      "record_type": "purchase_order",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R069": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NUMBER_REQUIRED"
+      ]
+    },
+    "R070": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_VENDOR_REQUIRED"
+      ]
+    },
+    "R071": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NOT_FOUND"
+      ]
+    },
+    "R072": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NOT_FOUND"
+      ]
+    },
+    "R073": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_STATUS_REQUIRED"
+      ]
+    },
+    "R074": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PO_STATUS"
+      ]
+    },
+    "R075": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_STATUS_TRANSITION"
+      ]
+    },
+    "R076": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_DATE_REQUIRED"
+      ]
+    },
+    "R077": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_DATE"
+      ]
+    },
+    "R078": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "EXPECTED_DATE_BEFORE_ORDER_DATE"
+      ]
+    },
+    "R079": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_REQUIRED"
+      ]
+    },
+    "R080": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_CURRENCY"
+      ]
+    },
+    "R081": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "CURRENCY_MISMATCH"
+      ]
+    },
+    "R082": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_TOTAL_REQUIRED"
+      ]
+    },
+    "R083": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PO_TOTAL"
+      ]
+    },
+    "R084": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_TOTAL_MISMATCH"
+      ]
+    },
+    "R085": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "EMPTY_ORDER_LINES"
+      ]
+    },
+    "R086": {
+      "record_type": "purchase_order",
+      "outcome": "rejected",
+      "reasons": [
+        "VENDOR_NOT_FOUND",
+        "INVALID_PO_STATUS"
+      ]
+    },
+    "R087": {
+      "record_type": "purchase_order",
+      "outcome": "review",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT_REVIEW"
+      ]
+    },
+    "R088": {
+      "record_type": "purchase_order",
+      "outcome": "review",
+      "reasons": [
+        "AMBIGUOUS_DATE_FORMAT_REVIEW"
+      ]
+    },
+    "R089": {
+      "record_type": "purchase_order",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_PO_NUMBER_REVIEW"
+      ]
+    },
+    "R090": {
+      "record_type": "purchase_order",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_PO_NUMBER_REVIEW"
+      ]
+    },
+    "R091": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R092": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R093": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R094": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R095": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R096": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R097": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R098": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R099": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R100": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R101": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R102": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R103": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R104": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R105": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R106": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R107": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R108": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R109": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R110": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R111": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R112": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R113": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R114": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R115": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R116": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R117": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R118": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R119": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R120": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R121": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R122": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R123": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R124": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R125": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R126": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R127": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R128": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R129": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R130": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R131": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R132": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R133": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R134": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R135": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R136": {
+      "record_type": "po_line",
+      "outcome": "accepted",
+      "reasons": []
+    },
+    "R137": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R138": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R139": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R140": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R141": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R142": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R143": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R144": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R145": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R146": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R147": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R148": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R149": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R150": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R151": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R152": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R153": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R154": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R155": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NUMBER_REQUIRED"
+      ]
+    },
+    "R156": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PO_NOT_FOUND"
+      ]
+    },
+    "R157": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_LINE_NUMBER"
+      ]
+    },
+    "R158": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_LINE_NUMBER"
+      ]
+    },
+    "R159": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "SKU_REQUIRED"
+      ]
+    },
+    "R160": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "UNKNOWN_PRODUCT"
+      ]
+    },
+    "R161": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "FORMULA_INJECTION_DETECTED"
+      ]
+    },
+    "R162": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_REQUIRED"
+      ]
+    },
+    "R163": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_MUST_BE_POSITIVE"
+      ]
+    },
+    "R164": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_MUST_BE_POSITIVE"
+      ]
+    },
+    "R165": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_QUANTITY"
+      ]
+    },
+    "R166": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_QUANTITY"
+      ]
+    },
+    "R167": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PRICE_REQUIRED"
+      ]
+    },
+    "R168": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "PRICE_MUST_BE_NON_NEGATIVE"
+      ]
+    },
+    "R169": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "INVALID_PRICE"
+      ]
+    },
+    "R170": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "LINE_TOTAL_MISMATCH"
+      ]
+    },
+    "R171": {
+      "record_type": "po_line",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_LINE_REVIEW"
+      ]
+    },
+    "R172": {
+      "record_type": "po_line",
+      "outcome": "review",
+      "reasons": [
+        "DUPLICATE_LINE_REVIEW"
+      ]
+    },
+    "R173": {
+      "record_type": "po_line",
+      "outcome": "rejected",
+      "reasons": [
+        "QUANTITY_MUST_BE_POSITIVE",
+        "PRICE_MUST_BE_NON_NEGATIVE"
+      ]
+    }
+  }
+}

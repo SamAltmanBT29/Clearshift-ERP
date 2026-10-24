@@ -1,5 +1,5 @@
 /**
- * ERP-1 Target Adapter (Decision C4 & KIT-08)
+ * ERP-1 Target Adapter (Decision C4 & KIT-08 / ERP1-07 / ERP1-11)
  *
  * Implements the TargetAdapter port from @cs/kit.
  * Executed in-process to guarantee atomic transaction commits between
@@ -22,10 +22,14 @@ import type {
 } from '@cs/kit';
 import {
   Erp1Service,
+  type ImportRowRequestExtended,
 } from '../services/erp1.service.js';
 import {
   Erp1ServiceError,
 } from '../services/errors.js';
+import {
+  Erp1DomainError,
+} from '../domain/rules.js';
 import {
   DEFAULT_CHUNK_SIZE,
   DEFAULT_FAILURE_THRESHOLD,
@@ -38,6 +42,8 @@ import {
   assertNoRollbackSaga,
 } from './batch-runner.js';
 
+export type { ImportRowRequestExtended };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // loadBatch Types (KIT-08 / KIT-12 / Decision C4)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,7 +55,7 @@ export interface BatchRowInput<TRow = unknown> {
   idempotencyKey: string;
   /** Cleaned/validated source data mapped to the target domain shape. */
   data: TRow;
-  /** Optional: originating system identifier. */
+  /** Optional: originating system identifier (for traceability). */
   sourceSystem?: string | undefined;
   /** Optional: original row identifier from the source system. */
   sourceId?: string | undefined;
@@ -105,12 +111,12 @@ const VALID_UNITS = new Set(['pcs', 'kg', 'g', 'litre', 'metre', 'box']);
 
 export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
   readonly module = 'erp1';
-  readonly entity: string;
+  readonly entity: 'product' | 'category' | 'stock_level' | string;
   readonly schemaVersion = 1;
 
   constructor(
     private readonly service: Erp1Service,
-    entity: 'product' | 'category' | 'stock_level' | 'warehouse' | string = 'product'
+    entity: 'product' | 'category' | 'stock_level' | string = 'product'
   ) {
     this.entity = entity;
   }
@@ -136,12 +142,12 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
       if (ent === 'product' || ent === 'products') {
         const hasName = typeof record['name'] === 'string' && record['name'].trim().length > 0;
         const hasSku = typeof record['sku'] === 'string' && record['sku'].trim().length > 0;
-        const uom = String(record['unitOfMeasure'] ?? record['unit_of_measure'] ?? '');
+        const uom = String(record['unitOfMeasure'] ?? record['unit_of_measure'] ?? record['uom'] ?? '').trim();
         const validUom = VALID_UNITS.has(uom);
         const rawPrice = record['price'];
         const validPrice =
           (typeof rawPrice === 'number' && rawPrice >= 0) ||
-          (typeof rawPrice === 'string' && !isNaN(Number(rawPrice)) && Number(rawPrice) >= 0);
+          (typeof rawPrice === 'string' && /^\d+(\.\d{1,4})?$/.test(rawPrice.trim()) && Number(rawPrice) >= 0);
 
         if (hasName && hasSku && validUom && validPrice) {
           validCount++;
@@ -163,7 +169,7 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         const rawQty = record['quantity'];
         const validQty =
           (typeof rawQty === 'number' && rawQty >= 0) ||
-          (typeof rawQty === 'string' && !isNaN(Number(rawQty)) && Number(rawQty) >= 0);
+          (typeof rawQty === 'string' && /^\d+(\.\d{1,4})?$/.test(rawQty.trim()) && Number(rawQty) >= 0);
 
         if (hasProduct && validQty) {
           validCount++;
@@ -220,7 +226,6 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         },
       });
     } catch (error) {
-      // Deterministic business rejections: return stable reason
       if (error instanceof Erp1ServiceError || error instanceof AppError) {
         const errPayload: TargetAdapterError = {
           reasonCode: error.code,
@@ -233,6 +238,17 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         return err(errPayload);
       }
 
+      if (error instanceof Erp1DomainError) {
+        const errPayload: TargetAdapterError = {
+          reasonCode: error.code,
+          message: error.message,
+        };
+        if (error.field) {
+          errPayload.field = error.field;
+        }
+        return err(errPayload);
+      }
+
       // Unexpected / simulated infrastructure failure (e.g. 503) must NOT be misclassified as bad data
       throw error;
     }
@@ -240,7 +256,7 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
 
   /**
    * Loads a batch of rows in sequential chunks, collecting per-row outcomes
-   * with bounded exponential retry and immediate halt on excessive failures (KIT-08 / KIT-12).
+   * with bounded exponential retry and immediate halt on excessive failures (ERP1-11, ERP1-13).
    *
    * @param batchId     UUID identifying the overall migration batch.
    * @param rows        Array of typed source rows, each with its own idempotency key.
@@ -271,102 +287,91 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
 
     for (let cIndex = 0; cIndex < chunks.length; cIndex++) {
       if (halted) {
-        // Mark all remaining chunk rows as unattempted
-        const chunk = chunks[cIndex]!;
-        for (const row of chunk) {
+        for (const row of chunks[cIndex]!) {
+          unattempted++;
           rowResults.push({
             sourceRow: row.sourceRow,
             idempotencyKey: row.idempotencyKey,
             outcome: 'unattempted',
           });
-          unattempted++;
         }
         continue;
       }
 
-      const chunk = chunks[cIndex]!;
       chunksProcessed++;
+      const currentChunk = chunks[cIndex]!;
 
-      for (let rIndex = 0; rIndex < chunk.length; rIndex++) {
-        const row = chunk[rIndex]!;
+      for (let rIndex = 0; rIndex < currentChunk.length; rIndex++) {
+        const row = currentChunk[rIndex]!;
 
         if (halted) {
+          unattempted++;
           rowResults.push({
             sourceRow: row.sourceRow,
             idempotencyKey: row.idempotencyKey,
             outcome: 'unattempted',
           });
-          unattempted++;
           continue;
         }
 
-        try {
-          const { result: importRes, attempts } = await executeWithRetry(
-            async (_attempt) => {
-              return this.importRow(
-                batchId,
-                row.sourceRow,
-                row.idempotencyKey,
-                row.data,
-                options
-              );
-            },
-            {
-              maxRetries,
-              initialDelayMs,
-              backoffFactor,
-            }
-          );
-
-          if (importRes.ok) {
-            loaded++;
-            rowResults.push({
-              sourceRow: row.sourceRow,
-              idempotencyKey: row.idempotencyKey,
-              outcome: 'loaded',
-              attempts,
-              priorResult: importRes.value.priorResult,
-              result: importRes.value,
-            });
-          } else {
-            // Business validation rejection
-            rejected++;
-            rowResults.push({
-              sourceRow: row.sourceRow,
-              idempotencyKey: row.idempotencyKey,
-              outcome: 'rejected',
-              attempts,
-              error: importRes.error,
-            });
-
-            // Check if failure threshold is exceeded
-            const currentAttempted = loaded + rejected;
-            if (
-              shouldHaltBatchExecution(rejected, currentAttempted, {
-                threshold,
-                minAttemptedRows: minAttempted,
-              })
-            ) {
-              halted = true;
-              const rate = calculateFailureRate(rejected, currentAttempted);
-              stoppedReason = `Failure rate ${(rate * 100).toFixed(1)}% exceeded threshold ${(threshold * 100).toFixed(1)}% after ${currentAttempted} attempted rows`;
-            }
+        const { result: rowResult, attempts } = await executeWithRetry(
+          async (_attempt) => {
+            return await this.importRow(
+              batchId,
+              row.sourceRow,
+              row.idempotencyKey,
+              row.data,
+              options
+            );
+          },
+          {
+            maxRetries,
+            initialDelayMs,
+            backoffFactor,
           }
-        } catch (error) {
-          // If error reached here after retries, it's an unrecoverable infrastructure failure
-          throw error;
+        );
+
+        if (rowResult.ok) {
+          loaded++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'loaded',
+            attempts,
+            priorResult: rowResult.value.priorResult,
+            result: rowResult.value,
+          });
+        } else {
+          rejected++;
+          rowResults.push({
+            sourceRow: row.sourceRow,
+            idempotencyKey: row.idempotencyKey,
+            outcome: 'rejected',
+            attempts,
+            error: rowResult.error,
+          });
+        }
+
+        const attemptedSoFar = loaded + rejected;
+        if (
+          shouldHaltBatchExecution(rejected, attemptedSoFar, {
+            threshold,
+            minAttemptedRows: minAttempted,
+          })
+        ) {
+          halted = true;
+          const currentRate = (calculateFailureRate(rejected, attemptedSoFar) * 100).toFixed(1);
+          const thresholdPct = (threshold * 100).toFixed(0);
+          stoppedReason = `Failure rate exceeded ${thresholdPct}% threshold (${rejected}/${attemptedSoFar} = ${currentRate}% rejected). Execution halted safely without rollback saga.`;
         }
       }
     }
 
-    const attempted = loaded + rejected;
-    const total = rows.length;
-
     return {
       batchId,
       status: halted ? 'STOPPED_EXCESSIVE_FAILURES' : 'COMPLETED',
-      total,
-      attempted,
+      total: rows.length,
+      attempted: loaded + rejected,
       loaded,
       rejected,
       unattempted,

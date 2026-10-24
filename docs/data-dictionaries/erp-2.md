@@ -459,3 +459,125 @@ ERP-2 implements high-reliability batch migration loading conforming to the Clea
 
 - In strict compliance with ClearShift Core Rules, compensating rollback sagas are explicitly prohibited in V1 (`ROLLBACK_SAGA_PROHIBITED`).
 - When a batch stops due to excessive failures, ClearShift preserves all durable evidence, target rows, and receipt logs for human inspection and auditable resumption. Under no circumstances are committed business rows or receipts rolled back or deleted.
+
+---
+
+## 13. Search, Filters and Sorting Controls (ERP2-18)
+
+### 13.1 Debounced Search Bar (AC1)
+
+| Parameter | Value |
+|---|---|
+| Component | `SearchBar` (`apps/erp/modules/erp-2/web/src/components/SearchBar.tsx`) |
+| Debounce delay | 300ms from last keystroke |
+| API parameter | `search` (string, max 100 chars) on `VendorListQuery` |
+| PO search | Client-side text match on `po_number` only (API does not support PO search) |
+| Clear behavior | Clicking ✕ fires `onChange('')` immediately (no debounce) |
+| External reset | Internal state syncs when parent `value` prop changes (e.g. Clear All) |
+
+### 13.2 Faceted Filter Sidebar (AC2)
+
+| Facet | Scope | Options | API parameter |
+|---|---|---|---|
+| Currency | Vendors | All, USD, EUR, GBP | Client-side filter (not in API) |
+| Status | Purchase Orders | All, Draft, Sent, Received, Closed | `status` on `PurchaseOrderListQuery` |
+
+- Sidebar is collapsible on mobile (< 768px stacks above content).
+- Radio group selection immediately updates filter state and triggers table reload.
+- "Reset Filters" button clears all facets in the sidebar.
+
+### 13.3 Active Filter Pill Tags (AC3)
+
+| Feature | Behavior |
+|---|---|
+| Pill rendering | One pill per active filter (search, currency, status, vendor_id) |
+| Individual remove | Clicking ✕ on a pill clears that specific filter and resets to page 1 |
+| Clear All | Clicking "Clear All" resets all filters and sort to defaults |
+| Empty state | Component returns `null` when no filters are active |
+
+### 13.4 URL Query State Synchronization
+
+Active filter values are synced to the browser URL using `window.history.replaceState`:
+
+| Tab | URL parameters |
+|---|---|
+| Vendors | `?search=X&currency=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+| Purchase Orders | `?status=X&vendor_id=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+
+- Default values (`page=1`, `pageSize=20`, no sort) are omitted from the URL.
+- Parameters are parsed on mount to restore filter state from shared/bookmarked URLs.
+
+### 13.5 Empty State (AC4)
+
+When a search or filter combination returns zero results and there is no loading or error state, the existing `EmptyState` component is displayed with:
+
+- **Default title**: "No records found"
+- **Default message**: "There are no records matching your current search or filter criteria."
+- Optional action button (e.g. "Clear filters") to reset all filters.
+
+### 13.6 CSS Scoping
+
+All new CSS classes use the `cs-erp2-*` prefix to avoid collision with other modules:
+
+- `cs-erp2-search-*` — Search bar tokens
+- `cs-erp2-pill-*` — Filter pill tags tokens
+- `cs-erp2-faceted-sidebar`, `cs-erp2-sidebar-*`, `cs-erp2-facet-*` — Sidebar tokens
+- `cs-erp2-content-with-sidebar`, `cs-erp2-content-main` — Layout tokens
+
+---
+
+## 14. Create/Edit/Detail Workflow & Client-Side Validation Specification (ERP2-05 / Issue #20)
+
+### 14.1 Overview & Architecture
+
+Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows for both Vendors and Purchase Orders in ERP-2. Consistent with SDS ClearShift ERP v2.0 §4.3 and §4.9:
+- All forms provide real-time, field-level client-side validation for instant feedback while preserving the server's authoritative validation.
+- Server-returned validation errors are mapped back to individual form fields with accessible alert labels.
+- Sensitive banking coordinates are displayed masked (`XXXX-XXXX-7890`) upon read and edit operations.
+- Purchase order lines compute exact line totals (`quantity * price`) live using decimal arithmetic, with the overall order total presented as read-only.
+- Status transitions are strictly unidirectional (`Draft -> Sent -> Received -> Closed`) and gated behind an explicit confirmation dialog (`ConfirmActionDialog`).
+
+### 14.2 Vendor Create, Edit & Detail Workflows
+
+| View | Route | Component | Key Behaviors |
+|---|---|---|---|
+| Vendor Create | `/erp2/vendors/new` | `VendorCreatePage` | Validates required fields (`name`, `tax_number`, `email`), validates ISO currency and minimum bank detail length, submits to `POST /vendors`, and redirects to detail view. |
+| Vendor Detail | `/erp2/vendors/:id` | `VendorDetailPage` | Renders complete procurement profile, displays server-masked bank coordinates (`XXXX-XXXX-7890`), and provides quick actions for `Edit Vendor` and `+ Create PO`. |
+| Vendor Edit | `/erp2/vendors/:id/edit` | `VendorEditPage` | Fetches vendor by ID, prefills existing values, shows current masked bank details, accepts optional new bank coordinates without requiring re-entry, and submits to `PATCH /vendors/:id`. |
+
+#### Field-Level Validation Rules
+
+- **Legal Name (`name`)**: Required, trimmed string. Displays "Name is required" if omitted.
+- **Tax Number / EIN (`tax_number`)**: Required, trimmed alphanumeric string. Enforces unique vendor tax identity.
+- **Procurement Email (`email`)**: Required, validated against standard email format (`^[^\s@]+@[^\s@]+\.[^\s@]+$`).
+- **Currency (`currency`)**: Optional, defaults to `USD`. Must be a 3-letter ISO 4217 code.
+- **Bank Account Details (`bank_details`)**: Optional. On create, entering plain text values submits to server for SHA-256 masking and storage of last 4 digits. If entered, minimum length is 4 characters. On edit, existing masked details are displayed, and users may optionally provide replacement numbers.
+
+### 14.3 Purchase Order Create & Detail Workflows
+
+| View | Route | Component | Key Behaviors |
+|---|---|---|---|
+| PO Create | `/erp2/purchase-orders/new` | `PurchaseOrderCreatePage` | Supports optional `?vendor_id=` query param, dynamic line item add/remove, live decimal calculations, read-only total display, and submits to `POST /purchase-orders`. |
+| PO Detail | `/erp2/purchase-orders/:id` | `PurchaseOrderDetailPage` | Renders order header, linked vendor reference, line items table, read-only computed total, and confirmation-gated status transition buttons. |
+
+#### Live Line Totals & Read-Only Order Total
+
+- **Line Total Calculation**: Line total is calculated dynamically as `calculateLineTotal(quantity, price)`.
+- **Order Total**: Aggregated via `calculateOrderTotal()`. The order total is rendered as a prominent read-only summary card (`cs-summary-card`). The client never authoritatively submits an order total to the server; the backend calculates and commits the canonical total in PostgreSQL transactions.
+- **Dynamic Items**: Operators can add arbitrary line items via `+ Add Line` or remove lines via `✕` (bounded to minimum 1 line).
+- **Foreign Key Validation**: Requires valid RFC 4122 UUID for `vendor_id` (ERP-2) and `product_id` (ERP-1 product catalog).
+- **Numeric Invariants**: Quantity must be strictly positive (`> 0`); Unit price must be non-negative (`>= 0`).
+
+### 14.4 Irreversible Forward Status Transitions & Confirmation Gates
+
+In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions in V1 are strictly forward-only:
+
+```
+[Draft] ──(Send to Vendor)──> [Sent] ──(Mark as Received)──> [Received] ──(Close Order)──> [Closed]
+```
+
+- **Draft -> Sent**: Confirms order dispatch to the vendor.
+- **Sent -> Received**: Confirms delivery of goods without modifying ERP-1 inventory (in V1).
+- **Received -> Closed**: Terminates order lifecycle.
+- **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
+- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.

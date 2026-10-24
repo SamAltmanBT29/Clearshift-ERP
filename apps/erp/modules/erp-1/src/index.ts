@@ -23,6 +23,9 @@ export default moduleDefinition;
 
 export * from './public.js';
 export * from './app.js';
+export * from './domain/rules.js';
+export * from './domain/relationships.js';
+export * from './domain/duplicate-policy.js';
 export * from './services/errors.js';
 export * from './services/erp1.service.js';
 export * from './services/repository.js';

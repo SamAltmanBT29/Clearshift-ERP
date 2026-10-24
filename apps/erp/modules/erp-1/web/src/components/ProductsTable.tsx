@@ -15,6 +15,8 @@ export interface ProductsTableProps {
   readonly pageSize: number;
   readonly totalPages: number;
   readonly onPageChange: (page: number) => void;
+  readonly onPageSizeChange?: ((pageSize: number) => void) | undefined;
+  readonly pageSizeOptions?: readonly number[] | undefined;
   readonly sortBy?: ProductSortField;
   readonly sortDirection?: 'asc' | 'desc';
   readonly onSort?: (column: ProductSortField) => void;
@@ -47,6 +49,8 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   pageSize,
   totalPages,
   onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [10, 25, 50, 100],
   sortBy,
   sortDirection = 'asc',
   onSort,
@@ -78,6 +82,14 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
     return sortDirection === 'asc' ? 'ascending' : 'descending';
   };
 
+  const getSortHeaderAriaLabel = (field: ProductSortField, label: string): string => {
+    const isCurrent = sortBy === field;
+    const nextDir = isCurrent && sortDirection === 'asc' ? 'descending' : 'ascending';
+    return isCurrent
+      ? `Sort by ${label}. Currently sorted ${sortDirection}ending. Activate to sort ${nextDir}.`
+      : `Sort by ${label}. Activate to sort ascending.`;
+  };
+
   return (
     <div className="cs-erp1-table-wrapper">
       <div className="cs-erp1-table-responsive">
@@ -94,6 +106,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
               <th
                 scope="col"
                 aria-sort={getAriaSort('name')}
+                aria-label={getSortHeaderAriaLabel('name', 'Product Name')}
                 className="cs-erp1-th-sortable"
                 onClick={() => onSort && onSort('name')}
                 tabIndex={0}
@@ -112,6 +125,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
               <th
                 scope="col"
                 aria-sort={getAriaSort('sku')}
+                aria-label={getSortHeaderAriaLabel('sku', 'SKU')}
                 className="cs-erp1-th-sortable"
                 onClick={() => onSort && onSort('sku')}
                 tabIndex={0}
@@ -132,6 +146,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
               <th
                 scope="col"
                 aria-sort={getAriaSort('price')}
+                aria-label={getSortHeaderAriaLabel('price', 'Price')}
                 className="cs-erp1-th-sortable cs-erp1-th-right"
                 onClick={() => onSort && onSort('price')}
                 tabIndex={0}
@@ -153,6 +168,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
               <th
                 scope="col"
                 aria-sort={getAriaSort('quantity')}
+                aria-label={getSortHeaderAriaLabel('quantity', 'Stock Status')}
                 className="cs-erp1-th-sortable"
                 onClick={() => onSort && onSort('quantity')}
                 tabIndex={0}
@@ -243,13 +259,15 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
         </table>
       </div>
 
-      {totalPages > 1 && (
+      {(totalPages > 1 || (total > 0 && Boolean(onPageSizeChange))) && (
         <Pagination
           currentPage={page}
-          totalPages={totalPages}
+          totalPages={totalPages || 1}
           totalItems={total}
           pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions ? [...pageSizeOptions] : [10, 25, 50, 100]}
           onPageChange={onPageChange}
+          {...(onPageSizeChange ? { onPageSizeChange } : {})}
           isLoading={isLoading}
         />
       )}

@@ -140,6 +140,14 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Frontend Screen**: Accessible UI component [`DataCleaningReviewPage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx).
 - **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../../apps/erp/modules/erp-4/tests/migration/cleaning.test.ts) (20 tests).
 
+## 14. Mapping & Value Translation Configuration (Issue #184 / ERP4-28 / KIT-05)
+
+- **Module Mapping Configuration**: [`apps/erp/modules/erp-4/src/migration/mapping-config.ts`](../../apps/erp/modules/erp-4/src/migration/mapping-config.ts) defines source-to-target field mapping templates, strict type coercion routines (ISO-8601 dates, decimal strings, booleans), enum translation dictionaries (`account_type`, `currency_code`, `status`), and required target column enforcement guards.
+- **Web Metadata Bridge**: [`apps/erp/modules/erp-4/web/src/kit-metadata.ts`](../../apps/erp/modules/erp-4/web/src/kit-metadata.ts) registering ERP-4 metadata with `@cs/kit` `MigrationKitRegistry`.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/mapping.ts`](../../apps/erp/modules/erp-4/src/routes/mapping.ts) (`/api/v1/erp-finance/migration/mapping/*`).
+- **Frontend Screen**: Accessible UI component [`DataMappingConfigPage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataMappingConfigPage.tsx) consuming shared `MigrationKitWizard`.
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../../apps/erp/modules/erp-4/tests/migration/mapping.test.ts) (26 tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../../apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx) (3 tests).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -148,3 +156,4 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
 | **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |
 | **`1.3.0`** | 2026-10-23 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #183 / ERP4-27) | Implemented canonical 12 V1 cleaning rules (`@cs/kit`), field-level change audit ledger (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints, React review screen (`DataCleaningReviewPage`), and 20 automated tests. |
+| **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |

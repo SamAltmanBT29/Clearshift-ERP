@@ -459,6 +459,123 @@ paths:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
 
+  /api/v1/erp-products/duplicates/check:
+    post:
+      operationId: checkErp1Duplicates
+      tags: [ERP-1 Duplicates]
+      summary: Scans candidate records for exact or ambiguous duplicates against the target database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckErp1DuplicatesRequest'
+      responses:
+        '200':
+          description: Duplicate check results with identified candidates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckErp1DuplicatesResponse'
+        '400':
+          description: Invalid check payload
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates:
+    get:
+      operationId: listErp1DuplicateCandidates
+      tags: [ERP-1 Duplicates]
+      summary: List all held duplicate candidates awaiting human review
+      parameters:
+        - name: entity
+          in: query
+          schema:
+            type: string
+            enum: [product, category]
+      responses:
+        '200':
+          description: List of duplicate candidate records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+                  total:
+                    type: integer
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/erp-products/duplicates/candidates/{id}:
+    get:
+      operationId: getErp1DuplicateCandidateById
+      tags: [ERP-1 Duplicates]
+      summary: Retrieve a single duplicate candidate by candidate UUID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Candidate record details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erp1DuplicateCandidateRecord'
+        '400':
+          description: Invalid UUID format
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+
+  /api/v1/erp-products/duplicates/review:
+    post:
+      operationId: reviewErp1DuplicateCandidate
+      tags: [ERP-1 Duplicates]
+      summary: Submit an authorized human review decision for a held duplicate candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewErp1DuplicateRequest'
+      responses:
+        '200':
+          description: Review decision executed and recorded in immutable audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewErp1DuplicateResponse'
+        '400':
+          description: Invalid review payload or missing rationale
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Candidate or target record not found
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
   /api/v1/erp-products/import:
     post:
       operationId: importRow
@@ -1021,6 +1138,39 @@ components:
               outcome: { type: string, enum: [accepted, rejected, review, skipped] }
               reasons: { type: array, items: { type: string } }
         generated_at: { type: string, format: date-time }
+
+    RelationshipWarning:
+      type: object
+      description: |
+        An absent optional relationship. The module never invents a record
+        to satisfy an optional link — the warning says so explicitly.
+      required: [relationship, field, code, message]
+      properties:
+        relationship:
+          type: string
+          description: The relationship that is absent
+          examples: ["category"]
+        field:
+          type: string
+          description: The field the relationship hangs on
+          examples: ["categoryId"]
+        code:
+          type: string
+          enum: [ERP1_OPTIONAL_REFERENCE_ABSENT]
+        message:
+          type: string
+
+    ImportReceipt:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        batch_id: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        target_id: { type: string, format: uuid }
+        target_entity: { type: string }
+        idempotency_key: { type: string }
+        outcome: { type: string }
+        created_at: { type: string, format: date-time }
 
     OpeningStockResponse:
       allOf:

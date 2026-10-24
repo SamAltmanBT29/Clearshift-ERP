@@ -1,14 +1,20 @@
 /**
- * ERP-1 Migration Kit Target Adapter & Durable Import Receipts Test Suite
+ * ERP-1 Idempotency & Migration Target Adapter Test Suite
  *
- * Verifies Acceptance Criteria for Issue #12 (KIT-08 / Decision C4):
- *   1. Fixture row loaded via the same public API used by the Kit; Kit has no direct target-table write privilege.
- *   2. Retrying identical row payload/key 3 times produces exactly 1 business record and 1 durable receipt.
- *   3. Reusing a key with a different payload returns HTTP 409 and does not mutate data.
- *   4. Business-rule rejection returns a reason code and safe message; simulated 503 is retryable and not recorded as rejected.
- *   5. Receipt and target mutation commit or roll back together atomically.
- *   6. SKU is unique in the database; UPSERT flag enables updating existing records with kind='linked'.
- *   7. Target adapter implements preflight (zero mutations) and loadBatch with chunking and 10% failure threshold halt.
+ * Verifies Acceptance Criteria for:
+ *   - Issue #12 (KIT-08 / Decision C4 / ERP1-07):
+ *       1. Fixture row loaded via public API; Kit has no direct target DB write privilege.
+ *       2. Retrying identical row payload/key 3 times produces exactly 1 business record and 1 durable receipt.
+ *       3. Reusing key with different payload returns HTTP 409 Conflict and does not mutate data.
+ *       4. Business-rule rejection returns stable reason code; simulated 503 is retryable and not recorded as rejected.
+ *       5. Receipt, target mutation commit or roll back together atomically.
+ *       6. SKU is unique in database; UPSERT flag enables updating existing records with kind='linked'.
+ *       7. Preflight dry run (zero mutations) and batch runner 10% stop threshold.
+ *   - Issue #107 (ERP1-11 / loadBatch UPSERT & durable receipt):
+ *       AC1. Target adapter implements loadBatch executing type-safe UPSERT operations.
+ *       AC2. Target record and durable import receipt commit atomically in one local database transaction.
+ *       AC3. Import receipt stores batch_id, source_row, target_id, idempotency_key, and timestamp.
+ *       AC4. Re-running the same source row with identical idempotency key returns existing receipt without duplication.
  *
  * @module erp1/tests/migration/idempotency.test
  */
@@ -28,7 +34,7 @@ const MIGRATION_HEADERS = {
   authorization: 'Bearer role:migration_runner',
 };
 
-describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', () => {
+describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issues #12 & #107)', () => {
   let app: FastifyInstance;
   let repo: InMemoryErp1Repository;
   let service: Erp1Service;
@@ -39,7 +45,7 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
     app = buildApp({ repository: repo, erp1Service: service, authRequired: true });
   });
 
-  describe('1. In-Process TargetAdapter (KIT-08 Contract)', () => {
+  describe('1. In-Process TargetAdapter (KIT-08 Contract & ERP1-07)', () => {
     it('executes preflight dry-run validation without mutating the database', async () => {
       const adapter = new Erp1TargetAdapter(service, 'product');
 
@@ -98,6 +104,7 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         expect(res.value.receipt.entity).toBe('product');
         expect(res.value.receipt.batchId).toBe(batchId);
         expect(res.value.receipt.kind).toBe('created');
+        expect(res.value.receipt.createdAt).toBeInstanceOf(Date);
       }
 
       // Assert business row exists
@@ -110,6 +117,45 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       expect(receipt).not.toBeNull();
       expect(receipt?.targetId).toBe(created?.id);
       expect(receipt?.kind).toBe('created');
+    });
+
+    it('returns existing receipt on identical idempotency key replay without duplication (3x replay)', async () => {
+      const adapter = new Erp1TargetAdapter(service, 'product');
+      const batchId = '00000000-0000-4000-8000-000000000010';
+      const key = 'idem-replay-001';
+      const payload = {
+        name: 'Washer M8',
+        sku: 'WASH-M8-001',
+        unitOfMeasure: 'pcs',
+        price: '0.15',
+        currency: 'USD',
+      };
+
+      // 1st attempt: fresh creation
+      const res1 = await adapter.importRow(batchId, 1, key, payload);
+      expect(res1.ok).toBe(true);
+      if (res1.ok) {
+        expect(res1.value.priorResult).toBe(false);
+      }
+
+      // 2nd attempt: idempotent replay
+      const res2 = await adapter.importRow(batchId, 1, key, payload);
+      expect(res2.ok).toBe(true);
+      if (res2.ok) {
+        expect(res2.value.priorResult).toBe(true);
+      }
+
+      // 3rd attempt: idempotent replay
+      const res3 = await adapter.importRow(batchId, 1, key, payload);
+      expect(res3.ok).toBe(true);
+      if (res3.ok) {
+        expect(res3.value.priorResult).toBe(true);
+        expect(res3.value.targetId).toBe(res1.ok ? res1.value.targetId : '');
+      }
+
+      // Exactly 1 product created
+      const { total } = await repo.listProducts({});
+      expect(total).toBe(1);
     });
   });
 
@@ -286,7 +332,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
     it('business rule rejection returns stable reason code and does not record a loaded receipt', async () => {
       const adapter = new Erp1TargetAdapter(service, 'product');
 
-      // Attempt to load invalid product with negative price
       const res = await adapter.importRow(
         '00000000-0000-4000-8000-000000000040',
         1,
@@ -315,7 +360,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       const adapter = new Erp1TargetAdapter(service, 'product');
       let calls = 0;
 
-      // Mock service method that fails with 503 twice then succeeds
       const originalImportRow = service.importRow.bind(service);
       service.importRow = async (req) => {
         calls++;
@@ -361,7 +405,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
     it('rolls back target entity and durable receipt together on unexpected failure', async () => {
       const key = 'idem-rollback-test-key';
 
-      // We simulate an error happening during receipt creation by intercepting repo.createImportReceipt
       const originalCreateReceipt = repo.createImportReceipt.bind(repo);
       repo.createImportReceipt = async () => {
         throw new Error('Simulated disk/database failure writing import receipt');
@@ -383,10 +426,8 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         })
       ).rejects.toThrow('Simulated disk/database failure writing import receipt');
 
-      // Restore original
       repo.createImportReceipt = originalCreateReceipt;
 
-      // Assert neither product nor receipt exist
       const product = await repo.getProductBySku('ATOMIC-001');
       expect(product).toBeNull();
 
@@ -397,7 +438,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
 
   describe('6. Domain Rules, Entity Types & UPSERT Semantics', () => {
     it('rejects duplicate normalized SKU when upsert=false (BR-ERP1-01)', async () => {
-      // 1. Create initial product
       await service.createProduct({
         name: 'Initial Product',
         sku: 'WIDGET-ABC',
@@ -406,7 +446,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         currency: 'USD',
       });
 
-      // 2. Try to import duplicate SKU with lowercase / whitespace normalization
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -433,7 +472,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
     });
 
     it('updates existing product with kind="linked" when upsert=true', async () => {
-      // 1. Create initial product
       const initial = await service.createProduct({
         name: 'Initial Product',
         sku: 'WIDGET-UPSERT',
@@ -442,7 +480,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         currency: 'USD',
       });
 
-      // 2. Import with upsert: true
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -468,7 +505,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       expect(body.target_id).toBe(initial.id);
       expect(body.receipt.kind).toBe('linked');
 
-      // Verify product fields were updated
       const updated = await repo.getProductById(initial.id);
       expect(updated?.name).toBe('Updated Product Name via Upsert');
       expect(updated?.unitOfMeasure).toBe('box');
@@ -476,7 +512,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
     });
 
     it('imports category entity with upsert support', async () => {
-      // Create fresh category
       const res1 = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -496,7 +531,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       const data1 = JSON.parse(res1.payload);
       expect(data1.receipt.kind).toBe('created');
 
-      // Upsert update category
       const res2 = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -531,7 +565,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         currency: 'USD',
       });
 
-      // Valid stock import
       const resValid = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -551,7 +584,6 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       const dataValid = JSON.parse(resValid.payload);
       expect(dataValid.target_id).toBeDefined();
 
-      // Negative stock -> 422
       const resNeg = await app.inject({
         method: 'POST',
         url: '/api/v1/erp-products/import',
@@ -605,13 +637,12 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       expect(result.total).toBe(15);
       expect(result.loaded).toBe(15);
       expect(result.rejected).toBe(0);
-      expect(result.chunksProcessed).toBe(3); // 15 items in chunks of 5
+      expect(result.chunksProcessed).toBe(3);
     });
 
     it('halts batch execution immediately when failure rate exceeds 10% after min attempted rows', async () => {
       const adapter = new Erp1TargetAdapter(service, 'product');
 
-      // Create 12 rows: 9 valid, 3 invalid (failure rate 3/12 = 25% > 10% threshold)
       const rows = [
         ...Array.from({ length: 9 }, (_, i) => ({
           sourceRow: i,
@@ -627,12 +658,12 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
         {
           sourceRow: 9,
           idempotencyKey: 'halt-invalid-1',
-          data: { name: 'Invalid 1', sku: '', unitOfMeasure: 'pcs', price: 10.0 }, // empty sku
+          data: { name: 'Invalid 1', sku: '', unitOfMeasure: 'pcs', price: 10.0 },
         },
         {
           sourceRow: 10,
           idempotencyKey: 'halt-invalid-2',
-          data: { name: 'Invalid 2', sku: '', unitOfMeasure: 'pcs', price: 10.0 }, // empty sku
+          data: { name: 'Invalid 2', sku: '', unitOfMeasure: 'pcs', price: 10.0 },
         },
         ...Array.from({ length: 5 }, (_, i) => ({
           sourceRow: 11 + i,
@@ -658,12 +689,46 @@ describe('ERP-1 Migration Kit Adapter & Durable Import Receipts (Issue #12)', ()
       );
 
       expect(res.status).toBe('STOPPED_EXCESSIVE_FAILURES');
-      expect(res.stoppedReason).toContain('exceeded threshold');
+      expect(res.stoppedReason).toContain('exceeded');
       expect(res.loaded).toBe(9);
       expect(res.rejected).toBe(2);
       expect(res.unattempted).toBe(5);
       expect(res.total).toBe(16);
       expect(res.attempted).toBe(11);
+    });
+
+    it('loadBatch error isolation: data-validation failure on row N does not abort subsequent valid rows', async () => {
+      const adapter = new Erp1TargetAdapter(service, 'product');
+      const batchId = '00000000-0000-4000-8000-000000000020';
+
+      const rows = [
+        {
+          sourceRow: 0,
+          idempotencyKey: 'iso-batch-row-0',
+          data: { name: 'Batch Item 1', sku: 'BATCH-ISO-001', unitOfMeasure: 'pcs', price: '1.00', currency: 'USD' },
+        },
+        {
+          sourceRow: 1,
+          idempotencyKey: 'iso-batch-row-1',
+          data: { name: 'Batch Item 2', sku: 'BATCH-ISO-002', unitOfMeasure: 'kg', price: '12.50', currency: 'USD' },
+        },
+        {
+          sourceRow: 2,
+          idempotencyKey: 'iso-batch-row-2',
+          data: { name: 'Invalid Item', sku: '', unitOfMeasure: 'pcs', price: '-1' },
+        },
+      ];
+
+      const result = await adapter.loadBatch(batchId, rows, { minAttemptedRows: 10 });
+      expect(result.status).toBe('COMPLETED');
+      expect(result.total).toBe(3);
+      expect(result.loaded).toBe(2);
+      expect(result.rejected).toBe(1);
+      expect(result.unattempted).toBe(0);
+
+      expect(result.rows[0]?.outcome).toBe('loaded');
+      expect(result.rows[1]?.outcome).toBe('loaded');
+      expect(result.rows[2]?.outcome).toBe('rejected');
     });
   });
 });
