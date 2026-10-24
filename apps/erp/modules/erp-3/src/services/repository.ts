@@ -24,7 +24,7 @@ import type {
   SalesOrderListResponse,
   SalesOrderStatus,
 } from "@clearshift/contracts";
-import { and, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   salesOrders,
@@ -562,7 +562,7 @@ export class DrizzleErp3Repository implements Erp3Repository {
       .select()
       .from(salesOrders)
       .where(whereClause)
-      .orderBy(desc(salesOrders.order_date), desc(salesOrders.id))
+      .orderBy(desc(salesOrders.order_date), asc(salesOrders.id))
       .limit(pageSize)
       .offset(offset);
 
@@ -820,7 +820,7 @@ export class DrizzleErp3Repository implements Erp3Repository {
       .select()
       .from(invoices)
       .where(whereClause)
-      .orderBy(desc(invoices.invoice_date), desc(invoices.id))
+      .orderBy(desc(invoices.invoice_date), asc(invoices.id))
       .limit(pageSize)
       .offset(offset);
 
@@ -1039,7 +1039,7 @@ export class DrizzleErp3Repository implements Erp3Repository {
       .select()
       .from(payments)
       .where(whereClause)
-      .orderBy(desc(payments.created_at), desc(payments.id))
+      .orderBy(desc(payments.created_at), asc(payments.id))
       .limit(pageSize)
       .offset(offset);
 

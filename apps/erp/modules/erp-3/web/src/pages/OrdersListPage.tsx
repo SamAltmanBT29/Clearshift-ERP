@@ -31,6 +31,7 @@ import { OrderCreatePage } from './OrderCreatePage.js';
 import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
 import { InvoiceDetailPage } from './InvoiceDetailPage.js';
+import { OrdersImportPage } from './OrdersImportPage.js';
 import { OrderCreateModal } from '../components/forms/OrderCreateModal.js';
 import { OrdersRejectionReviewPage } from './OrdersRejectionReviewPage.js';
 
@@ -40,6 +41,7 @@ export type OrdersViewMode =
   | 'order-detail'
   | 'create-invoice'
   | 'invoice-detail'
+  | 'import'
   | 'rejections';
 
 export interface PageErrorState {
@@ -54,6 +56,7 @@ export interface OrdersListPageProps {
   createMode?: 'modal' | 'page';
   initialView?: OrdersViewMode;
   onOrderCreated?: (order: SalesOrder) => void;
+  onNavigateImport?: () => void;
   onNavigateRejections?: () => void;
 }
 
@@ -127,6 +130,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   createMode = 'page',
   initialView = 'list',
   onOrderCreated,
+  onNavigateImport,
   onNavigateRejections,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(() =>
@@ -455,6 +459,17 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
     );
   }
 
+  if (viewMode === 'import') {
+    return (
+      <OrdersImportPage
+        onNavigateBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+      />
+    );
+  }
+
   if (viewMode === 'rejections') {
     return (
       <OrdersRejectionReviewPage
@@ -478,6 +493,20 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
             </p>
           </div>
           <div className="cs-top-actions">
+            <button
+              type="button"
+              data-testid="btn-import-orders"
+              className="cs-btn-secondary"
+              onClick={() => {
+                if (onNavigateImport) {
+                  onNavigateImport();
+                }
+                setViewMode('import');
+              }}
+              aria-label="Import sales orders and invoices through Migration Kit"
+            >
+              Import Orders
+            </button>
             <button
               type="button"
               className="cs-btn-secondary"
