@@ -485,3 +485,53 @@ $$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
 - **Review Date**: 2026-10-24
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
 - **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests (`17d24675e9af4f6a763b06b5a09400b471d36523254450c139f31b2d1fd73e53`).
+
+---
+
+## 12. Loading, Empty, Error, and Access-Denied States Specification (ERP3-19 / Issue #155)
+
+### 12.1 Overview & Architectural Invariants
+
+ERP-3 Sales Orders & Invoices provides production-grade operational state views in strict conformance with the ClearShift V1 Master Architecture Specification and SDS ClearShift ERP v2.0 §4.4 & §4.9. All screen state representations adhere to the following invariants:
+- **Zero Information Leakage**: Technical database dumps, Node.js filepaths, and raw execution stack traces are intercepted and sanitized before rendering to the DOM (`sanitizeErrorMessage()`).
+- **Accessible State Semantics**: Screen readers receive appropriate ARIA roles (`status` with `aria-busy="true"` for loading, `alert` for errors, `region` for empty and access-denied screens).
+- **Recoverable vs Deterministic Actions**: Transient data fetch errors present a recoverable "Try Again" action; deterministic 403 authorization refusals never display a retry button.
+
+### 12.2 Animated Loading Skeleton Placeholder (AC1)
+
+During initial data fetching and tab switches, the table displays an animated skeleton placeholder:
+- **Components**: `SalesOrdersLoadingSkeleton`, `InvoicesLoadingSkeleton`, and `SkeletonTable` (`apps/erp/modules/erp-3/web/src/components/StateViews.tsx`).
+- **Semantics**: Rendered with `role="status"`, `aria-busy="true"`, and accessible label (`Loading sales orders data` / `Loading invoices data`).
+- **Animation**: Placeholder cells utilize the `.cs-skeleton-cell` CSS class with CSS pulse animation (`animation: pulse 1.5s infinite ease-in-out`).
+- **Lifecycle**: Replaced seamlessly with the populated data table upon resolution of the asynchronous query.
+
+### 12.3 Zero-Data Condition & Action Callouts (AC2)
+
+The system distinguishes between an empty catalog (zero-data condition) and an active filter producing zero matches:
+- **Zero-Data State (Initial Catalog Empty)**:
+  - Sales Orders: Renders "No sales orders found" with guidance: "No orders match your current filter selection or search query. No sales orders have been recorded yet. Create your first sales order to begin managing orders and line items." Includes a prominent call-to-action button: `+ New Sales Order` (switching view mode to `create-order`).
+  - Invoices: Renders "No invoices found" with guidance: "No invoices match your current filter selection or search query. No billing invoices have been recorded yet. Create your first invoice or bill an existing sales order." Includes a call-to-action button: `+ New Invoice` (switching view mode to `create-invoice`).
+- **Filtered Zero-Records State**:
+  - When filters (e.g. search string, currency, or status) yield zero matches, displays "No sales orders found" / "No invoices found" with call-to-action button: `Clear Filters & Reload` (resetting active filters).
+
+### 12.4 Error Sanitization & Recoverable Alert Banner (AC3)
+
+On API failure, the interface displays an accessible alert banner with recoverable action while hiding raw internal technical details:
+- **Error Sanitization (`sanitizeErrorMessage`)**:
+  - Strips multiline JavaScript stack frames (`at ...`), Node.js internal paths, and module paths (`node_modules`).
+  - Masks internal SQL and ORM syntax error dumps (`syntax error`, `relation`, `drizzle-orm`, `postgres`, `pg-protocol`) and network socket failures (`ECONNREFUSED`, `ENOTFOUND`).
+  - Converts low-level errors into safe operator-facing diagnostics (`A database connection error occurred while retrieving sales orders. Please try again or contact support.`).
+  - Preserves user-facing domain validation messages and API envelope messages.
+- **Alert Banner**:
+  - Renders with `role="alert"` and accessible label.
+  - Displays correlation reference ID (`Reference ID: <code>...</code>`) when provided by the backend error envelope.
+  - Includes a `Try Again` retry action button that triggers a re-fetch without page reload.
+
+### 12.5 HTTP 403 Forbidden Access-Denied View & Role Guidance (AC4)
+
+When an API endpoint responds with HTTP 403 Forbidden:
+- **Access-Denied State (`AccessDeniedState`)**:
+  - Rendered with `role="region"`, `aria-label="Access denied state"`, and title "Access Denied".
+  - Explains the missing permission: displays `Required permission: orders:read (or orders:manage)`.
+  - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
+  - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.

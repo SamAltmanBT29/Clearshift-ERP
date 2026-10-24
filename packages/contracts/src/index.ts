@@ -12,6 +12,8 @@ export * from './erp-1.js';
 export * from './erp-1-events.js';
 export * from './erp-1-mock.js';
 export * from './erp-2.js';
+export * from './erp-2-events.js';
+export * from './erp-2-mock.js';
 export * from './erp-3.js';
 export * from './erp-3-events.js';
 export * from './erp-3-mock.js';

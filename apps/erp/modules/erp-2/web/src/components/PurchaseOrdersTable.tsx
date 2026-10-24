@@ -23,6 +23,7 @@ export interface PurchaseOrdersTableProps {
   totalPages: number;
   sortField?: string | undefined;
   sortDirection?: 'asc' | 'desc' | undefined;
+  hasActiveFilters?: boolean | undefined;
   onCreatePurchaseOrder?: (() => void) | undefined;
   onSortChange?: (field: string) => void;
   onPageChange: (newPage: number) => void;
@@ -39,6 +40,7 @@ export const PurchaseOrdersTable: React.FC<PurchaseOrdersTableProps> = ({
   totalPages,
   sortField,
   sortDirection = 'asc',
+  hasActiveFilters,
   onCreatePurchaseOrder,
   onSortChange,
   onPageChange,
@@ -46,10 +48,20 @@ export const PurchaseOrdersTable: React.FC<PurchaseOrdersTableProps> = ({
   onRefresh,
 }) => {
   if (isLoading) {
-    return <SkeletonTable columns={7} rows={pageSize > 10 ? 8 : pageSize} />;
+    return <SkeletonTable columns={7} rows={pageSize > 10 ? 8 : pageSize} ariaLabel="Loading data" />;
   }
 
   if (purchaseOrders.length === 0) {
+    if (!hasActiveFilters && total === 0 && onCreatePurchaseOrder) {
+      return (
+        <EmptyState
+          title="No purchase orders in ledger"
+          message="No purchase orders have been recorded in the procurement ledger yet. Create your first purchase order to begin tracking supplier orders."
+          actionLabel="New Purchase Order"
+          onAction={onCreatePurchaseOrder}
+        />
+      );
+    }
     return (
       <EmptyState
         title="No purchase orders found"

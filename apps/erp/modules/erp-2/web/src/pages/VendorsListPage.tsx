@@ -25,7 +25,13 @@ import { VendorFilterBar, PurchaseOrderFilterBar } from '../components/FilterBar
 import { VendorFilterSidebar, POFilterSidebar } from '../components/FilterSidebar.js';
 import { FilterPillTags } from '../components/FilterPillTags.js';
 import type { Erp2ActiveFilters, Erp2FilterKey } from '../components/FilterPillTags.js';
-import { ErrorState, AccessDeniedState } from '../components/StateViews.js';
+import {
+  ErrorState,
+  AccessDeniedState,
+  VendorsLoadingSkeleton,
+  PurchaseOrdersLoadingSkeleton,
+  sanitizeErrorMessage,
+} from '../components/StateViews.js';
 import { VendorCreateModal, PurchaseOrderCreateModal } from '../components/forms/index.js';
 
 // ─── URL param helpers ─────────────────────────────────────────────────────────
@@ -82,9 +88,23 @@ interface SortState {
 const DEFAULT_VENDOR_SORT: SortState = { field: undefined, direction: 'asc' };
 const DEFAULT_ORDER_SORT: SortState = { field: undefined, direction: 'asc' };
 
+export interface VendorsListPageProps {
+  onCreateVendor?: (() => void) | undefined;
+  onCreatePurchaseOrder?: (() => void) | undefined;
+}
+
+interface PageErrorInfo {
+  message: string;
+  isForbidden: boolean;
+  correlationId?: string | undefined;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const VendorsListPage: React.FC = () => {
+export const VendorsListPage: React.FC<VendorsListPageProps> = ({
+  onCreateVendor,
+  onCreatePurchaseOrder,
+}) => {
   const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
 
   // ── Modal & Toast states (AC4) ──
@@ -100,8 +120,8 @@ export const VendorsListPage: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsTotal, setVendorsTotal] = useState(0);
   const [vendorsTotalPages, setVendorsTotalPages] = useState(1);
-  const [isVendorsLoading, setIsVendorsLoading] = useState(false);
-  const [vendorsError, setVendorsError] = useState<{ message: string; isForbidden: boolean } | null>(null);
+  const [isVendorsLoading, setIsVendorsLoading] = useState(true);
+  const [vendorsError, setVendorsError] = useState<PageErrorInfo | null>(null);
 
   const [vendorFilters, setVendorFilters] = useState<VendorListQuery & { currency?: string | undefined }>(() => ({
     page: 1,
@@ -116,7 +136,7 @@ export const VendorsListPage: React.FC = () => {
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
-  const [ordersError, setOrdersError] = useState<{ message: string; isForbidden: boolean } | null>(null);
+  const [ordersError, setOrdersError] = useState<PageErrorInfo | null>(null);
 
   const [orderFilters, setOrderFilters] = useState<PurchaseOrderListQuery>(() => ({
     page: 1,
@@ -158,11 +178,13 @@ export const VendorsListPage: React.FC = () => {
       setVendors(items);
       setVendorsTotal(response.total || 0);
       setVendorsTotalPages(response.totalPages || 1);
-    } catch (err: any) {
-      const isForbidden = err instanceof ApiError ? err.status === 403 : err?.status === 403;
+    } catch (err: unknown) {
+      const isForbidden = err instanceof ApiError ? err.status === 403 : (err as { status?: number })?.status === 403;
+      const correlationId = (err as { correlationId?: string })?.correlationId;
       setVendorsError({
-        message: err?.message || 'Failed to fetch vendors from server.',
+        message: sanitizeErrorMessage(err),
         isForbidden,
+        correlationId,
       });
     } finally {
       setIsVendorsLoading(false);
@@ -194,11 +216,13 @@ export const VendorsListPage: React.FC = () => {
       setOrders(items);
       setOrdersTotal(response.total || 0);
       setOrdersTotalPages(response.totalPages || 1);
-    } catch (err: any) {
-      const isForbidden = err instanceof ApiError ? err.status === 403 : err?.status === 403;
+    } catch (err: unknown) {
+      const isForbidden = err instanceof ApiError ? err.status === 403 : (err as { status?: number })?.status === 403;
+      const correlationId = (err as { correlationId?: string })?.correlationId;
       setOrdersError({
-        message: err?.message || 'Failed to fetch purchase orders from server.',
+        message: sanitizeErrorMessage(err),
         isForbidden,
+        correlationId,
       });
     } finally {
       setIsOrdersLoading(false);
@@ -287,6 +311,22 @@ export const VendorsListPage: React.FC = () => {
     setOrderSort(DEFAULT_ORDER_SORT);
   }, []);
 
+  const handleCreateVendor = useCallback(() => {
+    if (onCreateVendor) {
+      onCreateVendor();
+    } else if (typeof window !== 'undefined' && window.location) {
+      window.location.href = '/erp2/vendors/new';
+    }
+  }, [onCreateVendor]);
+
+  const handleCreatePurchaseOrder = useCallback(() => {
+    if (onCreatePurchaseOrder) {
+      onCreatePurchaseOrder();
+    } else if (typeof window !== 'undefined' && window.location) {
+      window.location.href = '/erp2/purchase-orders/new';
+    }
+  }, [onCreatePurchaseOrder]);
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -302,23 +342,27 @@ export const VendorsListPage: React.FC = () => {
           </div>
           <div className="cs-page-actions">
             {activeTab === 'vendors' ? (
-              <button
-                type="button"
-                className="cs-btn-primary"
-                onClick={() => setIsVendorModalOpen(true)}
-                aria-label="Add Vendor"
-              >
-                + Add Vendor
-              </button>
+              vendorsTotal > 0 && (
+                <button
+                  type="button"
+                  className="cs-btn-primary"
+                  onClick={onCreateVendor ?? (() => setIsVendorModalOpen(true))}
+                  aria-label="Add Vendor"
+                >
+                  + Add Vendor
+                </button>
+              )
             ) : (
-              <button
-                type="button"
-                className="cs-btn-primary"
-                onClick={() => setIsPoModalOpen(true)}
-                aria-label="New Purchase Order"
-              >
-                + New Purchase Order
-              </button>
+              ordersTotal > 0 && (
+                <button
+                  type="button"
+                  className="cs-btn-primary"
+                  onClick={onCreatePurchaseOrder ?? (() => setIsPoModalOpen(true))}
+                  aria-label="New Purchase Order"
+                >
+                  + New Purchase Order
+                </button>
+              )
             )}
           </div>
         </div>
@@ -415,14 +459,18 @@ export const VendorsListPage: React.FC = () => {
                 <AccessDeniedState
                   title="Access Denied"
                   message="You do not have permission to view vendor profiles. Please check your role assignments."
+                  requiredCapability="module.read"
                 />
               ) : (
                 <ErrorState
                   title="Failed to Load Vendors"
                   message={vendorsError.message}
+                  correlationId={vendorsError.correlationId}
                   onRetry={() => loadVendors(vendorFilters, vendorSort)}
                 />
               )
+            ) : isVendorsLoading ? (
+              <VendorsLoadingSkeleton />
             ) : (
               <VendorsTable
                 vendors={vendors}
@@ -431,7 +479,8 @@ export const VendorsListPage: React.FC = () => {
                 page={vendorFilters.page || 1}
                 pageSize={vendorFilters.pageSize || 20}
                 totalPages={vendorsTotalPages}
-                onCreateVendor={() => setIsVendorModalOpen(true)}
+                hasActiveFilters={Boolean(vendorFilters.search || vendorFilters.currency)}
+                onCreateVendor={onCreateVendor}
                 onPageChange={(newPage: number) =>
                   setVendorFilters((prev) => ({
                     ...prev,
@@ -482,14 +531,18 @@ export const VendorsListPage: React.FC = () => {
                 <AccessDeniedState
                   title="Access Denied"
                   message="You do not have permission to view purchase orders. Please check your role assignments."
+                  requiredCapability="module.read"
                 />
               ) : (
                 <ErrorState
                   title="Failed to Load Purchase Orders"
                   message={ordersError.message}
+                  correlationId={ordersError.correlationId}
                   onRetry={() => loadOrders(orderFilters, orderSort)}
                 />
               )
+            ) : isOrdersLoading ? (
+              <PurchaseOrdersLoadingSkeleton />
             ) : (
               <PurchaseOrdersTable
                 purchaseOrders={orders}
@@ -498,7 +551,8 @@ export const VendorsListPage: React.FC = () => {
                 page={orderFilters.page || 1}
                 pageSize={orderFilters.pageSize || 20}
                 totalPages={ordersTotalPages}
-                onCreatePurchaseOrder={() => setIsPoModalOpen(true)}
+                hasActiveFilters={Boolean(orderFilters.status || orderFilters.vendor_id)}
+                onCreatePurchaseOrder={onCreatePurchaseOrder}
                 onPageChange={(newPage: number) =>
                   setOrderFilters((prev) => ({
                     ...prev,
