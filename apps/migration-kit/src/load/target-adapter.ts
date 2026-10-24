@@ -5,8 +5,14 @@ import {
   type MigrationTargetAdapter,
   type MigrationTargetAdapterResult,
   type MigrationTargetAdapterError,
+  TerminalOutcome,
+  SKIP_POLICY_CODE,
+  DryRunTokenInvalidatedError,
 } from '@clearshift/contracts';
 import { RowOutcome, evaluateReconciliation, type ReconciliationCounts } from '@cs/kit';
+import type { IKitRowOutcomeStore } from '../reconcile/outcome-ledger.js';
+import type { IDryRunTokenManager } from '../reconcile/dry-run-token.js';
+
 
 /**
  * Default chunk size for Migration Kit V1 Real Load (Decision KIT-08 & SDS §11.1)
@@ -327,6 +333,7 @@ export interface BatchLoadSummary {
   chunksProcessed: number;
   halted: boolean;
   haltReason?: string | undefined;
+  dryRunToken?: string | undefined;
   rowResults: LoadRowResult[];
 }
 
@@ -337,6 +344,8 @@ export interface TargetBatchLoaderOptions {
   chunkSize?: number | undefined;
   maxFailureRatePercent?: number | undefined;
   isDryRun?: boolean | undefined;
+  dryRunToken?: string | undefined;
+  requireDryRunToken?: boolean | undefined;
 }
 
 /**
@@ -347,9 +356,15 @@ export interface TargetBatchLoaderOptions {
  * - Stable idempotency key derivation
  * - 10% failure rate circuit breaker (STP-01)
  * - Row outcome conservation: source = loaded + rejected + merged + skipped (unaccounted = 0)
+ * - Durable outcome ledger recording (KIT-09)
+ * - Dry-run token validation & invalidation (KIT-09)
  */
 export class TargetBatchLoader {
-  constructor(private registry: GenericTargetAdapterRegistry) {}
+  constructor(
+    private registry: GenericTargetAdapterRegistry,
+    private outcomeStore?: IKitRowOutcomeStore | undefined,
+    private dryRunTokenManager?: IDryRunTokenManager | undefined
+  ) {}
 
   public async loadBatch<TRow = Record<string, unknown>>(
     batchId: string,
@@ -365,6 +380,25 @@ export class TargetBatchLoader {
     const adapter = this.registry.get(module, entity);
     if (!adapter) {
       throw new Error(`No TargetAdapter registered for target '${module}:${entity}'`);
+    }
+
+    // 1. Dry-run token guard (KIT-09)
+    let dryRunToken: string | undefined = options.dryRunToken;
+    if (isDryRun) {
+      if (this.dryRunTokenManager) {
+        const issued = await this.dryRunTokenManager.issueToken(batchId);
+        dryRunToken = issued.token;
+      }
+    } else {
+      if (this.dryRunTokenManager && (options.dryRunToken || options.requireDryRunToken)) {
+        if (!options.dryRunToken) {
+          throw new DryRunTokenInvalidatedError(
+            batchId,
+            `Batch '${batchId}' requires a valid dry-run token for real load.`
+          );
+        }
+        await this.dryRunTokenManager.assertValidToken(batchId, options.dryRunToken);
+      }
     }
 
     const rowResults: LoadRowResult[] = [];
@@ -435,6 +469,7 @@ export class TargetBatchLoader {
         reconciliationStatus: reconciliation.result,
         chunksProcessed: 1,
         halted: false,
+        dryRunToken,
         rowResults,
       };
     }
@@ -461,6 +496,21 @@ export class TargetBatchLoader {
             outcome: RowOutcome.SKIPPED,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            const alreadyRecorded = await this.outcomeStore.hasOutcome(batchId, row.sourceRow);
+            if (!alreadyRecorded) {
+              await this.outcomeStore.recordOutcome({
+                batchId,
+                sourceRow: row.sourceRow,
+                outcome: TerminalOutcome.SKIPPED,
+                policyCode: SKIP_POLICY_CODE,
+                reasonCode: 'OPERATOR_APPROVED_SKIP',
+                reasonText: row.skipReason ?? 'Skipped before real load',
+                idempotencyKey: idempKey,
+              });
+            }
+          }
           continue;
         }
 
@@ -476,6 +526,16 @@ export class TargetBatchLoader {
             isExisting: res.value.isExisting ?? false,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            await this.outcomeStore.recordOutcome({
+              batchId,
+              sourceRow: row.sourceRow,
+              outcome: TerminalOutcome.LOADED,
+              targetId: res.value.targetId,
+              idempotencyKey: idempKey,
+            });
+          }
         } else {
           rejectedCount++;
           rowResults.push({
@@ -484,6 +544,17 @@ export class TargetBatchLoader {
             error: res.error,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            await this.outcomeStore.recordOutcome({
+              batchId,
+              sourceRow: row.sourceRow,
+              outcome: TerminalOutcome.REJECTED,
+              reasonCode: res.error.reasonCode,
+              reasonText: res.error.message,
+              idempotencyKey: idempKey,
+            });
+          }
         }
 
         // 3. Circuit breaker: Check 10% row failure threshold
@@ -526,16 +597,40 @@ export class TargetBatchLoader {
           },
           idempotencyKey: idempKey,
         });
+
+        if (this.outcomeStore) {
+          await this.outcomeStore.recordOutcome({
+            batchId,
+            sourceRow: rem.sourceRow,
+            outcome: TerminalOutcome.REJECTED,
+            reasonCode: 'STOP_THRESHOLD_EXCEEDED',
+            reasonText: haltReason ?? 'Batch halted due to excessive failures',
+            idempotencyKey: idempKey,
+          });
+        }
       }
     }
 
     // Enforce row conservation: source = loaded + rejected + merged + skipped
+    let derivedLoaded = loadedCount;
+    let derivedRejected = rejectedCount;
+    let derivedMerged = mergedCount;
+    let derivedSkipped = skippedCount;
+
+    if (this.outcomeStore) {
+      const ledgerCounts = await this.outcomeStore.countOutcomesByBatch(batchId);
+      derivedLoaded = ledgerCounts.loaded;
+      derivedRejected = ledgerCounts.rejected;
+      derivedMerged = ledgerCounts.merged;
+      derivedSkipped = ledgerCounts.skipped;
+    }
+
     const reconciliationCounts: ReconciliationCounts = {
       source: rows.length,
-      loaded: loadedCount,
-      rejected: rejectedCount,
-      merged: mergedCount,
-      skipped: skippedCount,
+      loaded: derivedLoaded,
+      rejected: derivedRejected,
+      merged: derivedMerged,
+      skipped: derivedSkipped,
       pending: 0,
     };
     const reconciliation = evaluateReconciliation(reconciliationCounts);
@@ -546,15 +641,16 @@ export class TargetBatchLoader {
       entity,
       totalSourceRows: rows.length,
       attemptedRows: rowResults.length,
-      loadedCount,
-      rejectedCount,
-      mergedCount,
-      skippedCount,
+      loadedCount: derivedLoaded,
+      rejectedCount: derivedRejected,
+      mergedCount: derivedMerged,
+      skippedCount: derivedSkipped,
       unaccountedCount: reconciliation.unaccounted,
       reconciliationStatus: reconciliation.result,
       chunksProcessed,
       halted,
       haltReason,
+      dryRunToken,
       rowResults,
     };
   }

@@ -111,3 +111,81 @@ Migration Kit operates under strict privilege separation (ADR-004 / Decision C4)
 - **No Direct Table Privileges:** The Migration Kit worker role possesses ZERO insert, update, or delete privileges on module-owned domain schemas (`erp1.*`, `erp2.*`, `erp3.*`, `erp4.*`, `erp5.*`).
 - **Adapter In-Process Port:** All loads are mediated via the owning module's `MigrationTargetAdapter`, ensuring that module business rules, events, and transactional boundaries are strictly respected.
 - **Durable Import Receipts:** Every module maintains an `import_receipts` table with a unique constraint on `idempotency_key` (`<module>_import_receipts_idempotency_key_unique`), guaranteeing that no race condition or retry can ever produce a duplicate target record.
+
+---
+
+## 4. Step 7: Terminal Outcome Ledger & Mathematically Exact Reconciliation (KIT-09)
+
+**Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; Issue #76 `[KIT-09]`.
+
+### 4.1 Overview & Pipeline Stage Responsibilities
+
+Step 7 (**Reconcile**) provides mathematical accounting for every parsed source row in a migration batch. In ClearShift V1, a migration run is NEVER considered complete or eligible for client/operator signoff based on target table count heuristics. Reconciliation is mathematically exact and derived exclusively from the append-only `platform.kit_row_outcomes` ledger.
+
+```
+                  ┌─────────────────────────────────────────────────────────┐
+                  │ Append-Only Outcome Ledger (platform.kit_row_outcomes)  │
+                  │ - UNIQUE (batch_id, source_row)                         │
+                  │ - Database triggers strictly prohibit UPDATE & DELETE   │
+                  └────────────┬───────────────────────────────┬────────────┘
+                               │                               │
+                Loaded Rows    │                               │ Skipped Rows (Pre-Load)
+                               ▼                               ▼
+                     [ Target Adapter Port ]          [ SkipManager ]
+                     - Atomically commits             - Editor/Admin RBAC
+                       target row + receipt           - Runner self-approval blocked
+                     - Writes LOADED outcome          - Min 10 non-whitespace reason
+                               │                      - operator_approved_skip code
+                               │                      - Post-dry-run token invalidator
+                               ▼                               │
+                  ┌────────────────────────────────────────────▼────────────┐
+                  │ ReconciliationEngine                                    │
+                  │                                                         │
+                  │   source = loaded + rejected + merged + skipped         │
+                  │   unaccounted = 0                                       │
+                  │                                                         │
+                  │   ├── If holds: status = OK, signoffAllowed = true      │
+                  │   └── If discrepancy: status = reconciliation_failed,   │
+                  │       signoff strictly disabled                         │
+                  └─────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Append-Only Ledger Invariants (`kit_row_outcomes`)
+
+1. **Unique Terminal Outcome:** Every parsed source row has exactly one terminal outcome:
+   - `loaded`: Row successfully committed to the target module and import receipt issued.
+   - `rejected`: Row failed validation, formatting, or circuit breaker threshold.
+   - `merged`: Exact duplicate matched to existing golden master row and merged.
+   - `skipped`: Operator explicitly excluded row before real load following authorized skip policy.
+2. **Database-Level Uniqueness:** A database unique constraint on `(batch_id, source_row)` strictly blocks any second terminal outcome. Attempting to assign multiple outcomes throws `SecondTerminalOutcomeError` (`HTTP 409`).
+3. **Immutability (Append-Only):** Database trigger `trg_kit_row_outcomes_append_only` intercepts and blocks any `UPDATE` or `DELETE` statement, ensuring that outcome entries cannot be tampered with.
+4. **Ledger Authority:** Counts are derived directly by aggregating the outcome ledger (`countOutcomesByBatch`), never from target business table totals (`SELECT count(*) FROM target`). This guarantees immunity to external mutations or multi-tenant database writes.
+
+### 4.3 Operator Skip Authorization & Lifecycle Rules
+
+A `skipped` outcome is permitted ONLY under strict operational controls:
+- **Pre-Load Window Only:** Skips are strictly permitted before real load (i.e. during `created`, `extracted`, `profiled`, `cleaned`, `mapped`, or `dry_run_ok` states). Any skip requested during or after `loading` throws `SkipApprovalForbiddenError` (`HTTP 403`).
+- **Role-Based Access Control:** An **Editor** or **Admin** must confirm the Skip row action. Viewers, Analysts, or unprivileged roles cannot approve skips.
+- **Separation of Duties:** A **Migration Runner cannot approve its own skip**. If `actor === batchRunner`, the request is rejected immediately with `SkipApprovalForbiddenError`.
+- **Reason Requirement:** The operator must supply an explanatory reason of at least **10 non-whitespace characters**. Reasons failing this threshold throw `InvalidSkipReasonError` (`HTTP 400`).
+- **Audit Policy Stamp:** The Kit automatically records actor, timestamp, and policy code `operator_approved_skip` alongside the reason text in the ledger.
+- **Ignored Columns Policy:** Setting columns to "ignore" in field mapping NEVER marks a row as skipped. Ignored columns simply omit fields; row terminal outcomes remain governed by load/validation.
+
+### 4.4 Dry-Run Token Invalidation Protocol
+
+To guarantee that preflight predictions match actual load inputs:
+1. Completing a dry-run issues a cryptographic `DryRunToken` recorded in `DryRunTokenManager`.
+2. Any skip approved after dry-run **invalidates the dry-run token** immediately.
+3. The real load gateway (`TargetBatchLoader`) asserts token validity prior to dispatching chunks. If the token is invalidated or missing, load halts with `DryRunTokenInvalidatedError` (`HTTP 412`), requiring a new dry-run before real load is unlocked.
+
+### 4.5 Exact Conservation Equation & Signoff State
+
+The reconciliation engine verifies the mathematical conservation equation:
+
+$$\text{sourceRows} = \text{loaded} + \text{rejected} + \text{merged} + \text{skipped}$$
+$$\text{unaccountedRows} = \text{sourceRows} - (\text{loaded} + \text{rejected} + \text{merged} + \text{skipped}) = 0$$
+
+- **Verification Verdict:**
+  - **Verdict `OK`:** Formula holds and `unaccountedRows === 0`. The batch status transitions to `reconciled` and operator signoff is enabled.
+  - **Verdict `reconciliation_failed`:** If `unaccountedRows !== 0`, counts do not match, or double-count duplicates exist, the batch status remains `reconciliation_failed` and signoff is strictly disabled (`signoffAllowed: false`).
+- **Formula-Safe Export Defense:** All reconciliation summary and outcome CSV exports sanitize dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`), neutralizing CSV injection attacks per OWASP guidelines.
