@@ -172,4 +172,134 @@ describe("ERP-3 authorization and sensitive data protection (#34)", () => {
     expect(events[0]).toMatchObject({ actor: "editor-1", action: "erp.sales_order.status_changed", correlationId: "corr-status", result: "success", targetEntity: "sales_order" });
     expect(JSON.stringify(events)).not.toContain("1234567890");
   });
+
+  describe("Object-Level Authorization Guards (Tenant & Cross-User Isolation)", () => {
+    it("prevents cross-tenant access to sales orders with 403 OBJECT_ACCESS_DENIED", async () => {
+      // 1. Create sales order under tenant-alpha
+      const adminToken = await token(Roles.ADMIN, "admin-1");
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "x-tenant-id": "tenant-alpha",
+        },
+        payload: {
+          order_number: "SO-TENANT-ALPHA-01",
+          customer_golden_id: "55555555-0003-4000-8000-000000000001",
+          order_date: "2026-04-10",
+          currency: "USD",
+          lines: [
+            {
+              product_id: "11111111-0001-4000-8000-000000000001",
+              quantity: "1.0000",
+              price: "50.0000",
+              tax_rate: "0.0000",
+            },
+          ],
+        },
+      });
+      expect(createRes.statusCode).toBe(201);
+      const createdOrder = createRes.json();
+
+      // 2. Caller from tenant-beta attempts to read tenant-alpha order -> 403
+      const viewerToken = await token(Roles.VIEWER, "viewer-beta");
+      const readRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+        headers: {
+          authorization: `Bearer ${viewerToken}`,
+          "x-tenant-id": "tenant-beta",
+        },
+      });
+      expect(readRes.statusCode).toBe(403);
+      expect(readRes.json().code).toBe("OBJECT_ACCESS_DENIED");
+
+      // 3. Caller from tenant-alpha successfully reads it -> 200
+      const alphaViewer = await token(Roles.VIEWER, "viewer-alpha");
+      const alphaReadRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+        headers: {
+          authorization: `Bearer ${alphaViewer}`,
+          "x-tenant-id": "tenant-alpha",
+        },
+      });
+      expect(alphaReadRes.statusCode).toBe(200);
+      expect(alphaReadRes.json().id).toBe(createdOrder.id);
+    });
+
+    it("prevents non-admin users from mutating records created by another user with 403 CROSS_USER_MUTATION_FORBIDDEN", async () => {
+      // 1. User Alice creates sales order
+      const aliceToken = await token(Roles.EDITOR, "user-alice");
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        headers: {
+          authorization: `Bearer ${aliceToken}`,
+        },
+        payload: {
+          order_number: "SO-ALICE-MUTATION-01",
+          customer_golden_id: "55555555-0003-4000-8000-000000000001",
+          order_date: "2026-04-10",
+          currency: "USD",
+          lines: [
+            {
+              product_id: "11111111-0001-4000-8000-000000000001",
+              quantity: "1.0000",
+              price: "50.0000",
+              tax_rate: "0.0000",
+            },
+          ],
+        },
+      });
+      expect(createRes.statusCode).toBe(201);
+      const createdOrder = createRes.json();
+
+      // 2. User Bob (different editor) attempts to mutate Alice's order -> 403
+      const bobToken = await token(Roles.EDITOR, "user-bob");
+      const mutateRes = await app.inject({
+        method: "PATCH",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+        headers: {
+          authorization: `Bearer ${bobToken}`,
+        },
+        payload: {
+          status: "Invoiced",
+        },
+      });
+      expect(mutateRes.statusCode).toBe(403);
+      expect(mutateRes.json().code).toBe("CROSS_USER_MUTATION_FORBIDDEN");
+
+      // 3. User Alice can mutate her own order -> 200
+      const aliceMutateRes = await app.inject({
+        method: "PATCH",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+        headers: {
+          authorization: `Bearer ${aliceToken}`,
+        },
+        payload: {
+          status: "Invoiced",
+        },
+      });
+      expect(aliceMutateRes.statusCode).toBe(200);
+      expect(aliceMutateRes.json().status).toBe("Invoiced");
+
+      // 4. Admin can mutate across users -> 200
+      const adminToken = await token(Roles.ADMIN, "admin-supervisor");
+      const adminMutateRes = await app.inject({
+        method: "PATCH",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          status: "Closed",
+        },
+      });
+      expect(adminMutateRes.statusCode).toBe(200);
+      expect(adminMutateRes.json().status).toBe("Closed");
+    });
+  });
 });
+

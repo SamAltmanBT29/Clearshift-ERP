@@ -15,7 +15,7 @@
  * @module erp4/services/repository
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type {
   Account,
   CreateAccountRequest,
@@ -42,6 +42,33 @@ import {
   FIXTURE_JOURNAL_ENTRY_DRAFT,
   FIXTURE_OPENING_BALANCE_BANK,
 } from '../../fixtures/index.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility functions: Request Canonical Hashing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Deterministically canonicalizes a JSON structure (keys sorted recursively).
+ */
+export function canonicalizeJson(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalizeJson).join(',') + ']';
+  }
+  const record = obj as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonicalizeJson(record[k])).join(',') + '}';
+}
+
+/**
+ * Computes an SHA-256 hash of the canonicalized payload.
+ */
+export function computeRequestHash(payload: unknown): string {
+  const canonical = canonicalizeJson(payload);
+  return createHash('sha256').update(canonical).digest('hex');
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Repository Interface
@@ -94,17 +121,25 @@ export interface FinanceRepository {
     loaded_by_user_id: string;
   }): Promise<OpeningBalance>;
 
+  // Transaction Support (Decision C4 & KIT-08)
+  executeTransactional<T>(work: (txRepo: FinanceRepository) => Promise<T>): Promise<T>;
+
   // Import Receipts
   getImportReceiptByIdempotencyKey(key: string): Promise<ImportReceipt | null>;
   createImportReceipt(receipt: {
     id?: string;
     batch_id: string;
     source_row: number;
+    source_system?: string | null;
+    source_id?: string | null;
     entity: string;
     schema_version?: number;
     idempotency_key: string;
+    request_hash?: string;
     target_id: string;
     kind?: 'created' | 'linked';
+    outcome?: 'loaded' | 'rejected' | 'merged' | 'skipped';
+    response_payload?: unknown;
     created_at?: string;
   }): Promise<ImportReceipt>;
 }
@@ -114,11 +149,11 @@ export interface FinanceRepository {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class InMemoryFinanceRepository implements FinanceRepository {
-  private accounts: Map<string, Account> = new Map();
-  private periods: Map<string, AccountingPeriod> = new Map();
-  private journalEntries: Map<string, JournalEntry> = new Map();
-  private openingBalances: Map<string, OpeningBalance> = new Map();
-  private importReceipts: Map<string, ImportReceipt> = new Map();
+  public accounts: Map<string, Account> = new Map();
+  public periods: Map<string, AccountingPeriod> = new Map();
+  public journalEntries: Map<string, JournalEntry> = new Map();
+  public openingBalances: Map<string, OpeningBalance> = new Map();
+  public importReceipts: Map<string, ImportReceipt> = new Map();
 
   constructor(seedWithFixtures: boolean = true) {
     if (seedWithFixtures) {
@@ -637,7 +672,43 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     return ob;
   }
 
-  // ── Import Receipts ────────────────────────────────────────────────────────
+  // ── Import Receipts & Transactions (Decision C4 & KIT-08) ──────────────────
+
+  /**
+   * In-memory transaction simulator: creates a snapshot clone and commits on success;
+   * on failure, state reverts to pre-transaction snapshot.
+   */
+  async executeTransactional<T>(work: (txRepo: FinanceRepository) => Promise<T>): Promise<T> {
+    const accountsSnapshot = new Map(this.accounts);
+    const periodsSnapshot = new Map(this.periods);
+    const journalEntriesSnapshot = new Map(this.journalEntries);
+    const openingBalancesSnapshot = new Map(this.openingBalances);
+    const importReceiptsSnapshot = new Map(this.importReceipts);
+
+    const txRepo = new InMemoryFinanceRepository(false);
+    txRepo.accounts = new Map(this.accounts);
+    txRepo.periods = new Map(this.periods);
+    txRepo.journalEntries = new Map(this.journalEntries);
+    txRepo.openingBalances = new Map(this.openingBalances);
+    txRepo.importReceipts = new Map(this.importReceipts);
+
+    try {
+      const result = await work(txRepo);
+      this.accounts = txRepo.accounts;
+      this.periods = txRepo.periods;
+      this.journalEntries = txRepo.journalEntries;
+      this.openingBalances = txRepo.openingBalances;
+      this.importReceipts = txRepo.importReceipts;
+      return result;
+    } catch (err) {
+      this.accounts = accountsSnapshot;
+      this.periods = periodsSnapshot;
+      this.journalEntries = journalEntriesSnapshot;
+      this.openingBalances = openingBalancesSnapshot;
+      this.importReceipts = importReceiptsSnapshot;
+      throw err;
+    }
+  }
 
   async getImportReceiptByIdempotencyKey(key: string): Promise<ImportReceipt | null> {
     for (const receipt of this.importReceipts.values()) {
@@ -652,22 +723,32 @@ export class InMemoryFinanceRepository implements FinanceRepository {
     id?: string;
     batch_id: string;
     source_row: number;
+    source_system?: string | null;
+    source_id?: string | null;
     entity: string;
     schema_version?: number;
     idempotency_key: string;
+    request_hash?: string;
     target_id: string;
     kind?: 'created' | 'linked';
+    outcome?: 'loaded' | 'rejected' | 'merged' | 'skipped';
+    response_payload?: unknown;
     created_at?: string;
   }): Promise<ImportReceipt> {
     const item: ImportReceipt = {
       id: receipt.id ?? randomUUID(),
       batch_id: receipt.batch_id,
       source_row: receipt.source_row,
+      source_system: receipt.source_system ?? null,
+      source_id: receipt.source_id ?? null,
       entity: receipt.entity,
       schema_version: receipt.schema_version ?? 1,
       idempotency_key: receipt.idempotency_key,
+      request_hash: receipt.request_hash ?? '',
       target_id: receipt.target_id,
       kind: receipt.kind ?? 'created',
+      outcome: receipt.outcome ?? 'loaded',
+      response_payload: receipt.response_payload ?? null,
       created_at: receipt.created_at ?? new Date().toISOString(),
     };
     this.importReceipts.set(item.id, item);

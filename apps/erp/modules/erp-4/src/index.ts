@@ -23,6 +23,7 @@ export * from './services/audit.js';
 export * from './policies/index.js';
 export * from './plugins/auth.js';
 export * from './routes/index.js';
+export * from './migration/target-adapter.js';
 export {
   assertTenantAccess,
   assertObjectMutationAccess,
