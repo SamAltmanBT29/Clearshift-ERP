@@ -1,0 +1,50 @@
+name: ERP-3 Browser Journeys (Playwright)
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/erp/modules/erp-3/**'
+      - 'packages/contracts/**'
+      - 'packages/ui/**'
+      - '.github/workflows/erp3-e2e.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/erp/modules/erp-3/**'
+      - 'packages/contracts/**'
+      - 'packages/ui/**'
+
+jobs:
+  erp3-e2e:
+    name: 🌐 ERP-3 Playwright (Chromium + Firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies (clean install)
+        run: npm ci || npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run ERP-3 browser journeys
+        run: npm run erp3:e2e
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erp3-playwright-report
+          path: apps/erp/modules/erp-3/e2e/.artifacts/
+          retention-days: 7
