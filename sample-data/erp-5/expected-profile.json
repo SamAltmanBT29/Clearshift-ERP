@@ -4,7 +4,7 @@
   "source_system": "SYNTH-ERP5-DIRTY-V1",
   "fixture": {
     "path": "sample-data/erp-5/dirty-data-v1.csv",
-    "sha256": "8611cad5108d28d45c2ac2c97b7e0bfc25f0f97e4cae635f61afa1260caf2468",
+    "sha256": "af37a293b5109c3874bee91b059486cdaa1e81bae289881becfde512917d3be5",
     "row_count": 130,
     "columns": [
       "row_id",
