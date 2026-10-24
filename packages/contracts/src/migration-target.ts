@@ -153,6 +153,30 @@ export interface MigrationTargetAdapter<TRow = unknown> {
     | { ok: true; value: MigrationTargetAdapterResult }
     | { ok: false; error: MigrationTargetAdapterError }
   >;
+
+  /**
+   * Preflight conflict check for compensating rollback (KIT-12).
+   * Verifies target record exists, current version matches post-load version,
+   * and asserts no downstream child references or later edits exist.
+   */
+  checkRollbackConflict?(
+    targetId: string,
+    postLoadVersion: number
+  ): Promise<RollbackConflictCheck>;
+
+  /**
+   * Compensates a loaded row in reverse dependency order (KIT-12).
+   * For 'remove_created': removes the created business record.
+   * For 'restore_updated': restores prior state if current version matches post-load version.
+   */
+  compensateRow?(
+    targetId: string,
+    action: RollbackActionType,
+    options?: {
+      beforeState?: Record<string, unknown> | null;
+      expectedVersion?: number;
+    }
+  ): Promise<RollbackCompensationResult>;
 }
 
 // ============================================================================
@@ -344,5 +368,205 @@ export class ReconciliationFailedError extends Error {
   ) {
     super(reason);
     this.name = 'ReconciliationFailedError';
+  }
+}
+
+// ============================================================================
+// KIT-12: Resumable Compensating-Saga Rollback with Conflict Preflight
+// ============================================================================
+
+/**
+ * Rollback Compensation Actions (KIT-12)
+ * - remove_created: Removes a created record (permitted only if no child/later edits exist)
+ * - restore_updated: Restores record to before-state (permitted only if target version still matches post-load version)
+ */
+export const RollbackAction = {
+  REMOVE_CREATED: 'remove_created',
+  RESTORE_UPDATED: 'restore_updated',
+} as const;
+export type RollbackActionType = (typeof RollbackAction)[keyof typeof RollbackAction];
+
+export const RollbackActionSchema = z.enum([
+  RollbackAction.REMOVE_CREATED,
+  RollbackAction.RESTORE_UPDATED,
+]);
+
+/**
+ * Status of individual compensation actions in the rollback saga
+ */
+export const RollbackItemStatus = {
+  PENDING: 'pending',
+  COMPENSATED: 'compensated',
+  BLOCKED: 'blocked',
+  FAILED: 'failed',
+  RESUMED: 'resumed',
+} as const;
+export type RollbackItemStatusType = (typeof RollbackItemStatus)[keyof typeof RollbackItemStatus];
+
+export const RollbackItemStatusSchema = z.enum([
+  RollbackItemStatus.PENDING,
+  RollbackItemStatus.COMPENSATED,
+  RollbackItemStatus.BLOCKED,
+  RollbackItemStatus.FAILED,
+  RollbackItemStatus.RESUMED,
+]);
+
+/**
+ * Status of the entire batch rollback saga
+ */
+export const RollbackBatchStatus = {
+  IDLE: 'idle',
+  PREFLIGHT_PASSED: 'preflight_passed',
+  IN_PROGRESS: 'in_progress',
+  ROLLED_BACK: 'rolled_back',
+  ROLLBACK_BLOCKED: 'rollback_blocked',
+  FAILED: 'failed',
+} as const;
+export type RollbackBatchStatusType = (typeof RollbackBatchStatus)[keyof typeof RollbackBatchStatus];
+
+export const RollbackBatchStatusSchema = z.enum([
+  RollbackBatchStatus.IDLE,
+  RollbackBatchStatus.PREFLIGHT_PASSED,
+  RollbackBatchStatus.IN_PROGRESS,
+  RollbackBatchStatus.ROLLED_BACK,
+  RollbackBatchStatus.ROLLBACK_BLOCKED,
+  RollbackBatchStatus.FAILED,
+]);
+
+/**
+ * Conflict reason codes for preflight and runtime conflict detection
+ */
+export const RollbackConflictReason = {
+  CHILD_REFERENCES_EXIST: 'CHILD_REFERENCES_EXIST',
+  TARGET_VERSION_MISMATCH: 'TARGET_VERSION_MISMATCH',
+  RECEIPT_NOT_FOUND: 'RECEIPT_NOT_FOUND',
+  LATER_EDITS_DETECTED: 'LATER_EDITS_DETECTED',
+  RECORD_NOT_FOUND: 'RECORD_NOT_FOUND',
+} as const;
+export type RollbackConflictReasonType =
+  (typeof RollbackConflictReason)[keyof typeof RollbackConflictReason];
+
+/**
+ * Structured diagnostic details when a rollback conflict is detected
+ */
+export interface RollbackConflictDetail {
+  targetId: string;
+  module: string;
+  entity: string;
+  sourceRow?: number | undefined;
+  reasonCode: RollbackConflictReasonType;
+  message: string;
+  currentVersion?: number | undefined;
+  postLoadVersion?: number | undefined;
+  childReferences?: Array<{ childEntity: string; childId: string }> | undefined;
+}
+
+/**
+ * Preflight conflict check result for an individual target record
+ */
+export interface RollbackConflictCheck {
+  canRollback: boolean;
+  currentVersion: number;
+  expectedVersion: number;
+  hasChildReferences: boolean;
+  childReferences?: Array<{ childEntity: string; childId: string }> | undefined;
+  reason?: string | undefined;
+}
+
+/**
+ * Result of executing an individual compensation action
+ */
+export interface RollbackCompensationResult {
+  ok: boolean;
+  targetId: string;
+  action: RollbackActionType;
+  error?: string | undefined;
+}
+
+/**
+ * Preflight check result evaluating an entire batch prior to saga execution
+ */
+export interface RollbackPreflightResult {
+  batchId: string;
+  passed: boolean;
+  totalReceipts: number;
+  conflictCount: number;
+  conflicts: RollbackConflictDetail[];
+}
+
+/**
+ * Schema for an entry in the append-only rollback journal (platform.kit_rollback_journal)
+ */
+export const RollbackJournalRecordSchema = z.object({
+  id: z.string().uuid().optional(),
+  batchId: z.string().min(1).max(128),
+  module: z.string().min(1).max(64),
+  entity: z.string().min(1).max(64),
+  targetId: z.string().min(1).max(128),
+  sourceRow: z.number().int().min(1).optional(),
+  action: RollbackActionSchema,
+  targetVersion: z.number().int().min(1).default(1),
+  beforeState: z.record(z.unknown()).nullable().optional(),
+  afterState: z.record(z.unknown()).nullable().optional(),
+  actor: z.string().min(1).max(128),
+  status: RollbackItemStatusSchema,
+  idempotencyKey: z.string().min(1).max(128),
+  errorReason: z.string().optional(),
+  position: z.number().int().min(0),
+  executedAt: z.date().optional(),
+  createdAt: z.date().optional(),
+});
+export type RollbackJournalRecord = z.infer<typeof RollbackJournalRecordSchema>;
+
+/**
+ * Summary of a batch rollback saga execution
+ */
+export const RollbackBatchSummarySchema = z.object({
+  batchId: z.string().min(1).max(128),
+  status: RollbackBatchStatusSchema,
+  requestedBy: z.string().min(1).max(128),
+  reason: z.string().min(1),
+  preflightPassed: z.boolean(),
+  totalItems: z.number().int().min(0),
+  compensatedItems: z.number().int().min(0),
+  blockedItems: z.number().int().min(0),
+  failedItems: z.number().int().min(0),
+  conflicts: z.array(z.custom<RollbackConflictDetail>()).default([]),
+  isExisting: z.boolean().optional(),
+  startedAt: z.date().optional(),
+  completedAt: z.date().optional(),
+});
+export type RollbackBatchSummary = z.infer<typeof RollbackBatchSummarySchema>;
+
+/**
+ * Error raised when rollback preflight detects blocking conflicts (child references or later edits)
+ */
+export class RollbackBlockedError extends Error {
+  public readonly statusCode = 409;
+  public readonly code = 'ROLLBACK_BLOCKED';
+
+  constructor(
+    public readonly batchId: string,
+    public readonly conflicts: RollbackConflictDetail[],
+    public readonly reason: string = `Rollback blocked for batch '${batchId}' due to ${conflicts.length} conflict(s).`
+  ) {
+    super(reason);
+    this.name = 'RollbackBlockedError';
+  }
+}
+
+/**
+ * Error raised when a rollback is already in progress for a batch
+ */
+export class RollbackInProgressError extends Error {
+  public readonly statusCode = 423;
+  public readonly code = 'ROLLBACK_IN_PROGRESS';
+
+  constructor(
+    public readonly batchId: string,
+    public readonly reason: string = `Rollback is already in progress for batch '${batchId}'.`
+  ) {
+    super(reason);
+    this.name = 'RollbackInProgressError';
   }
 }
