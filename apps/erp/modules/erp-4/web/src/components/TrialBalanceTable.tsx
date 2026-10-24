@@ -1,9 +1,10 @@
 import React from 'react';
 import type { TrialBalanceResponse } from '@clearshift/contracts';
+import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { StatusBadge, SkeletonTable, EmptyState } from './StateViews.js';
 
 interface TrialBalanceTableProps {
-  data: TrialBalanceResponse | null;
+  data: NormalizedTrialBalanceResponse | TrialBalanceResponse | null;
   isLoading: boolean;
   period: string;
   onPeriodChange: (newPeriod: string) => void;
@@ -21,7 +22,7 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
     return <SkeletonTable columns={6} rows={6} />;
   }
 
-  const items = data?.items || (data as any)?.rows || [];
+  const items = (data as any)?.items || (data as any)?.rows || [];
 
   if (!data || items.length === 0) {
     return (
@@ -49,12 +50,13 @@ export const TrialBalanceTable: React.FC<TrialBalanceTableProps> = ({
     );
   }
 
-  const totalDebit = Number(data.totalDebit ?? (data as any).totals?.total_debit ?? 0);
-  const totalCredit = Number(data.totalCredit ?? (data as any).totals?.total_credit ?? 0);
+  const d = data as any;
+  const totalDebit = Number(d.totalDebit ?? d.totals?.total_debit ?? 0);
+  const totalCredit = Number(d.totalCredit ?? d.totals?.total_credit ?? 0);
   const difference = Math.abs(totalDebit - totalCredit);
-  const isBalanced = data.isBalanced ?? (data as any).totals?.is_balanced ?? (totalDebit === totalCredit);
-  const currencyCode = data.currencyCode || (data as any).currency_code || 'USD';
-  const accountCount = data.accountCount ?? items.length;
+  const isBalanced = d.isBalanced ?? d.totals?.is_balanced ?? (totalDebit === totalCredit);
+  const currencyCode = d.currencyCode || d.currency_code || 'USD';
+  const accountCount = d.accountCount ?? items.length;
 
   return (
     <div>
