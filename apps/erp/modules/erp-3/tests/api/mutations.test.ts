@@ -962,4 +962,200 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
       expect(res.payload).not.toContain("stack");
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 7. ERP3-06: Relationships, Provenance, Currency & Read Model Consistency
+  // ───────────────────────────────────────────────────────────────────────────
+  describe("ERP3-06: Relationships, Provenance, Currency & Read Model Consistency (Issue #31)", () => {
+    it("rejects partial provenance (source_system without source_id, or vice versa) with 422 SOURCE_IDENTITY_INCOMPLETE and no partial write", async () => {
+      const orderCountBefore = repo.salesOrders.size;
+
+      const missingSourceIdRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        payload: {
+          customer_golden_id: CUSTOMER_1,
+          order_date: "2026-04-10",
+          currency: "USD",
+          source_system: "legacy_erp",
+          source_id: null,
+          lines: [
+            {
+              product_id: PRODUCT_1,
+              quantity: "1.0000",
+              price: "100.0000",
+              tax_rate: "18.0000",
+            },
+          ],
+        },
+      });
+
+      expect(missingSourceIdRes.statusCode).toBe(422);
+      expect(JSON.parse(missingSourceIdRes.payload).code).toBe(
+        ERP3_DOMAIN_ERROR_CODES.SOURCE_IDENTITY_INCOMPLETE,
+      );
+      expect(repo.salesOrders.size).toBe(orderCountBefore);
+    });
+
+    it("rejects currency mismatch between a linked sales order and invoice with 422 CURRENCY_MISMATCH and leaves order status Open", async () => {
+      const mismatchCurrencyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/invoices",
+        payload: {
+          invoice_number: "INV-FX-0001",
+          order_id: SEEDED_ORDER_ID, // Seeded order is USD
+          customer_golden_id: CUSTOMER_1,
+          invoice_date: "2026-04-10",
+          due_date: "2026-05-10",
+          currency: "INR",
+          lines: [
+            {
+              product_id: PRODUCT_1,
+              quantity: "10.0000",
+              price: "100.0000",
+              tax_rate: "18.0000",
+            },
+          ],
+        },
+      });
+
+      expect(mismatchCurrencyRes.statusCode).toBe(422);
+      expect(JSON.parse(mismatchCurrencyRes.payload).code).toBe(
+        ERP3_DOMAIN_ERROR_CODES.CURRENCY_MISMATCH,
+      );
+
+      // Verify order was not mutated to Invoiced
+      const orderCheck = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/sales-orders/${SEEDED_ORDER_ID}`,
+      });
+      expect(JSON.parse(orderCheck.payload).status).toBe("Open");
+    });
+
+    it("handles external ReferenceResolver failures safely with 422 INVALID_REFERENCE and zero partial mutations (AC-5)", async () => {
+      const orderCountBefore = repo.salesOrders.size;
+      resolver.exists = async () => {
+        throw new Error("Upstream resolver connection reset");
+      };
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        payload: {
+          customer_golden_id: CUSTOMER_1,
+          order_date: "2026-04-10",
+          currency: "USD",
+          lines: [
+            {
+              product_id: PRODUCT_1,
+              quantity: "1.0000",
+              price: "100.0000",
+              tax_rate: "18.0000",
+            },
+          ],
+        },
+      });
+
+      expect(res.statusCode).toBe(422);
+      expect(JSON.parse(res.payload).code).toBe(
+        ERP3_DOMAIN_ERROR_CODES.INVALID_REFERENCE,
+      );
+      expect(repo.salesOrders.size).toBe(orderCountBefore);
+    });
+
+    it("guarantees write-then-read consistency across sales order creation, invoice linkage, overdue projection, and payment settlement (AC-4)", async () => {
+      // 1. Create sales order
+      const createOrderRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        payload: {
+          order_number: "SO-CONSIST-001",
+          customer_golden_id: CUSTOMER_1,
+          order_date: "2026-04-01",
+          currency: "USD",
+          source_system: "legacy_erp",
+          source_id: "L-SO-001",
+          lines: [
+            {
+              product_id: PRODUCT_1,
+              quantity: "2.0000",
+              price: "250.0000",
+              tax_rate: "18.0000",
+            },
+          ],
+        },
+      });
+      expect(createOrderRes.statusCode).toBe(201);
+      const createdOrder = JSON.parse(createOrderRes.payload);
+
+      // Immediate read agrees on status, links, and derived totals
+      const getOrderRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/sales-orders/${createdOrder.id}`,
+      });
+      expect(getOrderRes.statusCode).toBe(200);
+      expect(JSON.parse(getOrderRes.payload)).toEqual(createdOrder);
+
+      // 2. Create linked invoice
+      const createInvRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/invoices",
+        payload: {
+          invoice_number: "INV-CONSIST-001",
+          order_id: createdOrder.id,
+          customer_golden_id: CUSTOMER_1,
+          invoice_date: "2026-04-01",
+          due_date: "2026-04-20",
+          currency: "USD",
+          source_system: "legacy_erp",
+          source_id: "L-INV-001",
+          lines: [
+            {
+              product_id: PRODUCT_1,
+              quantity: "2.0000",
+              price: "250.0000",
+              tax_rate: "18.0000",
+            },
+          ],
+        },
+      });
+      expect(createInvRes.statusCode).toBe(201);
+      const createdInv = JSON.parse(createInvRes.payload);
+      expect(createdInv.status).toBe("Open");
+      expect(createdInv.total).toBe("590.0000");
+
+      // Immediate read of invoice agrees with write response
+      const getInvOpenRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/invoices/${createdInv.id}`,
+      });
+      expect(JSON.parse(getInvOpenRes.payload)).toEqual(createdInv);
+
+      // Advance clock past due_date -> read API projects Overdue consistently
+      currentUtcDate = "2026-04-25";
+      const getInvOverdueRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/invoices/${createdInv.id}`,
+      });
+      expect(JSON.parse(getInvOverdueRes.payload).status).toBe("Overdue");
+
+      // 3. Record full payment -> invoice transitions Overdue -> Paid
+      const payRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/payments",
+        payload: {
+          invoice_id: createdInv.id,
+          amount: "590.0000",
+          method: "card",
+        },
+      });
+      expect(payRes.statusCode).toBe(201);
+
+      const getInvPaidRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/erp-orders/invoices/${createdInv.id}`,
+      });
+      expect(JSON.parse(getInvPaidRes.payload).status).toBe("Paid");
+    });
+  });
 });

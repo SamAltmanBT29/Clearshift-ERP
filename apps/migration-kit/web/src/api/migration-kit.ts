@@ -208,12 +208,85 @@ export async function fetchRejects(batchId: string, page = 1, pageSize = 25): Pr
   return { rows, total: rows.length, page, pageSize };
 }
 
-export async function exportRejectsCsv(batchId: string): Promise<string> {
-  const r = await fetchRejects(batchId, 1, 1000);
-  const header = 'source_row,reason,rule_id';
-  const lines = r.rows.map((row) => `${row.sourceRow},"${row.reason}","${row.ruleId}"`);
-  return [header, ...lines].join('\n');
+import {
+  exportProfileReportCsv,
+  exportRejectReportCsv,
+  exportReconciliationReportCsv,
+} from '../../../src/reports/index.js';
+
+export async function exportProfileCsv(batchId: string): Promise<string> {
+  const profile = await fetchProfile(batchId);
+  const recon = await fetchReconciliation(batchId);
+  return exportProfileReportCsv({
+    batchId: profile.batchId,
+    module: 'erp1',
+    entity: 'products',
+    totalRows: profile.totalRows,
+    duplicateCount: profile.duplicateCount,
+    columns: profile.columns,
+    counts: {
+      sourceCount: recon.source,
+      loadedCount: recon.loaded,
+      rejectedCount: recon.rejected,
+      mergedCount: recon.merged,
+      skippedCount: recon.skipped,
+      unaccountedCount: recon.unaccounted,
+      formulaHolds: recon.ok,
+    },
+  });
 }
+
+export const exportProfileReportCsvExport = exportProfileCsv;
+
+export async function exportReconciliationCsv(batchId: string): Promise<string> {
+  const recon = await fetchReconciliation(batchId);
+  return exportReconciliationReportCsv({
+    batchId: recon.batchId,
+    sourceCount: recon.source,
+    loadedCount: recon.loaded,
+    rejectedCount: recon.rejected,
+    mergedCount: recon.merged,
+    skippedCount: recon.skipped,
+    unaccountedCount: recon.unaccounted,
+    formulaHolds: recon.ok,
+    result: recon.ok ? 'OK' : 'reconciliation_failed',
+    signoffAllowed: recon.ok,
+  });
+}
+
+export const exportReconciliationReportCsvExport = exportReconciliationCsv;
+
+export async function exportRejectsCsv(batchId: string): Promise<string> {
+  const res = await fetchRejects(batchId, 1, 1000);
+  const recon = await fetchReconciliation(batchId);
+  return exportRejectReportCsv({
+    batchId,
+    module: 'erp1',
+    entity: 'products',
+    rows: res.rows.map((r) => ({
+      sourceRow: r.sourceRow,
+      reasonCode: r.ruleId,
+      safeMessage: r.reason,
+      ruleId: r.ruleId,
+    })),
+    counts: {
+      sourceCount: recon.source,
+      loadedCount: recon.loaded,
+      rejectedCount: recon.rejected,
+      mergedCount: recon.merged,
+      skippedCount: recon.skipped,
+      unaccountedCount: recon.unaccounted,
+      formulaHolds: recon.ok,
+    },
+    pagination: {
+      page: res.page,
+      pageSize: res.pageSize,
+      total: res.total,
+    },
+  });
+}
+
+export const exportRejectReportCsvExport = exportRejectsCsv;
 
 export function canPerformTransition(status: BatchStatus, action: string, roles: string[]): boolean {
   const isAdmin = roles.includes('admin') || roles.includes('operator') || roles.includes('migration_operator');

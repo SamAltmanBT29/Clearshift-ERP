@@ -147,6 +147,27 @@ For the canonical, detailed version see:
 
 ---
 
+## 6A. V1 Data-Quality & Migration Rules
+
+Full catalogue: `apps/erp/modules/erp-2/docs/data-quality-rules.md` (rule catalogue version 1.0.0, 45 rules). The rules are implemented once, in `apps/erp/modules/erp-2/src/migration/dirty-data-plan.ts` (ERP2-25); this section and the catalogue document describe them.
+
+| Item | Value |
+|---|---|
+| Synthetic Dirty Data Pack | `sample-data/erp-2/dirty-data-v1.csv` (173 rows: 46 vendors, 44 purchase orders, 83 lines), SHA-256 `acc5a3b3c9785f97b59cdabfaf64f626afad26e8d2cbcd5990c93549352ed65b`, schema version 1 |
+| Expected outcomes / manifest | `sample-data/erp-2/expected-profile.json` (94 accepted, 68 rejected, 11 review, 0 skipped) |
+| Source-to-target mapping | `sample-data/erp-2/mapping-template.json` |
+| Rules and tests | `apps/erp/modules/erp-2/src/migration/dirty-data-plan.ts`, `apps/erp/modules/erp-2/tests/migration/dirty-data-plan.test.ts` |
+
+| Entity | Required | Optional (validated when supplied) | Key enumerations and limits |
+|---|---|---|---|
+| Vendor | `vendor_code`, `vendor_name`, `currency` | `tax_number`, `email`, `payment_terms_days`, `bank_account` | currency USD, EUR, GBP, INR; vendor code at most 64 characters; payment terms 0 to 365 days; bank account reported masked only |
+| Purchase order | `po_number`, `po_vendor_code`, `po_status`, `po_date`, `currency`, `po_total`, at least one valid line | `expected_date`, `status_path` | status Draft, Sent, Received, Closed (one step at a time); ISO `YYYY-MM-DD` dates; PO currency equals vendor currency; total equals the sum of rounded line totals |
+| PO line | `po_number`, `line_no`, `product_sku`, `quantity`, `unit_price` | `line_total` | SKU must exist in ERP-1; quantity above 0, up to 3 places; unit price 0 or more, up to 4 places; `ROUND_HALF_UP` to 2 places |
+
+Exact duplicate vendor codes, tax numbers, PO numbers and line keys are held for human review. There is no fuzzy matching and no automatic merge.
+
+---
+
 ## 7. Synthetic Demo & Runbook
 
 ### 7.1 Local Verification & Test Execution

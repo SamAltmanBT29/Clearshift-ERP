@@ -2,6 +2,7 @@ export * from './api/migration-kit.js';
 export * from './auth/session.js';
 export * from './auth/RequireAuth.js';
 export { ModuleShell } from './components/ModuleShell.js';
+export { ReportDownload, type ReportDownloadProps, type ReportType } from './components/ReportDownload.js';
 export * from './route-manifest.js';
 export * from './routes.js';
 export * from './pages/BatchList.js';

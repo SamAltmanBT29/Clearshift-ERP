@@ -570,3 +570,95 @@ export class RollbackInProgressError extends Error {
     this.name = 'RollbackInProgressError';
   }
 }
+
+// ============================================================================
+// KIT-16: Reject, Profiling and Reconciliation Reports with Formula-Safe CSV
+// ============================================================================
+
+export const ReportType = {
+  PROFILE: 'profile',
+  REJECT: 'reject',
+  RECONCILIATION: 'reconciliation',
+} as const;
+export type ReportTypeValue = (typeof ReportType)[keyof typeof ReportType];
+export const ReportTypeSchema = z.enum(['profile', 'reject', 'reconciliation']);
+
+/**
+ * Mathematical row conservation summary stamped on all reports (KIT-16)
+ * Enforces: source = loaded + rejected + merged + skipped; unaccounted = 0
+ */
+export const ReportAccountingCountsSchema = z.object({
+  sourceCount: z.number().int().min(0),
+  loadedCount: z.number().int().min(0),
+  rejectedCount: z.number().int().min(0),
+  mergedCount: z.number().int().min(0),
+  skippedCount: z.number().int().min(0),
+  unaccountedCount: z.number().int().min(0),
+  formulaHolds: z.boolean(),
+});
+export type ReportAccountingCounts = z.infer<typeof ReportAccountingCountsSchema>;
+
+/**
+ * Rejection report row record (KIT-16)
+ * Includes source row, entity, reason code, and safe message.
+ * Sensitive raw values are omitted/redacted by default.
+ */
+export const RejectReportRowSchema = z.object({
+  sourceRow: z.number().int().min(1),
+  entity: z.string().min(1).max(64),
+  reasonCode: z.string().min(1).max(64),
+  safeMessage: z.string(),
+  ruleId: z.string().optional(),
+  module: z.string().optional(),
+  rawSnippet: z.string().optional(),
+});
+export type RejectReportRow = z.infer<typeof RejectReportRowSchema>;
+
+/**
+ * Column profiling metrics (KIT-16)
+ */
+export const ProfileColumnMetricSchema = z.object({
+  columnName: z.string().min(1),
+  inferredType: z.string().min(1),
+  emptyCount: z.number().int().min(0),
+  duplicateCandidateCount: z.number().int().min(0).default(0),
+  formulaThreatCount: z.number().int().min(0).default(0),
+  totalRows: z.number().int().min(0),
+});
+export type ProfileColumnMetric = z.infer<typeof ProfileColumnMetricSchema>;
+
+/**
+ * Profiling report data (KIT-16)
+ */
+export const ProfileReportDataSchema = z.object({
+  batchId: z.string().min(1),
+  module: z.string().min(1),
+  entity: z.string().min(1),
+  totalRows: z.number().int().min(0),
+  duplicateCount: z.number().int().min(0),
+  columns: z.array(ProfileColumnMetricSchema),
+  counts: ReportAccountingCountsSchema.optional(),
+  evaluatedAt: z.date().or(z.string()),
+});
+export type ProfileReportData = z.infer<typeof ProfileReportDataSchema>;
+
+/**
+ * Reconciliation report data (KIT-16)
+ */
+export const ReconciliationReportDataSchema = z.object({
+  batchId: z.string().min(1),
+  module: z.string().min(1).optional(),
+  entity: z.string().min(1).optional(),
+  sourceCount: z.number().int().min(0),
+  loadedCount: z.number().int().min(0),
+  rejectedCount: z.number().int().min(0),
+  mergedCount: z.number().int().min(0),
+  skippedCount: z.number().int().min(0),
+  unaccountedCount: z.number().int().min(0),
+  formulaHolds: z.boolean(),
+  result: z.enum(['OK', 'reconciliation_failed']),
+  signoffAllowed: z.boolean(),
+  failureReasons: z.array(z.string()).optional(),
+  evaluatedAt: z.date().or(z.string()),
+});
+export type ReconciliationReportData = z.infer<typeof ReconciliationReportDataSchema>;

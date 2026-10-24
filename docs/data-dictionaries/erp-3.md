@@ -724,3 +724,43 @@ Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines 
 - Any cell value starting with `=`, `+`, `-`, `@`, `\t`, or `\r` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
 - Export includes all standardized headers: `"Source Row"`, `"Error Code"`, `"Error Title"`, `"Reason"`, `"Doc Reference"`, `"Resolution"`, `"Order Number"`, `"Customer Golden ID"`, `"Source ID"`, `"Currency Code"`.
 - Filtering is preserved: exporting with active filters downloads only the matching subset of rejected rows.
+
+
+---
+
+## 15. Relationships, State Transitions & Read-Model Consistency (`ERP3-06` / Issue #31)
+
+- **Relationship Catalog (`src/domain/relationships.ts`)**:
+  - `ORDER_CUSTOMER`, `ORDER_LINES`, `ORDER_LINE_PRODUCT`, `INVOICE_CUSTOMER`, `INVOICE_ORDER`, `INVOICE_LINES`, `INVOICE_LINE_PRODUCT`, `PAYMENT_INVOICE`.
+  - Optional links (`invoice.order_id`) use `handleOptionalRelationship` to return `ERP3_OPTIONAL_REFERENCE_ABSENT` warnings and `null` without creating synthetic records.
+  - Provenance fields (`source_system`, `source_id`) are validated as an atomic pair via `assertSourceIdentityIsComplete` (`422 SOURCE_IDENTITY_INCOMPLETE`).
+  - Linked orders and invoices enforce matching ISO 4217 currency codes via `assertOrderInvoiceCurrencyConsistency` (`422 CURRENCY_MISMATCH`).
+- **State Transition Matrices**:
+  - Sales Orders (`assertSalesOrderStatusTransition`): `Open -> Invoiced -> Closed` (and `Open -> Closed` per `ALLOWED_ORDER_STATUS_TRANSITIONS`), `Closed` is terminal (`422 INVALID_ORDER_STATUS_TRANSITION`).
+  - Invoices (`assertInvoiceStatusTransition`): `Open -> Paid | Overdue`, `Overdue -> Paid`, `Paid` is terminal (`422 INVALID_INVOICE_STATUS_TRANSITION`).
+- **Read-Model Consistency (`assertSalesOrderReadConsistency`, `assertInvoiceReadConsistency`, `assertPaymentReadConsistency`)**:
+  - Asserted immediately on every write and read in `Erp3Service` so persisted records and HTTP projections agree on status, links, derived line taxes/totals, and aggregate totals (`422 READ_MODEL_INCONSISTENT`).
+
+
+---
+
+## 16. Invariants Enforced at Schema & DB Level (ERP3-01 / Issue #26)
+
+1. **UUID Primary Keys**: Every table uses a `UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+2. **Deterministic Uniqueness**:
+   - `sales_orders.order_number` is unique.
+   - `invoices.invoice_number` is unique.
+   - `invoices.order_id` is unique (enforcing at most one V1 invoice per sales order).
+   - `(order_id, line_number)` is unique on `so_lines`.
+   - `(invoice_id, line_number)` is unique on `invoice_lines`.
+   - `import_receipts.idempotency_key` is unique.
+3. **Check Constraints**:
+   - Quantities are strictly positive (`> 0`).
+   - Prices, tax amounts, line totals, and document totals are non-negative (`>= 0`).
+   - Tax rates are bounded percentages (`>= 0 AND <= 100`).
+   - Payment amounts are strictly positive (`> 0`).
+   - Invoice `due_date >= invoice_date`.
+4. **Referential Integrity & Cascades**:
+   - Order lines cascade delete when the parent sales order is deleted (`ON DELETE CASCADE`).
+   - Invoice lines cascade delete when the parent invoice is deleted (`ON DELETE CASCADE`).
+   - Cross-module relationships use logical UUID columns without DB-level foreign keys.
