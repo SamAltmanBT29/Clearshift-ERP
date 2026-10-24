@@ -8,6 +8,7 @@
 
 import type { FastifyPluginAsync } from "fastify";
 import type { Erp3Service } from "../services/erp3.service.js";
+import type { Erp3AuditService } from "../services/audit.js";
 import { salesOrderRoutes } from "./sales-orders.js";
 import { invoiceRoutes } from "./invoices.js";
 import { paymentRoutes } from "./payments.js";
@@ -15,14 +16,27 @@ import { importRoutes } from "./import.js";
 
 export interface Erp3RouteOptions {
   erp3Service: Erp3Service;
+  auditService: Erp3AuditService;
 }
 
 export const erpOrdersRoutes: FastifyPluginAsync<Erp3RouteOptions> = async (
   fastify,
   opts,
 ) => {
-  await fastify.register(salesOrderRoutes, { erp3Service: opts.erp3Service });
-  await fastify.register(invoiceRoutes, { erp3Service: opts.erp3Service });
-  await fastify.register(paymentRoutes, { erp3Service: opts.erp3Service });
-  await fastify.register(importRoutes, { erp3Service: opts.erp3Service });
+  await fastify.register(salesOrderRoutes, {
+    erp3Service: opts.erp3Service,
+    auditService: opts.auditService,
+  });
+  await fastify.register(invoiceRoutes, {
+    erp3Service: opts.erp3Service,
+    auditService: opts.auditService,
+  });
+  await fastify.register(paymentRoutes, {
+    erp3Service: opts.erp3Service,
+    auditService: opts.auditService,
+  });
+  await fastify.register(importRoutes, {
+    erp3Service: opts.erp3Service,
+    auditService: opts.auditService,
+  });
 };

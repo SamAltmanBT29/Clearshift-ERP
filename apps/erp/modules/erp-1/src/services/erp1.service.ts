@@ -17,10 +17,14 @@ import { randomUUID } from 'node:crypto';
 import {
   ERP1_DOMAIN_RULES,
   normalizeSku,
+  CreateCategoryInputSchema,
+  CreateProductInputSchema,
+  SetOpeningStockInputSchema,
   type Category,
   type CategoryListQuery,
   type CreateCategoryInput,
   type CreateProductInput,
+  type ImportOutcome,
   type ImportReceiptRecord,
   type ImportRowRequest,
   type ImportRowResponse,
@@ -119,6 +123,73 @@ function sourceIdOf(input: {
   sourceId?: string | undefined;
 }): string | null {
   return input.source_id ?? input.sourceId ?? null;
+}
+
+export interface ImportRowRequestExtended extends ImportRowRequest {
+  upsert?: boolean;
+}
+
+function toReceiptRecord(
+  receipt: Erp1ImportReceipt,
+  kind: 'created' | 'linked' = (receipt.kind as 'created' | 'linked') ?? 'created'
+): ImportReceiptRecord {
+  return {
+    id: receipt.id,
+    batch_id: receipt.batchId,
+    source_row: receipt.sourceRow,
+    source_system: receipt.sourceSystem ?? null,
+    source_id: receipt.sourceId ?? null,
+    entity: receipt.targetEntity,
+    schema_version: 1,
+    idempotency_key: receipt.idempotencyKey,
+    request_hash: receipt.requestHash,
+    target_id: receipt.targetId,
+    kind,
+    outcome: (receipt.outcome as ImportOutcome) || 'loaded',
+    response_payload: receipt.responsePayload ? JSON.parse(receipt.responsePayload) : null,
+    created_at:
+      typeof receipt.createdAt === 'string'
+        ? new Date(receipt.createdAt).toISOString()
+        : new Date().toISOString(),
+  };
+}
+
+function normalizeProductRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...record };
+  if (result['unit_of_measure'] !== undefined && result['unitOfMeasure'] === undefined) {
+    result['unitOfMeasure'] = result['unit_of_measure'];
+    delete result['unit_of_measure'];
+  }
+  if (result['category_id'] !== undefined && result['categoryId'] === undefined) {
+    result['categoryId'] = result['category_id'];
+    delete result['category_id'];
+  }
+  if (result['tax_rate'] !== undefined && result['taxRate'] === undefined) {
+    result['taxRate'] = result['tax_rate'];
+    delete result['tax_rate'];
+  }
+  if (result['notification_email'] !== undefined && result['notificationEmail'] === undefined) {
+    result['notificationEmail'] = result['notification_email'];
+    delete result['notification_email'];
+  }
+  if (result['contact_phone'] !== undefined && result['contactPhone'] === undefined) {
+    result['contactPhone'] = result['contact_phone'];
+    delete result['contact_phone'];
+  }
+  return result;
+}
+
+function normalizeStockRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...record };
+  if (result['product_id'] !== undefined && result['productId'] === undefined) {
+    result['productId'] = result['product_id'];
+    delete result['product_id'];
+  }
+  if (result['warehouse_id'] !== undefined && result['warehouseId'] === undefined) {
+    result['warehouseId'] = result['warehouse_id'];
+    delete result['warehouse_id'];
+  }
+  return result;
 }
 
 function parseReceiptPayload<T>(receipt: Erp1ImportReceipt | null): T | null {
@@ -490,8 +561,6 @@ export class Erp1Service {
   loadOpeningStock(input: SetOpeningStockInput): Promise<OpeningStockResult> {
     return this.setOpeningStock(input);
   }
-
-  // ── Internal helpers ──────────────────────────────────────────────────────
 
   private async replay<T>(
     tx: Erp1Repository,
@@ -930,7 +999,9 @@ export class Erp1Service {
       let responsePayload: unknown;
       let receiptKind: 'created' | 'linked' = 'created';
 
-      if (req.entity === 'product') {
+      const entity = req.entity.toLowerCase();
+
+      if (entity === 'product' || entity === 'products') {
         const raw = req.record;
         const name = String(raw['name'] ?? raw['product_name'] ?? '').trim();
         const sku = String(raw['sku'] ?? '').trim();
@@ -1008,6 +1079,7 @@ export class Erp1Service {
           await this.assertCategoryExists(tx, categoryId);
           const updated = await tx.updateProduct(existing.id, {
             name,
+            unitOfMeasure: (unitOfMeasure as Product['unitOfMeasure']) || undefined,
             price,
             currency,
             taxRate,
@@ -1035,7 +1107,7 @@ export class Erp1Service {
           receiptKind = 'created';
           responsePayload = created;
         }
-      } else if (req.entity === 'category') {
+      } else if (entity === 'category' || entity === 'categories') {
         const raw = req.record;
         const name = String(raw['name'] ?? '').trim();
         const code = String(raw['code'] ?? '').trim();
@@ -1075,7 +1147,11 @@ export class Erp1Service {
           receiptKind = 'created';
           responsePayload = created;
         }
-      } else if (req.entity === 'stock_level') {
+      } else if (
+        entity === 'stock_level' ||
+        entity === 'stock' ||
+        entity === 'opening_stock'
+      ) {
         const raw = req.record;
         const productId = String(raw['productId'] ?? raw['product_id'] ?? '').trim();
         const warehouseId = String(raw['warehouseId'] ?? raw['warehouse_id'] ?? '').trim();
@@ -1087,14 +1163,27 @@ export class Erp1Service {
           ]);
         }
         const qtyNum = Number(quantity);
-        if (isNaN(qtyNum) || qtyNum < 0 || !/^\d+(\.\d{1,4})?$/.test(quantity)) {
+        if (isNaN(qtyNum) || !/^-?\d+(\.\d{1,4})?$/.test(quantity)) {
           throw new Erp1BadRequestError('quantity must be a valid non-negative decimal', [
             {
               field: 'quantity',
-              code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
-              message: 'Stock quantity cannot become negative (BR-ERP1-02)',
+              code: 'INVALID_QUANTITY',
+              message: 'Quantity must be a valid decimal number',
             },
           ]);
+        }
+        if (qtyNum < 0) {
+          throw new Erp1UnprocessableError(
+            'Stock quantity cannot become negative (BR-ERP1-02).',
+            [
+              {
+                field: 'quantity',
+                code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
+                message: 'Stock quantity cannot become negative (BR-ERP1-02)',
+              },
+            ],
+            ERP1_DOMAIN_RULES.NEGATIVE_STOCK
+          );
         }
 
         const warehouse = await this.resolveWarehouse(tx, warehouseId || undefined);
@@ -1106,6 +1195,24 @@ export class Erp1Service {
         targetId = stock.id;
         receiptKind = 'created';
         responsePayload = stock;
+      } else if (entity === 'warehouse' || entity === 'warehouses') {
+        const defaultWh = await tx.getDefaultWarehouse();
+        if (!defaultWh) {
+          throw new Erp1UnprocessableError(
+            'No default warehouse is configured.',
+            [
+              {
+                field: 'warehouseId',
+                code: ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED,
+                message: 'A default warehouse is required',
+              },
+            ],
+            ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED
+          );
+        }
+        targetId = defaultWh.id;
+        receiptKind = 'linked';
+        responsePayload = defaultWh;
       } else {
         throw new Erp1BadRequestError(`Unsupported entity type for import: '${req.entity}'`, [
           { field: 'entity', code: 'UNSUPPORTED_ENTITY', message: `Unsupported entity: ${req.entity}` },
@@ -1122,6 +1229,7 @@ export class Erp1Service {
         idempotencyKey: req.idempotency_key,
         requestHash,
         targetId,
+        kind: receiptKind,
         outcome: receiptKind === 'linked' ? 'linked' : 'loaded',
         responsePayload: JSON.stringify(responsePayload),
       });
