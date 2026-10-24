@@ -18,6 +18,9 @@ export interface JournalEntriesTableProps {
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
+  onCreateEntry?: (() => void) | undefined;
+  emptyActionLabel?: string | undefined;
+  emptyOnAction?: (() => void) | undefined;
 }
 
 /**
@@ -43,6 +46,9 @@ export const JournalEntriesTable: React.FC<JournalEntriesTableProps> = ({
   onPageSizeChange,
   onSort: externalOnSort,
   onRefresh,
+  onCreateEntry,
+  emptyActionLabel,
+  emptyOnAction,
 }) => {
   const [internalSortColumn, setInternalSortColumn] = useState<string>('posting_date');
   const [internalSortDirection, setInternalSortDirection] = useState<SortDirection>('desc');
@@ -225,12 +231,15 @@ export const JournalEntriesTable: React.FC<JournalEntriesTableProps> = ({
   }
 
   if (entries.length === 0) {
+    const actionLabel = emptyActionLabel || (onCreateEntry ? '+ New Journal Entry' : (onRefresh ? 'Refresh Ledger' : undefined));
+    const onAction = emptyOnAction || onCreateEntry || onRefresh;
     return (
       <EmptyState
+        icon="📄"
         title="No journal entries found"
         message="No journal entries match your search criteria. Create a double-entry transaction to begin."
-        actionLabel={onRefresh ? 'Refresh Ledger' : undefined}
-        onAction={onRefresh}
+        {...(actionLabel && onAction ? { actionLabel, onAction } : {})}
+        {...(onCreateEntry && onRefresh ? { secondaryActionLabel: 'Refresh Ledger', onSecondaryAction: onRefresh } : {})}
       />
     );
   }
