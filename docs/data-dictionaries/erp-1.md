@@ -36,7 +36,8 @@
 22. [Public Import Endpoints & Idempotent Ingestion (ERP1-11)](#22-public-import-endpoints--idempotent-ingestion-erp1-11)
 23. [Exact Duplicate Key Matching Policy & Human Review (ERP1-12)](#23-exact-duplicate-key-matching-policy--human-review-erp1-12)
 24. [Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)](#24-idempotent-retry-and-partial-load-stop-behavior-erp1-13)
-25. [Module Authorization and Policy Integration (ERP1-15)](#25-module-authorization-and-policy-integration-erp1-15)
+25. [Module Authorization and Policy Integration (ERP1-15)](#27-module-authorization-and-policy-integration-erp1-15)
+26. [Module Route and Page Registration in Shared Shell (ERP1-16)](#28-module-route-and-page-registration-in-shared-shell-erp1-16)
 
 ---
 
@@ -1079,3 +1080,42 @@ All `401 Unauthorized` and `403 Forbidden` responses strictly conform to the sta
 }
 ```
 
+---
+
+## 28. Module Route and Page Registration in Shared Shell (ERP1-16)
+
+**Issue Reference**: [#112](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/112)<br />
+**Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.8, §7.9; PLT-08 Shared Web Shell<br />
+**Implementation**: `apps/erp/modules/erp-1/web/src/route-manifest.ts`, `apps/erp/modules/erp-1/web/src/routes.tsx`, `apps/erp/modules/erp-1/web/src/components/ModuleShell.tsx`
+
+### 28.1 Route Manifest & Navigation Structure (AC1 & AC2)
+
+ERP-1 registers its client-side route manifest conforming to the platform shared shell specifications:
+- **Base Path**: `/erp-1`
+- **Navigation Links**:
+  - Products Master Catalog: `/erp-1/products`
+  - Product Categories: `/erp-1/categories`
+  - Stock Quantities: `/erp-1/stock`
+  - Migration Kit Ingestion & Review: `/erp-1/migration`
+- **Action & Detail Subroutes**:
+  - Create Product: `/erp-1/products/new` (accessible to `editor` and `admin`)
+  - Product Detail: `/erp-1/products/:productId` (accessible to `viewer`, `editor`, `admin`, `analyst`)
+  - Edit Product: `/erp-1/products/:productId/edit` (accessible to `editor` and `admin`)
+- **Fallback Route**:
+  - Module 404 Not Found: `/erp-1/*` with navigation back to Products list.
+
+### 28.2 Shared Shell Accessibility & Layout Conformance (AC3)
+
+All ERP-1 routes render within `ModuleShell`:
+- **Skip Link**: `<a href="#erp1-main" className="cs-skip-link">Skip to main content</a>` ensures WCAG 2.1 AA keyboard accessibility.
+- **Header & Navigation Landmark**: `<header>` banner with module branding, tenant display, user profile info, and sign-out action; `<nav aria-label="ERP-1 Module Navigation">` with active link indications (`aria-current="page"`).
+- **Breadcrumb Trail**: Dynamic breadcrumbs hierarchy (`Home > ERP-1 > Products > [Product Name]`) rendered using `@cs/ui` tokens.
+- **Main Landmark**: Single `<main id="erp1-main" tabIndex={-1}>` container for primary page contents.
+- **Design Tokens**: Standardized CSS variables from `@cs/ui` (`--cs-color-surface-bg`, `--cs-color-surface-card`, `--cs-space-4`, etc.).
+
+### 28.3 Client-Side Authentication & Session Integration (AC4)
+
+Route protection via `RequireAuth` wrapper:
+- Intercepts unauthenticated sessions and redirects to Hub login with return URL parameter (`/login?redirect=...`).
+- Checks user role against route permission requirements (e.g. restricts product creation/editing to `editor` / `admin`).
+- Emits standard access-denied state if the user lacks the required role.

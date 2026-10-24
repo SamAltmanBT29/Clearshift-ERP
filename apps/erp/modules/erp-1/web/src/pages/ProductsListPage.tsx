@@ -502,7 +502,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
         />
 
         {/* Results Area */}
-        <main className="cs-erp1-results-container" aria-label="Products list and results">
+        <section className="cs-erp1-results-container" aria-label="Products list and results">
           {error?.isPermissionDenied ? (
             <AccessDeniedProductsView
               message={error.message}
@@ -547,7 +547,7 @@ export const ProductsListPage: React.FC<ProductsListPageProps> = ({
               }}
             />
           )}
-        </main>
+        </section>
       </div>
 
       {/* Product Creation Modal */}

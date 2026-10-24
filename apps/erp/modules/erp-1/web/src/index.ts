@@ -27,8 +27,17 @@ export * from './pages/ProductDetailPage.js';
 export * from './pages/ProductImportPage.js';
 export * from './pages/ProductRejectionReviewPage.js';
 export * from './pages/DuplicateCandidatesPage.js';
+export * from './pages/CategoriesListPage.js';
+export * from './pages/StockLevelsListPage.js';
+export * from './pages/ProductCreatePage.js';
+export * from './pages/ProductEditPage.js';
+export * from './pages/ModuleNotFoundPage.js';
 export * from './kit-metadata.js';
 export * from './rejection-context.js';
-
-
-
+export * from './route-manifest.js';
+export * from './routes.js';
+export * from './auth/session.js';
+export * from './auth/RequireAuth.js';
+export * from './components/ModuleShell.js';
+export * from './components/ModuleNav.js';
+export * from './components/ModuleBreadcrumbs.js';
