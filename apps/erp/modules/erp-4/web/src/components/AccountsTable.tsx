@@ -22,6 +22,9 @@ export interface AccountsTableProps {
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
   onClearFilters?: (() => void) | undefined;
+  onCreateAccount?: (() => void) | undefined;
+  emptyActionLabel?: string | undefined;
+  emptyOnAction?: (() => void) | undefined;
 }
 
 /**
@@ -51,6 +54,9 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   onSort: externalOnSort,
   onRefresh,
   onClearFilters,
+  onCreateAccount,
+  emptyActionLabel,
+  emptyOnAction,
 }) => {
   // Local sorting state if not controlled externally
   const [internalSortColumn, setInternalSortColumn] = useState<string>('code');
@@ -247,8 +253,16 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
 
   if (accounts.length === 0) {
     const isFiltered = Boolean(hasActiveFilters);
+    const defaultActionLabel = isFiltered && onClearFilters
+      ? 'Clear All Filters'
+      : emptyActionLabel || (onCreateAccount ? '+ New Account' : (onRefresh ? 'Refresh Accounts' : undefined));
+    const defaultOnAction = isFiltered && onClearFilters
+      ? onClearFilters
+      : emptyOnAction || onCreateAccount || onRefresh;
+
     return (
       <EmptyState
+        icon="📂"
         title={emptyTitle ?? (isFiltered ? 'No matching accounts found' : 'No accounts found')}
         message={
           emptyMessage ??
@@ -256,8 +270,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
             ? 'No accounts match your current search query or filter selection. Try adjusting your search term or clearing active filters.'
             : 'No accounts have been created yet. Get started by creating your first account.')
         }
-        actionLabel={isFiltered && onClearFilters ? 'Clear All Filters' : onRefresh ? 'Refresh Accounts' : undefined}
-        onAction={isFiltered && onClearFilters ? onClearFilters : onRefresh}
+        {...(defaultActionLabel && defaultOnAction ? { actionLabel: defaultActionLabel, onAction: defaultOnAction } : {})}
+        {...(onCreateAccount && onRefresh && !isFiltered ? { secondaryActionLabel: 'Refresh Accounts', onSecondaryAction: onRefresh } : {})}
       />
     );
   }

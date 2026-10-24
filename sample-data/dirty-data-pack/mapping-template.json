@@ -1,0 +1,70 @@
+{
+  "template_name": "canonical-dirty-pack-v1-mapping",
+  "module": "crm1",
+  "entity": "contacts",
+  "version": "1.0.0",
+  "field_mappings": [
+    {
+      "source": "source_id",
+      "target": "source_id",
+      "required": true
+    },
+    {
+      "source": "first_name",
+      "target": "first_name",
+      "required": true
+    },
+    {
+      "source": "last_name",
+      "target": "last_name",
+      "required": true
+    },
+    {
+      "source": "email",
+      "target": "email",
+      "required": true
+    },
+    {
+      "source": "phone",
+      "target": "phone",
+      "required": false
+    },
+    {
+      "source": "company",
+      "target": "company_name",
+      "required": false
+    },
+    {
+      "source": "country",
+      "target": "country_code",
+      "required": false
+    },
+    {
+      "source": "postal_code",
+      "target": "postal_code",
+      "required": false
+    },
+    {
+      "source": "status",
+      "target": "status",
+      "required": false
+    },
+    {
+      "source": "notes",
+      "target": "notes",
+      "required": false
+    }
+  ],
+  "value_conversions": {
+    "status": {
+      "active": "ACTIVE",
+      "inactive": "INACTIVE",
+      "pending": "PENDING"
+    },
+    "country_code": {
+      "US": "USA",
+      "CA": "CAN",
+      "UK": "GBR"
+    }
+  }
+}

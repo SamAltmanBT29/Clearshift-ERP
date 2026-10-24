@@ -1267,3 +1267,60 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Detail/Edit Workflow, Golden ID & Conflict Banners (ERP2-21 / Issue #137)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-badge-golden {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+}
+
+.cs-golden-id {
+  font-family: var(--font-mono, monospace);
+  color: #b45309;
+}
+
+.cs-conflict-banner {
+  background-color: #fff1f2;
+  border-left: 4px solid var(--color-danger, #ef4444);
+  padding: var(--space-4, 16px);
+  border-radius: var(--radius-md, 6px);
+}
+
+.cs-drawer-overlay {
+  animation: cs-drawer-fade 0.15s ease-out;
+}
+
+.cs-drawer-content {
+  animation: cs-drawer-slide-in 0.2s ease-out;
+}
+
+@keyframes cs-drawer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cs-drawer-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.cs-cross-module-link {
+  transition: opacity 0.15s ease;
+}
+
+.cs-cross-module-link:hover {
+  opacity: 0.85;
+}
+
+/* Migration Kit Wizard Import Page */
+.cs-vendor-import-page {
+  background-color: var(--cs-surface, #ffffff);
+  border-radius: var(--cs-radius, 8px);
+  border: 1px solid var(--cs-border, #e2e8f0);
+}
+

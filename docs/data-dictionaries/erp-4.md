@@ -184,7 +184,62 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
 
-## 17. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
+## 17. Loading, Empty, Error, and Access-Denied States (Issue #175 / ERP4-19)
+
+- **Loading State**:
+  - [`SkeletonTable.tsx`](../../apps/erp/modules/erp-4/web/src/components/StateViews.tsx): Accessible animated skeleton table placeholder (`role="status"`, `aria-busy="true"`, `.animate-pulse`) displaying column header and row pulse blocks matching target dimensions during initial data fetching.
+- **Empty State**:
+  - [`EmptyState.tsx`](../../apps/erp/modules/erp-4/web/src/components/StateViews.tsx): Accessible zero-data condition card (`role="region"`, `aria-label="Empty state results"`) displaying descriptive message and primary Call-to-Action button (e.g. `+ New Account`, `+ New Journal Entry`), with optional secondary reset/refresh actions.
+- **API Failure & Error Sanitization**:
+  - [`error-sanitizer.ts`](../../apps/erp/modules/erp-4/web/src/utils/error-sanitizer.ts): Error sanitization utility that strips raw V8 stack traces, runtime engine exceptions, file paths, and internal PostgreSQL queries. Maps standard domain error codes (`JOURNAL_UNBALANCED`, `PERIOD_CLOSED`, `PERIOD_SOFT_CLOSED`, `DUPLICATE_CODE`, `NOT_FOUND`, `FORBIDDEN`) to helpful business descriptions without leaking backend internals.
+  - [`ErrorAlert.tsx`](../../apps/erp/modules/erp-4/web/src/components/StateViews.tsx): Accessible alert banner (`role="alert"`) wrapping shared `@cs/ui` `Alert` (`variant="error"`), displaying sanitized error details and an interactive `↻ Retry Action` button invoking bounded recovery.
+- **403 Forbidden Access-Denied View**:
+  - [`AccessDeniedView.tsx`](../../apps/erp/modules/erp-4/web/src/components/AccessDeniedView.tsx): Dedicated access-denied screen rendered on HTTP 403 or missing RBAC permissions (`role="region"`, `aria-label="Access Denied"`). Explains missing roles (`Finance Admin`, `Finance Editor`, `Finance Viewer`, `Auditor`), displays active user role, provides guidance for requesting role elevation from an administrator or PMO security officer, and provides `← Go Back` and `Return to Finance Overview` navigation actions.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/state-views.test.tsx`](../../apps/erp/modules/erp-4/web/tests/state-views.test.tsx) (15 tests covering skeleton placeholders, zero-data CTA actions, error sanitization & retry alerts, and 403 access-denied role explanations).
+
+## 18. Create Form with Field-Level Validation (Issue #176 / ERP4-20)
+
+- **Account Creation Form (`AccountForm.tsx`)**:
+  - Bound to shared `@cs/ui` `FormField`, `Input`, `Select`, `Button`, and `Card` components.
+  - Real-time client-side field validation covering required fields (`code`, `name`, `type`, `currency_code`), email format, phone numbers, and decimal numeric ranges (`opening_balance >= 0.00` and `<= 999,999,999.99`).
+  - Strict submission guards preventing whitespace-only submissions, clearing field errors upon user edits.
+  - Inflight double-submission prevention (`isSubmitting` flag disables submit button and displays loading spinner).
+  - Direct mapping of HTTP 400 server validation errors: parses server response details (array or object formats) and attaches error messages directly to matching field inputs.
+- **Modal Lifecycle & Collection Cache Synchronization (`AccountCreateModal.tsx` & `AccountsListPage.tsx`)**:
+  - Encapsulated within accessible `@cs/ui` `Dialog` modal with keyboard dismissal (`Escape`) and clean backdrop handling.
+  - On successful creation, closes modal automatically, invokes `onAccountCreated` callback to prepend/update the table cache optimistically, and dispatches an accessible confirmation toast (`Toast.tsx` with `role="status"` and `aria-live="polite"`).
+  - Full-page alternative route supported at `/erp4/accounts/new` via `AccountCreatePage.tsx`.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx`](../../apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx) (9 comprehensive tests verifying field validation, decimal boundaries, double-submit guards, server error mapping, modal lifecycle, and table cache updates).
+
+## 19. Detail/Edit Workflow and Linked Records (Issue #177 / ERP4-21)
+
+- **Primary Attribute & System Metadata Display (`AccountDetailPage.tsx` & `AccountAuditPanel.tsx`)**:
+  - Displays all primary domain attributes: Account Code (`code`), Account Name (`name`), Classification Type (`type`), Operating Currency (`currency_code`), Current Balance (`balance`), Active Status (`is_active`), Description, and Parent Account ID.
+  - Dedicated Audit Metadata Panel (`AccountAuditPanel.tsx`) rendering system-maintained `created_at` and `updated_at` formatted timestamps.
+  - Golden ID resolution (`resolveGoldenId`) resolving canonical master record identifiers (e.g. `GLD-ACC-<ID_PREFIX>` or `GLD-<SOURCE_SYSTEM>-<ID>`) with `Canonical` badge (`data-testid="audit-golden-id"`).
+- **Inline Edit & Drawer Modification Workflow (`AccountDetailPage.tsx` & `AccountEditDrawer.tsx`)**:
+  - Dual edit modes:
+    - **Inline Edit**: In-place edit toggle on the General Ledger Specification card with live inputs, real-time required field validation, and direct save.
+    - **Drawer Edit**: Slide-over modal dialog (`AccountEditDrawer.tsx`) wrapping allowlisted fields.
+  - Strict field allowlist enforcement: Only `name`, `description`, and `is_active` can be mutated; immutable system attributes (`code`, `type`, `currency_code`, `id`) remain permanently locked with visual lock indicators.
+  - Role-based permission checking: Disables edit actions and displays read-only mode banners when the user lacks Editor or Admin privileges (`canEdit` guard).
+- **Cross-Module Linked Records Sub-Tables (`AccountLinkedRecordsTable.tsx`)**:
+  - Sub-tables with tabbed navigation and badge counts displaying related master records across modules:
+    - ERP-4 Journal Transactions (`lines` / journal entries) with links to `/erp4/journal-entries/:id`.
+    - ERP-2 Vendor Bills (Purchasing & Accounts Payable) with links to `/erp2/bills/:id`.
+    - ERP-3 Customer Invoices (Sales & Receivables) with links to `/erp3/invoices/:id`.
+    - ERP-5 Payroll Allocations (Human Resources & Payroll Totals) with links to `/erp5/payroll/:id`.
+  - Accessible zero-records fallback using `@cs/ui` `EmptyState`.
+- **Concurrent Modification Conflict Handling (HTTP 409)**:
+  - Catches HTTP 409 Conflict responses on concurrent updates.
+  - Renders an alert banner (`data-testid="concurrent-conflict-banner"`) prompting the user: "This record was updated by another operator or background job while you were editing. To prevent data corruption, your changes were not applied."
+  - Provides an interactive `🔄 Refresh Record and Re-apply Changes` button (`data-testid="conflict-refresh-btn"`) that re-fetches the latest server state and resets dirty form fields.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/detail-edit-workflow.test.tsx`](../../apps/erp/modules/erp-4/web/tests/detail-edit-workflow.test.tsx) (13 tests verifying primary attribute display, timestamps, Golden ID resolution, inline and drawer editing with allowlist and permission checking, tabbed linked entity sub-tables, and HTTP 409 concurrent conflict prompts with refresh handling).
+
+## 20. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
 
 - **300ms Debounced Search Bar (`FilterBar.tsx` & `useDebounce.ts`)**:
   - Implements rapid keystroke debouncing (`useDebounce`) waiting 300ms before dispatching search queries.
@@ -219,7 +274,10 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
 | **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
-| **`1.7.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
+| **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
+| **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
+| **`1.10.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
 
 
 

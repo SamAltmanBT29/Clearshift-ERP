@@ -33,6 +33,7 @@ import {
   sanitizeErrorMessage,
 } from '../components/StateViews.js';
 import { VendorCreateModal, PurchaseOrderCreateModal } from '../components/forms/index.js';
+import { VendorImportPage } from './VendorImportPage.js';
 
 // ─── URL param helpers ─────────────────────────────────────────────────────────
 
@@ -91,6 +92,8 @@ const DEFAULT_ORDER_SORT: SortState = { field: undefined, direction: 'asc' };
 export interface VendorsListPageProps {
   onCreateVendor?: (() => void) | undefined;
   onCreatePurchaseOrder?: (() => void) | undefined;
+  onNavigateImport?: (() => void) | undefined;
+  initialView?: 'list' | 'import' | undefined;
 }
 
 interface PageErrorInfo {
@@ -104,8 +107,11 @@ interface PageErrorInfo {
 export const VendorsListPage: React.FC<VendorsListPageProps> = ({
   onCreateVendor,
   onCreatePurchaseOrder,
+  onNavigateImport,
+  initialView = 'list',
 }) => {
   const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
+  const [isImportView, setIsImportView] = useState<boolean>(initialView === 'import');
 
   // ── Modal & Toast states (AC4) ──
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
@@ -329,6 +335,14 @@ export const VendorsListPage: React.FC<VendorsListPageProps> = ({
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
+  if (isImportView) {
+    return (
+      <VendorImportPage
+        onNavigateBack={() => setIsImportView(false)}
+      />
+    );
+  }
+
   return (
     <div className="cs-module-root">
       {/* Page Header */}
@@ -340,7 +354,20 @@ export const VendorsListPage: React.FC<VendorsListPageProps> = ({
               Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
             </p>
           </div>
-          <div className="cs-page-actions">
+          <div className="cs-page-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="cs-btn-secondary cs-import-btn"
+              data-testid="btn-import-data"
+              onClick={() => {
+                setIsImportView(true);
+                onNavigateImport?.();
+              }}
+              aria-label="Import Data"
+              title="Import data through shared Migration Kit wizard"
+            >
+              Import Data
+            </button>
             {activeTab === 'vendors' ? (
               vendorsTotal > 0 && (
                 <button

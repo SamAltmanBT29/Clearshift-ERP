@@ -576,7 +576,6 @@ paths:
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-
   /api/v1/erp-products/import:
     post:
       operationId: importRow
@@ -592,27 +591,34 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ImportRowRequest"
+              $ref: '#/components/schemas/ImportRowRequest'
       responses:
-        "201":
+        '201':
           description: Target row and receipt committed atomically
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ImportRowResponse"
-        "200":
+                $ref: '#/components/schemas/ImportRowResponse'
+        '200':
           description: Idempotent replay of identical prior import
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ImportRowResponse"
-        "400":
+                $ref: '#/components/schemas/ImportRowResponse'
+        '400':
+          description: Validation error or missing fields
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "409":
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Idempotency key payload mismatch or unique key conflict without upsert
+          content:
+            application/json:
+              schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
+        '422':
+          description: Domain rule validation error
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
@@ -621,35 +627,33 @@ paths:
     post:
       operationId: importBatch
       tags: [Migration Import]
-      summary: Batch import rows via ERP1-11 loadBatch interface with per-row idempotency and optional UPSERT
+      summary: Batch import rows via KIT-08 loadBatch interface with per-row idempotency and optional UPSERT
       description: |
         Processes up to 500 rows sequentially through the ERP-1 target adapter.
         Each row has its own stable idempotency key. A data-validation failure on
         one row does NOT abort subsequent rows (error isolation). Infrastructure
         failures propagate as HTTP 5xx and are retryable. Dry-run semantics are
-        enforced by the service layer.
-
-        When `upsert=true`, rows whose natural key (normalized SKU for products) already
-        exists in the target will be updated and linked with `kind=linked`.
+        enforced by the preflight method.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ImportBatchRequest"
+              $ref: '#/components/schemas/ImportBatchRequest'
       responses:
-        "200":
+        '200':
           description: Batch processed — returns per-row outcomes and aggregate totals
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoadBatchResult"
-        "400":
+                $ref: '#/components/schemas/LoadBatchResult'
+        '400':
+          description: Invalid batch request
           content:
             application/json:
               schema: { $ref: './common.yaml#/components/schemas/ErrorEnvelope' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
   securitySchemes:
@@ -742,14 +746,16 @@ components:
         updatedAt: { type: string, format: date-time }
 
     CategoryListResponse:
-      allOf:
-        - type: object
-          required: [items]
-          properties:
-            items:
-              type: array
-              items: { $ref: '#/components/schemas/Category' }
-        - $ref: '#/components/schemas/PaginationFields'
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Category' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     CategoryMutationResponse:
       allOf:
@@ -805,14 +811,16 @@ components:
         updatedAt: { type: string, format: date-time }
 
     ProductListResponse:
-      allOf:
-        - type: object
-          required: [items]
-          properties:
-            items:
-              type: array
-              items: { $ref: '#/components/schemas/Product' }
-        - $ref: '#/components/schemas/PaginationFields'
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
 
     ProductMutationResponse:
       allOf:
@@ -944,33 +952,14 @@ components:
       type: object
       required: [id, batch_id, source_row, target_id, target_entity, idempotency_key, outcome, created_at]
       properties:
-        productId: { type: string, format: uuid }
-        warehouseId: { type: string, format: uuid }
-        quantity: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
-
-    ProductListResponse:
-      type: object
-      required: [items, page, pageSize, total]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Product' }
-        page: { type: integer, minimum: 1 }
-        pageSize: { type: integer, minimum: 1, maximum: 100 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-
-    CategoryListResponse:
-      type: object
-      required: [items, page, pageSize, total]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Category' }
-        page: { type: integer, minimum: 1 }
-        pageSize: { type: integer, minimum: 1, maximum: 100 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
+        id: { type: string, format: uuid }
+        batch_id: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        target_id: { type: string, format: uuid }
+        target_entity: { type: string }
+        idempotency_key: { type: string }
+        outcome: { type: string }
+        created_at: { type: string, format: date-time }
 
     TargetFieldDefinition:
       type: object
@@ -1292,198 +1281,102 @@ components:
 
     ImportRowRequest:
       type: object
-      required:
-        - batch_id
-        - source_row
-        - idempotency_key
-        - entity
-        - record
+      required: [batch_id, source_row, idempotency_key, entity, record]
       properties:
-        batch_id:
-          type: string
-          format: uuid
-        source_row:
-          type: integer
-          minimum: 0
-        source_system:
-          type: string
-          nullable: true
-        source_id:
-          type: string
-          nullable: true
-        idempotency_key:
-          type: string
-        correlation_id:
-          type: string
-          nullable: true
-        entity:
-          type: string
-          enum: [product, category, stock_level]
-        record:
-          type: object
-
-    ImportRowResponse:
-      type: object
-      required:
-        - target_id
-        - target_version
-        - outcome
-        - receipt
-        - prior_result
-      properties:
-        target_id:
-          type: string
-          format: uuid
-        target_version:
-          type: integer
-        outcome:
-          type: string
-          enum: [loaded, rejected, merged, skipped]
-        receipt:
-          $ref: "#/components/schemas/ImportReceiptRecord"
-        prior_result:
-          type: boolean
+        batch_id: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        source_system: { type: string, nullable: true }
+        source_id: { type: string, nullable: true }
+        idempotency_key: { type: string, maxLength: 128 }
+        correlation_id: { type: string, nullable: true }
+        entity: { type: string }
+        record: { type: object }
+        upsert: { type: boolean }
 
     ImportReceiptRecord:
       type: object
-      required:
-        - id
-        - batch_id
-        - source_row
-        - entity
-        - schema_version
-        - idempotency_key
-        - request_hash
-        - target_id
-        - kind
-        - outcome
-        - created_at
+      required: [id, batch_id, source_row, entity, schema_version, idempotency_key, request_hash, target_id, kind, outcome, created_at]
       properties:
-        id:
-          type: string
-          format: uuid
-        batch_id:
-          type: string
-          format: uuid
-        source_row:
-          type: integer
-        source_system:
-          type: string
-          nullable: true
-        source_id:
-          type: string
-          nullable: true
-        entity:
-          type: string
-        schema_version:
-          type: integer
-        idempotency_key:
-          type: string
-        request_hash:
-          type: string
-        target_id:
-          type: string
-          format: uuid
-        kind:
-          type: string
-          enum: [created, linked]
-        outcome:
-          type: string
-          enum: [loaded, rejected, merged, skipped]
-        response_payload:
-          type: object
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
+        id: { type: string, format: uuid }
+        batch_id: { type: string, format: uuid }
+        source_row: { type: integer, minimum: 0 }
+        source_system: { type: string, nullable: true }
+        source_id: { type: string, nullable: true }
+        entity: { type: string }
+        schema_version: { type: integer, minimum: 1 }
+        idempotency_key: { type: string }
+        request_hash: { type: string }
+        target_id: { type: string, format: uuid }
+        kind: { type: string, enum: [created, linked] }
+        outcome: { type: string, enum: [loaded, rejected, merged, skipped] }
+        response_payload: { nullable: true }
+        created_at: { type: string, format: date-time }
 
-    ImportBatchRequest:
+    ImportRowResponse:
       type: object
-      required:
-        - batch_id
-        - entity
-        - rows
+      required: [target_id, target_version, outcome, receipt, prior_result]
       properties:
-        batch_id:
-          type: string
-          format: uuid
-          description: Stable UUID identifying this overall migration batch
-        entity:
-          type: string
-          enum: [product, category, stock_level]
-        upsert:
-          type: boolean
-          default: false
-          description: When true, rows whose natural key already exists will be updated and linked (kind=linked)
-        rows:
-          type: array
-          minItems: 1
-          maxItems: 500
-          items:
-            $ref: "#/components/schemas/BatchRowInput"
+        target_id: { type: string, format: uuid }
+        target_version: { oneOf: [{ type: integer }, { type: string }] }
+        outcome: { type: string, enum: [loaded, rejected, merged, skipped] }
+        receipt: { $ref: '#/components/schemas/ImportReceiptRecord' }
+        prior_result: { type: boolean }
 
     BatchRowInput:
       type: object
-      required:
-        - source_row
-        - idempotency_key
-        - record
+      required: [source_row, idempotency_key, record]
       properties:
-        source_row:
-          type: integer
-          minimum: 0
-          description: 0-based row position in the source file
-        idempotency_key:
-          type: string
-          minLength: 1
-          maxLength: 128
-        source_system:
-          type: string
-          maxLength: 64
-          nullable: true
-        source_id:
-          type: string
-          maxLength: 128
-          nullable: true
-        record:
-          type: object
-          description: Cleaned source data mapped to target domain shape
+        source_row: { type: integer, minimum: 0 }
+        idempotency_key: { type: string, maxLength: 128 }
+        source_system: { type: string, nullable: true }
+        source_id: { type: string, nullable: true }
+        record: { type: object }
 
-    LoadBatchResult:
+    ImportBatchRequest:
       type: object
-      required:
-        - batchId
-        - status
-        - total
-        - attempted
-        - loaded
-        - rejected
-        - unattempted
-        - chunksProcessed
-        - rows
+      required: [batch_id, entity, rows]
       properties:
-        batchId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum: [COMPLETED, STOPPED_EXCESSIVE_FAILURES]
-        total:
-          type: integer
-        attempted:
-          type: integer
-        loaded:
-          type: integer
-        rejected:
-          type: integer
-        unattempted:
-          type: integer
-        chunksProcessed:
-          type: integer
-        stoppedReason:
-          type: string
-          nullable: true
+        batch_id: { type: string, format: uuid }
+        entity: { type: string }
+        upsert: { type: boolean, default: false }
+        chunk_size: { type: integer, minimum: 1, maximum: 500 }
+        failure_threshold: { type: number, minimum: 0, maximum: 1 }
+        min_attempted_rows: { type: integer, minimum: 0 }
         rows:
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/BatchRowInput'
+
+    LoadBatchRowResult:
+      type: object
+      required: [sourceRow, idempotencyKey, outcome]
+      properties:
+        sourceRow: { type: integer, minimum: 0 }
+        idempotencyKey: { type: string }
+        outcome: { type: string, enum: [loaded, rejected, unattempted] }
+        attempts: { type: integer }
+        priorResult: { type: boolean }
+        error:
+          type: object
+          properties:
+            reasonCode: { type: string }
+            message: { type: string }
+            field: { type: string }
+
+    LoadBatchResult:
+      type: object
+      required: [batchId, status, total, attempted, loaded, rejected, unattempted, chunksProcessed, rows]
+      properties:
+        batchId: { type: string, format: uuid }
+        status: { type: string, enum: [COMPLETED, STOPPED_EXCESSIVE_FAILURES] }
+        total: { type: integer, minimum: 0 }
+        attempted: { type: integer, minimum: 0 }
+        loaded: { type: integer, minimum: 0 }
+        rejected: { type: integer, minimum: 0 }
+        unattempted: { type: integer, minimum: 0 }
+        chunksProcessed: { type: integer, minimum: 0 }
+        stoppedReason: { type: string, nullable: true }
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadBatchRowResult'
