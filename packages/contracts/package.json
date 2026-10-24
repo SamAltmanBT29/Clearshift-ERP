@@ -11,6 +11,8 @@
     "./events": "./src/events.ts",
     "./erp-1": "./src/erp-1.ts",
     "./erp-2": "./src/erp-2.ts",
+    "./erp-2-events": "./src/erp-2-events.ts",
+    "./erp-2-mock": "./src/erp-2-mock.ts",
     "./erp-3": "./src/erp-3.ts",
     "./erp-3-mock": "./src/erp-3-mock.ts",
     "./erp-3-events": "./src/erp-3-events.ts",
