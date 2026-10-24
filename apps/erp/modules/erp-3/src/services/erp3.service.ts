@@ -918,7 +918,7 @@ export class Erp3Service {
     candidate.decision = request.decision;
     candidate.rationale = request.rationale;
 
-    await this.auditService.record({
+    await this.auditService?.record({
       actor: operator.id,
       actorRole: operator.role ?? "editor",
       action: "merge.decided",
