@@ -31,6 +31,7 @@
     "erp2:e2e": "playwright test -c apps/erp/modules/erp-2/e2e/playwright.config.ts",
     "erp3:e2e": "playwright test -c apps/erp/modules/erp-3/e2e/playwright.config.ts",
     "erp4:test": "vitest run apps/erp/modules/erp-4",
+    "erp4:seed": "node sample-data/erp-4/seed.ts",
     "erp4:e2e": "playwright test -c apps/erp/modules/erp-4/e2e/playwright.config.ts",
     "test:contracts": "vitest run tests/contracts packages/contracts/tests"
   },

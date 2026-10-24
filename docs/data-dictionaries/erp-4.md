@@ -264,6 +264,32 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/search-filters.test.tsx`](../../apps/erp/modules/erp-4/web/tests/search-filters.test.tsx) (9 comprehensive tests verifying 300ms debounce, faceted sidebar updates, pill tag clearing, Clear All, and empty state messaging).
 
+## 21. Playwright Browser Journey & E2E Verification (Issue #45 / ERP4-10)
+
+- **Browser Host Architecture (`apps/erp/modules/erp-4/e2e/`)**:
+  - Standalone minimal Vite dev server (`vite.e2e.config.ts`) running on port 5177 with `--strictPort`.
+  - Mounts real module web routes (`erp4Routes`) and intercepts `/api/*` via Fastify in-memory app injection (`app.inject`), eliminating external network and database dependencies.
+  - Exposes `POST /__e2e/reset` endpoint for deterministic test isolation.
+- **Automated Browser Journeys (`erp-4-journey.spec.ts`)**:
+  - Tested across Chromium and Firefox with zero retries.
+  - Unauthenticated visitors navigating to `/erp4/accounts` automatically redirect to `/login?returnTo=%2Ferp4%2Faccounts`.
+  - Authenticated finance user creates an account via `AccountCreateModal`, validates real-time input checks, confirms table insertion, filters by account classification, and navigates seamlessly across Chart of Accounts, Journal Entries, and Trial Balance tabs.
+
+## 22. Gate G4 Release Candidate Evidence & Test Inventory (Issue #45 / ERP4-10)
+
+- **Complete Test Pyramid (30 Test Files, 468 Tests)**:
+  - `tests/domain/invariants.test.ts` (15 tests): Asserts all domain invariants (balanced double-entry, non-negative amounts, immutable posted entries, compensating reversals, account uniqueness, one-time opening balance, locked period guard, currency isolation).
+  - `tests/api/auth-and-envelope.test.ts` (15 tests): Enforces standard ApiError envelopes (PLT-04), correlation ID propagation (`x-correlation-id`), zero raw SQL/secret leakage, and RBAC matrix.
+  - `tests/contract/openapi-parity.test.ts` (3 tests): Verifies 100% parity between Fastify route tree and `packages/contracts/openapi/erp-4.yaml`.
+  - `tests/db/constraints.test.ts` (4 tests): Tests real PostgreSQL schema constraints (unique codes, non-negative debits/credits, single-direction lines, foreign keys) conditional on `DATABASE_URL`.
+  - `tests/seed/seed.test.ts` (7 tests): Validates public API seeding (`sample-data/erp-4/seed.ts`), idempotency keys, and reset determinism.
+  - `tests/e2e/demo-journey.test.ts` (1 multiphase test): Executes complete 5-minute V1 user workflow without manual SQL or test fixtures.
+  - `web/tests/*.test.tsx` (14 test files, 127 tests): React Testing Library suite covering components, forms, filters, tables, and conflict handling.
+- **Convenience Scripts in Monorepo Root `package.json`**:
+  - `npm run erp4:test`: Runs full Vitest suite for ERP-4 module.
+  - `npm run erp4:seed`: Executes deterministic public API seed helper.
+  - `npm run erp4:e2e`: Runs Playwright browser journey suite.
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -277,8 +303,10 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
 | **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
 | **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
+| **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
 | **`1.10.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
 | **`1.11.0`** | 2026-10-24 | Sprint 3 / Gate G4 | Group 9 / Role 2 (Issue #42 / ERP4-07) | Implemented Migration Kit target adapter (`Erp4TargetAdapter`), public `POST /api/v1/erp-finance/import` endpoint, durable import receipts schema extension with request hash, atomic local dual-write transactions, 3x idempotent replay guarantees, and batch chunking with excessive failure circuit breaker. |
+| **`1.12.0`** | 2026-10-24 | Gate G4 Release Candidate | Group 9 / Role 4 (Issue #45 / ERP4-10) | Finalized V1 contract parity tests (OpenAPI <-> Fastify routes), domain invariant test suite, PostgreSQL DB constraint tests, public API deterministic seed helper, scripted demo journey E2E test, Playwright browser journeys, module runbook (`README.md`), and scripted demo walkthrough (`docs/demo-scripts/erp-4-v1.md`). 100% test pass rate across 30 test files and 468 tests. |
 
 ## 21. Migration Kit Target Adapter & Durable Import Receipts (Issue #42 / [ERP4-07])
 
@@ -297,3 +325,29 @@ As part of Sprint 3 / Gate G4 requirements (Decision C4 & KIT-08):
   - Processed in 500-row chunks.
   - Circuit breaker halts execution when failure rate exceeds 10% after 10 rows.
   - Terminal outcome reconciliation: `total = loaded + rejected + unattempted`, `unaccounted = 0`.
+
+## 22. Playwright Browser Journey & E2E Verification (Issue #45 / ERP4-10)
+
+- **Browser Host Architecture (`apps/erp/modules/erp-4/e2e/`)**:
+  - Standalone minimal Vite dev server (`vite.e2e.config.ts`) running on port 5177 with `--strictPort`.
+  - Mounts real module web routes (`erp4Routes`) and intercepts `/api/*` via Fastify in-memory app injection (`app.inject`), eliminating external network and database dependencies.
+  - Exposes `POST /__e2e/reset` endpoint for deterministic test isolation.
+- **Automated Browser Journeys (`erp-4-journey.spec.ts`)**:
+  - Tested across Chromium and Firefox with zero retries.
+  - Unauthenticated visitors navigating to `/erp4/accounts` automatically redirect to `/login?returnTo=%2Ferp4%2Faccounts`.
+  - Authenticated finance user creates an account via `AccountCreateModal`, validates real-time input checks, confirms table insertion, filters by account classification, and navigates seamlessly across Chart of Accounts, Journal Entries, and Trial Balance tabs.
+
+## 23. Gate G4 Release Candidate Evidence & Test Inventory (Issue #45 / ERP4-10)
+
+- **Complete Test Pyramid (30 Test Files, 468 Tests)**:
+  - `tests/domain/invariants.test.ts` (15 tests): Asserts all domain invariants (balanced double-entry, non-negative amounts, immutable posted entries, compensating reversals, account uniqueness, one-time opening balance, locked period guard, currency isolation).
+  - `tests/api/auth-and-envelope.test.ts` (15 tests): Enforces standard ApiError envelopes (PLT-04), correlation ID propagation (`x-correlation-id`), zero raw SQL/secret leakage, and RBAC matrix.
+  - `tests/contract/openapi-parity.test.ts` (3 tests): Verifies 100% parity between Fastify route tree and `packages/contracts/openapi/erp-4.yaml`.
+  - `tests/db/constraints.test.ts` (4 tests): Tests real PostgreSQL schema constraints (unique codes, non-negative debits/credits, single-direction lines, foreign keys) conditional on `DATABASE_URL`.
+  - `tests/seed/seed.test.ts` (7 tests): Validates public API seeding (`sample-data/erp-4/seed.ts`), idempotency keys, and reset determinism.
+  - `tests/e2e/demo-journey.test.ts` (1 multiphase test): Executes complete 5-minute V1 demo workflow without manual SQL or test fixtures.
+  - `web/tests/*.test.tsx` (14 test files, 127 tests): React Testing Library suite covering components, forms, filters, tables, and conflict handling.
+- **Convenience Scripts in Monorepo Root `package.json`**:
+  - `npm run erp4:test`: Runs full Vitest suite for ERP-4 module.
+  - `npm run erp4:seed`: Executes deterministic public API seed helper.
+  - `npm run erp4:e2e`: Runs Playwright browser journey suite.

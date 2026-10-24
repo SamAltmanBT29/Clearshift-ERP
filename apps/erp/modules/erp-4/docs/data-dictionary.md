@@ -453,3 +453,95 @@ When an optional relationship is absent, the system emits an approved warning ob
   - `POST /api/v1/erp-finance/migration/mapping/transform` (applies mapping, enum translation, and coercions to rows)
 - **Frontend Screen**: Accessible React component [`DataMappingConfigPage.tsx`](../web/src/pages/DataMappingConfigPage.tsx) featuring shared `MigrationKitWizard`, enum translation explorer, named template loader/saver, and synthetic test presets.
 - **Automated Test Suite**: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../tests/migration/mapping.test.ts) (26 tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../web/tests/DataMappingConfigPage.test.tsx) (3 tests) covering coercions, enum dictionaries, required field guards, Fastify endpoints, and UI views.
+
+---
+
+## 16. Module Route Manifest & Shell (Issue #172 / ERP4-16)
+
+- Accessible `ModuleShell` with keyboard skip links (`#main-content`), ARIA landmarks (`role="main"`, `role="navigation"`, `role="banner"`), dynamic document title synchronization (`<title>`), and hierarchical breadcrumb trail.
+- Route manifest under `/erp4` registering Chart of Accounts, Journal Entries, Trial Balance, Detail, Edit, and Migration Kit pages.
+- Client-side JWT session authentication guards (`RequireAuth`) redirecting unauthenticated visitors to `/login?returnTo=...`.
+
+---
+
+## 17. Paginated Data Tables (Issue #173 / ERP4-17)
+
+- Main paginated data tables for Chart of Accounts and Journal Entries powered by shared `@cs/ui` Table and Pagination primitives.
+- Bounded page sizing (`pageSize <= 100`, options: 10, 20, 50, 100) preventing client DOM performance degradation.
+- Predictable multi-column sorting toggling ascending/descending order with `aria-sort` indicators.
+
+---
+
+## 18. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
+
+- 300ms debounced search bar (`FilterBar.tsx` / `useDebounce.ts`) with immediate typing feedback and clear action (`✕`).
+- Faceted slide-over filter panel (`FilterSidebar.tsx`) with account classification, status, and currency facets.
+- Removable filter pill tags (`FilterPills.tsx`) with individual removal and one-click "Clear All" actions.
+- URL query state synchronization (`useSearchParams`) reflecting active filters in browser location.
+
+---
+
+## 19. Screen States & Error Sanitization (Issue #175 / ERP4-19)
+
+- Animated skeleton table placeholders during data loading.
+- Zero-data empty states with contextual illustrations and primary creation CTAs.
+- Sanitized error alert banners suppressing raw database queries, internal stack traces, and system file paths.
+- Accessible 403 Forbidden access-denied views explaining missing roles and permissions.
+
+---
+
+## 20. Create Form & Field Validation (Issue #176 / ERP4-20)
+
+- Accessible dialog modal powered by `@cs/ui` Dialog with real-time field validation.
+- Double-submission prevention disabling action buttons during inflight requests.
+- Direct mapping of server 400 validation error issues to corresponding form fields.
+- Optimistic table cache updates and accessible confirmation toast notifications.
+
+---
+
+## 21. Detail-Edit Workflow & Linked Records (Issue #177 / ERP4-21)
+
+- Primary attribute inspection with formatted timestamps, currency-formatted amounts, and Golden ID badge.
+- Inline and drawer editing protected by allowlisted mutable fields and RBAC permission guards.
+- Tabbed cross-module linked records sub-tables with badge counts.
+- Concurrent modification conflict detection (HTTP 409) with user conflict prompt and refresh action.
+
+---
+
+## 22. Gate G4 Release Candidate Evidence & Test Inventory (Issue #45 / ERP4-10)
+
+### 22.1 Test Pyramid Overview
+The ERP-4 module release candidate is verified by 30 test files and 468 automated tests achieving 100% pass rate:
+- **Domain Invariants (`tests/domain/invariants.test.ts`)**: 15 tests enforcing all core financial invariants (BR-ERP4-01 double-entry balance, non-negative amounts, immutable posted entries, compensating reversals, account uniqueness, one-time opening balance, locked period guard, currency isolation).
+- **API & Envelope (`tests/api/auth-and-envelope.test.ts`)**: 15 tests verifying standard ApiError envelopes (PLT-04), correlation ID propagation (`x-correlation-id`), zero raw SQL/secret leakage, and RBAC matrix.
+- **OpenAPI Parity (`tests/contract/openapi-parity.test.ts`)**: 3 tests asserting 100% parity between Fastify routes and `packages/contracts/openapi/erp-4.yaml`.
+- **Database Constraints (`tests/db/constraints.test.ts`)**: 4 tests asserting real PostgreSQL constraints (unique code, check constraints, foreign keys).
+- **Public API Deterministic Seed (`tests/seed/seed.test.ts`)**: 7 tests validating seed script execution, idempotency keys, and reset determinism.
+- **In-Process Scripted Demo Journey (`tests/e2e/demo-journey.test.ts`)**: 1 multiphase end-to-end test executing the 5-minute V1 demo workflow without manual SQL.
+- **Playwright Browser Journeys (`e2e/erp-4-journey.spec.ts`)**: End-to-end browser journeys running in Chromium and Firefox against a minimal Vite host mounting the real module UI and Fastify API.
+- **React Testing Library Suite (`web/tests/*.test.tsx`)**: 14 test files, 127 tests covering all UI components, forms, filters, and screens.
+
+### 22.2 Convenience Scripts
+- `npm run erp4:test`: Runs Vitest across all ERP-4 test suites.
+- `npm run erp4:seed`: Runs deterministic public API seed helper.
+- `npm run erp4:e2e`: Runs Playwright browser journeys.
+
+---
+
+## Versioned Contract Change Control Log
+
+| Version | Date | Gate / Milestone | Author / Team | Description of Changes |
+|---|---|---|---|---|
+| **`1.0.0`** | 2026-10-22 | Gate G1 Baseline Freeze | Group 9 / Role 2 (Issue #170) | Complete OpenAPI 3.1 specification, Zod contract schemas, domain event schemas, and deterministic mock package published. Approved as frozen baseline for Gate G1. |
+| **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
+| **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |
+| **`1.3.0`** | 2026-10-23 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #183 / ERP4-27) | Implemented canonical 12 V1 cleaning rules (`@cs/kit`), field-level change audit ledger (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints, React review screen (`DataCleaningReviewPage`), and 20 automated tests. |
+| **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
+| **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
+| **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
+| **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
+| **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
+| **`1.10.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
+| **`1.11.0`** | 2026-10-24 | Sprint 4 / Migration Adapter | Group 9 / Role 4 (Issue #42 / ERP4-07) | Implemented Migration Kit generic adapter for ERP-4, dual-write target transaction commits, idempotent receipt management, deterministic batch loading, and non-fatal relationship warning emission. |
+| **`1.12.0`** | 2026-10-24 | Gate G4 Release Candidate | Group 9 / Role 4 (Issue #45 / ERP4-10) | Finalized V1 contract parity tests (OpenAPI <-> Fastify routes), domain invariant test suite, PostgreSQL DB constraint tests, public API deterministic seed helper, scripted demo journey E2E test, Playwright browser journeys, module runbook (`README.md`), and scripted demo walkthrough (`docs/demo-scripts/erp-4-v1.md`). 100% test pass rate across 30 test files and 468 tests. |
