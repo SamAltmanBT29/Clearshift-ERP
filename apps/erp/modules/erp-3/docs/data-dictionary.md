@@ -535,3 +535,81 @@ When an API endpoint responds with HTTP 403 Forbidden:
   - Explains the missing permission: displays `Required permission: orders:read (or orders:manage)`.
   - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
   - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+
+---
+
+## 13. Module Metadata Integration with Shared Migration Kit Wizard Specification (ERP3-22 / Issue #158)
+
+**Issue**: [#158](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/158) — `[ERP3-22] ERP-3 Sales Orders and Invoices: Module metadata integration with shared Migration Kit wizard`<br>
+**Implementation**: `packages/kit/src/domain/metadata.ts`, `packages/ui/src/components/MigrationKitWizard.tsx`, `apps/erp/modules/erp-3/src/kit/field-registry.ts`, `apps/erp/modules/erp-3/web/src/kit-metadata.ts`, `apps/erp/modules/erp-3/web/src/pages/OrdersImportPage.tsx`.
+
+### 13.1 Architectural Scope & Acceptance Criteria
+
+| Requirement | Implementation Component | Technical Specification | Gate Acceptance |
+|---|---|---|:---:|
+| **AC 1: Module Metadata Registration** | `field-registry.ts`, `kit-metadata.ts`, `MigrationKitRegistry` | Registers ERP-3 target schema metadata across all 4 domain entities (`sales_orders`, `so_lines`, `invoices`, `invoice_lines`) into central `migrationKitRegistry` without duplicating wizard infrastructure (H2). | **Pass** |
+| **AC 2: Dynamic Rendering of Target Fields, Types & Badges** | `MigrationKitWizard.tsx`, `kit-metadata.ts` | Dynamically renders all target fields with human-readable labels, data type badges (`string`, `decimal`, `uuid`, `enum`, `date`), allowable enum options (`[Open, Invoiced, Closed]` for status), required badges, and governing rule IDs (`FR-ERP3-01`, `BR-ERP3-01`, `BR-ERP3-03`, `KIT-08`). | **Pass** |
+| **AC 3: Incompatible Source Type Operator Warnings** | `MigrationKitWizard.tsx`, `checkTypeCompatibility()` | Evaluates source column data types against target field definitions. Flags type mismatches (e.g. mapping `date` or `boolean` to `decimal` total or `enum` status) with an accessible operator warning banner and row-level alert. | **Pass** |
+| **AC 4: Guard Blocking Unmapped Required Fields** | `MigrationKitWizard.tsx`, `validateFieldMapping()` | Enforces that all required target fields (`order_number`, `customer_golden_id`, `order_date`, `currency`, `status`) must be mapped before progressing. Renders a missing required fields banner and disables "Proceed to Dry-Run" and "Proceed to Load" actions. | **Pass** |
+
+### 13.2 Entity Target Field Definitions
+
+1. **Sales Orders (`erp3_sales_orders`)**:
+   - `order_number`: string, required (FR-ERP3-01, RL-01). Natural key, unique human-readable sales order identifier (e.g. `SO-2026-0001`).
+   - `customer_golden_id`: uuid, required (BR-ERP3-03, ADR-003). Mandatory UUID v4 referencing the canonical Hub / CRM-1 customer identity.
+   - `order_date`: date, required (FR-ERP3-01, RL-01). Booking calendar date in ISO-8601 format (YYYY-MM-DD).
+   - `currency`: string(3), required (FR-ERP3-01, RL-01). ISO-4217 uppercase currency code (e.g. USD, EUR, GBP).
+   - `status`: enum, required (FR-ERP3-05). Forward-only lifecycle status: `Open`, `Invoiced`, `Closed`.
+   - `subtotal`: decimal(19,4), optional (BR-ERP3-01). Server-computed pre-tax sum of line items.
+   - `tax_total`: decimal(19,4), optional (BR-ERP3-02). Server-computed total tax across line items.
+   - `total`: decimal(19,4), optional (BR-ERP3-01). Server-computed grand total.
+   - `customer_email`: string, optional (RL-02). Optional operational customer contact email.
+   - `customer_phone`: string, optional (RL-02). Optional customer contact phone number.
+   - `notes`: string, optional (RL-02). Optional customer or fulfillment instructions.
+   - `source_system`: string, optional (KIT-08). Original legacy system name preserved immutably.
+   - `source_id`: string, optional (KIT-08). Original primary key in the source system for idempotency.
+
+2. **Sales Order Lines (`erp3_so_lines`)**:
+   - `order_id`: uuid, required (FR-ERP3-01). Foreign key linking to parent sales order.
+   - `line_number`: number, required (FR-ERP3-01). 1-based sequential line item position.
+   - `product_id`: uuid, required (FR-ERP3-01, Decision C7). Reference to ERP-1 catalog product.
+   - `quantity`: decimal(12,4), required (BR-ERP3-01). Strictly positive ordered quantity (> 0).
+   - `unit_price`: decimal(19,4), required (BR-ERP3-01). Non-negative unit selling price (>= 0).
+   - `tax_rate`: decimal(6,4), optional (BR-ERP3-02). Percentage tax rate (0.00% to 100.00%).
+   - `tax_amount`: decimal(19,4), optional (BR-ERP3-02). Computed line tax amount.
+   - `line_total`: decimal(19,4), optional (BR-ERP3-01). Computed line total ((qty * unit_price) + tax_amount).
+
+3. **Invoices (`erp3_invoices`)**:
+   - `invoice_number`: string, required (FR-ERP3-02, RL-01). Natural key, unique human-readable invoice identifier.
+   - `order_id`: uuid, required (FR-ERP3-02). 1:1 foreign key reference to parent sales order in V1.
+   - `customer_golden_id`: uuid, required (BR-ERP3-03, ADR-003). Reference to canonical customer identity.
+   - `invoice_date`: date, required (FR-ERP3-02, RL-01). Issue calendar date (YYYY-MM-DD).
+   - `due_date`: date, required (DR-2, FR-ERP3-02). Payment due date satisfying `due_date >= invoice_date`.
+   - `currency`: string(3), required (FR-ERP3-02). ISO-4217 uppercase currency code.
+   - `status`: enum, required (FR-ERP3-02, FR-ERP3-04). Lifecycle status: `Open`, `Paid`, `Overdue`.
+   - `subtotal`: decimal(19,4), optional (BR-ERP3-01). Server-computed pre-tax sum.
+   - `tax_total`: decimal(19,4), optional (BR-ERP3-02). Server-computed total tax.
+   - `total`: decimal(19,4), optional (BR-ERP3-01). Server-computed grand invoice total.
+   - `source_system`: string, optional (KIT-08). Original provenance system.
+   - `source_id`: string, optional (KIT-08). Original legacy invoice record ID.
+
+4. **Invoice Lines (`erp3_invoice_lines`)**:
+   - `invoice_id`: uuid, required (FR-ERP3-02). Foreign key linking to parent invoice.
+   - `line_number`: number, required (FR-ERP3-02). 1-based sequential line item position.
+   - `product_id`: uuid, required (FR-ERP3-02, Decision C7). Reference to ERP-1 catalog product.
+   - `quantity`: decimal(12,4), required (BR-ERP3-01). Invoiced quantity (> 0).
+   - `unit_price`: decimal(19,4), required (BR-ERP3-01). Non-negative unit price (>= 0).
+   - `tax_rate`: decimal(6,4), optional (BR-ERP3-02). Line tax rate percentage.
+   - `tax_amount`: decimal(19,4), optional (BR-ERP3-02). Server-computed line tax amount.
+   - `line_total`: decimal(19,4), optional (BR-ERP3-01). Computed line total ((qty * unit_price) + tax_amount).
+
+### 13.3 Source-to-Target Type Compatibility Rules
+
+| Target Type | Supported Source Types | Warning Scenarios | Incompatible / Error Scenarios |
+|---|---|---|---|
+| `string` | Any source type | Coerced to string | None |
+| `decimal` / `number` | `number`, `integer`, `float`, `decimal` | `string` / `text` (parsed dynamically) | `date`, `boolean`, `uuid` |
+| `boolean` | `boolean`, `bool` | `string`, `number` (coerced 1/0, true/false) | `date`, `uuid` |
+| `date` | `date`, `datetime`, `timestamp` | `string` (must match ISO-8601 YYYY-MM-DD) | `number`, `boolean`, `uuid` |
+| `enum` | `string`, `text` (exact match) | `string` (warns allowed enum options) | `number`, `date`, `boolean`, `uuid` |
+| `uuid` | `uuid` | `string` (must match RFC-4122 format) | `number`, `date`, `boolean` |

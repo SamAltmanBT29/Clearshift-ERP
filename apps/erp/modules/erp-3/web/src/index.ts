@@ -13,6 +13,8 @@ export * from './pages/OrderCreatePage.js';
 export * from './pages/OrderDetailPage.js';
 export * from './pages/InvoiceCreatePage.js';
 export * from './pages/InvoiceDetailPage.js';
+export * from './pages/OrdersImportPage.js';
+export * from './kit-metadata.js';
 
 // Route registration, shell, navigation & auth (ERP3-16)
 export * from './route-manifest.js';

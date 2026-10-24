@@ -30,13 +30,15 @@ import { OrderCreatePage } from './OrderCreatePage.js';
 import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
 import { InvoiceDetailPage } from './InvoiceDetailPage.js';
+import { OrdersImportPage } from './OrdersImportPage.js';
 
 export type OrdersViewMode =
   | 'list'
   | 'create-order'
   | 'order-detail'
   | 'create-invoice'
-  | 'invoice-detail';
+  | 'invoice-detail'
+  | 'import';
 
 export interface PageErrorState {
   message: string;
@@ -46,6 +48,8 @@ export interface PageErrorState {
 
 export interface OrdersListPageProps {
   initialTab?: 'orders' | 'invoices';
+  initialView?: OrdersViewMode;
+  onNavigateImport?: () => void;
 }
 
 // ─── URL Query State Helpers ──────────────────────────────────────────────────
@@ -112,11 +116,15 @@ function updateUrl(params: Record<string, string | number | undefined>) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'orders' }) => {
+export const OrdersListPage: React.FC<OrdersListPageProps> = ({
+  initialTab = 'orders',
+  initialView = 'list',
+  onNavigateImport,
+}) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(() =>
     parseInitialTabFromUrl(initialTab)
   );
-  const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
+  const [viewMode, setViewMode] = useState<OrdersViewMode>(initialView);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -437,6 +445,17 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     );
   }
 
+  if (viewMode === 'import') {
+    return (
+      <OrdersImportPage
+        onNavigateBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="cs-module-root">
       {/* Page Header with Action Buttons */}
@@ -449,6 +468,20 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
             </p>
           </div>
           <div className="cs-top-actions">
+            <button
+              type="button"
+              data-testid="btn-import-orders"
+              className="cs-btn-secondary"
+              onClick={() => {
+                if (onNavigateImport) {
+                  onNavigateImport();
+                }
+                setViewMode('import');
+              }}
+              aria-label="Import sales orders and invoices through Migration Kit"
+            >
+              Import Orders
+            </button>
             <button
               type="button"
               className="cs-btn-primary"

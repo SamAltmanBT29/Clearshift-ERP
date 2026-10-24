@@ -48,4 +48,6 @@ export const moduleDefinition = {
 
 export const erp3Descriptor = moduleDefinition;
 
+export * from "./kit/field-registry.js";
+
 export default moduleDefinition;
