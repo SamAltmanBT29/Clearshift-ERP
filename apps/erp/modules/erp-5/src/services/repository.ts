@@ -104,6 +104,7 @@ export interface NewHrImportReceipt {
   entity: string;
   schema_version?: number;
   idempotency_key: string;
+  request_hash: string;
   target_id: string;
   kind?: 'created' | 'linked';
 }
