@@ -20,6 +20,7 @@ export * from './policies/status-transitions.js';
 export * from './plugins/auth.js';
 export * from './migration/target-adapter.js';
 export * from './kit/field-registry.js';
+export * from './kit/rejection-context.js';
 export * from './routes/index.js';
 export * from './domain/index.js';
 export * from './client.js';
