@@ -42,6 +42,12 @@ export type ActionType = typeof Actions[keyof typeof Actions];
  * ClearShift Resource Identifiers
  */
 export const Resources = {
+  // ERP-3 Sales Orders & Invoices
+  ERP3_SALES_ORDERS: "erp3_sales_orders",
+  ERP3_INVOICES: "erp3_invoices",
+  ERP3_PAYMENTS: "erp3_payments",
+  ERP3_IMPORTS: "erp3_imports",
+
   // Finance & Accounting (ERP-4)
   ACCOUNTS: "accounts",
   JOURNAL_ENTRIES: "journal_entries",
