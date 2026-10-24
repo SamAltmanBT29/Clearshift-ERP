@@ -148,22 +148,25 @@ export const importRoutes: FastifyPluginAsync<{ hrService: HrService }> = async 
     } = parsed.data;
 
     // Instantiate in-process target adapter scoped to the declared entity
-    const adapter = new HrTargetAdapter(service, entity);
+    const adapter = new HrTargetAdapter(service.repository, entity);
 
-    const batchRows = rows.map((r) => ({
-      sourceRow: r.source_row,
-      idempotencyKey: r.idempotency_key,
-      sourceSystem: r.source_system ?? undefined,
-      sourceId: r.source_id ?? undefined,
-      data: r.record,
-    }));
-
-    const result = await adapter.loadBatch(batch_id, batchRows, {
-      upsert,
-      chunkSize: chunk_size,
-      failureThreshold: failure_threshold,
-      minAttemptedRows: min_attempted_rows,
+    const batchRows = rows.map((r) => {
+      const row: any = {
+        sourceRow: r.source_row,
+        idempotencyKey: r.idempotency_key,
+        data: r.record,
+      };
+      if (r.source_system !== null && r.source_system !== undefined) row.sourceSystem = r.source_system;
+      if (r.source_id !== null && r.source_id !== undefined) row.sourceId = r.source_id;
+      return row;
     });
+
+    const options: any = { upsert };
+    if (chunk_size !== undefined) options.chunkSize = chunk_size;
+    if (failure_threshold !== undefined) options.failureThreshold = failure_threshold;
+    if (min_attempted_rows !== undefined) options.minAttemptedRows = min_attempted_rows;
+
+    const result = await adapter.loadBatch(batch_id, batchRows, options);
 
     return reply.status(200).send(result);
   });
