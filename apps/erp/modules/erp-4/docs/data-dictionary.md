@@ -165,15 +165,21 @@
 | `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
 | `batch_id` | `UUID` | NOT NULL | — | Batch identifier for bulk import | — |
 | `source_row` | `INTEGER` | NOT NULL | — | Zero-indexed line/row in source file | CHECK (>= 0) |
-| `entity` | `VARCHAR(64)` | NOT NULL | — | Target entity name (e.g. `account`, `journal_entry`, `opening_balance`) | — |
+| `source_system` | `VARCHAR(64)` | NULL | — | Originating source system | — |
+| `source_id` | `VARCHAR(128)` | NULL | — | Identifier in source system | — |
+| `entity` | `VARCHAR(64)` | NOT NULL | — | Target entity name (`account`, `journal_entry`, `opening_balance`) | — |
 | `schema_version` | `INTEGER` | NOT NULL | `1` | Schema version of imported entity | — |
-| `idempotency_key` | `VARCHAR(255)` | NOT NULL | — | Stable idempotency key from header or payload | UNIQUE |
-| `target_id` | `VARCHAR(64)` | NOT NULL | — | ID of the created/updated target record | — |
-| `kind` | `VARCHAR(32)` | NOT NULL | `'created'` | Operation outcome: `created`, `updated`, `replayed`, `skipped` | — |
+| `idempotency_key` | `VARCHAR(128)` | NOT NULL | — | Stable idempotency key from header or payload | UNIQUE |
+| `request_hash` | `VARCHAR(64)` | NOT NULL | — | SHA-256 hash of canonical request record payload | — |
+| `target_id` | `UUID` | NOT NULL | — | UUID of the created/updated target record | — |
+| `kind` | `VARCHAR(16)` | NOT NULL | `'created'` | Operation kind: `created`, `linked` | — |
+| `outcome` | `VARCHAR(16)` | NOT NULL | `'loaded'` | Outcome: `loaded`, `rejected`, `merged`, `skipped` | — |
+| `response_payload` | `TEXT` | NULL | — | Serialized JSON response payload for prior result replay | — |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | Receipt creation timestamp | — |
 
-**Constraints**:
+**Constraints & Indexes**:
 - `import_receipts_idempotency_key_unique`: UNIQUE on `(idempotency_key)`
+- `import_receipts_batch_row_idx`: Index on `(batch_id, source_row)`
 
 ---
 

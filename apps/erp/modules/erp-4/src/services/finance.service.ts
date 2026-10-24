@@ -39,6 +39,8 @@ import type {
   ImportReceipt,
   UpdatePeriodRequest,
   RelationshipWarning,
+  ImportRowRequest,
+  ImportRowResponse,
 } from '@clearshift/contracts';
 import {
   assertDoubleEntryBalanced,
@@ -64,7 +66,7 @@ import {
 } from '../domain/relationships.js';
 import type { ReferenceResolver } from '@cs/kernel';
 import type { FinanceRepository } from './repository.js';
-import { InMemoryFinanceRepository } from './repository.js';
+import { InMemoryFinanceRepository, computeRequestHash } from './repository.js';
 import { Erp4AuditService } from './audit.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1323,5 +1325,348 @@ export class FinanceService {
     }).catch(() => {});
 
     return result;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Migration Kit Target Ingestion (KIT-08 / Decision C4)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Commits domain mutation and durable receipt together in a single local transaction.
+   * Handles idempotent replays and detects key reuse with mismatched payloads.
+   */
+  async importRow(req: ImportRowRequest): Promise<ImportRowResponse> {
+    const requestHash = computeRequestHash(req.record);
+
+    // 1. Check prior receipt
+    const priorReceipt = await this.repository.getImportReceiptByIdempotencyKey(req.idempotency_key);
+    if (priorReceipt) {
+      if (priorReceipt.request_hash === requestHash) {
+        // Idempotent replay: return prior result with HTTP 200 semantics
+        return {
+          target_id: priorReceipt.target_id,
+          target_version: 1,
+          outcome: (priorReceipt.outcome ?? 'loaded') as any,
+          receipt: {
+            id: priorReceipt.id,
+            batch_id: priorReceipt.batch_id,
+            source_row: priorReceipt.source_row,
+            source_system: priorReceipt.source_system ?? req.source_system ?? null,
+            source_id: priorReceipt.source_id ?? req.source_id ?? null,
+            entity: priorReceipt.entity,
+            schema_version: priorReceipt.schema_version ?? 1,
+            idempotency_key: priorReceipt.idempotency_key,
+            request_hash: priorReceipt.request_hash ?? requestHash,
+            target_id: priorReceipt.target_id,
+            kind: (priorReceipt.kind ?? 'created') as any,
+            outcome: (priorReceipt.outcome ?? 'loaded') as any,
+            response_payload: priorReceipt.response_payload ?? null,
+            created_at: priorReceipt.created_at,
+          },
+          prior_result: true,
+        };
+      } else {
+        // Key reuse with different payload: 409 Conflict
+        throw new ConflictError(
+          `Idempotency key '${req.idempotency_key}' was previously used with a different request payload`,
+          [{ field: 'idempotency_key', idempotency_key: req.idempotency_key }],
+          'IDEMPOTENCY_KEY_PAYLOAD_MISMATCH'
+        );
+      }
+    }
+
+    // 2. Execute atomic dual-write within local transaction
+    return this.repository.executeTransactional(async (txRepo) => {
+      let targetId: string;
+      let responsePayload: unknown;
+
+      if (req.entity === 'account') {
+        const raw = req.record;
+        const code = String(raw['code'] ?? '').trim();
+        const name = String(raw['name'] ?? '').trim();
+        const type = String(raw['type'] ?? '').trim();
+        const currencyCode = String(raw['currency_code'] ?? 'INR').trim().toUpperCase();
+
+        if (!code) {
+          throw new BadRequestError("Account 'code' is required", [{ field: 'code' }]);
+        }
+        if (!name) {
+          throw new BadRequestError("Account 'name' is required", [{ field: 'name' }]);
+        }
+        if (!['asset', 'liability', 'income', 'expense'].includes(type)) {
+          throw new BadRequestError(
+            `Invalid account type '${type}'. Must be asset, liability, income, or expense`,
+            [{ field: 'type' }]
+          );
+        }
+
+        // Code uniqueness invariant
+        const existing = await txRepo.getAccountByCode(code);
+        if (existing) {
+          throw new ConflictError(
+            `Account with code '${code}' already exists`,
+            [{ field: 'code', code }],
+            'ACCOUNT_CODE_EXISTS'
+          );
+        }
+
+        const parentId = typeof raw['parent_id'] === 'string' && raw['parent_id'] ? raw['parent_id'] : null;
+        if (parentId) {
+          const parent = await txRepo.getAccountById(parentId);
+          if (!parent) {
+            throw new BadRequestError(`Parent account with ID '${parentId}' not found`, [{ field: 'parent_id' }]);
+          }
+          if (parent.currency_code !== currencyCode) {
+            throw new UnprocessableError(
+              `Parent account currency '${parent.currency_code}' does not match child currency '${currencyCode}'`,
+              [{ field: 'parent_id' }],
+              'CURRENCY_MISMATCH'
+            );
+          }
+        }
+
+        const isPostingAccount = raw['is_posting_account'] !== undefined ? Boolean(raw['is_posting_account']) : true;
+
+        const createdAccount = await txRepo.createAccount({
+          id: typeof raw['id'] === 'string' && raw['id'] ? raw['id'] : randomUUID(),
+          code,
+          name,
+          type: type as any,
+          currency_code: currencyCode,
+          parent_id: parentId,
+          description: typeof raw['description'] === 'string' ? raw['description'] : null,
+          is_posting_account: isPostingAccount,
+          idempotency_key: req.idempotency_key,
+          batch_id: req.batch_id,
+          source_row: req.source_row,
+        });
+
+        targetId = createdAccount.id;
+        responsePayload = createdAccount;
+
+      } else if (req.entity === 'journal_entry') {
+        const raw = req.record;
+        const periodId = typeof raw['period_id'] === 'string' ? raw['period_id'] : '';
+        const postingDate = typeof raw['posting_date'] === 'string' ? raw['posting_date'] : '';
+        const currencyCode = String(raw['currency_code'] ?? 'INR').trim().toUpperCase();
+        const description = typeof raw['description'] === 'string' ? raw['description'] : '';
+        const linesRaw = Array.isArray(raw['lines']) ? raw['lines'] : [];
+
+        if (!periodId) {
+          throw new BadRequestError("Journal entry 'period_id' is required", [{ field: 'period_id' }]);
+        }
+        if (!postingDate) {
+          throw new BadRequestError("Journal entry 'posting_date' is required", [{ field: 'posting_date' }]);
+        }
+        if (linesRaw.length < 2) {
+          throw new UnprocessableError(
+            'Journal entry must contain at least 2 lines',
+            [{ field: 'lines' }],
+            'AT_LEAST_TWO_LINES_REQUIRED'
+          );
+        }
+
+        // Verify period exists and is not locked (BR-ERP4-02)
+        const period = await txRepo.getPeriodById(periodId);
+        if (!period) {
+          throw new BadRequestError(`Accounting period '${periodId}' not found`, [{ field: 'period_id' }]);
+        }
+        if (period.status === 'locked') {
+          throw new UnprocessableError(
+            `Accounting period '${period.period_label}' is locked. Posting into locked periods is prohibited.`,
+            [{ field: 'period_id', period_status: 'locked' }],
+            RELATIONSHIP_ERROR_CODES.PERIOD_LOCKED
+          );
+        }
+
+        // Validate and normalize lines
+        const lines = [];
+        for (let i = 0; i < linesRaw.length; i++) {
+          const l = linesRaw[i] as Record<string, unknown>;
+          const accountId = typeof l['account_id'] === 'string' ? l['account_id'] : '';
+          const debitRaw = l['debit_amount'] !== undefined ? l['debit_amount'] : l['debit'];
+          const creditRaw = l['credit_amount'] !== undefined ? l['credit_amount'] : l['credit'];
+          const debit = typeof debitRaw === 'string' || typeof debitRaw === 'number' ? String(debitRaw) : '0';
+          const credit = typeof creditRaw === 'string' || typeof creditRaw === 'number' ? String(creditRaw) : '0';
+
+          const account = await txRepo.getAccountById(accountId);
+          if (!account) {
+            throw new BadRequestError(
+              `Account '${accountId}' at line ${i} not found`,
+              [{ field: `lines[${i}].account_id` }],
+              RELATIONSHIP_ERROR_CODES.ACCOUNT_NOT_FOUND
+            );
+          }
+          if (!account.is_posting_account) {
+            throw new UnprocessableError(
+              `Cannot post to non-posting header account '${account.code}'`,
+              [{ field: `lines[${i}].account_id`, code: account.code }],
+              RELATIONSHIP_ERROR_CODES.CANNOT_POST_TO_HEADER_ACCOUNT
+            );
+          }
+          if (account.currency_code !== currencyCode) {
+            throw new UnprocessableError(
+              `Account currency '${account.currency_code}' does not match journal currency '${currencyCode}'`,
+              [{ field: `lines[${i}].account_id`, expected: currencyCode, got: account.currency_code }],
+              'CURRENCY_MISMATCH'
+            );
+          }
+
+          lines.push({
+            id: typeof l['id'] === 'string' && l['id'] ? l['id'] : randomUUID(),
+            account_id: accountId,
+            debit_amount: debit,
+            credit_amount: credit,
+            description: typeof l['description'] === 'string' ? l['description'] : null,
+          });
+        }
+
+        // Check double-entry exact balance invariant (BR-ERP4-01)
+        try {
+          assertDoubleEntryBalanced(lines, currencyCode);
+        } catch (err) {
+          if (err instanceof DomainError) {
+            throw new UnprocessableError(
+              `Cannot post unbalanced journal entry: ${err.message}`,
+              [err.context],
+              RELATIONSHIP_ERROR_CODES.UNBALANCED_ENTRY
+            );
+          }
+          throw err;
+        }
+
+        // Header and lines commit in one database transaction
+        const entryId = typeof raw['id'] === 'string' && raw['id'] ? raw['id'] : randomUUID();
+        const entryNumber = typeof raw['entry_number'] === 'string' && raw['entry_number']
+          ? raw['entry_number']
+          : `JE-${Date.now()}-${randomUUID().slice(0, 4).toUpperCase()}`;
+
+        const isPosting = raw['status'] === 'posted';
+        const createdEntry = await txRepo.createJournalEntry({
+          id: entryId,
+          entry_number: entryNumber,
+          posting_date: postingDate,
+          description: description || 'Imported Journal Entry',
+          currency_code: currencyCode,
+          period_id: periodId,
+          lines,
+          created_by_user_id: typeof raw['created_by_user_id'] === 'string' ? raw['created_by_user_id'] : 'system',
+          idempotency_key: req.idempotency_key,
+          batch_id: req.batch_id,
+          source_row: req.source_row,
+        });
+
+        if (isPosting) {
+          await txRepo.updateJournalEntryStatus(entryId, {
+            status: 'posted',
+            posted_at: new Date().toISOString(),
+            posted_by_user_id: 'system',
+          });
+        }
+
+        targetId = createdEntry.id;
+        responsePayload = createdEntry;
+
+      } else if (req.entity === 'opening_balance') {
+        const raw = req.record;
+        const accountId = typeof raw['account_id'] === 'string' ? raw['account_id'] : '';
+        const currencyCode = String(raw['currency_code'] ?? 'INR').trim().toUpperCase();
+        const balanceAmount = typeof raw['balance_amount'] === 'string' || typeof raw['balance_amount'] === 'number'
+          ? String(raw['balance_amount'])
+          : '';
+        const asOfDate = typeof raw['as_of_date'] === 'string' ? raw['as_of_date'] : '';
+
+        if (!accountId) {
+          throw new BadRequestError("Opening balance 'account_id' is required", [{ field: 'account_id' }]);
+        }
+        if (!balanceAmount) {
+          throw new BadRequestError("Opening balance 'balance_amount' is required", [{ field: 'balance_amount' }]);
+        }
+        if (!asOfDate) {
+          throw new BadRequestError("Opening balance 'as_of_date' is required", [{ field: 'as_of_date' }]);
+        }
+
+        const account = await txRepo.getAccountById(accountId);
+        if (!account) {
+          throw new BadRequestError(`Account with ID '${accountId}' not found`, [{ field: 'account_id' }]);
+        }
+        if (account.currency_code !== currencyCode) {
+          throw new UnprocessableError(
+            `Account currency '${account.currency_code}' does not match opening balance currency '${currencyCode}'`,
+            [{ field: 'currency_code' }],
+            'CURRENCY_MISMATCH'
+          );
+        }
+
+        // Enforce one-time opening balance per account & currency (FR-ERP4-04)
+        const existing = await txRepo.getOpeningBalance(accountId, currencyCode);
+        if (existing) {
+          throw new ConflictError(
+            `Opening balance for account '${accountId}' and currency '${currencyCode}' already exists`,
+            [{ field: 'account_id', account_id: accountId, currency_code: currencyCode }],
+            'OPENING_BALANCE_ALREADY_EXISTS'
+          );
+        }
+
+        const createdOb = await txRepo.createOpeningBalance({
+          id: typeof raw['id'] === 'string' && raw['id'] ? raw['id'] : randomUUID(),
+          account_id: accountId,
+          currency_code: currencyCode,
+          balance_amount: balanceAmount,
+          as_of_date: asOfDate,
+          source_reference: typeof raw['source_reference'] === 'string' ? raw['source_reference'] : null,
+          loaded_by_user_id: typeof raw['loaded_by_user_id'] === 'string' ? raw['loaded_by_user_id'] : 'system',
+        });
+
+        targetId = createdOb.id;
+        responsePayload = createdOb;
+
+      } else {
+        throw new BadRequestError(
+          `Unsupported entity type for import: '${req.entity}'`,
+          [{ field: 'entity', entity: req.entity }],
+          'UNSUPPORTED_ENTITY'
+        );
+      }
+
+      // 3. Insert durable import receipt in SAME transaction
+      const receipt = await txRepo.createImportReceipt({
+        batch_id: req.batch_id,
+        source_row: req.source_row,
+        source_system: req.source_system ?? null,
+        source_id: req.source_id ?? null,
+        entity: req.entity,
+        schema_version: 1,
+        idempotency_key: req.idempotency_key,
+        request_hash: requestHash,
+        target_id: targetId,
+        kind: 'created',
+        outcome: 'loaded',
+        response_payload: responsePayload,
+      });
+
+      return {
+        target_id: targetId,
+        target_version: 1,
+        outcome: 'loaded',
+        receipt: {
+          id: receipt.id,
+          batch_id: receipt.batch_id,
+          source_row: receipt.source_row,
+          source_system: receipt.source_system ?? null,
+          source_id: receipt.source_id ?? null,
+          entity: receipt.entity,
+          schema_version: receipt.schema_version ?? 1,
+          idempotency_key: receipt.idempotency_key,
+          request_hash: requestHash,
+          target_id: targetId,
+          kind: receipt.kind ?? 'created',
+          outcome: 'loaded',
+          response_payload: responsePayload,
+          created_at: receipt.created_at,
+        },
+        prior_result: false,
+      };
+    });
   }
 }
