@@ -952,3 +952,15 @@ Unauthenticated callers receive `401 Unauthorized`. Authenticated callers lackin
 - Audit logs capture `actor`, `action`, `entity`, `entity_id`, and `diff_redacted` without copying sensitive plain-text values.
 
 | **`1.7.0`** | 2026-10-24 | Sprint 3 / Gate G4 Security Baseline | Mahek Yadav (Issue #24 / ERP2-09) | Implemented authorization, sensitive field protection (bank masking), audit logging, and domain invariants. |
+
+---
+
+## 21. Design Artifacts (ERP2-24 / Issue #140)
+
+Gate G1 design artifacts, kept in `apps/erp/modules/erp-2/docs/`:
+
+- [Field-level data dictionary](../../apps/erp/modules/erp-2/docs/field-level-data-dictionary.md): every column with type, nullability, constraint, rule and example, plus the SQL-vs-Drizzle drift register
+- [ERD](../../apps/erp/modules/erp-2/docs/erd.md): keys and master-data ownership boundaries
+- [Traceability matrix](../../apps/erp/modules/erp-2/docs/traceability-matrix.md): Must requirements mapped to automated tests
+- [Dirty Data Pack plan](../../apps/erp/modules/erp-2/docs/dirty-data-pack-plan.md): synthetic edge-case scenarios and expected defect distribution
+
