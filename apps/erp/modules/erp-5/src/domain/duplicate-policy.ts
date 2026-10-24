@@ -8,9 +8,9 @@
 
 import { randomUUID } from 'node:crypto';
 import type {
-  Erp5Employee,
-  Erp5Department,
-} from '../db/schema.js';
+  HrEmployee,
+  HrDepartment,
+} from '@clearshift/contracts';
 
 export type DuplicateClassificationType = 'UNIQUE' | 'EXACT_DUPLICATE' | 'AMBIGUOUS_CANDIDATE';
 
@@ -37,7 +37,7 @@ export interface MatchOutcome {
  */
 export function classifyEmployeeCandidate(
   incoming: any,
-  existing: readonly Erp5Employee[]
+  existing: readonly HrEmployee[]
 ): MatchOutcome {
   const key = incoming.employee_no?.trim().toUpperCase();
   if (!key) return { classification: 'UNIQUE' };
@@ -63,7 +63,7 @@ export function classifyEmployeeCandidate(
     };
   }
 
-  const matched = matches[0];
+  const matched = matches[0]!;
   return {
     classification: 'EXACT_DUPLICATE',
     candidate: {
@@ -86,7 +86,7 @@ export function classifyEmployeeCandidate(
  */
 export function classifyDepartmentCandidate(
   incoming: any,
-  existing: readonly Erp5Department[]
+  existing: readonly HrDepartment[]
 ): MatchOutcome {
   const key = incoming.code?.trim().toUpperCase();
   if (!key) return { classification: 'UNIQUE' };
@@ -112,7 +112,7 @@ export function classifyDepartmentCandidate(
     };
   }
 
-  const matched = matches[0];
+  const matched = matches[0]!;
   return {
     classification: 'EXACT_DUPLICATE',
     candidate: {
