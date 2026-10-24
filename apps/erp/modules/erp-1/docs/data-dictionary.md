@@ -33,6 +33,8 @@
 19. [Requirement-to-Test Traceability Matrix (ERP1-24)](#19-requirement-to-test-traceability-matrix-erp1-24)
 20. [Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)](#20-canonical-dirty-data-pack-plan--defect-distribution-erp1-24)
 21. [Gate G1 Review & Design Artifact Sign-Off (ERP1-24)](#21-gate-g1-review--design-artifact-sign-off-erp1-24)
+22. [QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)](#22-qa-evidence-automated-test-mapping-and-team-handoff-erp1-10)
+23. [Profiling Configuration & Expected-Result Assertions (ERP1-26)](#23-profiling-configuration--expected-result-assertions-erp1-26)
 
 ---
 
@@ -205,6 +207,11 @@ cannot create a second stock row for the same pair.
 | `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
 | `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
 | `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `source_system` | `VARCHAR(64)` | `z.string().optional()` | NULLABLE | — | Source system identifier | Audit | `'legacy_erp'` |
+| `source_id` | `VARCHAR(128)` | `z.string().optional()` | NULLABLE | — | Source record identifier | Audit | `'LEG-1001'` |
+| `request_hash` | `VARCHAR(64)` | `z.string()` | NOT NULL | `''` | SHA-256 hash of canonical request | KIT-08 | `'e3b0c442...'` |
+| `outcome` | `VARCHAR(16)` | `enum('loaded','rejected','merged','skipped')` | NOT NULL | `'loaded'` | Row outcome classification | KIT-08 | `'loaded'` |
+| `response_payload` | `TEXT` | `z.string().optional()` | NULLABLE | — | Serialized JSON response for idempotent replay | KIT-08 | `'{"id":"..."}'` |
 | `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
@@ -711,21 +718,23 @@ Every functional requirement, domain rule, and platform architectural invariant 
 | **ERP1-21** | Issue #117 | Detail/edit drawer workflow, linked records, HTTP 409 conflict handling | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
 | **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
 | **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
+| **ERP1-08** | Issue #13 | Module-specific profiling, cleaning, mapping and dirty-data pack | `apps/erp/modules/erp-1/tests/migration/rules.test.ts`<br>`apps/erp/modules/erp-1/docs/data-quality-rules.md` | **Verified** |
 | **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
 
 ---
 
-## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)
+## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-08 / ERP1-24)
 
 ### 20.1 Plan Overview & Principles
 
 The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove the entire 7-step Migration Kit pipeline (**Extract, Profile, Clean, Map, Load, Validate, Reconcile**) against real-world messiness without utilizing any real customer or employee PII.
 
-- **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../sample-data/erp-1/dirty-data-v1.csv)
-- **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json)
-- **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../sample-data/erp-1/mapping-template.json)
-- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/dirty-data-plan.ts`](../src/migration/dirty-data-plan.ts)
-- **Automated Regression Suite**: [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
+- **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../../../sample-data/erp-1/dirty-data-v1.csv)
+- **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../../../sample-data/erp-1/expected-profile.json)
+- **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../../../sample-data/erp-1/mapping-template.json)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/rules.ts`](../src/migration/rules.ts)
+- **Data Quality Rules Specification**: [`apps/erp/modules/erp-1/docs/data-quality-rules.md`](data-quality-rules.md)
+- **Automated Regression Suites**: [`apps/erp/modules/erp-1/tests/migration/rules.test.ts`](../tests/migration/rules.test.ts) & [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
 
 ### 20.2 Synthetic Edge-Case Scenarios
 
@@ -861,4 +870,32 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Author**: Samarth (`Samarth-ITM`)
 - **Role**: Group 6 / Role 4 — Data & QA Lead
 - **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
+---
+
+## 23. Profiling Configuration & Expected-Result Assertions (ERP1-26)
+
+**Issue Reference**: Resolves [#122](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/122) (ERP1-26 / KIT-03)  
+**Implementation**: `apps/erp/modules/erp-1/src/migration/profiling-config.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/migration/profiling.test.ts`  
+**Detailed Specification**: `docs/data-dictionaries/erp-1-profiling.md`  
+
+### 23.1 Shared Migration Kit Profiler Integration (KIT-03)
+ERP-1 registers domain rules for module columns (`category`, `warehouse`, `product`, `stock_level`) with `@cs/kit`'s `profileDataset`.
+- Computes `totalRows` (131), `nullCount`, `populatedCount`, `distinctCount`, `invalidFormatCount`, `invalidFormatRate`, and `topValues` (max 5).
+- Enforces V1 domain invariants: single warehouse `WH-01`, fixed UOM enum, non-negative price/tax/stock, RFC email/phone regex, and OWASP formula injection prevention.
+- All column defect counts match pre-calculated manifest numbers from `sample-data/erp-1/expected-profile.json`.
+
+### 23.2 Exact Duplicate Key Matching Policy
+Configures 3 exact duplicate matching rules:
+1. `category_code`: trimmed uppercase category code (2 candidates: `R012`, `R013` matching `R001`)
+2. `product_sku`: normalized uppercase SKU (3 candidates: `R057`, `R058` matching `R022`, `R059` matching `R023`)
+3. `stock_level_key`: composite `${sku}::${warehouse}` (2 candidates: `R112`, `R113` matching `R087`)
+
+Total duplicate candidates = 7, exactly matching manifest `review: 7`. Zero fuzzy scoring or V2 compensating rollback sagas.
+
+### 23.3 Non-Destructive Guarantee & Sensitive Data Masking
+- Source data immutability: input CSV text and parsed objects are never mutated. SHA-256 digest is verified against manifest `fixture_sha256`.
+- Sensitive fields `supplier_bank_account` and `employee_ssn` are excluded from column rules and masked before profiling; zero raw financial/personal numbers in reports or formula-safe CSV exports.
+
 

@@ -535,3 +535,154 @@ When an API endpoint responds with HTTP 403 Forbidden:
   - Explains the missing permission: displays `Required permission: orders:read (or orders:manage)`.
   - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
   - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+
+---
+
+## 13. Create Form and Field-Level Validation Specification (ERP3-20 / Issue #156)
+
+### 13.1 Overview & Architecture
+
+ERP-3 Sales Orders & Invoices implements production-grade creation workflows with client-side field validation, double-submission guards, and server validation error mapping in conformance with ClearShift V1 Master Architecture Specification and SDS §4.4 & §4.9.
+
+- **Hook**: `apps/erp/modules/erp-3/web/src/hooks/useOrderForm.ts`
+- **Modal Component**: `apps/erp/modules/erp-3/web/src/components/forms/OrderCreateModal.tsx`
+- **List Page Integration**: `apps/erp/modules/erp-3/web/src/pages/OrdersListPage.tsx`
+- **Test Suite**: `apps/erp/modules/erp-3/web/tests/OrderCreateModal.test.tsx` (13 tests, 100% synthetic fixtures)
+
+### 13.2 Field-Level Client Validation (AC1)
+
+Client-side synchronous validation (`validateOrderForm`) executes prior to network dispatch:
+- **Required Primary Identifiers**:
+  - `Customer Golden ID`: Mandatory UUID v4 per ADR-003 and BR-ERP3-03; validated against `CustomerGoldenIdSchema` (`UuidSchema`). Legacy/raw strings (e.g. `gid-*`) are rejected.
+  - `Order Date`: Mandatory string in ISO `YYYY-MM-DD` format.
+  - `Currency`: Mandatory 3-letter ISO 4217 uppercase currency code (`/^[A-Z]{3}$/`, e.g. `USD`, `EUR`, `GBP`, `INR`).
+- **Contact & Communication Formats**:
+  - `Customer Email`: Optional; when provided, strictly validated against standard email pattern (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`). Rejects invalid syntax with inline error guidance.
+  - `Contact Phone`: Optional; when provided, validated against E.164-compatible pattern (`/^\+?[0-9\s\-()]{7,20}$/`).
+- **Line Items & Decimal Ranges**:
+  - Minimum 1 line item required (`lines.length >= 1`).
+  - `Product ID`: Mandatory catalog item UUID v4 (`OrdersUuid`).
+  - `Quantity`: Decimal string with up to 4 decimal places (`/^\d+(\.\d{1,4})?$/`). Strictly enforces `Number(quantity) > 0` (zero and negative quantities rejected).
+  - `Unit Price`: Decimal string with up to 4 decimal places (`/^\d+(\.\d{1,4})?$/`). Enforces `Number(price) >= 0` (negative prices rejected).
+  - `Tax Rate`: Decimal percentage string (`/^\d+(\.\d{1,4})?$/`). Enforces range `0.00%` to `100.00%`.
+- **Live Calculations**:
+  - Line items compute live subtotal, tax amount, and line total using the canonical `@clearshift/contracts` helper `calculateLineAmounts(qty, price, taxRate)`.
+  - Order totals card computes aggregate subtotal, total tax, and total order amount in real time.
+
+### 13.3 Double-Submit Prevention & Inflight States (AC2)
+
+To prevent duplicate database mutations and race conditions:
+- **Inflight State**: `useOrderForm` tracks the `isSubmitting` flag during promise execution.
+- **Form Submission Guard**: Any submission attempt while `isSubmitting === true` is immediately rejected at the hook level.
+- **Button Semantics**: The submit button (`Create Sales Order`) is disabled during request flight, receives `aria-busy="true"`, and changes its label to `"Creating..."`.
+
+### 13.4 Server Error Mapping (AC3)
+
+When backend validation fails with HTTP 400 Bad Request:
+- **Detail Extraction**: Extracts error details from `ApiError.details` or `details.errors` array.
+- **Input Mapping**: Maps error messages directly to the corresponding input fields (`customerGoldenId`, `orderDate`, `currency`, `customerEmail`, `customerPhone`).
+- **Line Items Mapping**: Nested line item error paths (e.g. `lines.0.quantity`, `lines[0].price`, `lines.0.product_id`) are mapped to the exact line item index and field (`errors.lines[index]`), rendering inline `aria-invalid="true"` and `<p role="alert">` indicators.
+- **Alert Banner**: Renders an error alert banner with correlation reference ID (`Reference ID: <code>...</code>`).
+- **Conflict Handling (HTTP 409)**: Detects duplicate entity conflicts and renders appropriate guidance.
+
+### 13.5 Modal Closure, Table Cache Update & Toast Confirmation (AC4)
+
+Upon successful creation:
+- **Modal Closure**: Invokes `onClose()` and resets form state.
+- **Cache Update**: Prepends the newly created `SalesOrder` directly into the list page's local `orders` array and increments `totalOrders` by 1 without requiring a full page refresh.
+- **Confirmation Toast**: Renders an accessible confirmation toast notification (`.cs-erp3-toast-container`, `role="status"`, `aria-live="polite"`, `Alert variant="success"`) with message: `Sales order {order_number} created successfully.`.
+
+---
+
+## 14. Migration Rejection, Review, and Export Context (ERP3-23)
+
+**Issue**: [#159](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/159) — `[ERP3-23] ERP-3 Sales Orders and Invoices: Module context in shared rejection/review/export screens`<br>
+**Implementation**: `packages/kit/src/domain/rejection.ts`, `packages/ui/src/components/RejectionReviewScreen.tsx`, `apps/erp/modules/erp-3/src/kit/rejection-context.ts`, `apps/erp/modules/erp-3/web/src/pages/OrdersRejectionReviewPage.tsx`.
+
+### 14.1 Module Identifier Columns (AC1)
+
+The shared Migration Kit rejection review interface dynamically displays ERP-3's primary identifier and business columns:
+
+| Column | Field | Role | Formatting / Constraints |
+|---|---|---|---|
+| **Source Row** | `sourceRow` | Line Number | 1-based source file line reference |
+| **Error Code** | `errorCode` | Standard Code | Formatted as high-contrast red badge (`data-testid="error-code-badge"`) |
+| **Order Number** | `order_number` | Primary Natural Identifier | Normalized uppercase string; badged with `ID` pill |
+| **Customer Golden ID** | `customer_golden_id` | Master Identity Key | Canonical UUID v4 referencing CRM-1 customer identity |
+| **Source ID** | `source_id` | Provenance Key | Legacy primary key preserved without mutation (KIT-08) |
+| **Currency Code** | `currency` | Currency Reference | ISO-4217 3-letter currency code |
+| **Order Date** | `order_date` | Secondary Context | Calendar booking date (YYYY-MM-DD) |
+| **Order Status** | `status` | Secondary Context | Forward-only status (`Open`, `Invoiced`, `Closed`) |
+| **Total Amount** | `total` | Financial Context | Server-computed order grand total |
+
+### 14.2 Standardized Error Codes & Failure Explanations (AC2)
+
+| Error Code | Title | Failure Explanation | Doc Ref | Remediation Guidance |
+|---|---|---|---|---|
+| `DUPLICATE_ORDER_NUMBER` | Duplicate Order Number | Sales order number is already registered after normalization (BR-ERP3-01 / FR-ERP3-01). Order numbers must be globally unique across active and historical records. | BR-ERP3-01 | Verify existing order catalog in ERP-3 or re-map source order number. |
+| `MISSING_CUSTOMER_GOLDEN_ID` | Missing Customer Golden ID | Customer reference must resolve to a valid canonical UUID v4 Golden ID from Hub / CRM-1 (BR-ERP3-03 / ADR-003). | BR-ERP3-03 | Ensure customer is master-keyed in CRM-1 Hub before migrating sales orders. |
+| `INVALID_ORDER_STATUS` | Invalid Order Status | Order status transitions are strictly forward-only: Open -> Invoiced -> Closed (FR-ERP3-05). | FR-ERP3-05 | Map source status to an allowed V1 lifecycle status (Open, Invoiced, Closed). |
+| `NEGATIVE_QUANTITY` | Negative or Zero Line Quantity | Ordered line quantity must be strictly positive (> 0.0000) (BR-ERP3-01 / FR-ERP3-01). | BR-ERP3-01 | Ensure line quantity is greater than zero. |
+| `NEGATIVE_UNIT_PRICE` | Negative Unit Price | Selling unit price cannot be negative (BR-ERP3-01). Must be a decimal >= 0.0000. | BR-ERP3-01 | Ensure line item unit price is non-negative. |
+| `INVALID_CURRENCY` | Invalid Currency Code | Currency must be a valid 3-letter uppercase ISO-4217 code (e.g. USD, EUR, GBP) (FR-ERP3-01). | FR-ERP3-01 | Standardize currency column to uppercase ISO-4217 format. |
+| `INVALID_INVOICE_DUE_DATE` | Invalid Invoice Due Date | Invoice payment due date must be greater than or equal to invoice issue date (DR-2 / FR-ERP3-02). | DR-2 | Adjust due_date so that due_date >= invoice_date. |
+| `MULTIPLE_INVOICES_PER_ORDER` | Multiple Invoices for Single Order Rejected | ClearShift V1 strictly enforces a 1:1 relationship between sales orders and billing invoices (FR-ERP3-02). Multiple invoices for one order are rejected. | FR-ERP3-02 | Consolidate billings into a single invoice per sales order for V1. |
+| `UNRESOLVED_PRODUCT_REFERENCE` | Unresolved ERP-1 Product Reference | Product ID reference does not exist in ERP-1 product catalog (Decision C7 / FR-ERP3-01). Cross-module references must resolve via owning API. | Decision C7 | Import or register product catalog items in ERP-1 before loading order lines. |
+| `SOURCE_VALUE_MUTATED` | Raw Source Value Alteration | Raw source provenance values must be preserved without destructive mutation (KIT-08). | KIT-08 | Retain original source_system and source_id untouched. |
+| `TOTAL_MISMATCH` | Line Item Total Mismatch | Order total is server-computed: line_total = (qty * price) + tax, total = sum(line_total) (BR-ERP3-01). Source total did not reconcile. | BR-ERP3-01 | Allow server-side computed totals or reconcile source line arithmetic. |
+| `MISSING_REQUIRED_FIELD` | Missing Mandatory Field | A mandatory field (order_number, customer_golden_id, order_date, currency, status) is missing or blank (FR-ERP3-01). | FR-ERP3-01 | Populate all required fields in source data prior to importing. |
+
+### 14.3 Sensitive Field Masking (AC3)
+
+All sensitive financial, bank, or employee fields are automatically masked or excluded from review tables, payload inspector modals, and CSV downloads:
+- **Credentials & Passwords**: `[REDACTED]`
+- **Bank Accounts & Card Numbers**: `****-****-XXXX` (last 4 characters preserved)
+- **Government Tax IDs & SSNs**: `***-**-XXXX` (last 4 characters preserved)
+- **Employee Salaries & Compensation**: `[CONFIDENTIAL SALARY]`
+
+### 14.4 Formula-Safe CSV Export (AC4)
+
+Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines (PLT-12 / KIT-16):
+- Any cell value starting with `=`, `+`, `-`, `@`, `\t`, or `\r` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
+- Export includes all standardized headers: `"Source Row"`, `"Error Code"`, `"Error Title"`, `"Reason"`, `"Doc Reference"`, `"Resolution"`, `"Order Number"`, `"Customer Golden ID"`, `"Source ID"`, `"Currency Code"`.
+- Filtering is preserved: exporting with active filters downloads only the matching subset of rejected rows.
+
+
+---
+
+## 15. Relationships, State Transitions & Read-Model Consistency (`ERP3-06` / Issue #31)
+
+- **Relationship Catalog (`src/domain/relationships.ts`)**:
+  - `ORDER_CUSTOMER`, `ORDER_LINES`, `ORDER_LINE_PRODUCT`, `INVOICE_CUSTOMER`, `INVOICE_ORDER`, `INVOICE_LINES`, `INVOICE_LINE_PRODUCT`, `PAYMENT_INVOICE`.
+  - Optional links (`invoice.order_id`) use `handleOptionalRelationship` to return `ERP3_OPTIONAL_REFERENCE_ABSENT` warnings and `null` without creating synthetic records.
+  - Provenance fields (`source_system`, `source_id`) are validated as an atomic pair via `assertSourceIdentityIsComplete` (`422 SOURCE_IDENTITY_INCOMPLETE`).
+  - Linked orders and invoices enforce matching ISO 4217 currency codes via `assertOrderInvoiceCurrencyConsistency` (`422 CURRENCY_MISMATCH`).
+- **State Transition Matrices**:
+  - Sales Orders (`assertSalesOrderStatusTransition`): `Open -> Invoiced -> Closed` (and `Open -> Closed` per `ALLOWED_ORDER_STATUS_TRANSITIONS`), `Closed` is terminal (`422 INVALID_ORDER_STATUS_TRANSITION`).
+  - Invoices (`assertInvoiceStatusTransition`): `Open -> Paid | Overdue`, `Overdue -> Paid`, `Paid` is terminal (`422 INVALID_INVOICE_STATUS_TRANSITION`).
+- **Read-Model Consistency (`assertSalesOrderReadConsistency`, `assertInvoiceReadConsistency`, `assertPaymentReadConsistency`)**:
+  - Asserted immediately on every write and read in `Erp3Service` so persisted records and HTTP projections agree on status, links, derived line taxes/totals, and aggregate totals (`422 READ_MODEL_INCONSISTENT`).
+
+
+---
+
+## 16. Invariants Enforced at Schema & DB Level (ERP3-01 / Issue #26)
+
+1. **UUID Primary Keys**: Every table uses a `UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+2. **Deterministic Uniqueness**:
+   - `sales_orders.order_number` is unique.
+   - `invoices.invoice_number` is unique.
+   - `invoices.order_id` is unique (enforcing at most one V1 invoice per sales order).
+   - `(order_id, line_number)` is unique on `so_lines`.
+   - `(invoice_id, line_number)` is unique on `invoice_lines`.
+   - `import_receipts.idempotency_key` is unique.
+3. **Check Constraints**:
+   - Quantities are strictly positive (`> 0`).
+   - Prices, tax amounts, line totals, and document totals are non-negative (`>= 0`).
+   - Tax rates are bounded percentages (`>= 0 AND <= 100`).
+   - Payment amounts are strictly positive (`> 0`).
+   - Invoice `due_date >= invoice_date`.
+4. **Referential Integrity & Cascades**:
+   - Order lines cascade delete when the parent sales order is deleted (`ON DELETE CASCADE`).
+   - Invoice lines cascade delete when the parent invoice is deleted (`ON DELETE CASCADE`).
+   - Cross-module relationships use logical UUID columns without DB-level foreign keys.

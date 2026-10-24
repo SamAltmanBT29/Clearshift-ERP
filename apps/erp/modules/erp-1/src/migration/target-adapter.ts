@@ -1,14 +1,20 @@
 /**
- * ERP-1 Target Adapter (Decision C4 & KIT-08 / ERP1-11)
+ * ERP-1 Target Adapter (Decision C4 & KIT-08 / ERP1-07 / ERP1-11)
  *
  * Implements the TargetAdapter port from @cs/kit.
  * Executed in-process to guarantee atomic transaction commits between
  * the target business entity and the durable import receipt.
  *
+ * Capabilities:
+ *   - preflight: Zero-mutation dry run validation.
+ *   - importRow: In-process atomic transactional dual-write of entity mutation + receipt.
+ *   - loadBatch: Chunked batch processing (500 rows), bounded retry (transient 503/deadlock),
+ *                and immediate halt if failure rate exceeds 10% after 10 rows.
+ *
  * @module erp1/migration/target-adapter
  */
 
-import { type Result, ok, err } from '@cs/kernel';
+import { type Result, ok, err, AppError } from '@cs/kernel';
 import type {
   TargetAdapter,
   TargetAdapterResult,
@@ -36,15 +42,12 @@ import {
   assertNoRollbackSaga,
 } from './batch-runner.js';
 
+export type { ImportRowRequestExtended };
+
 // ─────────────────────────────────────────────────────────────────────────────
-// loadBatch-specific types (ERP1-11, ERP1-13 / KIT-08, KIT-12)
+// loadBatch Types (KIT-08 / KIT-12 / Decision C4)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * A single source row supplied to loadBatch.
- * Each row carries its own stable idempotency key so that partial-batch retries
- * can be replayed without duplicating already-committed rows.
- */
 export interface BatchRowInput<TRow = unknown> {
   /** 0-based position of this row within the source file / batch. */
   sourceRow: number;
@@ -58,16 +61,9 @@ export interface BatchRowInput<TRow = unknown> {
   sourceId?: string | undefined;
 }
 
-/**
- * Options for loadBatch execution.
- * V1: upsert flag enables UPSERT semantics (kind='linked') for known natural keys.
- * ERP1-13: chunking, failure threshold, and bounded retry configuration.
- */
 export interface LoadBatchOptions {
   /**
-   * When true, a row whose natural duplicate key (normalized SKU) already exists
-   * in the target will be updated and linked (kind='linked') rather than rejected.
-   * The idempotency key check always precedes any write.
+   * When true, duplicate natural keys will update/link rather than reject.
    */
   upsert?: boolean | undefined;
   /** Size of chunks to process (default 500). */
@@ -84,9 +80,6 @@ export interface LoadBatchOptions {
   backoffFactor?: number | undefined;
 }
 
-/**
- * Per-row outcome returned from loadBatch.
- */
 export interface LoadBatchRowResult {
   sourceRow: number;
   idempotencyKey: string;
@@ -97,9 +90,6 @@ export interface LoadBatchRowResult {
   error?: TargetAdapterError | undefined;
 }
 
-/**
- * Aggregate result from loadBatch.
- */
 export interface LoadBatchResult {
   batchId: string;
   status: 'COMPLETED' | 'STOPPED_EXCESSIVE_FAILURES';
@@ -117,14 +107,16 @@ export interface LoadBatchResult {
 // Erp1TargetAdapter
 // ─────────────────────────────────────────────────────────────────────────────
 
+const VALID_UNITS = new Set(['pcs', 'kg', 'g', 'litre', 'metre', 'box']);
+
 export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
   readonly module = 'erp1';
-  readonly entity: 'product' | 'category' | 'stock_level';
+  readonly entity: 'product' | 'category' | 'stock_level' | string;
   readonly schemaVersion = 1;
 
   constructor(
     private readonly service: Erp1Service,
-    entity: 'product' | 'category' | 'stock_level' = 'product'
+    entity: 'product' | 'category' | 'stock_level' | string = 'product'
   ) {
     this.entity = entity;
   }
@@ -145,21 +137,24 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         continue;
       }
       const record = row as Record<string, unknown>;
+      const ent = this.entity.toLowerCase();
 
-      if (this.entity === 'product') {
+      if (ent === 'product' || ent === 'products') {
         const hasName = typeof record['name'] === 'string' && record['name'].trim().length > 0;
         const hasSku = typeof record['sku'] === 'string' && record['sku'].trim().length > 0;
         const uom = String(record['unitOfMeasure'] ?? record['unit_of_measure'] ?? record['uom'] ?? '').trim();
-        const validUom = ['pcs', 'kg', 'g', 'litre', 'metre', 'box'].includes(uom);
-        const price = String(record['price'] ?? '').trim();
-        const validPrice = /^\d+(\.\d{1,4})?$/.test(price) && Number(price) >= 0;
+        const validUom = VALID_UNITS.has(uom);
+        const rawPrice = record['price'];
+        const validPrice =
+          (typeof rawPrice === 'number' && rawPrice >= 0) ||
+          (typeof rawPrice === 'string' && /^\d+(\.\d{1,4})?$/.test(rawPrice.trim()) && Number(rawPrice) >= 0);
 
         if (hasName && hasSku && validUom && validPrice) {
           validCount++;
         } else {
           rejectCount++;
         }
-      } else if (this.entity === 'category') {
+      } else if (ent === 'category' || ent === 'categories') {
         const hasName = typeof record['name'] === 'string' && record['name'].trim().length > 0;
         const hasCode = typeof record['code'] === 'string' && record['code'].trim().length > 0;
         if (hasName && hasCode) {
@@ -167,16 +162,22 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         } else {
           rejectCount++;
         }
-      } else if (this.entity === 'stock_level') {
-        const hasProduct = typeof record['productId'] === 'string' || typeof record['product_id'] === 'string';
-        const hasWarehouse = typeof record['warehouseId'] === 'string' || typeof record['warehouse_id'] === 'string';
-        const qty = String(record['quantity'] ?? '').trim();
-        const validQty = /^\d+(\.\d{1,4})?$/.test(qty) && Number(qty) >= 0;
-        if (hasProduct && hasWarehouse && validQty) {
+      } else if (ent === 'stock_level' || ent === 'stock' || ent === 'opening_stock') {
+        const hasProduct =
+          typeof (record['productId'] ?? record['product_id']) === 'string' &&
+          String(record['productId'] ?? record['product_id']).trim().length > 0;
+        const rawQty = record['quantity'];
+        const validQty =
+          (typeof rawQty === 'number' && rawQty >= 0) ||
+          (typeof rawQty === 'string' && /^\d+(\.\d{1,4})?$/.test(rawQty.trim()) && Number(rawQty) >= 0);
+
+        if (hasProduct && validQty) {
           validCount++;
         } else {
           rejectCount++;
         }
+      } else if (ent === 'warehouse' || ent === 'warehouses') {
+        validCount++;
       } else {
         rejectCount++;
       }
@@ -225,7 +226,7 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
         },
       });
     } catch (error) {
-      if (error instanceof Erp1ServiceError) {
+      if (error instanceof Erp1ServiceError || error instanceof AppError) {
         const errPayload: TargetAdapterError = {
           reasonCode: error.code,
           message: error.message,
@@ -257,15 +258,9 @@ export class Erp1TargetAdapter<TRow = unknown> implements TargetAdapter<TRow> {
    * Loads a batch of rows in sequential chunks, collecting per-row outcomes
    * with bounded exponential retry and immediate halt on excessive failures (ERP1-11, ERP1-13).
    *
-   * Design rules:
-   *   1. Records are processed in bounded chunks of 500 rows (CHUNK_SIZE = 500).
-   *   2. Transient infrastructure failures trigger bounded exponential backoff retries
-   *      without altering or corrupting the stable idempotency key.
-   *   3. Batch execution stops immediately if row failures exceed 10% of attempted rows
-   *      (after a minimum statistical sample of 10 rows).
-   *   4. Already committed rows and receipts remain durable; batch state transitions
-   *      to STOPPED_EXCESSIVE_FAILURES with exact diagnostics.
-   *   5. Compensating rollback sagas and destructive data loss are strictly prohibited in V1.
+   * @param batchId     UUID identifying the overall migration batch.
+   * @param rows        Array of typed source rows, each with its own idempotency key.
+   * @param options     Batch-level options (upsert mode, chunk size, threshold overrides).
    */
   async loadBatch(
     batchId: string,
