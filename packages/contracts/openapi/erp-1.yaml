@@ -1195,6 +1195,90 @@ components:
         - $ref: '#/components/schemas/ImportProvenance'
       additionalProperties: false
 
+    Erp1DuplicateMatchKind:
+      type: string
+      enum: [EXACT_SKU, EXACT_NAME, EXACT_CATEGORY_CODE, NORMALIZED_EXACT, EXACT, AMBIGUOUS_MULTI_MATCH, AMBIGUOUS]
+
+    Erp1DuplicateCandidateStatus:
+      type: string
+      enum: [PENDING_REVIEW, MERGED, REJECTED, KEPT_BOTH]
+
+    Erp1MergeDecisionType:
+      type: string
+      enum: [MERGE, REJECT, KEEP_BOTH]
+
+    Erp1DuplicateCandidateRecord:
+      type: object
+      required:
+        - candidate_id
+        - entity
+        - match_kind
+        - status
+        - matching_key
+        - matching_value
+        - incoming_record
+        - existing_record
+        - confidence
+        - created_at
+      properties:
+        candidate_id: { type: string, format: uuid }
+        entity: { type: string, enum: [product, category] }
+        match_kind: { $ref: '#/components/schemas/Erp1DuplicateMatchKind' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        matching_key: { type: string }
+        matching_value: { type: string }
+        incoming_record: { type: object }
+        existing_record: { type: object }
+        confidence: { type: number, enum: [1.0] }
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decided_by: { type: string, nullable: true }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType', nullable: true }
+        rationale: { type: string, nullable: true }
+
+    CheckErp1DuplicatesRequest:
+      type: object
+      required: [entity, records]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        records:
+          type: array
+          items: { type: object }
+
+    CheckErp1DuplicatesResponse:
+      type: object
+      required: [entity, total_checked, duplicates_found, candidates]
+      properties:
+        entity: { type: string, enum: [product, category] }
+        total_checked: { type: integer }
+        duplicates_found: { type: integer }
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/Erp1DuplicateCandidateRecord' }
+
+    ReviewErp1DuplicateRequest:
+      type: object
+      required: [candidate_id, decision, rationale]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        rationale: { type: string, minLength: 5 }
+
+    ReviewErp1DuplicateResponse:
+      type: object
+      required: [candidate_id, decision, status, actor_id, timestamp, audit_record_id]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        decision: { $ref: '#/components/schemas/Erp1MergeDecisionType' }
+        status: { $ref: '#/components/schemas/Erp1DuplicateCandidateStatus' }
+        kept_id: { type: string, format: uuid }
+        merged_id: { type: string, format: uuid }
+        actor_id: { type: string }
+        timestamp: { type: string, format: date-time }
+        audit_record_id: { type: string, format: uuid }
+
     ImportRowRequest:
       type: object
       required: [batch_id, source_row, idempotency_key, entity, record]

@@ -562,283 +562,6 @@ export class Erp1Service {
     return this.setOpeningStock(input);
   }
 
-  /**
-   * Loads a single row as part of Migration Kit integration (KIT-08 / Decision C4).
-   *
-   * Commits domain mutation and durable receipt together in a single local transaction.
-   * Handles idempotent replays (200 OK with prior_result: true) and detects key reuse with
-   * mismatched payloads (409 Conflict).
-   */
-  async importRow(req: ImportRowRequest | ImportRowRequestExtended): Promise<ImportRowResponse> {
-    const upsert = (req as ImportRowRequestExtended).upsert ?? false;
-    const requestHash = computeRequestHash(req.record);
-
-    // 1. Check prior receipt
-    const priorReceipt = await this.repo.getImportReceiptByKey(req.idempotency_key);
-    if (priorReceipt) {
-      if (priorReceipt.requestHash === requestHash) {
-        return {
-          target_id: priorReceipt.targetId,
-          target_version: 1,
-          outcome: (priorReceipt.outcome as ImportOutcome) || 'loaded',
-          receipt: toReceiptRecord(priorReceipt),
-          prior_result: true,
-        };
-      } else {
-        throw new Erp1ConflictError(
-          `Idempotency key '${req.idempotency_key}' was previously used with a different request payload.`,
-          [
-            {
-              field: 'idempotency_key',
-              code: ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT,
-              message: `Idempotency key '${req.idempotency_key}' was previously used with a different request payload`,
-            },
-          ],
-          ERP1_DOMAIN_RULES.IDEMPOTENCY_CONFLICT
-        );
-      }
-    }
-
-    // 2. Execute transactional dual-write
-    return this.repo.transaction(async (tx) => {
-      let targetId: string;
-      let responsePayload: unknown;
-      let receiptKind: 'created' | 'linked' = 'created';
-
-      const entity = req.entity.toLowerCase();
-
-      if (entity === 'product' || entity === 'products') {
-        const normalizedInput = normalizeProductRecord(req.record);
-        const parsed = CreateProductInputSchema.safeParse(normalizedInput);
-        if (!parsed.success) {
-          const first = parsed.error.issues[0];
-          throw new Erp1BadRequestError(
-            first?.message ?? 'Invalid product data',
-            parsed.error.issues.map((i) => ({
-              field: i.path.join('.'),
-              code: i.code,
-              message: i.message,
-            }))
-          );
-        }
-        const data = parsed.data;
-        const normalizedSku = normalizeSku(data.sku);
-        const existing = await tx.getProductByNormalizedSku(normalizedSku);
-
-        if (existing) {
-          if (!upsert) {
-            throw new Erp1ConflictError(
-              `A product with SKU '${data.sku}' already exists.`,
-              [
-                {
-                  field: 'sku',
-                  code: ERP1_DOMAIN_RULES.SKU_DUPLICATE,
-                  message: 'SKU must be unique after normalization (BR-ERP1-01)',
-                },
-              ],
-              ERP1_DOMAIN_RULES.SKU_DUPLICATE
-            );
-          }
-          if (data.categoryId) {
-            await this.assertCategoryExists(tx, data.categoryId);
-          }
-          const updated = await tx.updateProduct(existing.id, {
-            name: data.name,
-            categoryId: data.categoryId ?? null,
-            unitOfMeasure: data.unitOfMeasure,
-            price: data.price,
-            currency: data.currency ?? 'USD',
-            taxRate: data.taxRate ?? '0.00',
-          });
-          targetId = updated.id;
-          receiptKind = 'linked';
-          responsePayload = updated;
-        } else {
-          if (data.categoryId) {
-            await this.assertCategoryExists(tx, data.categoryId);
-          }
-          const created = await tx.createProduct({
-            name: data.name,
-            sku: data.sku,
-            normalizedSku,
-            categoryId: data.categoryId ?? null,
-            unitOfMeasure: data.unitOfMeasure,
-            price: data.price,
-            currency: data.currency ?? 'USD',
-            taxRate: data.taxRate ?? '0.00',
-            sourceSystem: sourceSystemOf(data) ?? req.source_system ?? null,
-            sourceId: sourceIdOf(data) ?? req.source_id ?? null,
-          });
-          await this.ensureZeroStock(tx, created.id);
-          targetId = created.id;
-          receiptKind = 'created';
-          responsePayload = created;
-        }
-      } else if (entity === 'category' || entity === 'categories') {
-        const parsed = CreateCategoryInputSchema.safeParse(req.record);
-        if (!parsed.success) {
-          const first = parsed.error.issues[0];
-          throw new Erp1BadRequestError(
-            first?.message ?? 'Invalid category data',
-            parsed.error.issues.map((i) => ({
-              field: i.path.join('.'),
-              code: i.code,
-              message: i.message,
-            }))
-          );
-        }
-        const data = parsed.data;
-        const existing = await tx.getCategoryByCode(data.code);
-
-        if (existing) {
-          if (!upsert) {
-            throw new Erp1ConflictError(
-              `A category with code '${data.code}' already exists.`,
-              [
-                {
-                  field: 'code',
-                  code: ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE,
-                  message: 'Category code must be unique',
-                },
-              ],
-              ERP1_DOMAIN_RULES.CATEGORY_CODE_DUPLICATE
-            );
-          }
-          const updated = await tx.updateCategory(existing.id, {
-            name: data.name,
-          });
-          targetId = updated.id;
-          receiptKind = 'linked';
-          responsePayload = updated;
-        } else {
-          const created = await tx.createCategory({
-            name: data.name,
-            code: data.code,
-          });
-          targetId = created.id;
-          receiptKind = 'created';
-          responsePayload = created;
-        }
-      } else if (
-        entity === 'stock_level' ||
-        entity === 'stock' ||
-        entity === 'opening_stock'
-      ) {
-        const normalizedInput = normalizeStockRecord(req.record);
-        const parsed = SetOpeningStockInputSchema.safeParse(normalizedInput);
-        if (!parsed.success) {
-          const negativeStock = parsed.error.issues.find((issue) =>
-            issue.message.includes('Stock quantity cannot become negative')
-          );
-          if (negativeStock) {
-            throw new Erp1UnprocessableError(
-              negativeStock.message,
-              [
-                {
-                  field: negativeStock.path.join('.'),
-                  code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
-                  message: negativeStock.message,
-                },
-              ],
-              ERP1_DOMAIN_RULES.NEGATIVE_STOCK
-            );
-          }
-          const first = parsed.error.issues[0];
-          throw new Erp1BadRequestError(
-            first?.message ?? 'Invalid opening stock data',
-            parsed.error.issues.map((i) => ({
-              field: i.path.join('.'),
-              code: i.code,
-              message: i.message,
-            }))
-          );
-        }
-        const data = parsed.data;
-        const product = await tx.getProductById(data.productId);
-        if (!product) {
-          throw new Erp1NotFoundError('Product', data.productId);
-        }
-        const warehouse = await this.resolveWarehouse(tx, data.warehouseId);
-        if (Number(data.quantity) < 0) {
-          throw new Erp1UnprocessableError(
-            'Stock quantity cannot become negative (BR-ERP1-02).',
-            [
-              {
-                field: 'quantity',
-                code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
-                message: 'Stock quantity cannot become negative (BR-ERP1-02)',
-              },
-            ],
-            ERP1_DOMAIN_RULES.NEGATIVE_STOCK
-          );
-        }
-        const level = await tx.upsertStockLevel({
-          id: randomUUID(),
-          productId: product.id,
-          warehouseId: warehouse.id,
-          quantity: data.quantity,
-        });
-        targetId = level.id;
-        receiptKind = 'linked';
-        responsePayload = level;
-      } else if (entity === 'warehouse' || entity === 'warehouses') {
-        const defaultWh = await tx.getDefaultWarehouse();
-        if (!defaultWh) {
-          throw new Erp1UnprocessableError(
-            'No default warehouse is configured.',
-            [
-              {
-                field: 'warehouseId',
-                code: ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED,
-                message: 'A default warehouse is required',
-              },
-            ],
-            ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED
-          );
-        }
-        targetId = defaultWh.id;
-        receiptKind = 'linked';
-        responsePayload = defaultWh;
-      } else {
-        throw new Erp1BadRequestError(
-          `Unsupported entity type for import: '${req.entity}'`,
-          [
-            {
-              field: 'entity',
-              code: 'UNSUPPORTED_ENTITY',
-              message: `Unsupported entity type '${req.entity}'`,
-            },
-          ]
-        );
-      }
-
-      // 3. Dual-write durable import receipt in SAME transaction
-      const receipt = await tx.createImportReceipt({
-        batchId: req.batch_id,
-        sourceRow: req.source_row,
-        sourceSystem: req.source_system ?? null,
-        sourceId: req.source_id ?? null,
-        targetId,
-        targetEntity: req.entity,
-        idempotencyKey: req.idempotency_key,
-        requestHash,
-        kind: receiptKind,
-        outcome: 'loaded',
-        responsePayload: JSON.stringify(responsePayload),
-      });
-
-      return {
-        target_id: targetId,
-        target_version: 1,
-        outcome: 'loaded',
-        receipt: toReceiptRecord(receipt, receiptKind),
-        prior_result: false,
-      };
-    });
-  }
-
-  // ── Internal helpers ──────────────────────────────────────────────────────
-
   private async replay<T>(
     tx: Erp1Repository,
     idempotencyKey: string,
@@ -1276,7 +999,9 @@ export class Erp1Service {
       let responsePayload: unknown;
       let receiptKind: 'created' | 'linked' = 'created';
 
-      if (req.entity === 'product') {
+      const entity = req.entity.toLowerCase();
+
+      if (entity === 'product' || entity === 'products') {
         const raw = req.record;
         const name = String(raw['name'] ?? raw['product_name'] ?? '').trim();
         const sku = String(raw['sku'] ?? '').trim();
@@ -1354,6 +1079,7 @@ export class Erp1Service {
           await this.assertCategoryExists(tx, categoryId);
           const updated = await tx.updateProduct(existing.id, {
             name,
+            unitOfMeasure: (unitOfMeasure as Product['unitOfMeasure']) || undefined,
             price,
             currency,
             taxRate,
@@ -1381,7 +1107,7 @@ export class Erp1Service {
           receiptKind = 'created';
           responsePayload = created;
         }
-      } else if (req.entity === 'category') {
+      } else if (entity === 'category' || entity === 'categories') {
         const raw = req.record;
         const name = String(raw['name'] ?? '').trim();
         const code = String(raw['code'] ?? '').trim();
@@ -1421,7 +1147,11 @@ export class Erp1Service {
           receiptKind = 'created';
           responsePayload = created;
         }
-      } else if (req.entity === 'stock_level') {
+      } else if (
+        entity === 'stock_level' ||
+        entity === 'stock' ||
+        entity === 'opening_stock'
+      ) {
         const raw = req.record;
         const productId = String(raw['productId'] ?? raw['product_id'] ?? '').trim();
         const warehouseId = String(raw['warehouseId'] ?? raw['warehouse_id'] ?? '').trim();
@@ -1433,14 +1163,27 @@ export class Erp1Service {
           ]);
         }
         const qtyNum = Number(quantity);
-        if (isNaN(qtyNum) || qtyNum < 0 || !/^\d+(\.\d{1,4})?$/.test(quantity)) {
+        if (isNaN(qtyNum) || !/^-?\d+(\.\d{1,4})?$/.test(quantity)) {
           throw new Erp1BadRequestError('quantity must be a valid non-negative decimal', [
             {
               field: 'quantity',
-              code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
-              message: 'Stock quantity cannot become negative (BR-ERP1-02)',
+              code: 'INVALID_QUANTITY',
+              message: 'Quantity must be a valid decimal number',
             },
           ]);
+        }
+        if (qtyNum < 0) {
+          throw new Erp1UnprocessableError(
+            'Stock quantity cannot become negative (BR-ERP1-02).',
+            [
+              {
+                field: 'quantity',
+                code: ERP1_DOMAIN_RULES.NEGATIVE_STOCK,
+                message: 'Stock quantity cannot become negative (BR-ERP1-02)',
+              },
+            ],
+            ERP1_DOMAIN_RULES.NEGATIVE_STOCK
+          );
         }
 
         const warehouse = await this.resolveWarehouse(tx, warehouseId || undefined);
@@ -1452,6 +1195,24 @@ export class Erp1Service {
         targetId = stock.id;
         receiptKind = 'created';
         responsePayload = stock;
+      } else if (entity === 'warehouse' || entity === 'warehouses') {
+        const defaultWh = await tx.getDefaultWarehouse();
+        if (!defaultWh) {
+          throw new Erp1UnprocessableError(
+            'No default warehouse is configured.',
+            [
+              {
+                field: 'warehouseId',
+                code: ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED,
+                message: 'A default warehouse is required',
+              },
+            ],
+            ERP1_DOMAIN_RULES.WAREHOUSE_REQUIRED
+          );
+        }
+        targetId = defaultWh.id;
+        receiptKind = 'linked';
+        responsePayload = defaultWh;
       } else {
         throw new Erp1BadRequestError(`Unsupported entity type for import: '${req.entity}'`, [
           { field: 'entity', code: 'UNSUPPORTED_ENTITY', message: `Unsupported entity: ${req.entity}` },
@@ -1468,6 +1229,7 @@ export class Erp1Service {
         idempotencyKey: req.idempotency_key,
         requestHash,
         targetId,
+        kind: receiptKind,
         outcome: receiptKind === 'linked' ? 'linked' : 'loaded',
         responsePayload: JSON.stringify(responsePayload),
       });
