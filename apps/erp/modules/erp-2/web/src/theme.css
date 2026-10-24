@@ -1114,3 +1114,74 @@
   flex: 1;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Creation Modals & Toast Notification Styles (ERP2-20 / Issue #136)
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.cs-erp2-create-modal {
+  max-width: 680px;
+}
+
+.cs-erp2-po-create-modal {
+  max-width: 820px;
+}
+
+.cs-erp2-modal-body {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: var(--space-1) 0;
+}
+
+.cs-erp2-toast-container {
+  margin-bottom: var(--space-4);
+  animation: cs-erp2-toast-fade-in 0.2s ease-out;
+}
+
+.cs-erp2-toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--color-bg-surface, #f0fdf4);
+  border: 1px solid var(--color-border-success, #86efac);
+  border-radius: var(--radius-md, 6px);
+  color: var(--color-text-success, #166534);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cs-erp2-toast-icon {
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.cs-erp2-toast-text {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.cs-erp2-toast-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.cs-erp2-toast-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+@keyframes cs-erp2-toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

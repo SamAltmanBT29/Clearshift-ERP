@@ -581,3 +581,54 @@ In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions i
 - **Received -> Closed**: Terminates order lifecycle.
 - **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
 - **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.
+
+---
+
+## 15. Create Form with Field-Level Validation & Modals Specification (ERP2-20 / Issue #136)
+
+### 15.1 Overview & Scope
+
+Issue #136 (`[ERP2-20]`) implements responsive, accessible entity creation modals with comprehensive client-side and server-side validation for Vendors and Purchase Orders within ERP-2:
+- **`VendorCreateModal`**: Provides an accessible modal dialog wrapping `VendorForm` with instant field validation, double-submission locking, and field error mapping conforming to SDS §4.3 & §4.9.
+- **`PurchaseOrderCreateModal`**: Accessible dialog wrapping `PurchaseOrderForm` with multi-line items, dynamic line additions/removals, live client decimal total calculation, and read-only canonical order totals.
+- **Seamless List Integration**: In `VendorsListPage`, header quick actions (`+ Add Vendor`, `+ New Purchase Order`) open their respective modals; on completion, the modal closes, the newly created record prepends to the active table view cache (`setVendors((prev) => [created, ...prev])`), total count increments, and an accessible confirmation toast displays.
+
+### 15.2 Field-Level Client-Side Validation Rules (AC1)
+
+Forms execute client validation prior to payload submission and provide live feedback on change:
+
+| Field | Entity | Validation Rule | Error Message |
+|---|---|---|---|
+| Legal Name (`name`) | Vendor | Non-empty trimmed string, max 255 chars | `Name is required` |
+| Tax Number (`tax_number`) | Vendor | Non-empty trimmed string, max 64 chars | `Tax number is required` |
+| Email (`email`) | Vendor | Non-empty RFC-compliant email string | `Valid email is required` |
+| Phone (`phone`) | Vendor | Optional; regex `^\+?[0-9\s\-()]{7,25}$` if provided | `Phone number must be a valid format (min 7 digits, e.g. +1-555-0199)` |
+| Currency (`currency`) | Both | 3-letter ISO 4217 uppercase code (e.g., `USD`) | `Currency must be a 3-letter ISO code (e.g. USD)` |
+| Bank Details (`bank_details`) | Vendor | Optional; minimum 4 characters if provided | `Bank details must be at least 4 characters` |
+| Vendor UUID (`vendor_id`) | PO | Required RFC 4122 UUID matching supplier master | `Valid Vendor UUID is required` |
+| Order Date (`order_date`) | PO | Required ISO format `YYYY-MM-DD` | `Order date must be in YYYY-MM-DD format` |
+| Lines (`lines`) | PO | At least 1 item line required | `At least one line item is required` |
+| Product UUID (`product_id`) | PO Line | Required RFC 4122 UUID matching ERP-1 catalog | `Product UUID is required (ERP-1)` |
+| Quantity (`quantity`) | PO Line | Positive decimal string (`> 0`) | `Quantity must be > 0` |
+| Unit Price (`price`) | PO Line | Non-negative decimal string (`>= 0`) | `Price must be >= 0` |
+
+### 15.3 Inflight Double-Submission Prevention (AC2)
+
+- Upon submitting the form, `isSubmitting` / `isLoading` is set to `true`.
+- The submission button is disabled and its label switches from `"Create Vendor"` / `"Create Purchase Order"` to `"Saving..."`.
+- Cancel buttons are disabled to prevent state inconsistencies during flight.
+- Secondary clicks or rapid double-clicks on the submission button are ignored.
+- The disabled state is released in a `finally` block on error or when the modal closes upon completion.
+
+### 15.4 Server Validation Error Mapping (AC3)
+
+When the server returns an HTTP 400 Bad Request:
+- Form-level error alerts display the top-level error message in a `cs-error-box` with `role="alert"`.
+- Detailed field issues (from `err.details` array containing `path` / `field` and `message`) map directly to input fields via `setFieldErrors`.
+- Each invalid field sets `aria-invalid="true"`, applies the `.cs-input-error` class, and links via `aria-describedby` to a `<span role="alert" class="cs-field-error">` containing the server message.
+
+### 15.5 Modal Lifecycle, Cache Update & Confirmation Toast (AC4)
+
+- **Modal Closure**: On successful API response, `isOpen` transitions to `false` and the form resets.
+- **Cache Prepending**: In `VendorsListPage`, the newly returned entity is immediately prepended to local table state (`setVendors((prev) => [created, ...prev])`) and the total counter is incremented by 1 without requiring a full page refresh.
+- **Confirmation Toast**: An accessible notification banner (`.cs-erp2-toast-banner`) announces the creation outcome with an explicit close button.

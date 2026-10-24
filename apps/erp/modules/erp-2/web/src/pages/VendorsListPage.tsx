@@ -26,6 +26,7 @@ import { VendorFilterSidebar, POFilterSidebar } from '../components/FilterSideba
 import { FilterPillTags } from '../components/FilterPillTags.js';
 import type { Erp2ActiveFilters, Erp2FilterKey } from '../components/FilterPillTags.js';
 import { ErrorState, AccessDeniedState } from '../components/StateViews.js';
+import { VendorCreateModal, PurchaseOrderCreateModal } from '../components/forms/index.js';
 
 // ─── URL param helpers ─────────────────────────────────────────────────────────
 
@@ -85,6 +86,11 @@ const DEFAULT_ORDER_SORT: SortState = { field: undefined, direction: 'asc' };
 
 export const VendorsListPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
+
+  // ── Modal & Toast states (AC4) ──
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [isPoModalOpen, setIsPoModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // ── Vendor sidebar collapse ──
   const [vendorSidebarOpen, setVendorSidebarOpen] = useState(true);
@@ -287,11 +293,62 @@ export const VendorsListPage: React.FC = () => {
     <div className="cs-module-root">
       {/* Page Header */}
       <header className="cs-page-header">
-        <h1 className="cs-page-title">Vendors &amp; Purchasing</h1>
-        <p className="cs-page-description">
-          Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
-        </p>
+        <div className="cs-page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 className="cs-page-title">Vendors &amp; Purchasing</h1>
+            <p className="cs-page-description">
+              Manage supplier catalog, masked bank details, purchase order lifecycles, and product-linked line items (ERP-2).
+            </p>
+          </div>
+          <div className="cs-page-actions">
+            {activeTab === 'vendors' ? (
+              <button
+                type="button"
+                className="cs-btn-primary"
+                onClick={() => setIsVendorModalOpen(true)}
+                aria-label="Add Vendor"
+              >
+                + Add Vendor
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="cs-btn-primary"
+                onClick={() => setIsPoModalOpen(true)}
+                aria-label="New Purchase Order"
+              >
+                + New Purchase Order
+              </button>
+            )}
+          </div>
+        </div>
       </header>
+
+      {/* Confirmation Toast Notification (AC4) */}
+      {toastMessage && (
+        <div
+          className="cs-erp2-toast-container"
+          role="status"
+          aria-live="polite"
+          style={{ marginBottom: '16px' }}
+        >
+          <div className="cs-erp2-toast" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--color-bg-surface, #f0fdf4)', border: '1px solid var(--color-border-success, #86efac)', borderRadius: '6px', color: 'var(--color-text-success, #166534)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="cs-erp2-toast-icon" aria-hidden="true">✓</span>
+              <span className="cs-erp2-toast-text" style={{ fontWeight: 500 }}>{toastMessage}</span>
+            </div>
+            <button
+              type="button"
+              className="cs-erp2-toast-close"
+              aria-label="Close notification"
+              onClick={() => setToastMessage(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '4px' }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <nav className="cs-tabs-container" aria-label="Vendors and purchase order views">
@@ -374,6 +431,7 @@ export const VendorsListPage: React.FC = () => {
                 page={vendorFilters.page || 1}
                 pageSize={vendorFilters.pageSize || 20}
                 totalPages={vendorsTotalPages}
+                onCreateVendor={() => setIsVendorModalOpen(true)}
                 onPageChange={(newPage: number) =>
                   setVendorFilters((prev) => ({
                     ...prev,
@@ -440,6 +498,7 @@ export const VendorsListPage: React.FC = () => {
                 page={orderFilters.page || 1}
                 pageSize={orderFilters.pageSize || 20}
                 totalPages={ordersTotalPages}
+                onCreatePurchaseOrder={() => setIsPoModalOpen(true)}
                 onPageChange={(newPage: number) =>
                   setOrderFilters((prev) => ({
                     ...prev,
@@ -452,6 +511,32 @@ export const VendorsListPage: React.FC = () => {
           </div>
         </main>
       )}
+
+      {/* Vendor Creation Modal (AC4) */}
+      <VendorCreateModal
+        isOpen={isVendorModalOpen}
+        onClose={() => setIsVendorModalOpen(false)}
+        onVendorCreated={(created) => {
+          // Update table cache
+          setVendors((prev) => [created, ...prev]);
+          setVendorsTotal((prev) => prev + 1);
+          // Show confirmation toast
+          setToastMessage(`Vendor "${created.name}" created successfully.`);
+        }}
+      />
+
+      {/* Purchase Order Creation Modal (AC4) */}
+      <PurchaseOrderCreateModal
+        isOpen={isPoModalOpen}
+        onClose={() => setIsPoModalOpen(false)}
+        onOrderCreated={(created) => {
+          // Update table cache
+          setOrders((prev) => [created, ...prev]);
+          setOrdersTotal((prev) => prev + 1);
+          // Show confirmation toast
+          setToastMessage(`Purchase Order "${created.po_number}" created successfully.`);
+        }}
+      />
     </div>
   );
 };

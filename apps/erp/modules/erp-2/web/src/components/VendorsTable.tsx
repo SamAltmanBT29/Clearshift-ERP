@@ -23,6 +23,7 @@ export interface VendorsTableProps {
   totalPages: number;
   sortField?: string | undefined;
   sortDirection?: 'asc' | 'desc' | undefined;
+  onCreateVendor?: (() => void) | undefined;
   onSortChange?: (field: string) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newPageSize: number) => void;
@@ -38,6 +39,7 @@ export const VendorsTable: React.FC<VendorsTableProps> = ({
   totalPages,
   sortField,
   sortDirection = 'asc',
+  onCreateVendor,
   onSortChange,
   onPageChange,
   onPageSizeChange,
@@ -52,8 +54,8 @@ export const VendorsTable: React.FC<VendorsTableProps> = ({
       <EmptyState
         title="No vendors found"
         message="No vendor profiles match your current search criteria. Try modifying your search term."
-        actionLabel={onRefresh ? 'Reset Search' : undefined}
-        onAction={onRefresh}
+        actionLabel={onCreateVendor ? 'Add Vendor' : onRefresh ? 'Reset Search' : undefined}
+        onAction={onCreateVendor || onRefresh}
       />
     );
   }

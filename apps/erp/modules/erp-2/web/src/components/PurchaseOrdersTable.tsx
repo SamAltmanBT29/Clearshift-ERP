@@ -23,6 +23,7 @@ export interface PurchaseOrdersTableProps {
   totalPages: number;
   sortField?: string | undefined;
   sortDirection?: 'asc' | 'desc' | undefined;
+  onCreatePurchaseOrder?: (() => void) | undefined;
   onSortChange?: (field: string) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newPageSize: number) => void;
@@ -38,6 +39,7 @@ export const PurchaseOrdersTable: React.FC<PurchaseOrdersTableProps> = ({
   totalPages,
   sortField,
   sortDirection = 'asc',
+  onCreatePurchaseOrder,
   onSortChange,
   onPageChange,
   onPageSizeChange,
@@ -52,8 +54,8 @@ export const PurchaseOrdersTable: React.FC<PurchaseOrdersTableProps> = ({
       <EmptyState
         title="No purchase orders found"
         message="No purchase orders match your current filter criteria."
-        actionLabel={onRefresh ? 'Reset Filters' : undefined}
-        onAction={onRefresh}
+        actionLabel={onCreatePurchaseOrder ? 'New Purchase Order' : onRefresh ? 'Reset Filters' : undefined}
+        onAction={onCreatePurchaseOrder || onRefresh}
       />
     );
   }
