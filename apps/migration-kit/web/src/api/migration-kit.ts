@@ -42,6 +42,12 @@ export interface DuplicateCandidate {
   readonly sourceRow: number;
   readonly key: string;
   readonly existingId: string;
+  readonly rule?: string;
+  readonly status?: 'pending_review' | 'keep_both' | 'merged' | 'reviewed';
+  readonly sourceData?: Record<string, unknown>;
+  readonly existingData?: Record<string, unknown>;
+  readonly reviewedBy?: string;
+  readonly reviewedAt?: string;
 }
 
 export interface RunResult {
@@ -136,16 +142,62 @@ export async function saveMapping(batchId: string, rules: readonly MappingRule[]
   void rules;
 }
 
+const mockDuplicateStore: Record<string, DuplicateCandidate[]> = {
+  'batch-001': [
+    {
+      id: 'dup-1',
+      sourceRow: 5,
+      key: 'billing@acme.com',
+      existingId: 'cust-uuid-001',
+      rule: 'RULE_DUP_EMAIL_EXACT',
+      status: 'pending_review',
+      sourceData: { name: 'Acme Supply Co', email: 'billing@acme.com', phone: '+15550199' },
+      existingData: { name: 'Acme Corporation', email: 'billing@acme.com', phone: '+15550199' },
+    },
+  ],
+};
+
 export async function fetchDuplicates(batchId: string): Promise<readonly DuplicateCandidate[]> {
-  return [
-    { id: 'dup-1', sourceRow: 5, key: 'SKU-001', existingId: 'prod-1' },
-  ];
+  return mockDuplicateStore[batchId] ?? (mockDuplicateStore[batchId] = [
+    {
+      id: `dup-${batchId}-1`,
+      sourceRow: 5,
+      key: 'billing@acme.com',
+      existingId: 'cust-uuid-001',
+      rule: 'RULE_DUP_EMAIL_EXACT',
+      status: 'pending_review',
+      sourceData: { name: 'Acme Supply Co', email: 'billing@acme.com', phone: '+15550199' },
+      existingData: { name: 'Acme Corporation', email: 'billing@acme.com', phone: '+15550199' },
+    },
+  ]);
 }
 
-export async function resolveDuplicate(id: string, decision: 'merge' | 'skip' | 'create'): Promise<void> {
-  void id;
-  void decision;
+export async function resolveDuplicate(
+  id: string,
+  decision: 'merge' | 'keep_both' | 'skip' | 'create',
+  options?: {
+    reviewerId?: string;
+    reviewerRole?: string;
+    fieldChoices?: Record<string, 'source' | 'target'>;
+  }
+): Promise<void> {
+  for (const list of Object.values(mockDuplicateStore)) {
+    const found = list.find((d) => d.id === id);
+    if (found) {
+      const status = decision === 'merge' ? 'merged' : 'keep_both';
+      const updated: DuplicateCandidate = {
+        ...found,
+        status,
+        reviewedBy: options?.reviewerId ?? 'operator-1',
+        reviewedAt: new Date().toISOString(),
+      };
+      const idx = list.indexOf(found);
+      list[idx] = updated;
+      break;
+    }
+  }
 }
+
 
 export async function runDryRun(batchId: string): Promise<{ validCount: number; rejectCount: number; passed: boolean }> {
   currentDryRun = { batchId, passed: true, timestamp: Date.now() };
