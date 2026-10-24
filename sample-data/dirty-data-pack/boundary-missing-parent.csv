@@ -1,0 +1,21 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+B4-FK-001,RelationalUser1,ForeignKey1,relational1@example.net,+1-555-0501,COMP-NONEXISTENT-UUID,US,10004,active,MISSING_PARENT_ENTITY
+B4-FK-002,RelationalUser2,ForeignKey2,relational2@example.net,+1-555-0502,COMP-NONEXISTENT-UUID,US,10004,active,MISSING_PARENT_ENTITY
+B4-FK-003,RelationalUser3,ForeignKey3,relational3@example.net,+1-555-0503,COMP-NONEXISTENT-UUID,US,10004,active,MISSING_PARENT_ENTITY
+B4-FK-004,RelationalUser4,ForeignKey4,relational4@example.net,+1-555-0504,COMP-NONEXISTENT-UUID,US,10004,active,MISSING_PARENT_ENTITY
+B4-FK-005,RelationalUser5,ForeignKey5,relational5@example.net,+1-555-0505,COMP-NONEXISTENT-UUID,US,10004,active,MISSING_PARENT_ENTITY
+B4-FK-006,RelationalUser6,ForeignKey6,relational6@example.net,+1-555-0506,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-007,RelationalUser7,ForeignKey7,relational7@example.net,+1-555-0507,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-008,RelationalUser8,ForeignKey8,relational8@example.net,+1-555-0508,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-009,RelationalUser9,ForeignKey9,relational9@example.net,+1-555-0509,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-010,RelationalUser10,ForeignKey10,relational10@example.net,+1-555-0510,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-011,RelationalUser11,ForeignKey11,relational11@example.net,+1-555-0511,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-012,RelationalUser12,ForeignKey12,relational12@example.net,+1-555-0512,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-013,RelationalUser13,ForeignKey13,relational13@example.net,+1-555-0513,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-014,RelationalUser14,ForeignKey14,relational14@example.net,+1-555-0514,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-015,RelationalUser15,ForeignKey15,relational15@example.net,+1-555-0515,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-016,RelationalUser16,ForeignKey16,relational16@example.net,+1-555-0516,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-017,RelationalUser17,ForeignKey17,relational17@example.net,+1-555-0517,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-018,RelationalUser18,ForeignKey18,relational18@example.net,+1-555-0518,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-019,RelationalUser19,ForeignKey19,relational19@example.net,+1-555-0519,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link
+B4-FK-020,RelationalUser20,ForeignKey20,relational20@example.net,+1-555-0520,COMP-AUTH-EXISTING-001,US,10004,active,Valid parent company link

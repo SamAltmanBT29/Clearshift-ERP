@@ -348,7 +348,9 @@ async function handleReportReject(args: string[], io: CliIO): Promise<number> {
 
   const { exportRejectReportCsv } = await import('../src/reports/index.js');
   const rows = [];
-  if (batch.rejectedCount > 0) {
+  if (batch.rejects && batch.rejects.length > 0) {
+    rows.push(...batch.rejects);
+  } else if (batch.rejectedCount > 0) {
     for (let i = 1; i <= batch.rejectedCount; i++) {
       rows.push({
         sourceRow: i,

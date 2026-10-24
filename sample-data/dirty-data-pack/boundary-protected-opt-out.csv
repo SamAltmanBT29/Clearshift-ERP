@@ -1,0 +1,21 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+B6-OPTOUT-001,PrivacyUser1,OptOut1,optout1@example.org,+1-555-0301,PrivacyShield LLC,US,10006,opt_out,PROTECTED_OPT_OUT
+B6-OPTOUT-002,PrivacyUser2,OptOut2,optout2@example.org,+1-555-0302,PrivacyShield LLC,US,10006,opt_out,PROTECTED_OPT_OUT
+B6-OPTOUT-003,PrivacyUser3,OptOut3,optout3@example.org,+1-555-0303,PrivacyShield LLC,US,10006,opt_out,PROTECTED_OPT_OUT
+B6-OPTOUT-004,PrivacyUser4,OptOut4,optout4@example.org,+1-555-0304,PrivacyShield LLC,US,10006,opt_out,PROTECTED_OPT_OUT
+B6-OPTOUT-005,PrivacyUser5,OptOut5,optout5@example.org,+1-555-0305,PrivacyShield LLC,US,10006,opt_out,PROTECTED_OPT_OUT
+B6-OPTOUT-006,PrivacyUser6,OptOut6,optout6@example.org,+1-555-0306,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-007,PrivacyUser7,OptOut7,optout7@example.org,+1-555-0307,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-008,PrivacyUser8,OptOut8,optout8@example.org,+1-555-0308,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-009,PrivacyUser9,OptOut9,optout9@example.org,+1-555-0309,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-010,PrivacyUser10,OptOut10,optout10@example.org,+1-555-0310,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-011,PrivacyUser11,OptOut11,optout11@example.org,+1-555-0311,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-012,PrivacyUser12,OptOut12,optout12@example.org,+1-555-0312,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-013,PrivacyUser13,OptOut13,optout13@example.org,+1-555-0313,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-014,PrivacyUser14,OptOut14,optout14@example.org,+1-555-0314,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-015,PrivacyUser15,OptOut15,optout15@example.org,+1-555-0315,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-016,PrivacyUser16,OptOut16,optout16@example.org,+1-555-0316,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-017,PrivacyUser17,OptOut17,optout17@example.org,+1-555-0317,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-018,PrivacyUser18,OptOut18,optout18@example.org,+1-555-0318,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-019,PrivacyUser19,OptOut19,optout19@example.org,+1-555-0319,PrivacyShield LLC,US,10006,active,Standard consent granted
+B6-OPTOUT-020,PrivacyUser20,OptOut20,optout20@example.org,+1-555-0320,PrivacyShield LLC,US,10006,active,Standard consent granted

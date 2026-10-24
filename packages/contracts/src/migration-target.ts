@@ -662,3 +662,98 @@ export const ReconciliationReportDataSchema = z.object({
   evaluatedAt: z.date().or(z.string()),
 });
 export type ReconciliationReportData = z.infer<typeof ReconciliationReportDataSchema>;
+
+// ============================================================================
+// KIT-17: Canonical Dirty Data Pack & Seven-Step Regression Suite
+// ============================================================================
+
+export const CANONICAL_DIRTY_PACK_TOTAL_ROWS = 1000;
+export const CANONICAL_DIRTY_PACK_DUPLICATES = 80;
+export const CANONICAL_DIRTY_PACK_BAD_FORMATS = 60;
+export const CANONICAL_DIRTY_PACK_EMPTY_REQUIRED = 50;
+export const CANONICAL_DIRTY_PACK_LOADED = 810;
+export const CANONICAL_DIRTY_PACK_REJECTED = 110;
+export const CANONICAL_DIRTY_PACK_MERGED = 80;
+export const CANONICAL_DIRTY_PACK_SKIPPED = 0;
+export const CANONICAL_DIRTY_PACK_UNACCOUNTED = 0;
+
+/**
+ * Boundary Fixture Types (KIT-17)
+ */
+export const BoundaryFixtureType = {
+  FORTY_PERCENT_INVALID: 'forty_percent_invalid',
+  UNRESOLVED_TRANSIENT_FAILURE: 'unresolved_transient_failure',
+  DUPLICATE_DELIVERY: 'duplicate_delivery',
+  MISSING_PARENT: 'missing_parent',
+  INVALID_ENUM: 'invalid_enum',
+  PROTECTED_OPT_OUT: 'protected_opt_out',
+} as const;
+export type BoundaryFixtureTypeValue =
+  (typeof BoundaryFixtureType)[keyof typeof BoundaryFixtureType];
+
+export const BoundaryFixtureTypeSchema = z.enum([
+  'forty_percent_invalid',
+  'unresolved_transient_failure',
+  'duplicate_delivery',
+  'missing_parent',
+  'invalid_enum',
+  'protected_opt_out',
+]);
+
+/**
+ * Expected defect profile in canonical Dirty Data Pack (SDS §4.14 TS-02)
+ */
+export const DirtyPackDefectProfileSchema = z.object({
+  knownDuplicates: z.number().int().min(0),
+  badFormats: z.number().int().min(0),
+  emptyRequiredFields: z.number().int().min(0),
+  totalDefectFindings: z.number().int().min(0),
+});
+export type DirtyPackDefectProfile = z.infer<typeof DirtyPackDefectProfileSchema>;
+
+/**
+ * Boundary Fixture Manifest Item Schema (KIT-17)
+ */
+export const BoundaryFixtureItemSchema = z.object({
+  fixtureName: z.string().min(1),
+  fileName: z.string().min(1),
+  relativeFilePath: z.string().min(1),
+  checksumSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  totalRows: z.number().int().min(1),
+  invalidRows: z.number().int().min(0).optional(),
+  description: z.string().min(1),
+  expectedBehavior: z.string().min(1),
+});
+export type BoundaryFixtureItem = z.infer<typeof BoundaryFixtureItemSchema>;
+
+/**
+ * Canonical Dirty Data Pack Manifest Schema (KIT-17)
+ */
+export const DirtyDataPackManifestSchema = z.object({
+  packName: z.string().min(1),
+  version: z.string().min(1),
+  catalogId: z.literal('KIT-17'),
+  relativeFilePath: z.string().min(1),
+  checksumSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  totalRows: z.literal(1000),
+  rulesVersion: z.string().min(1),
+  traceability: z.object({
+    sds: z.string(),
+    projectPlan: z.string(),
+    issue: z.string(),
+  }),
+  defects: DirtyPackDefectProfileSchema,
+  expectedReconciliation: z.object({
+    source: z.literal(1000),
+    loaded: z.literal(810),
+    rejected: z.literal(110),
+    merged: z.literal(80),
+    skipped: z.literal(0),
+    unaccounted: z.literal(0),
+    formulaHolds: z.literal(true),
+    status: z.literal('OK'),
+  }),
+  testScenariosProof: z.record(z.string()),
+  boundaryFixtures: z.record(BoundaryFixtureTypeSchema, BoundaryFixtureItemSchema),
+});
+export type DirtyDataPackManifest = z.infer<typeof DirtyDataPackManifestSchema>;
