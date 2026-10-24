@@ -709,3 +709,28 @@ ERP-3 Sales Orders & Invoices enforces a deterministic, exact duplicate matching
    - `GET /api/v1/erp-orders/duplicates/candidates/:id`: Inspects candidate record details.
    - `POST /api/v1/erp-orders/duplicates/review`: Submits operator merge decision (`MERGE`, `REJECT`, `KEEP_BOTH`), requiring distinct `kept_id` and `merged_id` for merges and a minimum 5-character rationale. Logs immutable audit trail with action `merge.decided`.
 
+---
+
+## 18. Idempotent Retry and Partial-Load Stop Behavior (ERP3-13 / KIT-12 / Issue #149)
+
+ERP-3 Sales Orders & Invoices implements robust batch processing, transient fault recovery, and circuit-breaker behavior in strict alignment with ClearShift V1 migration standards:
+
+1. **500-Row Chunk Partition Boundaries**:
+   - `chunkArray(items, chunkSize = 500)`: Partitions arbitrary-length record streams into contiguous slices of at most 500 rows (`DEFAULT_CHUNK_SIZE = 500`).
+   - Batches are processed sequentially chunk-by-chunk to enforce bounded memory utilization and clear transaction boundaries.
+2. **Transient Exponential Backoff Retry**:
+   - `executeWithRetry(operation, options)`: Intercepts transient infrastructure exceptions (`isTransientFailure` detecting HTTP 503/504, PostgreSQL deadlock `40P01`, admin shutdown `57P01`, network disconnects `ECONNRESET`, `ETIMEDOUT`).
+   - Retries up to 3 times (`DEFAULT_RETRY_CONFIG.maxRetries = 3`) with exponential backoff delay (`initialDelayMs = 50`, `backoffFactor = 2`).
+   - **Key Invariant**: Idempotency keys and payload values remain completely immutable and uncorrupted across retry attempts.
+   - Deterministic errors (HTTP 400 validation, HTTP 409 conflict, business rule violations) fail fast and are never retried.
+3. **Circuit-Breaker Stop Threshold (> 10% Failure Rate)**:
+   - Evaluated after a minimum sample of 10 attempted rows (`DEFAULT_MIN_ATTEMPTED_ROWS = 10`) via `shouldHaltBatchExecution(rejectedCount, attemptedCount)`.
+   - When `rejectedCount / attemptedCount > 0.10` (`DEFAULT_FAILURE_THRESHOLD = 0.10`), batch execution halts immediately.
+   - Subsequent rows and remaining chunks are marked `unattempted` and are not dispatched to the database.
+   - Batch status transitions to `STOPPED_EXCESSIVE_FAILURES` with a detailed `stoppedReason`.
+4. **Committed Row Durability & Prohibition of Rollback Sagas**:
+   - In accordance with Decision C4 and Gate G4 rules, compensating rollback sagas are strictly out of scope (`assertNoRollbackSaga`).
+   - All rows committed prior to circuit-breaker tripping remain permanent and durable along with their corresponding import receipts.
+   - Replaying the batch is fully idempotent: previously committed rows return `outcome: loaded` and `priorResult: true` with zero duplicate entities.
+
+
