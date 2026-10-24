@@ -120,3 +120,41 @@ export const kitReconciliations = platformSchema.table("kit_reconciliations", {
   reconciledAt: timestamp("reconciled_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
+
+export const kitRollbackExecutions = platformSchema.table("kit_rollback_executions", {
+  batchId: text("batch_id").primaryKey(),
+  status: text("status").notNull(),
+  requestedBy: text("requested_by").notNull(),
+  reason: text("reason").notNull(),
+  preflightPassed: boolean("preflight_passed").notNull().default(false),
+  totalItems: integer("total_items").notNull().default(0),
+  compensatedItems: integer("compensated_items").notNull().default(0),
+  blockedItems: integer("blocked_items").notNull().default(0),
+  failedItems: integer("failed_items").notNull().default(0),
+  conflicts: jsonb("conflicts"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const kitRollbackJournal = platformSchema.table("kit_rollback_journal", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  batchId: text("batch_id").notNull(),
+  module: text("module").notNull(),
+  entity: text("entity").notNull(),
+  targetId: text("target_id").notNull(),
+  sourceRow: integer("source_row"),
+  action: text("action").notNull(),
+  targetVersion: integer("target_version").notNull().default(1),
+  beforeState: jsonb("before_state"),
+  afterState: jsonb("after_state"),
+  actor: text("actor").notNull(),
+  status: text("status").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  errorReason: text("error_reason"),
+  position: integer("position").notNull().default(0),
+  executedAt: timestamp("executed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  uniqueIndex("kit_rollback_journal_idemp_act_idx").on(table.batchId, table.idempotencyKey, table.action)
+]);
