@@ -1317,3 +1317,10 @@
   opacity: 0.85;
 }
 
+/* Migration Kit Wizard Import Page */
+.cs-vendor-import-page {
+  background-color: var(--cs-surface, #ffffff);
+  border-radius: var(--cs-radius, 8px);
+  border: 1px solid var(--cs-border, #e2e8f0);
+}
+

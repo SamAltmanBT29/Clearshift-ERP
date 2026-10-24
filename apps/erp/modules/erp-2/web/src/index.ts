@@ -26,3 +26,5 @@ export * from './components/forms/index.js';
 export * from './components/VendorAuditPanel.js';
 export * from './components/VendorLinkedOrdersTable.js';
 export * from './components/VendorEditDrawer.js';
+export * from './pages/VendorImportPage.js';
+export * from './kit-metadata.js';
