@@ -115,6 +115,13 @@ export const ERP2_ROUTE_DESCRIPTORS: readonly Erp2RouteDescriptor[] = [
     title: 'Duplicate candidates',
     group: 'integration',
   },
+  {
+    id: 'rejection-review',
+    path: 'rejection-review',
+    label: 'Migration rejections',
+    title: 'Migration rejections',
+    group: 'integration',
+  },
 ];
 
 /** Absolute URL path of a registered route descriptor. */
