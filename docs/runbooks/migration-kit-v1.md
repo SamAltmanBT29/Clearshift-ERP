@@ -112,7 +112,28 @@ Migration Kit operates under strict privilege separation (ADR-004 / Decision C4)
 - **Adapter In-Process Port:** All loads are mediated via the owning module's `MigrationTargetAdapter`, ensuring that module business rules, events, and transactional boundaries are strictly respected.
 - **Durable Import Receipts:** Every module maintains an `import_receipts` table with a unique constraint on `idempotency_key` (`<module>_import_receipts_idempotency_key_unique`), guaranteeing that no race condition or retry can ever produce a duplicate target record.
 
+### 3.6 Step 5a: Dry-Run Planner with Strict No-Target-Mutation Guarantee (KIT-07)
+
+**Traceability:** Issue #74 `[KIT-07]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17.
+
+1. **Strict No-Target-Mutation Invariant:**
+   - Dry run validates every mapped row, duplicate candidate, target invariant, and policy without executing any database write operations on module-owned target tables.
+   - Zero target import receipts are issued (`targetReceiptsCreated: 0`).
+   - Before/after database snapshots of target business tables and import receipts are byte- and count-identical. Spies on target write APIs assert zero mutation calls.
+2. **Deterministic Cryptographic Token Issuance:**
+   - A deterministic SHA-256 token is computed from the plan report:
+     $$\text{token} = \text{SHA256}(\text{batchId} \mid \text{mappingChecksum} \mid \text{ruleVersion} \mid \text{targetBaselineHash} \mid \text{counts} \mid \text{policyConfig})$$
+   - The token acts as a mandatory pre-condition to unlock real load (`TargetBatchLoader`).
+3. **Drift & Invalidation Safeguards:**
+   - If target baseline records drift (e.g. external edits occur in PostgreSQL), `BASELINE_DRIFT` is triggered.
+   - If mapping rules or translation dictionaries change, `MAPPING_CHANGED` is triggered.
+   - If cleaning or validation rule versions change, `RULE_VERSION_CHANGED` is triggered.
+   - Any drift immediately invalidates the dry-run token, requiring a fresh dry-run pass before real load is permitted.
+4. **40%-Invalid Fixture Policy Ceiling:**
+   - In accordance with Decision C9 and Core Rules, if predicted row failures exceed the 10.0% failure threshold (e.g. 40% invalid boundary fixture), the policy fails (`policyPassed: false`, `canProceedToLoad: false`), preventing real load from proceeding.
+
 ---
+
 
 ## 4. Step 7: Terminal Outcome Ledger & Mathematically Exact Reconciliation (KIT-09)
 
@@ -190,9 +211,30 @@ $$\text{unaccountedRows} = \text{sourceRows} - (\text{loaded} + \text{rejected} 
   - **Verdict `reconciliation_failed`:** If `unaccountedRows !== 0`, counts do not match, or double-count duplicates exist, the batch status remains `reconciliation_failed` and signoff is strictly disabled (`signoffAllowed: false`).
 - **Formula-Safe Export Defense:** All reconciliation summary and outcome CSV exports sanitize dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`), neutralizing CSV injection attacks per OWASP guidelines.
 
+### 4.6 Exact Duplicate Candidate Review & Audited Merge Decisions (KIT-10)
+
+**Traceability:** Issue #77 `[KIT-10]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17.
+
+1. **V1 Exact Normalized Candidate Matching Rules:**
+   - `RULE_DUP_EMAIL_EXACT`: Same normalized email (trimmed, lowercase).
+   - `RULE_DUP_PHONE_NAME_EXACT`: Same normalized phone (stripped of non-digits) + normalized name (trimmed, lowercase).
+   - `RULE_DUP_TAX_ID_EXACT`: Same normalized tax number within entity and jurisdiction scope (`<entity>::<jurisdiction>::<taxNumber>`).
+   - **Company Separation Guarantee:** Different companies with a shared name stay separate; company name alone is never used for automatic deduplication.
+2. **Candidate Separation & Workflow:**
+   - **In-File Duplicates:** Identified before load and consolidated as `in_file_merged`.
+   - **Target-Existing Duplicates:** Routed to human review (`pending_review`).
+3. **Audited Human Review Decisions:**
+   - Reviewer explicitly chooses **Keep both** (load as separate target entity) or **Merge** (merge into golden target record).
+   - The decision records surviving kept ID, absorbed source rows/IDs, matching rule, version, evidence, reviewer actor, timestamp, and field choices.
+4. **Security & Governance Invariants:**
+   - **No Auto-Merge:** Target duplicate choices strictly require an authorized human review decision.
+   - **Pre-Load Guard:** An unreviewed duplicate candidate cannot load as merged (`UnreviewedCandidateMergeError`).
+   - **Reauthorization & Separation of Duties:** Duplicate review requires Editor or Admin role; a migration runner cannot review or approve their own duplicate decisions.
+
 ---
 
 ## 5. Step 5b: Resumable Compensating-Saga Rollback with Conflict Preflight (KIT-12)
+
 
 **Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; Issue #79 `[KIT-12]`.
 
@@ -271,6 +313,31 @@ Every compensation decision is audited durably in PostgreSQL:
    - Completed compensation actions remain stamped `compensated` in the append-only journal.
    - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
    - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
+
+### 5.6 BullMQ Worker Execution, Bounded Retries & Partial-Load Recovery (KIT-11)
+
+**Traceability:** Issue #78 `[KIT-11]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17.
+
+1. **BullMQ Worker Architecture & Pinned Stack:**
+   - Extraction, profiling, cleaning, mapping, dry-run, load, and validation jobs execute in BullMQ workers, not request handlers.
+   - Pinned Redis Open Source 8.10.1 (`redis:8.10.1-alpine`).
+   - Default concurrency: 4 workers.
+   - Per-job execution timeout: 15 minutes (900,000 ms).
+2. **Bounded Retries & Exponential Backoff:**
+   - Maximum attempt count: 3 attempts.
+   - Exponential backoff: base 1 second (1,000 ms), maximum backoff 30 seconds (30,000 ms):
+     $$\text{delayMs} = \min(30000, 1000 \times 2^{\text{attempt} - 1})$$
+   - Retries strictly reuse the same stable idempotency key (`batchId:sourceRow:module:entity:v#`).
+3. **10% Chunk Error Circuit Breaker:**
+   - Records are processed in bounded 500-row chunks.
+   - If row failures exceed 10.0% inside a chunk, the loader halts immediately and stops scheduling new chunks.
+4. **Unresolved Write Failure & `load_failed_partial` Transition:**
+   - If target writes fail and retry attempts are exhausted, the batch status moves to `load_failed_partial` and checkpoint is set to `load_checkpoint`.
+   - **Core Invariant:** An unresolved write error does NOT become marked as `rejected`. It remains an uncommitted write failure, preserving audit trail and recovery eligibility.
+5. **Crash Resumption & Reconciliation Guard:**
+   - An interrupted or crashed worker resumes from the latest committed checkpoint (`load_checkpoint` for partial chunks).
+   - Completed row receipts and outcomes survive in PostgreSQL. Re-executing replays existing receipts without duplicating target rows.
+   - Any batch in `load_failed_partial` or `failed` strictly blocks reconciliation (`ReconciliationBlockedError`) until resumption or rollback is completed.
 
 ---
 

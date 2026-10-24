@@ -1566,6 +1566,62 @@ export function computeTargetBaselineHash(records: unknown[]): string {
   return createHash('sha256').update(stringified.join('\n'), 'utf8').digest('hex');
 }
 
+/**
+ * Validates dry-run load precondition before allowing a real load execution (KIT-07).
+ * Throws DryRunPreconditionError if any precondition or invariant check fails.
+ */
+export function validateLoadPrecondition(
+  precondition: DryRunLoadPrecondition,
+  planReport: DryRunPlanReport
+): { ok: true } {
+  if (!planReport.policyPassed || !planReport.canProceedToLoad) {
+    throw new DryRunPreconditionError(
+      'POLICY_FAILED',
+      `Cannot proceed to load: dry-run plan failed policy (failure rate ${(planReport.failureRate * 100).toFixed(1)}% exceeds threshold ${(planReport.policyConfig.maxFailureRate * 100).toFixed(1)}%)`
+    );
+  }
+
+  if (precondition.batchId !== planReport.batchId) {
+    throw new DryRunPreconditionError(
+      'TOKEN_INVALID',
+      `Precondition check failed: batchId '${precondition.batchId}' does not match plan report batchId '${planReport.batchId}'`
+    );
+  }
+
+  if (precondition.token !== planReport.token) {
+    throw new DryRunPreconditionError(
+      'TOKEN_INVALID',
+      `Precondition check failed: dry-run token does not match active plan token`
+    );
+  }
+
+  if (precondition.currentTargetBaselineHash !== planReport.targetBaselineHash) {
+    throw new DryRunPreconditionError(
+      'BASELINE_DRIFT',
+      `Precondition check failed: target baseline has drifted since dry-run plan was generated (target data modified)`
+    );
+  }
+
+  if (precondition.currentMappingChecksum !== planReport.mappingChecksum) {
+    throw new DryRunPreconditionError(
+      'MAPPING_CHANGED',
+      `Precondition check failed: mapping rules have changed since dry-run plan was generated`
+    );
+  }
+
+  if (precondition.currentRuleVersion !== planReport.ruleVersion) {
+    throw new DryRunPreconditionError(
+      'RULE_VERSION_CHANGED',
+      `Precondition check failed: rule version '${precondition.currentRuleVersion}' differs from plan rule version '${planReport.ruleVersion}'`
+    );
+  }
+
+  assertDryRunConservation(planReport.plannedCounts);
+
+  return { ok: true };
+}
+
+
 // ============================================================================
 // KIT-08: Generic Target Adapter, Stable Idempotency & Import Receipts
 // ============================================================================
@@ -2304,3 +2360,190 @@ export const DirtyDataPackManifestSchema = z.object({
   boundaryFixtures: z.record(BoundaryFixtureTypeSchema, BoundaryFixtureItemSchema),
 });
 export type DirtyDataPackManifest = z.infer<typeof DirtyDataPackManifestSchema>;
+
+// ============================================================================
+// KIT-10: Exact Duplicate Candidate Review & Audited Merge Decisions
+// ============================================================================
+
+export const ExactDuplicateRuleId = {
+  EMAIL_EXACT: 'RULE_DUP_EMAIL_EXACT',
+  PHONE_NAME_EXACT: 'RULE_DUP_PHONE_NAME_EXACT',
+  TAX_ID_EXACT: 'RULE_DUP_TAX_ID_EXACT',
+} as const;
+export type ExactDuplicateRuleIdType =
+  (typeof ExactDuplicateRuleId)[keyof typeof ExactDuplicateRuleId];
+
+export const ExactDuplicateRuleIdSchema = z.enum([
+  ExactDuplicateRuleId.EMAIL_EXACT,
+  ExactDuplicateRuleId.PHONE_NAME_EXACT,
+  ExactDuplicateRuleId.TAX_ID_EXACT,
+]);
+
+export const DuplicateCandidateScopeSchema = z.enum(['in_file', 'target_existing']);
+export type DuplicateCandidateScope = z.infer<typeof DuplicateCandidateScopeSchema>;
+
+export const DuplicateReviewDecisionSchema = z.enum(['keep_both', 'merge']);
+export type DuplicateReviewDecision = z.infer<typeof DuplicateReviewDecisionSchema>;
+
+export const KitDuplicateCandidateStatusSchema = z.enum([
+  'pending_review',
+  'reviewed',
+  'in_file_merged',
+  'keep_both',
+  'merged',
+]);
+export type KitDuplicateCandidateStatus = z.infer<typeof KitDuplicateCandidateStatusSchema>;
+
+export const DuplicateCandidateItemSchema = z.object({
+  id: z.string().uuid(),
+  batchId: z.string().min(1),
+  sourceRow: z.number().int().min(1),
+  scope: DuplicateCandidateScopeSchema,
+  matchingRule: ExactDuplicateRuleIdSchema,
+  ruleVersion: z.string().min(1).default('1.0.0'),
+  matchKey: z.string().min(1),
+  evidence: z.record(z.string(), z.unknown()),
+  targetExistingId: z.string().optional(),
+  targetExistingData: z.record(z.string(), z.unknown()).optional(),
+  candidateData: z.record(z.string(), z.unknown()),
+  status: KitDuplicateCandidateStatusSchema.default('pending_review'),
+  decision: DuplicateReviewDecisionSchema.optional(),
+  keptId: z.string().optional(),
+  absorbedSourceRows: z.array(z.number().int()).default([]),
+  reviewedBy: z.string().optional(),
+  reviewedAt: z.coerce.date().optional(),
+  fieldChoices: z.record(z.string(), z.enum(['source', 'target'])).optional(),
+  createdAt: z.coerce.date().default(() => new Date()),
+});
+export type DuplicateCandidateItem = z.infer<typeof DuplicateCandidateItemSchema>;
+
+export const SubmitDuplicateReviewInputSchema = z.object({
+  candidateId: z.string().uuid(),
+  batchId: z.string().min(1),
+  decision: DuplicateReviewDecisionSchema,
+  reviewerId: z.string().min(1),
+  reviewerRole: z.string().min(1),
+  batchRunnerId: z.string().min(1).optional(),
+  fieldChoices: z.record(z.string(), z.enum(['source', 'target'])).optional(),
+});
+export type SubmitDuplicateReviewInput = z.infer<typeof SubmitDuplicateReviewInputSchema>;
+
+export class UnreviewedCandidateMergeError extends Error {
+  public readonly statusCode = 409;
+  public readonly code = 'UNREVIEWED_CANDIDATE_CANNOT_MERGE';
+
+  constructor(
+    public readonly candidateId: string,
+    public readonly sourceRow: number,
+    message?: string
+  ) {
+    super(
+      message ||
+        `Unreviewed duplicate candidate '${candidateId}' at row ${sourceRow} cannot load as merged. An explicit human review decision is required.`
+    );
+    this.name = 'UnreviewedCandidateMergeError';
+  }
+}
+
+export class UnauthorizedDuplicateReviewError extends Error {
+  public readonly statusCode = 403;
+  public readonly code = 'UNAUTHORIZED_DUPLICATE_REVIEW';
+
+  constructor(reason: string) {
+    super(`Unauthorized duplicate review: ${reason}`);
+    this.name = 'UnauthorizedDuplicateReviewError';
+  }
+}
+
+// ============================================================================
+// KIT-11: BullMQ Worker Execution, Bounded Retries & Partial-Load Recovery
+// ============================================================================
+
+export const BullMqWorkerDefaults = {
+  REDIS_VERSION: '8.10.1',
+  ATTEMPTS: 3,
+  BACKOFF_BASE_MS: 1000,
+  BACKOFF_MAX_MS: 30000,
+  JOB_TIMEOUT_MS: 900000, // 15 minutes
+  DEFAULT_CONCURRENCY: 4,
+  MAX_CHUNK_FAILURE_RATE: 0.10, // 10%
+} as const;
+
+export const BullMqQueueConfigSchema = z.object({
+  redisHost: z.string().default('localhost'),
+  redisPort: z.number().int().default(6379),
+  redisVersion: z.literal('8.10.1').default('8.10.1'),
+  attempts: z.number().int().min(1).max(10).default(BullMqWorkerDefaults.ATTEMPTS),
+  backoffBaseMs: z.number().int().min(100).default(BullMqWorkerDefaults.BACKOFF_BASE_MS),
+  backoffMaxMs: z.number().int().min(1000).default(BullMqWorkerDefaults.BACKOFF_MAX_MS),
+  jobTimeoutMs: z.number().int().min(10000).default(BullMqWorkerDefaults.JOB_TIMEOUT_MS),
+  concurrency: z.number().int().min(1).max(32).default(BullMqWorkerDefaults.DEFAULT_CONCURRENCY),
+  circuitBreakerThreshold: z.number().min(0).max(1).default(BullMqWorkerDefaults.MAX_CHUNK_FAILURE_RATE),
+});
+export type BullMqQueueConfig = z.infer<typeof BullMqQueueConfigSchema>;
+
+export const WorkerJobDataSchema = z.object({
+  jobId: z.string().min(1),
+  batchId: z.string().min(1),
+  module: z.string().min(1),
+  entity: z.string().min(1),
+  step: KitBatchStepNameSchema,
+  correlationId: z.string().min(1),
+  attempt: z.number().int().min(1).default(1),
+  checkpoint: z.string().default('created'),
+  chunkIndex: z.number().int().min(0).optional(),
+  totalChunks: z.number().int().min(1).optional(),
+  payload: z.record(z.string(), z.unknown()).default({}),
+});
+export type WorkerJobData = z.infer<typeof WorkerJobDataSchema>;
+
+export class ReconciliationBlockedError extends Error {
+  public readonly statusCode = 409;
+  public readonly code = 'RECONCILIATION_BLOCKED';
+
+  constructor(
+    public readonly batchId: string,
+    public readonly batchStatus: string,
+    message?: string
+  ) {
+    super(
+      message ||
+        `Reconciliation blocked for batch '${batchId}': batch is in status '${batchStatus}'. Resumption or rollback is required before reconciliation can proceed.`
+    );
+    this.name = 'ReconciliationBlockedError';
+  }
+}
+
+export class WorkerStopThresholdExceededError extends Error {
+  public readonly statusCode = 422;
+  public readonly code = 'STOP_THRESHOLD_EXCEEDED';
+
+  constructor(
+    public readonly failureRate: number,
+    public readonly threshold: number,
+    message?: string
+  ) {
+    super(
+      message ||
+        `Worker circuit breaker triggered: row failure rate ${(failureRate * 100).toFixed(1)}% exceeds threshold ${(threshold * 100).toFixed(1)}%. Halting chunk scheduling.`
+    );
+    this.name = 'WorkerStopThresholdExceededError';
+  }
+}
+
+export class PartialLoadExhaustionError extends Error {
+  public readonly statusCode = 500;
+  public readonly code = 'PARTIAL_LOAD_EXHAUSTED';
+
+  constructor(
+    public readonly batchId: string,
+    public readonly attempts: number,
+    public readonly lastError: string
+  ) {
+    super(
+      `Target write retries exhausted after ${attempts} attempts for batch '${batchId}'. Batch transitioned to load_failed_partial. Last error: ${lastError}`
+    );
+    this.name = 'PartialLoadExhaustionError';
+  }
+}
+
