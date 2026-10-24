@@ -202,18 +202,19 @@ describe("ERP-3 Data Dictionary, ERD, Traceability & Dirty Data Pack Plan ([ERP3
 
     it("verifies expected defect counts match the committed expected profile report", () => {
       const profileJson = JSON.parse(readFileSync(PROFILE_PATH, "utf8"));
-      expect(profileJson.fixture.row_count).toBe(60);
-      expect(profileJson.reconciliation.accepted).toBe(19);
-      expect(profileJson.reconciliation.rejected).toBe(37);
-      expect(profileJson.reconciliation.review).toBe(4);
+      expect(profileJson.fixture.row_count).toBeGreaterThanOrEqual(100);
+      expect(profileJson.fixture.row_count).toBe(135);
+      expect(profileJson.reconciliation.accepted).toBe(35);
+      expect(profileJson.reconciliation.rejected).toBe(91);
+      expect(profileJson.reconciliation.review).toBe(9);
       expect(profileJson.reconciliation.skipped).toBe(0);
       expect(profileJson.reconciliation.unaccounted).toBe(0);
       expect(profileJson.reconciliation.is_balanced).toBe(true);
 
-      expect(globalDictContent).toContain("`60`");
-      expect(globalDictContent).toContain("`19`");
-      expect(globalDictContent).toContain("`37`");
-      expect(globalDictContent).toContain("`4`");
+      expect(globalDictContent).toContain("`135`");
+      expect(globalDictContent).toContain("`35`");
+      expect(globalDictContent).toContain("`91`");
+      expect(globalDictContent).toContain("`9`");
     });
 
     it("documents all failure categories including formula injection, date inversions, and duplicate reviews", () => {

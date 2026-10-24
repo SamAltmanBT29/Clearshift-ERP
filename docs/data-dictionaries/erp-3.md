@@ -404,10 +404,10 @@ $$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
 #### Reconciliation Summary
 | Metric | Value | Meaning |
 |---|---|---|
-| **Total Source Rows** | `60` | Total records in `dirty-data-v1.csv` |
-| **Accepted** | `19` | Valid rows ready for target ingestion |
-| **Rejected** | `37` | Rows failing validation, format, or invariant rules |
-| **Review** | `4` | Duplicate natural keys held for operator review |
+| **Total Source Rows** | `135` | Total records in `dirty-data-v1.csv` |
+| **Accepted** | `35` | Valid rows ready for target ingestion |
+| **Rejected** | `91` | Rows failing validation, format, or invariant rules |
+| **Review** | `9` | Duplicate natural keys held for operator review |
 | **Skipped** | `0` | Skipped records (none in V1) |
 | **Unaccounted** | `0` | Zero orphan or unclassified rows |
 | **Is Balanced?** | **`true`** | Mathematical balance achieved |
@@ -415,12 +415,12 @@ $$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
 #### Breakdown by Entity Record Type
 | Record Type | Total | Accepted | Rejected | Review | Skipped | Pass Rate |
 |---|---|---|---|---|---|---|
-| **`sales_order`** | 21 | 4 | 16 | 1 | 0 | 19.0% |
-| **`so_line`** | 14 | 6 | 7 | 1 | 0 | 42.9% |
-| **`invoice`** | 11 | 4 | 6 | 1 | 0 | 36.4% |
-| **`invoice_line`** | 3 | 2 | 1 | 0 | 0 | 66.7% |
-| **`payment`** | 11 | 3 | 7 | 1 | 0 | 27.3% |
-| **Total** | **60** | **19** | **37** | **4** | **0** | **31.7%** |
+| **`sales_order`** | 51 | 11 | 38 | 2 | 0 | 21.6% |
+| **`so_line`** | 38 | 13 | 23 | 2 | 0 | 34.2% |
+| **`invoice`** | 21 | 5 | 14 | 2 | 0 | 23.8% |
+| **`invoice_line`** | 5 | 2 | 2 | 1 | 0 | 40.0% |
+| **`payment`** | 20 | 4 | 14 | 2 | 0 | 20.0% |
+| **Total** | **135** | **35** | **91** | **9** | **0** | **25.9%** |
 
 #### Defect Distribution by Reason Code
 | Reason Code | Count | Failure Condition / Description | Doc Reference |
@@ -484,4 +484,4 @@ $$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
 - **Peer Development Group**: Group 6 (ERP-1 Products & Inventory) & Group 9 (ERP-4 Finance & Accounting)
 - **Review Date**: 2026-10-24
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
-- **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests (`d09217dfbc4cb334e39c894556b7749c584cdf9f1acc47e7685282d87cca333a`).
+- **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests (`17d24675e9af4f6a763b06b5a09400b471d36523254450c139f31b2d1fd73e53`).
