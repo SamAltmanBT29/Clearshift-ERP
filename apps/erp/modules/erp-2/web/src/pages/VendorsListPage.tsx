@@ -93,6 +93,7 @@ export interface VendorsListPageProps {
   onCreateVendor?: (() => void) | undefined;
   onCreatePurchaseOrder?: (() => void) | undefined;
   onNavigateImport?: (() => void) | undefined;
+  onNavigateRejections?: (() => void) | undefined;
   initialView?: 'list' | 'import' | undefined;
 }
 
@@ -108,6 +109,7 @@ export const VendorsListPage: React.FC<VendorsListPageProps> = ({
   onCreateVendor,
   onCreatePurchaseOrder,
   onNavigateImport,
+  onNavigateRejections,
   initialView = 'list',
 }) => {
   const [activeTab, setActiveTab] = useState<'vendors' | 'orders'>('vendors');
@@ -355,6 +357,16 @@ export const VendorsListPage: React.FC<VendorsListPageProps> = ({
             </p>
           </div>
           <div className="cs-page-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="cs-btn-secondary"
+              data-testid="btn-view-rejections"
+              onClick={() => onNavigateRejections?.()}
+              aria-label="View Migration Rejections"
+              title="Review rejected rows from most recent import batch"
+            >
+              View Rejections
+            </button>
             <button
               type="button"
               className="cs-btn-secondary cs-import-btn"
