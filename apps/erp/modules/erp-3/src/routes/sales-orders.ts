@@ -20,7 +20,13 @@ import {
   SalesOrderListQuerySchema,
   UpdateSalesOrderStatusRequestSchema,
 } from "@clearshift/contracts";
-import { requireErp3Policy } from "../policies/authorization.js";
+import {
+  requireErp3Policy,
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+  registerEntityCreator,
+} from "../policies/authorization.js";
 import { auditRequest, type Erp3AuditService } from "../services/audit.js";
 import type { Erp3Service } from "../services/erp3.service.js";
 
@@ -86,6 +92,8 @@ export const salesOrderRoutes: FastifyPluginAsync<{
     }
 
     const order = await service.getSalesOrderById(parsedParams.data.id);
+    const requestTenantId = (request.headers["x-tenant-id"] as string | undefined)?.trim();
+    assertTenantAccess(request.user, order, requestTenantId);
     return reply.status(200).send(order);
   });
 
@@ -155,6 +163,19 @@ export const salesOrderRoutes: FastifyPluginAsync<{
     }
 
     const created = await service.createSalesOrder(parsed.data);
+    const creatorId =
+      request.user?.sub ??
+      (request.headers["x-actor-id"] as string | undefined)?.trim();
+    const requestTenantId = (
+      request.headers["x-tenant-id"] as string | undefined
+    )?.trim();
+    if (creatorId) {
+      registerEntityCreator(created.id, creatorId);
+    }
+    if (requestTenantId) {
+      registerEntityTenant(created.id, requestTenantId);
+    }
+
     await auditRequest(auditService, request, {
       action: "erp.sales_order.created",
       targetEntity: "sales_order",
@@ -187,6 +208,12 @@ export const salesOrderRoutes: FastifyPluginAsync<{
         correlation_id: correlationId,
       });
     }
+
+    const existingOrder = await service.getSalesOrderById(parsedParams.data.id);
+    const requestTenantId = (
+      request.headers["x-tenant-id"] as string | undefined
+    )?.trim();
+    assertObjectMutationAccess(request.user, existingOrder, requestTenantId);
 
     const parsedBody = STRICT_UPDATE_STATUS_SCHEMA.safeParse(request.body);
     if (!parsedBody.success) {
