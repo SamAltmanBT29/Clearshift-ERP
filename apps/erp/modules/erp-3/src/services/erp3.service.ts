@@ -23,6 +23,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { ZodError } from "zod";
 import { AppError, type ReferenceResolver } from "@cs/kernel";
 import {
   CreateInvoiceRequestSchema,
@@ -717,6 +718,13 @@ export class Erp3Service {
             ...(err.field ? { field: err.field } : {}),
             ...err.context,
           });
+        }
+        if (err instanceof ZodError) {
+          const first = err.issues[0];
+          throw new ValidationError(
+            first?.message ?? "Invalid import row data",
+            first?.path.join("."),
+          );
         }
         throw err;
       }
