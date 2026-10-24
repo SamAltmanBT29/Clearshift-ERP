@@ -93,7 +93,7 @@ function extractOperationResponses(spec: string, operationId: string): Set<strin
     }
     if (!inResponses) continue;
 
-    const codeMatch = /^ {8}['"]?(\d{3}|default)['"]?:\s*$/.exec(raw);
+    const codeMatch = /^ {8}['"]?(\d{3}|default)['"]?:/.exec(raw);
     if (codeMatch && codeMatch[1]) {
       responses.add(codeMatch[1]);
     }
@@ -158,5 +158,42 @@ describe('ERP-1 OpenAPI 3.1 Specification Verification', () => {
     const batchResponses = extractOperationResponses(SPEC, 'importBatch');
     expect(batchResponses.has('200')).toBe(true);
     expect(batchResponses.has('400')).toBe(true);
+  });
+
+  it('documents the required role set for each API operation', () => {
+    expect(SPEC.match(/x-required-roles:/g)).toHaveLength(19);
+    expect(SPEC).toContain('x-required-roles: [viewer, editor, analyst, admin]');
+    expect(SPEC).toContain('x-required-roles: [editor, migration_runner, admin]');
+    expect(SPEC).toContain('x-required-roles: [editor, admin]');
+    expect(SPEC).toContain('x-required-roles: [migration_runner, admin]');
+  });
+
+  it('documents HTTP 401 and 403 responses on every protected operation', () => {
+    const protectedOps = [
+      'listErp1Products',
+      'createErp1Product',
+      'getErp1Product',
+      'updateErp1Product',
+      'getErp1ProductLinkedRecords',
+      'getErp1MigrationMetadata',
+      'listErp1Rejections',
+      'listErp1Categories',
+      'createErp1Category',
+      'getErp1Category',
+      'updateErp1Category',
+      'listErp1Stock',
+      'setErp1OpeningStock',
+      'checkErp1Duplicates',
+      'listErp1DuplicateCandidates',
+      'getErp1DuplicateCandidateById',
+      'reviewErp1DuplicateCandidate',
+      'importRow',
+      'importBatch',
+    ];
+    for (const opId of protectedOps) {
+      const responses = extractOperationResponses(SPEC, opId);
+      expect(responses.has('401'), `${opId} 401`).toBe(true);
+      expect(responses.has('403'), `${opId} 403`).toBe(true);
+    }
   });
 });

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ClearShift ERP — monorepo root",
+  "description": "ClearShift ERP \u2014 monorepo root",
   "workspaces": [
     "apps/*",
     "apps/erp/modules/*",
@@ -29,7 +29,8 @@
     "erp2:test": "vitest run apps/erp/modules/erp-2",
     "erp2:seed": "node sample-data/erp-2/seed.ts",
     "erp2:e2e": "playwright test -c apps/erp/modules/erp-2/e2e/playwright.config.ts",
-    "erp3:e2e": "playwright test -c apps/erp/modules/erp-3/e2e/playwright.config.ts"
+    "erp3:e2e": "playwright test -c apps/erp/modules/erp-3/e2e/playwright.config.ts",
+    "test:contracts": "vitest run tests/contracts packages/contracts/tests"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
