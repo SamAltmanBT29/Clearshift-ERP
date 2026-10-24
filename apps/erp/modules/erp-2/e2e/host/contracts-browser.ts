@@ -6,3 +6,4 @@ export * from '../../../../../../packages/contracts/src/common.js';
 export * from '../../../../../../packages/contracts/src/erp-2.js';
 export * from '../../../../../../packages/contracts/src/golden-id.js';
 export * from '../../../../../../packages/contracts/src/import-target.js';
+export * from '../../../../../../packages/contracts/src/events.js';
