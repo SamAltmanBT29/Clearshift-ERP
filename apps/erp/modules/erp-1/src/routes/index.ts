@@ -27,4 +27,11 @@ export const erp1Routes: FastifyPluginAsync<Erp1RoutesOptions> = async (fastify,
   await fastify.register(metadataRoutes);
 };
 
-export { categoriesRoutes, duplicateRoutes, importRoutes, metadataRoutes, productsRoutes, stockRoutes };
+export {
+  categoriesRoutes,
+  duplicateRoutes,
+  importRoutes,
+  metadataRoutes,
+  productsRoutes,
+  stockRoutes,
+};
