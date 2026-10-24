@@ -11,7 +11,7 @@ import { PageTitle, type SortDirection } from '@cs/ui';
 import { Link } from 'react-router-dom';
 import type { JournalEntry } from '@clearshift/contracts';
 import { fetchJournalEntries } from '../api/erp-4.js';
-import { ErrorState } from '../components/StateViews.js';
+import { ErrorState, EmptyState } from '../components/StateViews.js';
 import { JournalEntriesTable } from '../components/JournalEntriesTable.js';
 
 export const JournalEntriesListPage: React.FC = () => {
@@ -23,7 +23,7 @@ export const JournalEntriesListPage: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('posting_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
 
   const loadJournalEntries = useCallback(async () => {
     setIsLoading(true);
@@ -33,8 +33,8 @@ export const JournalEntriesListPage: React.FC = () => {
       setEntries(response.items || []);
       setTotal(response.total || 0);
       setTotalPages(response.totalPages || Math.max(1, Math.ceil((response.total || 0) / pageSize)));
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load journal entries');
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setIsLoading(false);
     }
@@ -80,8 +80,7 @@ export const JournalEntriesListPage: React.FC = () => {
 
       {error ? (
         <ErrorState
-          title="Error Loading Journal Entries"
-          message={error}
+          error={error}
           onRetry={loadJournalEntries}
         />
       ) : (

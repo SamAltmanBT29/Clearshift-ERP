@@ -11,6 +11,8 @@ import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
 import { FilterBar } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
+import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
+import { Toast } from '../components/Toast.js';
 import { JournalEntryFormPage } from './JournalEntryFormPage.js';
 import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
 
@@ -18,6 +20,8 @@ export const AccountsListPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance' | 'journal-entries'>('accounts');
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Accounts List State
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -26,7 +30,7 @@ export const AccountsListPage: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('code');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<unknown | null>(null);
 
   const [filters, setFilters] = useState<AccountsFilterQuery>({
     page: 1,
@@ -42,12 +46,12 @@ export const AccountsListPage: React.FC = () => {
   });
   const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
-  const [tbError, setTbError] = useState<string | null>(null);
+  const [tbError, setTbError] = useState<unknown | null>(null);
 
   // Journal Entries State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [isEntriesLoading, setIsEntriesLoading] = useState(false);
-  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<unknown | null>(null);
   const [entriesTotal, setEntriesTotal] = useState(0);
 
   // Fetch Accounts from real API
@@ -59,8 +63,8 @@ export const AccountsListPage: React.FC = () => {
       setAccounts(response.items);
       setAccountsTotal(response.total);
       setAccountsTotalPages(response.totalPages);
-    } catch (err: any) {
-      setAccountsError(err?.message || 'Failed to fetch chart of accounts');
+    } catch (err: unknown) {
+      setAccountsError(err);
     } finally {
       setIsAccountsLoading(false);
     }
@@ -73,8 +77,8 @@ export const AccountsListPage: React.FC = () => {
     try {
       const response = await fetchTrialBalance(currentPeriod);
       setTrialBalanceData(response);
-    } catch (err: any) {
-      setTbError(err?.message || 'Failed to fetch trial balance report');
+    } catch (err: unknown) {
+      setTbError(err);
     } finally {
       setIsTbLoading(false);
     }
@@ -88,8 +92,8 @@ export const AccountsListPage: React.FC = () => {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
       setJournalEntries(response.items);
       setEntriesTotal(response.total);
-    } catch (err: any) {
-      setEntriesError(err?.message || 'Failed to fetch journal entries');
+    } catch (err: unknown) {
+      setEntriesError(err);
     } finally {
       setIsEntriesLoading(false);
     }
@@ -167,6 +171,12 @@ export const AccountsListPage: React.FC = () => {
   const assetCount = accounts.filter((a) => a.type === 'asset').length;
   const liabilityCount = accounts.filter((a) => a.type === 'liability').length;
 
+  const handleAccountCreated = (newAccount: Account) => {
+    setAccounts((prev) => [newAccount, ...prev.filter((a) => a.id !== newAccount.id)]);
+    setAccountsTotal((prev) => prev + 1);
+    setToastMessage(`Account ${newAccount.code} — ${newAccount.name} created successfully.`);
+  };
+
   // Render Form Page View
   if (currentView === 'create-journal') {
     return (
@@ -207,6 +217,14 @@ export const AccountsListPage: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="cs-btn cs-btn-secondary"
+            onClick={() => setIsCreateAccountModalOpen(true)}
+            aria-label="Create new account"
+          >
+            + New Account
+          </button>
           <button
             type="button"
             className="cs-btn cs-btn-primary"
@@ -297,8 +315,7 @@ export const AccountsListPage: React.FC = () => {
 
           {accountsError ? (
             <ErrorState
-              title="Unable to load Chart of Accounts"
-              message={accountsError}
+              error={accountsError}
               onRetry={() => loadAccounts(filters)}
             />
           ) : (
@@ -316,6 +333,7 @@ export const AccountsListPage: React.FC = () => {
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
+              onCreateAccount={() => setIsCreateAccountModalOpen(true)}
             />
           )}
         </section>
@@ -325,8 +343,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-trial-balance" role="tabpanel" aria-labelledby="tab-trial-balance">
           {tbError ? (
             <ErrorState
-              title="Unable to generate Trial Balance"
-              message={tbError}
+              error={tbError}
               onRetry={() => loadTrialBalance(period)}
             />
           ) : (
@@ -345,8 +362,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-journal-entries" role="tabpanel" aria-labelledby="tab-journal-entries">
           {entriesError ? (
             <ErrorState
-              title="Unable to load journal entries"
-              message={entriesError}
+              error={entriesError}
               onRetry={loadJournalEntries}
             />
           ) : isEntriesLoading ? (
@@ -416,6 +432,22 @@ export const AccountsListPage: React.FC = () => {
             </div>
           )}
         </section>
+      )}
+
+      {/* Account Creation Modal (ERP4-20) */}
+      <AccountCreateModal
+        isOpen={isCreateAccountModalOpen}
+        onClose={() => setIsCreateAccountModalOpen(false)}
+        onAccountCreated={handleAccountCreated}
+      />
+
+      {/* Confirmation Toast Notification (ERP4-20) */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
       )}
     </div>
   );
