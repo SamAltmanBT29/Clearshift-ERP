@@ -662,3 +662,27 @@ Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines 
   - Invoices (`assertInvoiceStatusTransition`): `Open -> Paid | Overdue`, `Overdue -> Paid`, `Paid` is terminal (`422 INVALID_INVOICE_STATUS_TRANSITION`).
 - **Read-Model Consistency (`assertSalesOrderReadConsistency`, `assertInvoiceReadConsistency`, `assertPaymentReadConsistency`)**:
   - Asserted immediately on every write and read in `Erp3Service` so persisted records and HTTP projections agree on status, links, derived line taxes/totals, and aggregate totals (`422 READ_MODEL_INCONSISTENT`).
+
+
+---
+
+## 16. Invariants Enforced at Schema & DB Level (ERP3-01 / Issue #26)
+
+1. **UUID Primary Keys**: Every table uses a `UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+2. **Deterministic Uniqueness**:
+   - `sales_orders.order_number` is unique.
+   - `invoices.invoice_number` is unique.
+   - `invoices.order_id` is unique (enforcing at most one V1 invoice per sales order).
+   - `(order_id, line_number)` is unique on `so_lines`.
+   - `(invoice_id, line_number)` is unique on `invoice_lines`.
+   - `import_receipts.idempotency_key` is unique.
+3. **Check Constraints**:
+   - Quantities are strictly positive (`> 0`).
+   - Prices, tax amounts, line totals, and document totals are non-negative (`>= 0`).
+   - Tax rates are bounded percentages (`>= 0 AND <= 100`).
+   - Payment amounts are strictly positive (`> 0`).
+   - Invoice `due_date >= invoice_date`.
+4. **Referential Integrity & Cascades**:
+   - Order lines cascade delete when the parent sales order is deleted (`ON DELETE CASCADE`).
+   - Invoice lines cascade delete when the parent invoice is deleted (`ON DELETE CASCADE`).
+   - Cross-module relationships use logical UUID columns without DB-level foreign keys.
