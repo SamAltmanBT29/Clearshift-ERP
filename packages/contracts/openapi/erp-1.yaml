@@ -973,30 +973,6 @@ components:
         warehouseId: { type: string, format: uuid }
         quantity: { oneOf: [{ type: string, pattern: '^\d+(\.\d{1,4})?$' }, { type: number, minimum: 0 }] }
 
-    ProductListResponse:
-      type: object
-      required: [items, page, pageSize, total]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Product' }
-        page: { type: integer, minimum: 1 }
-        pageSize: { type: integer, minimum: 1, maximum: 100 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-
-    CategoryListResponse:
-      type: object
-      required: [items, page, pageSize, total]
-      properties:
-        items:
-          type: array
-          items: { $ref: '#/components/schemas/Category' }
-        page: { type: integer, minimum: 1 }
-        pageSize: { type: integer, minimum: 1, maximum: 100 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-
     TargetFieldDefinition:
       type: object
       required: [name, label, type, required]
