@@ -10,6 +10,8 @@
     "packages/*"
   ],
   "scripts": {
+    "contract:test": "vitest run tests/contracts",
+
     "compose:up": "docker compose -f infra/compose.yaml up -d --wait",
     "compose:down": "docker compose -f infra/compose.yaml down -v",
     "db:migrate": "node packages/database/scripts/migrate.js",
