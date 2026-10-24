@@ -1250,12 +1250,6 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
-    Forbidden:
-      description: Authenticated caller lacks required RBAC role for this operation
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ApiError'
   securitySchemes:
     BearerAuth:
       type: http
