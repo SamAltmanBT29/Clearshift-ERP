@@ -39,10 +39,12 @@ export const FinancePolicies = {
   PERIODS_READ: 'finance.periods.read',
   PERIODS_UPDATE: 'finance.periods.update',
 
-  // ── Migration & Profiling / Cleaning (KIT-03 / KIT-04 / ERP4-26 / ERP4-27) ──
+  // ── Migration Profiling / Cleaning / Mapping (KIT-03 / KIT-04 / KIT-05 / ERP4-26..28) ──
   MIGRATION_PROFILE_READ: 'finance.migration.profile.read',
   MIGRATION_CLEAN_READ: 'finance.migration.clean.read',
   MIGRATION_CLEAN_RUN: 'finance.migration.clean.run',
+  MIGRATION_MAPPING_READ: 'finance.migration.mapping.read',
+  MIGRATION_MAPPING_RUN: 'finance.migration.mapping.run',
 } as const;
 
 export type FinancePolicy = typeof FinancePolicies[keyof typeof FinancePolicies];
@@ -139,6 +141,16 @@ export const FINANCE_ROUTE_POLICIES: Record<
     policy: FinancePolicies.MIGRATION_CLEAN_RUN,
     allowedRoles: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN, 'finance_admin'],
     description: 'Execute dataset cleaning with custom rule toggles',
+  },
+  [FinancePolicies.MIGRATION_MAPPING_READ]: {
+    policy: FinancePolicies.MIGRATION_MAPPING_READ,
+    allowedRoles: [Roles.VIEWER, Roles.ANALYST, Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN, 'finance_admin', 'auditor'],
+    description: 'Inspect migration field mapping templates and schema targets',
+  },
+  [FinancePolicies.MIGRATION_MAPPING_RUN]: {
+    policy: FinancePolicies.MIGRATION_MAPPING_RUN,
+    allowedRoles: [Roles.EDITOR, Roles.MIGRATION_RUNNER, Roles.ADMIN, 'finance_admin'],
+    description: 'Validate and execute source-to-target field mapping projections',
   },
 };
 
