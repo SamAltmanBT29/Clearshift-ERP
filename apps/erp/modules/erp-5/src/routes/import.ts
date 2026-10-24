@@ -21,7 +21,7 @@ import { z } from 'zod';
 import type { FastifyPluginAsync } from 'fastify';
 import { ImportRowRequestSchema } from '@clearshift/contracts';
 import type { HrService } from '../services/hr.service.js';
-import { HrTargetAdapter } from '../migration/target-adapter.js';
+
 import { erp5IngestGuard, assertTenantAccess } from './guard.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,9 +146,6 @@ export const importRoutes: FastifyPluginAsync<{ hrService: HrService }> = async 
       min_attempted_rows,
       rows,
     } = parsed.data;
-
-    // Instantiate in-process target adapter scoped to the declared entity
-    const adapter = new HrTargetAdapter(service, entity);
 
     const batchRows = rows.map((r) => ({
       sourceRow: r.source_row,

@@ -81,6 +81,7 @@ import {
   HrUnprocessableError,
 } from './errors.js';
 import type { HrRepository } from './repository.js';
+import { HrTargetAdapter } from '../migration/target-adapter.js';
 
 /** Result of a create operation. `created` is false for an idempotent replay. */
 export interface HrMutationResult<T> {
@@ -1219,6 +1220,7 @@ export class HrService {
       entity,
       schema_version: HR_TARGET_SCHEMA_VERSION,
       idempotency_key: provenance.idempotency_key,
+      request_hash: '',
       target_id: targetId,
       kind: 'created',
     });
