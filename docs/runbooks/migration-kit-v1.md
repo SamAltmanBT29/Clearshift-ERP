@@ -315,3 +315,9 @@ The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides
 
 State-transition actions are disabled until prerequisites pass; load requires a current dry-run pass and operator role permission. Synthetic data only.
 
+---
+
+## 8. CLI Usage (KIT-15)
+
+The CLI shares the same batch engine as the UI. See `docs/runbooks/cli.md` for command reference, flags, and exit codes.
+
