@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import type { SortDirection } from '@cs/ui';
 import type {
   Account,
   AccountsFilterQuery,
-  TrialBalanceResponse,
   JournalEntry,
 } from '@clearshift/contracts';
+import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
@@ -22,6 +23,8 @@ export const AccountsListPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTotal, setAccountsTotal] = useState(0);
   const [accountsTotalPages, setAccountsTotalPages] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string>('code');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string | null>(null);
 
@@ -29,8 +32,6 @@ export const AccountsListPage: React.FC = () => {
     page: 1,
     limit: 20,
     search: '',
-    type: undefined,
-    isActive: undefined,
   });
 
   // Trial Balance State
@@ -39,7 +40,7 @@ export const AccountsListPage: React.FC = () => {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
-  const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
+  const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
   const [tbError, setTbError] = useState<string | null>(null);
 
@@ -129,8 +130,6 @@ export const AccountsListPage: React.FC = () => {
       page: 1,
       limit: 20,
       search: '',
-      type: undefined,
-      isActive: undefined,
     });
   };
 
@@ -139,6 +138,23 @@ export const AccountsListPage: React.FC = () => {
       ...prev,
       page: newPage,
     }));
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setFilters((prev) => ({
+      ...prev,
+      limit: Math.min(100, Math.max(1, newPageSize)),
+      page: 1,
+    }));
+  };
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('asc');
+    }
   };
 
   // Switch to detail view for a specific journal entry
@@ -292,7 +308,13 @@ export const AccountsListPage: React.FC = () => {
               total={accountsTotal}
               page={filters.page || 1}
               totalPages={accountsTotalPages}
+              pageSize={filters.limit || 20}
+              pageSizeOptions={[10, 20, 50, 100]}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              onSort={handleSort}
               onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
             />
           )}

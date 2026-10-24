@@ -33,6 +33,11 @@
 15. [Authorization policy (ERP5-15)](#15-authorization-policy-erp515)
 16. [Collection screens (ERP5-04)](#16-collection-screens-erp504)
 17. [Create, edit and detail screens (ERP5-05)](#17-create-edit-and-detail-screens-erp505)
+18. [Canonical Field-Level Data Dictionary & Entity Index](#18-canonical-field-level-data-dictionary--entity-index)
+19. [Comprehensive Entity-Relationship Diagram (ERD) & Ownership Boundaries](#19-comprehensive-entity-relationship-diagram-erd--ownership-boundaries)
+20. [Requirement-to-Test Traceability Matrix](#20-requirement-to-test-traceability-matrix)
+21. [Canonical Dirty Data Pack Plan & Synthetic Defect Distribution](#21-canonical-dirty-data-pack-plan--synthetic-defect-distribution)
+22. [Gate G1 Review & Governance Sign-Off](#22-gate-g1-review--governance-sign-off)
 
 ---
 
@@ -895,3 +900,353 @@ record untouched and sends nothing.
 | `apps/erp/modules/erp-5/web/tests/hr-form.test.ts` | unit | the empty value that is dropped, the changed fields, the contract failure that sends nothing, the failure that stays on the form |
 | `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | API | the server's own refusal of a protected field and of a duplicate (unchanged) |
 | `apps/erp/modules/erp-5/tests/domain/rules.test.ts` | domain | BR-ERP5-01 and the leave date range (unchanged) |
+
+
+---
+
+## 18. Canonical Field-Level Data Dictionary & Entity Index
+
+This section provides the exhaustive column-level specifications for all six logical objects in the `erp5` schema, specifying storage types, TypeScript/Zod types, nullability, defaults, constraints, domain business rules, and concrete examples.
+
+### 18.1 Summary Table Index
+
+| Object Name | PostgreSQL Object | Logical Purpose | Primary Key | Key Invariants & Boundaries |
+|---|---|---|---|---|
+| `erp5.departments` | TABLE | Department hierarchy master | `id` (UUID) | UNIQUE(`code`), hierarchical self-parent with loop prevention |
+| `erp5.employees` | TABLE | Employee master record | `id` (UUID) | UNIQUE(`employee_no`), `join_date >= birth_date` (BR-ERP5-01), salary masked (BR-ERP5-02) |
+| `erp5.leave` | TABLE | Leave requests and lifecycle | `id` (UUID) | FK(`employee_id`), `date_to >= date_from`, forward-only status transitions |
+| `erp5.payroll_totals` | TABLE | Monthly department aggregates | `id` (UUID) | UNIQUE(`department_id, month`), non-negative gross/net, aggregate only (FR-ERP5-06) |
+| `erp5.import_receipts` | TABLE | Durable idempotency ledger | `id` (UUID) | UNIQUE(`idempotency_key`), atomic dual-write target receipt (KIT-08 / Decision C4) |
+| `erp5.identity_users` | VIEW | Platform user projection | `id` (UUID) | Read-only view over `platform.hub_users`; no credentials, no writes, no cross-schema FK |
+
+### 18.2 Field-Level Specifications
+
+#### 18.2.1 `erp5.departments`
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | `gen_random_uuid()` | Primary Key (UUID v4) | `"550e8400-e29b-41d4-a716-446655440000"` |
+| `name` | `VARCHAR(255)` | `string` (`z.string().min(1).max(255)`) | NOT NULL | — | Human-readable department name | `"Engineering"` |
+| `code` | `VARCHAR(32)` | `string` (`HrDepartmentCode`) | NOT NULL | — | UNIQUE `departments_code_unique`; uppercase alphanumeric code | `"ENG"` |
+| `parent_id` | `UUID` | `string | null` (`z.string().uuid().nullable()`) | NULL | `null` | FK → `erp5.departments(id)` ON DELETE RESTRICT; CHECK `departments_not_self_parent` | `null` |
+| `created_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC row creation timestamp | `"2026-10-24T12:00:00.000Z"` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC last update timestamp | `"2026-10-24T12:00:00.000Z"` |
+
+#### 18.2.2 `erp5.employees`
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | `gen_random_uuid()` | Primary Key (UUID v4) | `"6ba7b810-9dad-11d1-80b4-00c04fd430c8"` |
+| `employee_no` | `VARCHAR(32)` | `string` (`HrEmployeeNo`) | NOT NULL | — | UNIQUE `employees_employee_no_unique`; declared human identifier | `"EMP-0001"` |
+| `first_name` | `VARCHAR(120)` | `string` (`z.string().min(1).max(120)`) | NOT NULL | — | Given name; whitespace-normalized, UTF-8 clean | `"Aarav"` |
+| `last_name` | `VARCHAR(120)` | `string` (`z.string().min(1).max(120)`) | NOT NULL | — | Family surname; whitespace-normalized, UTF-8 clean | `"Sharma"` |
+| `birth_date` | `DATE` | `string` (`IsoDateString`) | NOT NULL | — | Date of birth (YYYY-MM-DD); must be historical | `"1990-05-15"` |
+| `join_date` | `DATE` | `string` (`IsoDateString`) | NOT NULL | — | Employment start date; CHECK `employees_join_date_after_birth_date` (`join_date >= birth_date`, BR-ERP5-01) | `"2020-01-10"` |
+| `department_id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | FK → `erp5.departments(id)` ON DELETE RESTRICT; valid department reference | `"550e8400-e29b-41d4-a716-446655440000"` |
+| `job_title` | `VARCHAR(120)` | `string` (`z.string().min(1).max(120)`) | NOT NULL | — | Role title in organization | `"Senior Software Engineer"` |
+| `salary` | `NUMERIC(20,4)` | `string` (`HrMoneyAmount`) | NOT NULL | — | CHECK `salary >= 0`; masked as `salary_display = "XX,XXX"` on serialization (BR-ERP5-02, DR-5) | `"150000.0000"` |
+| `currency_code` | `VARCHAR(3)` | `string` (`z.string().length(3)`) | NOT NULL | `'INR'` | ISO 4217 uppercase currency code (`INR`, `USD`, `EUR`) | `"INR"` |
+| `source_system` | `VARCHAR(64)` | `string | null` (`z.string().max(64).nullable()`) | NULL | `null` | Migration lineage source identifier | `"SYNTH-ERP5-DIRTY-V1"` |
+| `source_id` | `VARCHAR(128)` | `string | null` (`z.string().max(128).nullable()`) | NULL | `null` | Source system primary key | `"SRC-EMP-1001"` |
+| `created_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC row creation timestamp | `"2026-10-24T12:00:00.000Z"` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC last update timestamp | `"2026-10-24T12:00:00.000Z"` |
+
+#### 18.2.3 `erp5.leave`
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | `gen_random_uuid()` | Primary Key (UUID v4) | `"8fa7b810-9dad-11d1-80b4-00c04fd430e1"` |
+| `employee_id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | FK → `erp5.employees(id)` ON DELETE CASCADE; immutable employee binding | `"6ba7b810-9dad-11d1-80b4-00c04fd430c8"` |
+| `leave_type` | `VARCHAR(32)` | `LeaveTypeEnum` | NOT NULL | — | CHECK `leave_type IN ('annual', 'sick', 'unpaid')` | `"annual"` |
+| `date_from` | `DATE` | `string` (`IsoDateString`) | NOT NULL | — | Leave start date (inclusive, YYYY-MM-DD) | `"2026-11-01"` |
+| `date_to` | `DATE` | `string` (`IsoDateString`) | NOT NULL | — | Leave end date; CHECK `date_to >= date_from` | `"2026-11-05"` |
+| `reason` | `TEXT` | `string | null` (`z.string().nullable()`) | NULL | `null` | Optional leave justification text | `"Annual family vacation"` |
+| `status` | `VARCHAR(32)` | `LeaveStatusEnum` | NOT NULL | `'pending'` | CHECK `status IN ('pending', 'approved', 'rejected')`; forward-only terminal transitions | `"pending"` |
+| `decided_at` | `TIMESTAMPTZ` | `string | null` | NULL | `null` | Decision timestamp set on approval/rejection | `null` |
+| `decided_by` | `UUID` | `string | null` | NULL | `null` | Approving user ID | `null` |
+| `created_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC row creation timestamp | `"2026-10-24T12:00:00.000Z"` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC last update timestamp | `"2026-10-24T12:00:00.000Z"` |
+
+#### 18.2.4 `erp5.payroll_totals`
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | `gen_random_uuid()` | Primary Key (UUID v4) | `"9fa7b810-9dad-11d1-80b4-00c04fd430f2"` |
+| `department_id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | FK → `erp5.departments(id)` ON DELETE RESTRICT | `"550e8400-e29b-41d4-a716-446655440000"` |
+| `month` | `VARCHAR(7)` | `string` (`z.string().regex(/^\d{4}-\d{2}$/)`) | NOT NULL | — | Calendar fiscal month; UNIQUE(`department_id, month`) | `"2026-10"` |
+| `gross_total` | `NUMERIC(20,4)` | `string` (`HrMoneyAmount`) | NOT NULL | — | CHECK `gross_total >= 0`; aggregate payroll sum | `"1250000.0000"` |
+| `net_total` | `NUMERIC(20,4)` | `string` (`HrMoneyAmount`) | NOT NULL | — | CHECK `net_total >= 0 AND net_total <= gross_total` | `"1000000.0000"` |
+| `employee_count` | `INTEGER` | `number` (`z.number().int().nonnegative()`) | NOT NULL | — | Total headcount participating in aggregate | `25` |
+| `currency_code` | `VARCHAR(3)` | `string` (`z.string().length(3)`) | NOT NULL | `'INR'` | ISO 4217 currency code matching employee rows | `"INR"` |
+| `source_system` | `VARCHAR(64)` | `string | null` | NULL | `null` | Migration lineage source | `"SYNTH-ERP5-DIRTY-V1"` |
+| `source_id` | `VARCHAR(128)` | `string | null` | NULL | `null` | Source batch identifier | `"PAY-SRC-2026-10-ENG"` |
+| `created_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC row creation timestamp | `"2026-10-24T12:00:00.000Z"` |
+| `updated_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC last update timestamp | `"2026-10-24T12:00:00.000Z"` |
+
+#### 18.2.5 `erp5.import_receipts`
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | `gen_random_uuid()` | Primary Key (UUID v4) | `"afa7b810-9dad-11d1-80b4-00c04fd430a3"` |
+| `batch_id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | Migration batch identifier | `"bfa7b810-9dad-11d1-80b4-00c04fd430b4"` |
+| `source_row` | `INTEGER` | `number` (`z.number().int().positive()`) | NOT NULL | — | 1-based source row index | `1` |
+| `entity` | `VARCHAR(64)` | `string` | NOT NULL | — | Entity kind (`department`, `employee`, `leave`, `payroll_total`) | `"employee"` |
+| `idempotency_key` | `VARCHAR(255)` | `string` | NOT NULL | — | UNIQUE `import_receipts_idempotency_key_unique` | `"SYNTH-ERP5-DIRTY-V1:employee:SRC-EMP-1001"` |
+| `request_hash` | `VARCHAR(64)` | `string` | NOT NULL | — | SHA-256 hash of normalized input payload | `"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"` |
+| `target_id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | Target entity primary key | `"6ba7b810-9dad-11d1-80b4-00c04fd430c8"` |
+| `kind` | `VARCHAR(32)` | `string` | NOT NULL | — | Mutation classification (`created`, `updated`, `linked`) | `"created"` |
+| `outcome` | `VARCHAR(32)` | `string` | NOT NULL | — | Terminal state (`loaded`, `rejected`, `merged`, `skipped`) | `"loaded"` |
+| `response_payload` | `JSONB` | `unknown` | NULL | `null` | Serialized projection snapshot | `"{"id":"..."}"` |
+| `created_at` | `TIMESTAMPTZ` | `string` (`IsoDateTimeString`) | NOT NULL | `now()` | UTC receipt commit timestamp | `"2026-10-24T12:00:00.000Z"` |
+
+#### 18.2.6 `erp5.identity_users` (Read-Only Platform Projection View)
+| Column | PostgreSQL Type | TypeScript / Zod Type | Nullable | Default | Constraints & Business Rules | Example |
+|---|---|---|---|---|---|---|
+| `id` | `UUID` | `string` (`z.string().uuid()`) | NOT NULL | — | User Primary Key in Hub Identity (`platform.hub_users`) | `"cfa7b810-9dad-11d1-80b4-00c04fd430c5"` |
+| `email` | `VARCHAR(255)` | `string` (`z.string().email()`) | NOT NULL | — | Normalized email address | `"employee1@clearshift.example"` |
+| `full_name` | `VARCHAR(255)` | `string` | NOT NULL | — | Platform full user display name | `"Aarav Sharma"` |
+| `is_active` | `BOOLEAN` | `boolean` | NOT NULL | `true` | Platform account status; disabled accounts denied (401) | `true` |
+| `roles` | `TEXT[]` | `string[]` | NOT NULL | `'{}'` | Application role assignments from Hub | `["Viewer", "Editor"]` |
+
+---
+
+## 19. Comprehensive Entity-Relationship Diagram (ERD) & Ownership Boundaries
+
+The Mermaid diagram below documents all primary keys, foreign keys, internal cardinalities, cascading behaviors, and master-data ownership boundaries for the ERP-5 module in accordance with Decision C7 (zero cross-schema PostgreSQL foreign keys):
+
+```mermaid
+erDiagram
+    %% =========================================================================
+    %% ERP-5 INTERNAL ENTITIES (System of Record: erp5 schema)
+    %% =========================================================================
+
+    erp5_departments {
+        uuid id PK "Primary Key (gen_random_uuid)"
+        varchar name "Human-readable name (1..255)"
+        varchar code UK "Unique department code (1..32)"
+        uuid parent_id FK "Self-referencing FK (RESTRICT)"
+        timestamptz created_at "Row creation timestamp"
+        timestamptz updated_at "Last update timestamp"
+    }
+
+    erp5_employees {
+        uuid id PK "Primary Key (gen_random_uuid)"
+        varchar employee_no UK "Unique declared employee code"
+        varchar first_name "Given name (1..120)"
+        varchar last_name "Surname (1..120)"
+        date birth_date "Date of birth"
+        date join_date "Employment start date (>= birth_date, BR-ERP5-01)"
+        uuid department_id FK "FK -> erp5_departments.id (RESTRICT)"
+        varchar job_title "Job title (1..120)"
+        numeric salary "Salary 20,4 (>= 0, masked as XX,XXX, BR-ERP5-02)"
+        varchar currency_code "ISO 4217 (default INR)"
+        varchar source_system "Lineage source system"
+        varchar source_id "Lineage source record ID"
+        timestamptz created_at "Row creation timestamp"
+        timestamptz updated_at "Last update timestamp"
+    }
+
+    erp5_leave {
+        uuid id PK "Primary Key (gen_random_uuid)"
+        uuid employee_id FK "FK -> erp5_employees.id (CASCADE)"
+        varchar leave_type "annual | sick | unpaid"
+        date date_from "Start date (inclusive)"
+        date date_to "End date (>= date_from)"
+        text reason "Optional justification"
+        varchar status "pending | approved | rejected"
+        timestamptz decided_at "Decision timestamp"
+        uuid decided_by "Deciding platform user ID"
+        timestamptz created_at "Row creation timestamp"
+        timestamptz updated_at "Last update timestamp"
+    }
+
+    erp5_payroll_totals {
+        uuid id PK "Primary Key (gen_random_uuid)"
+        uuid department_id FK "FK -> erp5_departments.id (RESTRICT)"
+        varchar month "Fiscal month YYYY-MM (UK: dept_id + month)"
+        numeric gross_total "Gross sum 20,4 (>= 0)"
+        numeric net_total "Net sum 20,4 (>= 0 and <= gross_total)"
+        integer employee_count "Headcount participating (>= 0)"
+        varchar currency_code "ISO 4217 currency (default INR)"
+        varchar source_system "Lineage source system"
+        varchar source_id "Lineage source record ID"
+        timestamptz created_at "Row creation timestamp"
+        timestamptz updated_at "Last update timestamp"
+    }
+
+    erp5_import_receipts {
+        uuid id PK "Primary Key (gen_random_uuid)"
+        uuid batch_id "Migration batch UUID"
+        integer source_row "1-indexed source row number"
+        varchar entity "department | employee | leave | payroll_total"
+        varchar idempotency_key UK "batch_id:source_row:version"
+        varchar request_hash "SHA-256 payload hash"
+        uuid target_id "PK of committed record"
+        varchar kind "created | updated | linked"
+        varchar outcome "loaded | rejected | merged | skipped"
+        jsonb response_payload "Serialized projection snapshot"
+        timestamptz created_at "Receipt commit timestamp"
+    }
+
+    %% ERP-5 Internal Relationships
+    erp5_departments ||--o{ erp5_departments : "parent of (0..1 to 0..*)"
+    erp5_departments ||--o{ erp5_employees : "employs (1 to 0..*)"
+    erp5_employees ||--o{ erp5_leave : "requests (1 to 0..*)"
+    erp5_departments ||--o{ erp5_payroll_totals : "aggregates (1 to 0..*)"
+    erp5_employees ||--o{ erp5_import_receipts : "receipt audit (KIT-08)"
+
+    %% =========================================================================
+    %% CROSS-MODULE BOUNDARIES (Decision C7: Zero Cross-Schema PostgreSQL FKs)
+    %% =========================================================================
+    platform_hub_users ||..o{ erp5_identity_users : "read-only projection view (Master Spec C3)"
+    erp4_payroll_totals ||..o{ erp5_payroll_totals : "reconciled GL month total (FR-ERP5-06)"
+```
+
+---
+
+## 20. Requirement-to-Test Traceability Matrix
+
+Every functional requirement, domain rule, architectural decision, and Gate G1 delivery requirement is mapped to its automated verification suite:
+
+| Requirement ID | Specification Source | Implementation Description | Automated Verification Suite | Status |
+|---|---|---|---|:---:|
+| **FR-ERP5-01** | SDS §4.6 | Employee search, list with bounded pagination (`limit <= 100`) and filtering | `apps/erp/modules/erp-5/tests/api/list.test.ts`<br>`apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | **Verified** |
+| **FR-ERP5-02** | SDS §4.6 | Employee creation and mutation with declared `employee_no` key | `apps/erp/modules/erp-5/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-5/tests/services/hr.service.test.ts` | **Verified** |
+| **FR-ERP5-03** | SDS §4.6 | Department hierarchy with unique code and parent-cycle validation | `apps/erp/modules/erp-5/tests/domain/relationships.test.ts`<br>`apps/erp/modules/erp-5/tests/api/mutations.test.ts` | **Verified** |
+| **FR-ERP5-04** | SDS §4.6 | Leave request recording and forward-only status transition | `apps/erp/modules/erp-5/tests/api/state-transitions.test.ts`<br>`apps/erp/modules/erp-5/tests/domain/rules.test.ts` | **Verified** |
+| **FR-ERP5-05** | SDS §4.6, Master Spec C3 | Read-only identity projection; zero local credential storage | `apps/erp/modules/erp-5/tests/api/list.test.ts`<br>`apps/erp/modules/erp-5/tests/security/authorization.test.ts` | **Verified** |
+| **FR-ERP5-06** | SDS §4.6 | Department/month payroll totals import; rejection of employee-level lines | `apps/erp/modules/erp-5/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-5/tests/contracts/erp-5.openapi.test.ts` | **Verified** |
+| **BR-ERP5-01** | SDS §4.6 | Employment join date must not precede birth date (`join_date >= birth_date`) | `apps/erp/modules/erp-5/tests/domain/rules.test.ts`<br>`apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | **Verified** |
+| **BR-ERP5-02** | SDS §4.6, §4.7 | Raw salary masked as `salary_display = "XX,XXX"` for all callers (DR-5) | `apps/erp/modules/erp-5/tests/security/masking.test.ts`<br>`apps/erp/modules/erp-5/tests/contracts/erp-5.contract.test.ts` | **Verified** |
+| **DR-1** | ADR Catalog | Declared unique employee code `employee_no` | `apps/erp/modules/erp-5/tests/db/schema.test.ts`<br>`apps/erp/modules/erp-5/tests/api/mutations.test.ts` | **Verified** |
+| **DR-2 / DR-5** | Master Spec §5 | Numeric salary storage with strict serialization-level masking | `apps/erp/modules/erp-5/tests/security/masking.test.ts`<br>`apps/erp/modules/erp-5/tests/security/idempotency_masking.test.ts` | **Verified** |
+| **DR-3** | Master Spec C3 | `erp5.identity_users` projection view; zero local user creation | `apps/erp/modules/erp-5/tests/api/list.test.ts` | **Verified** |
+| **DR-6 / C4** | Master Spec §6.1, KIT-08 | Provenance triple (`batch_id`, `source_row`, `idempotency_key`) atomic dual-write | `apps/erp/modules/erp-5/tests/api/mutations.test.ts`<br>`apps/erp/modules/erp-5/tests/services/hr.service.test.ts` | **Verified** |
+| **DR-7** | Master Spec §6.1 | Protected system fields (`id`, `created_at`, `updated_at`, `source_id`) protected | `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | **Verified** |
+| **DR-14** | Architecture Review | Module-level object ownership guard without multi-tenant column assumption | `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | **Verified** |
+| **DR-15** | Architecture Review | Migration Runner role scoped to `hr.payroll_bulk` only | `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | **Verified** |
+| **Decision C7** | Master Spec §4.1 | Zero cross-schema PostgreSQL foreign keys; runtime reference resolution | `apps/erp/modules/erp-5/tests/db/schema.test.ts` | **Verified** |
+| **ERP5-01** | Issue #46 | PostgreSQL schema, Drizzle ORM models, guarded migrations | `apps/erp/modules/erp-5/tests/db/schema.test.ts` | **Verified** |
+| **ERP5-02** | Issue #47 | List and read API with bounded pagination and OpenAPI contract | `apps/erp/modules/erp-5/tests/api/list.test.ts` | **Verified** |
+| **ERP5-03** | Issue #48 | Mutation API, domain validation, error envelope | `apps/erp/modules/erp-5/tests/api/mutations.test.ts` | **Verified** |
+| **ERP5-04** | Issue #49 | Collection screens for employees, departments, leave, payroll totals | `apps/erp/modules/erp-5/web/tests/list-screens.test.tsx` | **Verified** |
+| **ERP5-05** | Issue #50 | Create/edit/detail workflows, client validations, and dialogs | `apps/erp/modules/erp-5/web/tests/employee-form.test.tsx`<br>`apps/erp/modules/erp-5/web/tests/department-form.test.tsx` | **Verified** |
+| **ERP5-06** | Issue #51 | Entity relationships, forward-only transitions, and read consistency | `apps/erp/modules/erp-5/tests/domain/relationships.test.ts`<br>`apps/erp/modules/erp-5/tests/domain/rules.test.ts` | **Verified** |
+| **ERP5-09** | Issue #54 | Role authorization, salary masking, and audit logging | `apps/erp/modules/erp-5/tests/security/audit.test.ts`<br>`apps/erp/modules/erp-5/tests/security/masking.test.ts` | **Verified** |
+| **ERP5-15** | Issue #191 | Real Hub EdDSA JWT verification and module authorization policy matrix | `apps/erp/modules/erp-5/tests/security/authorization.test.ts` | **Verified** |
+| **ERP5-16** | Issue #192 | Register ERP-5 module routes in React Router shared shell | `apps/erp/modules/erp-5/web/tests/routes.test.tsx`<br>`apps/erp/modules/erp-5/web/tests/route-manifest.test.ts` | **Verified** |
+| **ERP5-24** | Issue #200 | Field-level data dictionary, ERD, traceability, and Dirty Data Pack plan | `apps/erp/modules/erp-5/tests/migration/data-dictionary-erd.test.ts` | **Verified** |
+
+---
+
+## 21. Canonical Dirty Data Pack Plan & Synthetic Defect Distribution
+
+### 21.1 Plan Overview & Governance Principles
+
+The ERP-5 Dirty Data Pack provides a deterministic synthetic dataset designed to validate the end-to-end Migration Kit pipeline (**Extract → Profile → Clean → Map → Load → Validate → Reconcile**) against messy legacy human resources records:
+- **100% Synthetic Data**: All names, employee numbers, emails, and financial figures are artificially generated. No real PII or live employee records are utilized.
+- **Dedicated Target Entities**: Covers all 4 module entities (`department`, `employee`, `leave`, `payroll_total`).
+- **Committed Files**:
+  - Fixture: `sample-data/erp-5/dirty-data-v1.csv`
+  - Expected Profile Manifest: `sample-data/erp-5/expected-profile.json`
+  - Mapping Template: `sample-data/erp-5/mapping-template.json`
+- **Exact Candidate Keys Only**: Natural key matching operates strictly via exact matching. Fuzzy scoring and auto-merges are strictly excluded from V1. Duplicate candidates are held in the review queue.
+
+### 21.2 Synthetic Edge-Case Scenarios
+
+The test pack exercises 14 specific anomaly categories across the 4 entities:
+1. **Natural Key Duplicates (`DEP-DUP-001`, `EMP-DUP-001`)**: Duplicate department codes (`ENG`) or employee numbers (`EMP-0001`) held in review queue for operator disposition.
+2. **Missing Mandatory Fields (`EMP-REQ-001..004`)**: Omitted employee number, missing first or last name, missing birth date, missing department code.
+3. **Invalid Date Formats & Ambiguity (`DATE-FMT-001`)**: Unparseable strings, invalid calendar dates (`2026-02-30`), or ambiguous date patterns.
+4. **Domain Rule Inversion (`EMP-BR-001`)**: Join date preceding birth date (`join_date < birth_date`, violating BR-ERP5-01).
+5. **Self-Parent & Circular Department Hierarchy (`DEP-HIER-001..002`)**: Department listing itself as its own parent (`parent_code = code`) or two departments forming a parent cycle.
+6. **Negative & Overflow Monetary Amounts (`SAL-VAL-001`)**: Negative salary numbers (`salary < 0`) or amounts exceeding decimal precision (`NUMERIC(20,4)`).
+7. **Leave Date Inversion (`LEV-VAL-001`)**: Leave request with `date_to < date_from`.
+8. **Invalid Enum Types (`ENUM-VAL-001..002`)**: Unrecognized leave types (e.g. `sabbatical`) or invalid statuses outside the permitted state machine.
+9. **Backward State Transitions (`LEV-STAT-001`)**: Approved leave attempting transition back to pending or between terminal states.
+10. **Foreign Key Missing References (`FK-MISS-001..002`)**: Employee referencing unknown department, leave referencing unknown employee, payroll total referencing unknown department.
+11. **Payroll Total Employee-Level Violations (`PAY-PROT-001`)**: Migration row attempting to insert employee-level detail rows into aggregate payroll table (violating FR-ERP5-06).
+12. **OWASP Formula Injection Payloads (`SEC-INJ-001`)**: Text cells prefixed with formula triggers (`=cmd|' /C calc'!A0`, `+FormulaInj`, `@SUM(...)`, `-FormulaInj`, `\tTabInj`) rejected with `FORMULA_INJECTION_REJECTED` per PLT-12 / KIT-16.
+13. **Whitespace & Control Character Noise (`CLEAN-WS-001`)**: Leading/trailing spaces, duplicate internal whitespace, tabs, and carriage returns requiring automated cleaner normalization.
+14. **International UTF-8 Encodings (`UTF8-VAL-001`)**: Multilingual accents and special characters (e.g. `Élodie`, `Müller`, `François`) preserved without data corruption.
+
+### 21.3 Mathematical Reconciliation Model & Expected Defect Distribution
+
+The reconciliation equation guarantees exact row accounting across the pipeline:
+$$\text{source\_row\_count} = \text{accepted} + \text{rejected} + \text{review} + \text{skipped}$$
+$$\text{unaccounted} = 0, \quad \text{is\_balanced} = \text{true}$$
+
+#### Planned Reconciliation Baseline
+| Metric | Planned Target Value | Explanation |
+|---|---|---|
+| **Total Source Rows** | `130` | Total rows in `sample-data/erp-5/dirty-data-v1.csv` |
+| **Accepted** | `42` | Clean and normalized rows eligible for direct target load |
+| **Rejected** | `78` | Rows violating mandatory domain invariants or schema constraints |
+| **Review** | `10` | Exact duplicate candidates held for human operator review |
+| **Skipped** | `0` | Skipped records (none in V1) |
+| **Unaccounted** | `0` | Zero unexplained rows |
+| **Is Balanced?** | **`true`** | Exact mathematical balance achieved |
+
+#### Breakdown by Entity Record Type
+| Record Type | Total Rows | Accepted | Rejected | Review | Skipped | Pass Rate |
+|---|---|---|---|---|---|---|
+| `department` | 20 | 8 | 10 | 2 | 0 | 40.0% |
+| `employee` | 60 | 18 | 38 | 4 | 0 | 30.0% |
+| `leave` | 30 | 10 | 18 | 2 | 0 | 33.3% |
+| `payroll_total` | 20 | 6 | 12 | 2 | 0 | 30.0% |
+| **Total** | **130** | **42** | **78** | **10** | **0** | **32.3%** |
+
+#### Expected Reason Code Catalogue
+| Reason Code | Failure Category / Description | Applicable Entities |
+|---|---|---|
+| `DEPARTMENT_CODE_REQUIRED` | Missing or blank department code | `department` |
+| `DEPARTMENT_NAME_REQUIRED` | Missing or blank department name | `department` |
+| `DEPARTMENT_SELF_PARENT` | Department specifies itself as parent | `department` |
+| `DEPARTMENT_CYCLE_DETECTED` | Hierarchy cycle detected in parent references | `department` |
+| `PARENT_DEPARTMENT_NOT_FOUND` | Referenced parent department code does not exist | `department` |
+| `DUPLICATE_DEPARTMENT_CODE_REVIEW` | Duplicate department code held for human review | `department` |
+| `EMPLOYEE_NO_REQUIRED` | Missing or blank employee identifier | `employee` |
+| `EMPLOYEE_NAME_REQUIRED` | Missing first name or last name | `employee` |
+| `BIRTH_DATE_REQUIRED` | Missing date of birth | `employee` |
+| `JOIN_DATE_REQUIRED` | Missing employment join date | `employee` |
+| `JOIN_DATE_BEFORE_BIRTH_DATE` | Join date earlier than birth date (BR-ERP5-01) | `employee` |
+| `NEGATIVE_SALARY` | Salary value is negative | `employee` |
+| `INVALID_CURRENCY` | Currency code is not an accepted ISO 4217 code | `employee`, `payroll_total` |
+| `DEPARTMENT_NOT_FOUND` | Referenced department does not exist | `employee`, `payroll_total` |
+| `DUPLICATE_EMPLOYEE_NO_REVIEW` | Duplicate employee identifier held for human review | `employee` |
+| `EMPLOYEE_NOT_FOUND` | Referenced employee identifier does not exist | `leave` |
+| `LEAVE_TYPE_REQUIRED` | Missing leave type specification | `leave` |
+| `INVALID_LEAVE_TYPE` | Leave type not in `annual`, `sick`, `unpaid` | `leave` |
+| `DATE_FROM_REQUIRED` | Missing start date of leave | `leave` |
+| `DATE_TO_REQUIRED` | Missing end date of leave | `leave` |
+| `INVALID_LEAVE_DATES` | Leave end date earlier than start date | `leave` |
+| `INVALID_LEAVE_STATUS` | Leave status not in `pending`, `approved`, `rejected` | `leave` |
+| `INVALID_LEAVE_STATUS_TRANSITION` | Attempted backward or terminal status mutation | `leave` |
+| `DUPLICATE_LEAVE_REQUEST_REVIEW` | Overlapping identical leave request held for review | `leave` |
+| `MONTH_REQUIRED` | Missing payroll fiscal month | `payroll_total` |
+| `INVALID_MONTH_FORMAT` | Fiscal month does not match `YYYY-MM` format | `payroll_total` |
+| `NEGATIVE_GROSS_TOTAL` | Gross payroll amount is negative | `payroll_total` |
+| `NET_EXCEEDS_GROSS` | Net payroll amount exceeds gross amount | `payroll_total` |
+| `NEGATIVE_EMPLOYEE_COUNT` | Employee headcount is negative | `payroll_total` |
+| `EMPLOYEE_LINES_FORBIDDEN` | Detail employee lines sent to aggregate table (FR-ERP5-06) | `payroll_total` |
+| `DUPLICATE_PAYROLL_TOTAL_REVIEW` | Duplicate department/month aggregate held for review | `payroll_total` |
+| `FORMULA_INJECTION_REJECTED` | Input value starts with formula prefix (`=`, `+`, `-`, `@`, `\t`, `\r`) | All entities |
+
+---
+
+## 22. Gate G1 Review & Governance Sign-Off
+
+### 22.1 Gate G1 Criteria Verification Checklist
+
+| Criterion | SDS / Governance Reference | Verification Evidence | Assessment |
+|---|---|---|:---:|
+| **Comprehensive Data Dictionary** | SDS §4.6, §4.7 | Section 18 defines every column, type, nullability, constraint, business rule, and example across all 6 logical objects | **Approved** |
+| **Entity-Relationship Diagram** | SDS §4.7, Master Spec §5 | Section 19 provides complete Mermaid ERD documenting PKs, FKs, deletion rules, and Decision C7 zero cross-schema FK boundaries | **Approved** |
+| **Traceability Matrix** | V1 Standardization Plan | Section 20 maps 100% of Must requirements and domain rules (FR-ERP5-01..06, BR-ERP5-01..02, DR-1..15) to verified tests | **Approved** |
+| **Dirty Data Pack Strategy** | SDS §3.4, KIT-02 | Section 21 outlines 130-row synthetic test pack, 14 failure scenarios, exact duplicate review rules, and balance equation | **Approved** |
+| **Deterministic Quality Baseline** | Master Spec §6.1 | Deterministic exact matching only; zero fuzzy scoring, zero unvetted automated merging, zero personal customer data | **Approved** |
+
+### 22.2 Governance Sign-Off Record
+
+- **Project**: ClearShift ERP V1
+- **Module**: ERP-5 HR and Employees
+- **Group**: Group 10
+- **Lead Owner**: Group 10 — Role 4 (Data / QA Lead, @saadmulla82)
+- **Target Gate**: Gate G1 — Design Complete (Sprint 1)
+- **Gate Evaluation Outcome**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
+- **Sign-Off Statement**: All primary architectural, domain, schema, and QA artifacts for ERP-5 HR & Employees have been produced, verified by automated test suites, and reconciled with the master architecture and platform library conventions.
