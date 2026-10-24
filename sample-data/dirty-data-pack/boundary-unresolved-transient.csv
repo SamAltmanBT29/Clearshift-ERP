@@ -1,0 +1,21 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+B2-TRANSIENT-001,TransientUser1,NetworkFlake1,transient1@example.org,+1-555-0701,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-002,TransientUser2,NetworkFlake2,transient2@example.org,+1-555-0702,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-003,TransientUser3,NetworkFlake3,transient3@example.org,+1-555-0703,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-004,TransientUser4,NetworkFlake4,transient4@example.org,+1-555-0704,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-005,TransientUser5,NetworkFlake5,transient5@example.org,+1-555-0705,FlakyNetwork Inc,US,10002,active,SIMULATE_TRANSIENT_FAILURE_EXHAUSTED
+B2-TRANSIENT-006,TransientUser6,NetworkFlake6,transient6@example.org,+1-555-0706,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-007,TransientUser7,NetworkFlake7,transient7@example.org,+1-555-0707,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-008,TransientUser8,NetworkFlake8,transient8@example.org,+1-555-0708,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-009,TransientUser9,NetworkFlake9,transient9@example.org,+1-555-0709,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-010,TransientUser10,NetworkFlake10,transient10@example.org,+1-555-0710,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-011,TransientUser11,NetworkFlake11,transient11@example.org,+1-555-0711,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-012,TransientUser12,NetworkFlake12,transient12@example.org,+1-555-0712,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-013,TransientUser13,NetworkFlake13,transient13@example.org,+1-555-0713,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-014,TransientUser14,NetworkFlake14,transient14@example.org,+1-555-0714,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-015,TransientUser15,NetworkFlake15,transient15@example.org,+1-555-0715,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-016,TransientUser16,NetworkFlake16,transient16@example.org,+1-555-0716,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-017,TransientUser17,NetworkFlake17,transient17@example.org,+1-555-0717,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-018,TransientUser18,NetworkFlake18,transient18@example.org,+1-555-0718,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-019,TransientUser19,NetworkFlake19,transient19@example.org,+1-555-0719,FlakyNetwork Inc,US,10002,active,Normal row
+B2-TRANSIENT-020,TransientUser20,NetworkFlake20,transient20@example.org,+1-555-0720,FlakyNetwork Inc,US,10002,active,Normal row
