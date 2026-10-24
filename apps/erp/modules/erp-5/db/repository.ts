@@ -337,6 +337,7 @@ export class DrizzleHrRepository implements HrRepository {
         entity: receipt.entity,
         schema_version: receipt.schema_version ?? 1,
         idempotency_key: receipt.idempotency_key,
+        request_hash: receipt.request_hash,
         target_id: receipt.target_id,
         kind: receipt.kind ?? 'created',
       })
