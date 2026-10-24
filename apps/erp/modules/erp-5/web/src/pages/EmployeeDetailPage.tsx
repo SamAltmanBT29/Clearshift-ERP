@@ -7,15 +7,17 @@
  * @module erp5/web/pages/EmployeeDetailPage
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { HrEmployeeView } from '@clearshift/contracts';
-import { getEmployee } from '../api/erp-5.js';
+import type { HrEmployeeView, HrLeave, HrLeaveListQuery } from '@clearshift/contracts';
+import { getEmployee, listLeave } from '../api/erp-5.js';
 import { FormPageLayout } from '../components/FormPageLayout.js';
+import { LeaveTable } from '../components/LeaveTable.js';
 import { RecordDetail } from '../components/RecordDetail.js';
 import { RecordStateBoundary } from '../components/RecordStateBoundary.js';
 import { departmentLabel } from '../hooks/useDepartmentLookup.js';
 import { useDepartmentLookup } from '../hooks/useDepartmentLookup.js';
+import { useHrList } from '../hooks/useHrList.js';
 import { useHrRecord } from '../hooks/useHrRecord.js';
 
 export const EmployeeDetailPage: React.FC = () => {
@@ -33,6 +35,22 @@ export const EmployeeDetailPage: React.FC = () => {
   );
 
   const { record, isLoading, error, reload } = useHrRecord<HrEmployeeView>(fetchEmployee);
+
+  // Linked records: the leave records that belong to this employee. The API
+  // filters by `employee_id`, so the sub-table is a bounded page of the
+  // employee's own leave history rather than the whole module collection.
+  const leaveQuery = useMemo<HrLeaveListQuery>(
+    () => ({ page: 1, pageSize: 25, ...(employeeId ? { employee_id: employeeId } : {}) }),
+    [employeeId]
+  );
+  const {
+    items: leaveRecords,
+    isLoading: leaveLoading,
+    error: leaveError,
+  } = useHrList<HrLeave, HrLeaveListQuery>(
+    (query, signal) => listLeave(query, { signal }),
+    leaveQuery
+  );
 
   return (
     <FormPageLayout
@@ -83,6 +101,19 @@ export const EmployeeDetailPage: React.FC = () => {
                 { label: 'Updated', value: record.updated_at },
               ]}
             />
+
+            <section className="cs-erp5-linked-records" aria-labelledby="erp5-employee-leave-heading">
+              <h2 id="erp5-employee-leave-heading" className="cs-erp5-detail-section-title">
+                Leave records
+              </h2>
+              {leaveError ? (
+                <p className="cs-erp5-detail-hint">
+                  Leave records could not be loaded: {leaveError.message}
+                </p>
+              ) : (
+                <LeaveTable leaveRecords={leaveRecords} isLoading={leaveLoading} />
+              )}
+            </section>
           </>
         ) : null}
       </RecordStateBoundary>
