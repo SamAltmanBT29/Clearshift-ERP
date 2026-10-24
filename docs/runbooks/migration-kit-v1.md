@@ -272,7 +272,35 @@ Every compensation decision is audited durably in PostgreSQL:
    - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
    - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
 
-### 6. KIT-14 Operator Workflow (Screens)
+---
+
+## 6. Transactional Event Envelope, Outbox Producer and CRM-5 Projections (KIT-13)
+
+**Traceability:** Issue #80 `[KIT-13]`; SDS ClearShift Migration Kit v2.0 §4.13; Project Plan v3.0 §§9, 11, 17.
+
+### 6.1 Event Types
+Batch state events published via the PostgreSQL outbox:
+- `batch.extracted` — payload: `batch_id`, `module`, `rows_read`
+- `batch.profiled` — payload: `batch_id`, `module`, `empty_count`, `invalid_count`, `duplicate_count`
+- `batch.cleaned` — payload: `batch_id`, `cleaned`, `rejected`
+- `batch.mapped` — payload: `batch_id`, `mapped`, `missing_required`
+- `batch.loaded` — payload: `batch_id`, `loaded`, `rejected`, `merged`
+- `batch.validated` — payload: `batch_id`, `validation_failures`
+- `batch.failed` — payload: `batch_id`, `step`, `reason`
+- `contact.merged` — where relevant
+
+### 6.2 Transactional Commit
+For each state event, the DB mutation and the outbox envelope commit together in the same PostgreSQL transaction. The Migration Kit uses `OutboxEventProducer` (`apps/migration-kit/src/events/producer.ts`) which delegates to `IOutboxRepository.writeEvent(envelope, tx)`.
+
+### 6.3 CRM-5 Projections
+`InMemoryCrm5ProjectionStore` (`apps/migration-kit/src/events/projection.ts`) derives batch counts/status from event envelopes. Duplicate deliveries are deduplicated by `event_id`; out-of-order deliveries are ignored when their `occurred_at` is older than the last applied event, preventing projection regression.
+
+### 6.4 Hard Failure
+Any unrecoverable step emits `batch.failed` with `step` and `reason`. Consumers tolerate duplicate and out-of-order delivery and never claim exactly-once.
+
+---
+
+## 7. Migration Kit Operator Workflow (Screens) (KIT-14)
 
 The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides:
 
@@ -289,6 +317,7 @@ State-transition actions are disabled until prerequisites pass; load requires a 
 
 ---
 
-## 7. CLI Usage (KIT-15)
+## 8. CLI Usage (KIT-15)
 
 The CLI shares the same batch engine as the UI. See `docs/runbooks/cli.md` for command reference, flags, and exit codes.
+
