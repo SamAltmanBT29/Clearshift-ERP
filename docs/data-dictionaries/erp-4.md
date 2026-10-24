@@ -351,3 +351,18 @@ As part of Sprint 3 / Gate G4 requirements (Decision C4 & KIT-08):
   - `npm run erp4:test`: Runs full Vitest suite for ERP-4 module.
   - `npm run erp4:seed`: Executes deterministic public API seed helper.
   - `npm run erp4:e2e`: Runs Playwright browser journey suite.
+
+## 24. Gate G1 Design Artifacts (Issue #180 / ERP4-24)
+
+- **Comprehensive Field-Level Data Dictionary**:
+  [`apps/erp/modules/erp-4/docs/field-level-data-dictionary.md`](../../apps/erp/modules/erp-4/docs/field-level-data-dictionary.md)  
+  Defines every entity column: PostgreSQL Type, TypeScript/Zod Type, Nullability, Default, Constraints, Business Rule, and Example for `erp4.accounts`, `erp4.accounting_periods`, `erp4.journal_entries`, `erp4.journal_lines`, `erp4.opening_balances`, and `erp4.import_receipts`.
+- **Entity-Relationship Diagram (ERD)**:
+  [`apps/erp/modules/erp-4/docs/erd.md`](../../apps/erp/modules/erp-4/docs/erd.md)  
+  Documents real database primary keys, foreign keys (`ON DELETE CASCADE` on lines, `RESTRICT` on periods/accounts), and master-data ownership boundaries (ERP-2 vendor bills, ERP-3 invoices, CRM-5 projections).
+- **Requirement-to-Test Traceability Matrix**:
+  [`apps/erp/modules/erp-4/docs/traceability-matrix.md`](../../apps/erp/modules/erp-4/docs/traceability-matrix.md)  
+  Bi-directionally maps every SDS requirement (`FR-ERP4-01` through `FR-ERP4-05`, `BR-ERP4-01`, `BR-ERP4-02`, `KIT-08`, `KIT-14`, `KIT-16`, `SEC-01`) to automated test cases across database, domain, API, and UI layers.
+- **Dirty Data Pack Plan**:
+  [`apps/erp/modules/erp-4/docs/dirty-data-pack-plan.md`](../../apps/erp/modules/erp-4/docs/dirty-data-pack-plan.md)  
+  Specifies the 120-row synthetic fixture layout across 40 accounts, 30 opening balances, and 50 journal entries/lines with exact defect allocations (`loaded`, `loaded_cleaned`, `merged`, `rejected`) and strict reconciliation (`unaccounted = 0`).
