@@ -8,7 +8,7 @@ import {
   createEventEnvelopeSchema,
   createEventEnvelope,
   type EventEnvelope,
-} from './events.js';
+} from './event-envelope.js';
 
 export const KIT_EVENT_TYPES = {
   BATCH_EXTRACTED: 'batch.extracted',
