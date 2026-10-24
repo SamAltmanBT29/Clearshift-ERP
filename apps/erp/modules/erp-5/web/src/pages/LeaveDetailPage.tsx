@@ -68,7 +68,14 @@ export const LeaveDetailPage: React.FC = () => {
             <RecordDetail
               caption="Leave record"
               items={[
-                { label: 'Employee', value: record.employee_id },
+                {
+                  label: 'Employee',
+                  value: (
+                    <Link className="cs-erp5-row-link" to={`/erp5/employees/${record.employee_id}`}>
+                      {record.employee_id}
+                    </Link>
+                  ),
+                },
                 { label: 'From', value: record.date_from },
                 { label: 'To', value: record.date_to },
                 { label: 'Type', value: record.type },

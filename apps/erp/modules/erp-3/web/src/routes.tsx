@@ -22,6 +22,7 @@
 import React from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth.js';
+import { RequireErp3Permission } from './auth/RequireErp3Permission.js';
 import { ModuleShell } from './components/ModuleShell.js';
 import { SalesOrdersListPage } from './pages/SalesOrdersListPage.js';
 import { SalesOrderCreatePage } from './pages/SalesOrderCreatePage.js';
@@ -53,47 +54,47 @@ export const erp3Routes: RouteObject[] = [
           {
             id: 'erp3-sales-orders',
             path: 'sales-orders',
-            element: <SalesOrdersListPage />,
+            element: <RequireErp3Permission permission="SALES_ORDERS_READ"><SalesOrdersListPage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-sales-orders-create',
             path: 'sales-orders/new',
-            element: <SalesOrderCreatePage />,
+            element: <RequireErp3Permission permission="SALES_ORDERS_CREATE"><SalesOrderCreatePage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-sales-orders-detail',
             path: 'sales-orders/:orderId',
-            element: <SalesOrderDetailPage />,
+            element: <RequireErp3Permission permission="SALES_ORDERS_READ"><SalesOrderDetailPage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-sales-orders-edit',
             path: 'sales-orders/:orderId/edit',
-            element: <SalesOrderEditPage />,
+            element: <RequireErp3Permission permission="SALES_ORDERS_UPDATE"><SalesOrderEditPage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-invoices',
             path: 'invoices',
-            element: <InvoicesListPage />,
+            element: <RequireErp3Permission permission="INVOICES_READ"><InvoicesListPage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-invoices-create',
             path: 'invoices/new',
-            element: <InvoiceCreateRoutePage />,
+            element: <RequireErp3Permission permission="INVOICES_CREATE"><InvoiceCreateRoutePage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-invoices-detail',
             path: 'invoices/:invoiceId',
-            element: <InvoiceDetailRoutePage />,
+            element: <RequireErp3Permission permission="INVOICES_READ"><InvoiceDetailRoutePage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-invoices-edit',
             path: 'invoices/:invoiceId/edit',
-            element: <InvoiceEditRoutePage />,
+            element: <RequireErp3Permission permission="INVOICES_READ"><InvoiceEditRoutePage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-payments',
             path: 'payments',
-            element: <PaymentsListPage />,
+            element: <RequireErp3Permission permission="PAYMENTS_READ"><PaymentsListPage /></RequireErp3Permission>,
           },
           {
             id: 'erp3-not-found',

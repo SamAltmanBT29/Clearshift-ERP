@@ -1,5 +1,5 @@
 /**
- * ERP-1 Public Import Routes (KIT-08 / Decision C4, ERP1-11)
+ * ERP-1 Public Import Routes (KIT-08 / Decision C4, ERP1-07 / ERP1-11)
  *
  * Exposes two endpoints for the Migration Kit to load records
  * safely through the public API without direct target-table database access:
@@ -38,7 +38,7 @@ const BatchRowInputSchema = z.object({
 
 const ImportBatchRequestSchema = z.object({
   batch_id: z.string().uuid({ message: 'batch_id must be a valid UUID' }),
-  entity: z.enum(['product', 'category', 'stock_level']),
+  entity: z.string().min(1).max(64),
   /** When true, existing records with matching natural keys will be updated. */
   upsert: z.boolean().optional().default(false),
   chunk_size: z.number().int().positive().max(500).optional(),
@@ -90,8 +90,9 @@ export const importRoutes: FastifyPluginAsync<{ erp1Service: Erp1Service }> = as
     const upsert = typeof rawBody['upsert'] === 'boolean' ? rawBody['upsert'] : false;
     const result = await service.importRow({
       ...parsed.data,
+      record: parsed.data.record as Record<string, unknown>,
       upsert,
-    } as any);
+    });
 
     const statusCode = result.prior_result ? 200 : 201;
     return reply.status(statusCode).send(result);
