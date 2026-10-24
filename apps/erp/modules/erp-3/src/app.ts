@@ -55,10 +55,12 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     new Erp3Service({
       repository,
       referenceResolver: options.referenceResolver,
+      auditService,
       nowUtcDate: options.nowUtcDate,
       strictDr1Exact4Dp: options.strictDr1Exact4Dp,
       allowDirectOpenToClosed: options.allowDirectOpenToClosed,
     });
+
 
   app.addHook("onSend", async (request, reply) => {
     reply.header("x-correlation-id", resolveCorrelationId(request.headers));

@@ -753,3 +753,118 @@ export function deriveInvoiceStatus(
 
   return "Open";
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exact Duplicate Key Policy & Human Review (ERP3-12 / KIT-10 / Issue #148)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalizes an order number for deterministic exact duplicate matching.
+ * Trims leading/trailing whitespace, converts to uppercase, and strips delimiters.
+ */
+export function normalizeOrderNumber(orderNumber: string): string {
+  if (typeof orderNumber !== "string") return "";
+  return orderNumber.trim().toUpperCase().replace(/[\s\-_/]/g, "");
+}
+
+/**
+ * Normalizes an invoice number for deterministic exact duplicate matching.
+ * Trims leading/trailing whitespace, converts to uppercase, and strips delimiters.
+ */
+export function normalizeInvoiceNumber(invoiceNumber: string): string {
+  if (typeof invoiceNumber !== "string") return "";
+  return invoiceNumber.trim().toUpperCase().replace(/[\s\-_/]/g, "");
+}
+
+/**
+ * Nature of the match between candidate and target ERP-3 record.
+ */
+export const Erp3DuplicateMatchKindEnum = z.enum([
+  "EXACT_ORDER_NUMBER",
+  "EXACT_INVOICE_NUMBER",
+  "EXACT_PAYMENT_REFERENCE",
+  "AMBIGUOUS",
+]);
+export type Erp3DuplicateMatchKind = z.infer<typeof Erp3DuplicateMatchKindEnum>;
+
+/**
+ * Status of duplicate candidate in human review lifecycle.
+ */
+export const Erp3DuplicateCandidateStatusEnum = z.enum([
+  "PENDING_REVIEW",
+  "MERGED",
+  "REJECTED",
+  "KEPT_BOTH",
+]);
+export type Erp3DuplicateCandidateStatus = z.infer<typeof Erp3DuplicateCandidateStatusEnum>;
+
+/**
+ * Permitted human merge decisions in V1.
+ */
+export const Erp3MergeDecisionTypeEnum = z.enum([
+  "MERGE",
+  "REJECT",
+  "KEEP_BOTH",
+]);
+export type Erp3MergeDecisionType = z.infer<typeof Erp3MergeDecisionTypeEnum>;
+
+/**
+ * Exact duplicate candidate record presented for human review.
+ */
+export const Erp3DuplicateCandidateRecordSchema = z.object({
+  candidate_id: z.string().uuid(),
+  entity: z.enum(["sales_order", "invoice", "payment"]),
+  match_kind: Erp3DuplicateMatchKindEnum,
+  status: Erp3DuplicateCandidateStatusEnum.default("PENDING_REVIEW"),
+  matching_key: z.string(),
+  matching_value: z.string(),
+  incoming_record: z.record(z.unknown()),
+  existing_record: z.record(z.unknown()),
+  confidence: z.literal(1.0), // V1 invariant: exact matches only (1.0). Fuzzy scoring prohibited.
+  created_at: z.string(),
+  decided_at: z.string().optional().nullable(),
+  decided_by: z.string().optional().nullable(),
+  decision: Erp3MergeDecisionTypeEnum.optional().nullable(),
+  rationale: z.string().optional().nullable(),
+});
+export type Erp3DuplicateCandidateRecord = z.infer<typeof Erp3DuplicateCandidateRecordSchema>;
+
+/** POST /api/v1/erp-orders/duplicates/check — request. */
+export const Erp3CheckDuplicatesRequestSchema = z.object({
+  entity: z.enum(["sales_order", "invoice", "payment"]),
+  records: z.array(z.record(z.unknown())).min(1, "At least one record is required"),
+});
+export type Erp3CheckDuplicatesRequest = z.infer<typeof Erp3CheckDuplicatesRequestSchema>;
+
+/** POST /api/v1/erp-orders/duplicates/check — response. */
+export const Erp3CheckDuplicatesResponseSchema = z.object({
+  entity: z.enum(["sales_order", "invoice", "payment"]),
+  total_checked: z.number().int().nonnegative(),
+  duplicates_found: z.number().int().nonnegative(),
+  candidates: z.array(Erp3DuplicateCandidateRecordSchema),
+});
+export type Erp3CheckDuplicatesResponse = z.infer<typeof Erp3CheckDuplicatesResponseSchema>;
+
+/** POST /api/v1/erp-orders/duplicates/review — request. */
+export const Erp3ReviewDuplicateRequestSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: Erp3MergeDecisionTypeEnum,
+  kept_id: UuidSchema.optional(),
+  merged_id: UuidSchema.optional(),
+  rationale: z.string().min(5, "Review rationale must be at least 5 characters"),
+});
+export type Erp3ReviewDuplicateRequest = z.infer<typeof Erp3ReviewDuplicateRequestSchema>;
+
+/** POST /api/v1/erp-orders/duplicates/review — response. */
+export const Erp3ReviewDuplicateResponseSchema = z.object({
+  candidate_id: z.string().uuid(),
+  decision: Erp3MergeDecisionTypeEnum,
+  status: Erp3DuplicateCandidateStatusEnum,
+  kept_id: UuidSchema.optional(),
+  merged_id: UuidSchema.optional(),
+  actor_id: z.string(),
+  timestamp: z.string(),
+  audit_record_id: z.string().uuid(),
+});
+export type Erp3ReviewDuplicateResponse = z.infer<typeof Erp3ReviewDuplicateResponseSchema>;
+
