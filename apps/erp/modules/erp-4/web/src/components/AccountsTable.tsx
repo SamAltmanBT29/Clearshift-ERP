@@ -19,6 +19,8 @@ export interface AccountsTableProps {
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
   onCreateAccount?: (() => void) | undefined;
+  emptyActionLabel?: string | undefined;
+  emptyOnAction?: (() => void) | undefined;
 }
 
 /**
@@ -45,6 +47,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   onSort: externalOnSort,
   onRefresh,
   onCreateAccount,
+  emptyActionLabel,
+  emptyOnAction,
 }) => {
   // Local sorting state if not controlled externally
   const [internalSortColumn, setInternalSortColumn] = useState<string>('code');
@@ -240,12 +244,15 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   }
 
   if (accounts.length === 0) {
+    const actionLabel = emptyActionLabel || (onCreateAccount ? '+ New Account' : (onRefresh ? 'Refresh Accounts' : undefined));
+    const onAction = emptyOnAction || onCreateAccount || onRefresh;
     return (
       <EmptyState
+        icon="📂"
         title="No accounts found"
-        message="No accounts match your current filter selection or search query."
-        actionLabel={onRefresh ? 'Refresh Accounts' : undefined}
-        onAction={onRefresh}
+        message="No accounts match your current filter selection or search query. Create your first general ledger account to begin."
+        {...(actionLabel && onAction ? { actionLabel, onAction } : {})}
+        {...(onCreateAccount && onRefresh ? { secondaryActionLabel: 'Refresh Accounts', onSecondaryAction: onRefresh } : {})}
       />
     );
   }

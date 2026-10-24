@@ -30,7 +30,7 @@ export const AccountsListPage: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<string>('code');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<unknown | null>(null);
 
   const [filters, setFilters] = useState<AccountsFilterQuery>({
     page: 1,
@@ -46,12 +46,12 @@ export const AccountsListPage: React.FC = () => {
   });
   const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
-  const [tbError, setTbError] = useState<string | null>(null);
+  const [tbError, setTbError] = useState<unknown | null>(null);
 
   // Journal Entries State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [isEntriesLoading, setIsEntriesLoading] = useState(false);
-  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<unknown | null>(null);
   const [entriesTotal, setEntriesTotal] = useState(0);
 
   // Fetch Accounts from real API
@@ -63,8 +63,8 @@ export const AccountsListPage: React.FC = () => {
       setAccounts(response.items);
       setAccountsTotal(response.total);
       setAccountsTotalPages(response.totalPages);
-    } catch (err: any) {
-      setAccountsError(err?.message || 'Failed to fetch chart of accounts');
+    } catch (err: unknown) {
+      setAccountsError(err);
     } finally {
       setIsAccountsLoading(false);
     }
@@ -77,8 +77,8 @@ export const AccountsListPage: React.FC = () => {
     try {
       const response = await fetchTrialBalance(currentPeriod);
       setTrialBalanceData(response);
-    } catch (err: any) {
-      setTbError(err?.message || 'Failed to fetch trial balance report');
+    } catch (err: unknown) {
+      setTbError(err);
     } finally {
       setIsTbLoading(false);
     }
@@ -92,8 +92,8 @@ export const AccountsListPage: React.FC = () => {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
       setJournalEntries(response.items);
       setEntriesTotal(response.total);
-    } catch (err: any) {
-      setEntriesError(err?.message || 'Failed to fetch journal entries');
+    } catch (err: unknown) {
+      setEntriesError(err);
     } finally {
       setIsEntriesLoading(false);
     }
@@ -315,8 +315,7 @@ export const AccountsListPage: React.FC = () => {
 
           {accountsError ? (
             <ErrorState
-              title="Unable to load Chart of Accounts"
-              message={accountsError}
+              error={accountsError}
               onRetry={() => loadAccounts(filters)}
             />
           ) : (
@@ -344,8 +343,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-trial-balance" role="tabpanel" aria-labelledby="tab-trial-balance">
           {tbError ? (
             <ErrorState
-              title="Unable to generate Trial Balance"
-              message={tbError}
+              error={tbError}
               onRetry={() => loadTrialBalance(period)}
             />
           ) : (
@@ -364,8 +362,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-journal-entries" role="tabpanel" aria-labelledby="tab-journal-entries">
           {entriesError ? (
             <ErrorState
-              title="Unable to load journal entries"
-              message={entriesError}
+              error={entriesError}
               onRetry={loadJournalEntries}
             />
           ) : isEntriesLoading ? (

@@ -21,6 +21,8 @@ export * from './components/StateViews.js';
 export * from './components/Toast.js';
 export * from './components/forms/AccountForm.js';
 export * from './components/forms/AccountCreateModal.js';
+export * from './components/AccessDeniedView.js';
+export * from './utils/error-sanitizer.js';
 export * from './pages/AccountsListPage.js';
 export * from './pages/AccountCreatePage.js';
 export * from './pages/AccountDetailPage.js';
