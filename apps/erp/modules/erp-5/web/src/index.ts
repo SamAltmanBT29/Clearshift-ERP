@@ -15,6 +15,8 @@
  * @module erp5/web
  */
 
+export * from './kit-metadata.js';
+export * from './rejection-context.js';
 export * from './route-manifest.js';
 export * from './routes.js';
 export * from './api/erp-5.js';
