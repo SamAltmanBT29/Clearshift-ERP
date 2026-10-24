@@ -5,6 +5,7 @@
  *   - Server-side bounded pagination with page and pageSize query parameters
  *   - Sortable column headers toggling ascending/descending order
  *   - Status and vendor filtering via PurchaseOrderFilterBar
+ *   - Empty state and zero-data handling via PurchaseOrdersTable
  *   - URL search parameter synchronization
  *
  * @module erp2/web/pages/PurchaseOrdersListPage
