@@ -580,7 +580,7 @@ In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions i
 - **Sent -> Received**: Confirms delivery of goods without modifying ERP-1 inventory (in V1).
 - **Received -> Closed**: Terminates order lifecycle.
 - **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
-- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.
+- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id`.
 
 ---
 
@@ -742,3 +742,79 @@ To prevent lost updates in distributed operational environments:
 - **Actionable Refresh (`handleRefreshRecord`)**:
   - The banner renders an explicit action button: `🔄 Refresh Record and Re-apply Changes` (`data-testid="conflict-refresh-btn"`).
   - Clicking refresh calls `fetchVendorById(id)` to synchronize the latest canonical record from the server, clears the conflict error state, and displays a confirmation toast notifying the operator that current server state has been restored.
+
+## 17. Module Authorization & Policy Integration Specification (ERP2-15 / Issue #131)
+
+### 18.1 Overview & Architecture Integration
+
+In accordance with SDS §4.2, §4.9 and ADR-0006, ERP-2 Vendors & Purchasing integrates zero duplicate identity or authorization infrastructure. All authentication and authorization decisions delegate directly to the platform identity (`@cs/identity`, PLT-05) and access control (`@cs/rbac`, PLT-06) primitives.
+
+- **Authentication**: Hub Ed25519 signed JWT access tokens (`verifyAccessToken`), verifying issuer (`clearshift-hub`), audience (`clearshift`), signature, and token expiration. Inactive and revoked accounts are rejected (`401 Unauthorized`).
+- **Authorization**: Pre-handler route guards enforcing capability requirements mapped from assigned roles. Requests lacking permissions fail closed (`403 Forbidden`).
+- **Object-Level Boundaries**: Explicit multi-tenant boundary checks (`assertTenantAccess`) and record modification ownership checks (`assertObjectMutationAccess`).
+
+### 18.2 Five-Role Capability Matrix across ERP-2 Endpoints
+
+The module capability matrix maps the standard roles to operational permissions:
+
+| Endpoint | HTTP Method | Required Capability / Action | Allowed Roles | Default Deny Roles |
+|---|---|---|---|---|
+| `/vendors` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/vendors/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/vendors` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/vendors/:id` | `PATCH` | `write` (`records:write`, `system:admin`) | Editor, Admin | Viewer, Migration Runner, Analyst |
+| `/purchase-orders` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/purchase-orders/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/purchase-orders` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/purchase-orders/:id` | `PATCH` | `write` (`records:write`, `system:admin`) | Editor, Admin | Viewer, Migration Runner, Analyst |
+| `/duplicates/check` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/candidates` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/candidates/:id` | `GET` | `read` (`records:read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `/duplicates/review` | `POST` | `review` (`duplicates:review`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/import` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `/import/batch` | `POST` | `ingest` (`migrations:run`, `records:write`, `system:admin`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+
+### 18.3 Default Deny & Standard Error Envelope
+
+All authentication and authorization failures return HTTP 401 and 403 status codes conforming strictly to the ClearShift unified error envelope:
+
+```json
+{
+  "statusCode": 401,
+  "error": "Unauthorized",
+  "code": "UNAUTHORIZED",
+  "message": "Missing Authorization header. Bearer token required.",
+  "details": [],
+  "correlation_id": "a9a38ffb-d36c-4b68-98e3-0d33e5c9ef01"
+}
+```
+
+```json
+{
+  "statusCode": 403,
+  "error": "Forbidden",
+  "code": "FORBIDDEN",
+  "message": "Role does not have permission to execute this operation. Required capability: records:write.",
+  "details": [
+    {
+      "field": "authorization",
+      "message": "Role does not have permission to execute this operation",
+      "code": "FORBIDDEN"
+    }
+  ],
+  "correlation_id": "a9a38ffb-d36c-4b68-98e3-0d33e5c9ef01"
+}
+```
+
+### 18.4 Multi-Tenant Boundary Enforcement
+
+Multi-tenant isolation is enforced on every operation:
+- If a tenant context is established (via `x-tenant-id` header or JWT `tenant_id` claim), operations attempting to access or mutate records belonging to a different tenant are rejected with `403 Forbidden` (`code: TENANT_MISMATCH`).
+- Ingestion endpoints (`/vendors`, `/purchase-orders`, `/import`) bind target records and dual-write receipts to the active tenant ID.
+
+### 18.5 Object-Level Cross-User Mutation Safety
+
+Mutation safety prevents unauthorized cross-user modifications:
+- When a non-admin user attempts to update a record (`PATCH /vendors/:id` or `PATCH /purchase-orders/:id`), the user must either be an `admin` or the recorded creator of the entity (`assertObjectMutationAccess`).
+- Non-admin attempts to overwrite another user's draft or record are rejected with `403 Forbidden` (`code: FORBIDDEN`).
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Authorization Policy | Role 3 / Mahek Yadav (Issue #131 / ERP2-15) | Integrated module authorization and access control policy conforming to SDS §4.2, §4.9, and ADR-0006. Enforced 5-role capability matrix, Ed25519 Hub JWT validation, multi-tenant isolation, object-level creator mutation guards, and standard error envelopes. |
