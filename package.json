@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "ClearShift ERP — monorepo root",
+  "description": "ClearShift ERP \u2014 monorepo root",
   "workspaces": [
     "apps/*",
     "apps/erp/modules/*",
@@ -22,14 +22,17 @@
     "lint": "eslint .",
     "validate:frontend": "node scripts/validate-frontend.js",
     "mock:erp-4": "node --experimental-strip-types scripts/mock-erp-4.ts",
+    "cs-kit": "node_modules/.bin/tsx apps/migration-kit/cli/index.ts",
     "security:scan": "node --experimental-strip-types infra/security/scan-secrets.ts",
     "erp1:test": "vitest run apps/erp/modules/erp-1",
     "erp1:seed": "node sample-data/erp-1/seed.ts",
     "erp2:test": "vitest run apps/erp/modules/erp-2",
     "erp2:seed": "node sample-data/erp-2/seed.ts",
     "erp2:e2e": "playwright test -c apps/erp/modules/erp-2/e2e/playwright.config.ts",
+    "erp3:e2e": "playwright test -c apps/erp/modules/erp-3/e2e/playwright.config.ts",
     "erp4:test": "vitest run apps/erp/modules/erp-4",
-    "erp4:e2e": "playwright test -c apps/erp/modules/erp-4/e2e/playwright.config.ts"
+    "erp4:e2e": "playwright test -c apps/erp/modules/erp-4/e2e/playwright.config.ts",
+    "test:contracts": "vitest run tests/contracts packages/contracts/tests"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

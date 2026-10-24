@@ -1,0 +1,51 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+B1-ERR-001,,BadFormat1,user1@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-002,,BadFormat2,user2@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-003,,BadFormat3,user3@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-004,,BadFormat4,user4@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-005,,BadFormat5,user5@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-006,,BadFormat6,user6@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-007,,BadFormat7,user7@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-008,,BadFormat8,user8@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-009,,BadFormat9,user9@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-010,,BadFormat10,user10@example.com,+1-555-0999,Broken Corp,US,00000,active,Empty required first_name
+B1-ERR-011,InvalidUser11,BadFormat11,invalid.email.without.at.11,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-012,InvalidUser12,BadFormat12,invalid.email.without.at.12,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-013,InvalidUser13,BadFormat13,invalid.email.without.at.13,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-014,InvalidUser14,BadFormat14,invalid.email.without.at.14,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-015,InvalidUser15,BadFormat15,invalid.email.without.at.15,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-016,InvalidUser16,BadFormat16,invalid.email.without.at.16,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-017,InvalidUser17,BadFormat17,invalid.email.without.at.17,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-018,InvalidUser18,BadFormat18,invalid.email.without.at.18,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-019,InvalidUser19,BadFormat19,invalid.email.without.at.19,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-ERR-020,InvalidUser20,BadFormat20,invalid.email.without.at.20,+1-555-0999,Broken Corp,US,00000,active,Email missing @ sign
+B1-VAL-001,ValidUser1,Tester1,valid.user1@example.com,+1-555-0801,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-002,ValidUser2,Tester2,valid.user2@example.com,+1-555-0802,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-003,ValidUser3,Tester3,valid.user3@example.com,+1-555-0803,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-004,ValidUser4,Tester4,valid.user4@example.com,+1-555-0804,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-005,ValidUser5,Tester5,valid.user5@example.com,+1-555-0805,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-006,ValidUser6,Tester6,valid.user6@example.com,+1-555-0806,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-007,ValidUser7,Tester7,valid.user7@example.com,+1-555-0807,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-008,ValidUser8,Tester8,valid.user8@example.com,+1-555-0808,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-009,ValidUser9,Tester9,valid.user9@example.com,+1-555-0809,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-010,ValidUser10,Tester10,valid.user10@example.com,+1-555-0810,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-011,ValidUser11,Tester11,valid.user11@example.com,+1-555-0811,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-012,ValidUser12,Tester12,valid.user12@example.com,+1-555-0812,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-013,ValidUser13,Tester13,valid.user13@example.com,+1-555-0813,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-014,ValidUser14,Tester14,valid.user14@example.com,+1-555-0814,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-015,ValidUser15,Tester15,valid.user15@example.com,+1-555-0815,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-016,ValidUser16,Tester16,valid.user16@example.com,+1-555-0816,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-017,ValidUser17,Tester17,valid.user17@example.com,+1-555-0817,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-018,ValidUser18,Tester18,valid.user18@example.com,+1-555-0818,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-019,ValidUser19,Tester19,valid.user19@example.com,+1-555-0819,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-020,ValidUser20,Tester20,valid.user20@example.com,+1-555-0820,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-021,ValidUser21,Tester21,valid.user21@example.com,+1-555-0821,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-022,ValidUser22,Tester22,valid.user22@example.com,+1-555-0822,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-023,ValidUser23,Tester23,valid.user23@example.com,+1-555-0823,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-024,ValidUser24,Tester24,valid.user24@example.com,+1-555-0824,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-025,ValidUser25,Tester25,valid.user25@example.com,+1-555-0825,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-026,ValidUser26,Tester26,valid.user26@example.com,+1-555-0826,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-027,ValidUser27,Tester27,valid.user27@example.com,+1-555-0827,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-028,ValidUser28,Tester28,valid.user28@example.com,+1-555-0828,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-029,ValidUser29,Tester29,valid.user29@example.com,+1-555-0829,Good Corp,US,10001,active,Valid row in 40% invalid pack
+B1-VAL-030,ValidUser30,Tester30,valid.user30@example.com,+1-555-0830,Good Corp,US,10001,active,Valid row in 40% invalid pack

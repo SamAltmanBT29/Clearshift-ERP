@@ -32,4 +32,5 @@ docs/ERP5_HR_Employees_Issue_Review.md
 *.d.ts.map
 *.tsbuildinfo
 apps/erp/modules/erp-2/e2e/.artifacts/
+apps/erp/modules/erp-3/e2e/.artifacts/
 apps/erp/modules/erp-4/e2e/.artifacts/

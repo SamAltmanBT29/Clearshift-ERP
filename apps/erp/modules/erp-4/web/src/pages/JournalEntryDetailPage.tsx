@@ -7,15 +7,22 @@ import {
 } from '../api/erp-4.js';
 import { SkeletonTable, ErrorState, StatusBadge } from '../components/StateViews.js';
 
+import { useParams, useNavigate } from 'react-router-dom';
+
 interface JournalEntryDetailPageProps {
-  entryId: string;
-  onBackToList: () => void;
+  entryId?: string;
+  onBackToList?: () => void;
 }
 
 export const JournalEntryDetailPage: React.FC<JournalEntryDetailPageProps> = ({
-  entryId,
+  entryId: propEntryId,
   onBackToList,
 }) => {
+  const params = useParams<{ entryId?: string }>();
+  const navigate = useNavigate();
+  const entryId = propEntryId || params.entryId || '';
+  const handleBack = onBackToList || (() => navigate('/erp4/journal-entries'));
+
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +30,8 @@ export const JournalEntryDetailPage: React.FC<JournalEntryDetailPageProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const loadEntry = async () => {
+    if (!entryId) return;
+    setIsLoading(true);
     setIsLoading(true);
     setError(null);
     try {
@@ -93,7 +102,7 @@ export const JournalEntryDetailPage: React.FC<JournalEntryDetailPageProps> = ({
         <button
           type="button"
           className="cs-btn cs-btn-secondary cs-btn-sm"
-          onClick={onBackToList}
+          onClick={handleBack}
           style={{ marginBottom: '16px' }}
         >
           ← Back to Financial Overview
@@ -126,7 +135,7 @@ export const JournalEntryDetailPage: React.FC<JournalEntryDetailPageProps> = ({
         <button
           type="button"
           className="cs-btn cs-btn-secondary cs-btn-sm"
-          onClick={onBackToList}
+          onClick={handleBack}
           aria-label="Back to accounts list"
         >
           ← Back to Financial Overview

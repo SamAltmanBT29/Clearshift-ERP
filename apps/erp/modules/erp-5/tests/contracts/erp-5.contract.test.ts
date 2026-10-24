@@ -434,6 +434,7 @@ describe('Mutation response schemas', () => {
         entity: 'employee',
         schema_version: 1,
         idempotency_key: 'erp5-batch-12',
+        request_hash: 'e'.repeat(64),
         target_id: EMPLOYEE_VIEW.id,
         kind: 'created',
         created_at: '2026-04-01T00:00:00.000Z',

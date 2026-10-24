@@ -86,6 +86,38 @@ async function buildTestApp(): Promise<FastifyInstance> {
 
 describe("Central Role and Field-Level Authorization Matrix (PLT-06)", () => {
   describe("1. Role Permission Matrix & Default Deny Invariant", () => {
+    it("enforces the ERP-3 endpoint matrix with default deny for unlisted roles", () => {
+      const readResources = [
+        Resources.ERP3_SALES_ORDERS,
+        Resources.ERP3_INVOICES,
+        Resources.ERP3_PAYMENTS,
+      ];
+      const createResources = readResources;
+
+      for (const resource of readResources) {
+        expect(hasPermission([Roles.VIEWER], Actions.READ, resource)).toBe(true);
+        expect(hasPermission([Roles.EDITOR], Actions.READ, resource)).toBe(true);
+        expect(hasPermission([Roles.MIGRATION_RUNNER], Actions.READ, resource)).toBe(false);
+        expect(hasPermission([Roles.ANALYST], Actions.READ, resource)).toBe(false);
+        expect(hasPermission([Roles.ADMIN], Actions.READ, resource)).toBe(true);
+      }
+
+      for (const resource of createResources) {
+        expect(hasPermission([Roles.EDITOR], Actions.CREATE, resource)).toBe(true);
+        expect(hasPermission([Roles.MIGRATION_RUNNER], Actions.CREATE, resource)).toBe(true);
+        expect(hasPermission([Roles.VIEWER], Actions.CREATE, resource)).toBe(false);
+        expect(hasPermission([Roles.ANALYST], Actions.CREATE, resource)).toBe(false);
+        expect(hasPermission([Roles.ADMIN], Actions.CREATE, resource)).toBe(true);
+      }
+
+      expect(hasPermission([Roles.EDITOR], Actions.UPDATE, Resources.ERP3_SALES_ORDERS)).toBe(true);
+      expect(hasPermission([Roles.ADMIN], Actions.UPDATE, Resources.ERP3_SALES_ORDERS)).toBe(true);
+      expect(hasPermission([Roles.MIGRATION_RUNNER], Actions.UPDATE, Resources.ERP3_SALES_ORDERS)).toBe(false);
+      expect(hasPermission([Roles.MIGRATION_RUNNER], Actions.EXECUTE_BULK, Resources.ERP3_IMPORTS)).toBe(true);
+      expect(hasPermission([Roles.ADMIN], Actions.EXECUTE_BULK, Resources.ERP3_IMPORTS)).toBe(true);
+      expect(hasPermission([Roles.EDITOR], Actions.EXECUTE_BULK, Resources.ERP3_IMPORTS)).toBe(false);
+    });
+
     it("enforces default deny for undeclared routes or empty roles", () => {
       // Empty roles
       expect(hasPermission([], Actions.READ, Resources.ACCOUNTS)).toBe(false);
