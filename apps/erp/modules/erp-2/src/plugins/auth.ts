@@ -35,6 +35,9 @@ const erp2AuthPluginAsync: FastifyPluginAsync<AuthPluginOptions> = async (
   fastify.decorateRequest('user', undefined);
 
   fastify.decorate('authenticate', async (request: FastifyRequest) => {
+    if (request.user) {
+      return;
+    }
     const authHeader = request.headers.authorization;
 
     if (!authHeader) {

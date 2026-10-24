@@ -3,15 +3,13 @@
  *
  * Implements:
  *   - GET /vendors (search by name, bounded paging)
- *   - GET /vendors/:id (retrieve vendor)
  *   - POST /vendors (create vendor, server-side bank details masking, idempotency support)
+ *   - GET /vendors/:id (retrieve vendor)
  *   - PATCH /vendors/:id (update editable fields)
  *
  * Security:
- *   - RBAC route guards via requireRoles()
- *   - EdDSA/Ed25519 JWT verification via Fastify auth hook
- *   - Server-side bank details masking (FR-ERP2-06)
- *   - Audit logging of mutations to platform.audit
+ *   - RBAC matrix enforcement (ERP2_ENDPOINT_ROLES)
+ *   - Object-level tenant and cross-user mutation guards (assertTenantAccess, assertObjectMutationAccess)
  *
  * @module erp2/routes/vendors
  */
@@ -24,10 +22,16 @@ import {
   UpdateVendorRequestSchema,
   UuidSchema,
 } from '@clearshift/contracts';
-import { ERP2_ENDPOINT_ROLES } from '../policies/rbac.js';
-import { requireRoles } from '../plugins/auth.js';
 import type { Erp2Service } from '../services/erp2.service.js';
 import type { VendorService } from '../services/vendor.service.js';
+import {
+  ERP2_ENDPOINT_ROLES,
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+  registerEntityCreator,
+} from './guard.js';
+import { requireRoles } from '../plugins/auth.js';
 
 export interface VendorRoutesOptions {
   erp2Service?: Erp2Service | undefined;
@@ -41,7 +45,7 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
   const service = opts.erp2Service;
   const vendorService = opts.vendorService;
 
-  // 1. GET /vendors — search, paged
+  // 1. GET /vendors — list with search & pagination
   fastify.get(
     '/vendors',
     {
@@ -51,9 +55,12 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const parsed = VendorListQuerySchema.safeParse(request.query);
       if (!parsed.success) {
         const correlationId =
+          (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
+        reply.header('x-correlation-id', correlationId);
         return reply.status(400).send({
           statusCode: 400,
           error: 'Bad Request',
@@ -82,7 +89,7 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
     }
   );
 
-  // 2. GET /vendors/:id — get vendor by ID
+  // 2. GET /vendors/:id — get by UUID
   fastify.get(
     '/vendors/:id',
     {
@@ -93,8 +100,8 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -109,17 +116,21 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
         });
       }
 
-      if (vendorService) {
-        const vendor = await vendorService.getVendorById(id);
-        return reply.status(200).send(vendor);
-      }
+      const vendor = vendorService
+        ? await vendorService.getVendorById(id)
+        : await service!.getVendorById(id);
 
-      const vendor = await service!.getVendorById(id);
+      assertTenantAccess(
+        request.user,
+        vendor,
+        request.headers['x-tenant-id'] as string | undefined
+      );
+
       return reply.status(200).send(vendor);
     }
   );
 
-  // 3. POST /vendors — create vendor
+  // 3. POST /vendors — create new vendor
   fastify.post(
     '/vendors',
     {
@@ -137,8 +148,8 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const parsed = CreateVendorRequestSchema.safeParse(bodyToValidate);
       if (!parsed.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -157,15 +168,10 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
         });
       }
 
-      const actor = request.user?.sub || 'system';
-      const correlationId =
-        (request as any).correlationId ??
-        (typeof request.headers['x-correlation-id'] === 'string'
-          ? request.headers['x-correlation-id']
-          : undefined);
+      const requestTenant = request.headers['x-tenant-id'] as string | undefined;
 
-      // If batch_id and idempotency_key are present, execute via atomic import dual-write
-      if (parsed.data.batch_id && parsed.data.idempotency_key && service) {
+      // If batch_id and idempotency_key are present and service is available, execute via atomic import dual-write
+      if (service && parsed.data.batch_id && parsed.data.idempotency_key) {
         const importRes = await service.importRow({
           batch_id: parsed.data.batch_id,
           source_row: parsed.data.source_row ?? 0,
@@ -176,15 +182,31 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
           record: parsed.data as unknown as Record<string, unknown>,
         });
         const vendor = await service.getVendorById(importRes.target_id);
+
+        registerEntityTenant(vendor.id, requestTenant ?? (request.user as any)?.tenant_id);
+        registerEntityCreator(vendor.id, request.user?.sub);
+
         return reply.status(importRes.prior_result ? 200 : 201).send(vendor);
       }
 
+      const actor = request.user?.sub || 'system';
+      const correlationId =
+        (reply.getHeader('x-correlation-id') as string | undefined) ??
+        (request as any).correlationId ??
+        (typeof request.headers['x-correlation-id'] === 'string'
+          ? request.headers['x-correlation-id']
+          : undefined);
+
+      let vendor;
       if (vendorService) {
-        const created = await vendorService.createVendor(parsed.data, { actor, correlationId });
-        return reply.status(201).send(created);
+        vendor = await vendorService.createVendor(parsed.data, { actor, correlationId });
+      } else {
+        vendor = await service!.createVendor(parsed.data);
       }
 
-      const vendor = await service!.createVendor(parsed.data);
+      registerEntityTenant(vendor.id, requestTenant ?? (request.user as any)?.tenant_id);
+      registerEntityCreator(vendor.id, request.user?.sub);
+
       return reply.status(201).send(vendor);
     }
   );
@@ -200,8 +222,8 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -219,8 +241,8 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
       const parsed = UpdateVendorRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -235,8 +257,19 @@ export const vendorRoutes: FastifyPluginAsync<VendorRoutesOptions> = async (
         });
       }
 
+      const existing = vendorService
+        ? await vendorService.getVendorById(id)
+        : await service!.getVendorById(id);
+
+      assertObjectMutationAccess(
+        request.user,
+        existing,
+        request.headers['x-tenant-id'] as string | undefined
+      );
+
       const actor = request.user?.sub || 'system';
       const correlationId =
+        (reply.getHeader('x-correlation-id') as string | undefined) ??
         (request as any).correlationId ??
         (typeof request.headers['x-correlation-id'] === 'string'
           ? request.headers['x-correlation-id']

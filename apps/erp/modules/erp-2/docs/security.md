@@ -1,115 +1,92 @@
-# ERP-2 Vendors & Purchasing — Security, Authorization & Audit Specification
+# ERP-2 Vendors & Purchasing — Security & Authorization Architecture
 
-**Module:** ERP-2 Vendors and Purchasing  
-**Issue:** `24-erp2-09-erp-2-vendors-and-purchasing-authorization-sensitive-field-protection-audit-and-safe-logging`  
-**Classification:** Confidential / Internal Security Architecture  
-**Version:** V1.0  
+**Issues**:
+- [#24](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/24) — `[ERP2-09] ERP-2 Vendors & Purchasing: Authorization, Sensitive-Field Protection, Audit and Safe Logging`
+- [#131](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/131) — `[ERP2-15] ERP-2 Vendors and Purchasing: Module authorization policy integration`
 
----
+**Scope**: V1 · **Module**: ERP-2 Vendors & Purchasing  
+**Central matrix**: PLT-06 (`packages/core/src/auth/permissions.ts`, `packages/rbac/src/matrix.ts`)  
+**Token verification**: PLT-05 (`@cs/identity` → `verifyAccessToken`)  
 
-## 1. Overview & Security Posture
-
-ERP-2 Vendors and Purchasing manages sensitive vendor master data (bank accounts, corporate tax identifiers) and procurement lifecycle workflows (purchase orders and line items). In accordance with ClearShift ERP v2.0 Master Architecture, security and privacy are enforced at the server-side API boundary, before persistence, serialization, or log emission.
-
-Key security requirements enforced:
-- **Asymmetric JWT Verification:** Asymmetric EdDSA (Ed25519) JSON Web Tokens issued by ClearShift Hub Identity.
-- **Route Authorization (RBAC):** Granular capability and role enforcement strictly matching the SDS endpoint matrix.
-- **Sensitive Field Protection:** Strict server-side masking of bank details to `XXXX-XXXX-7890` (FR-ERP2-06).
-- **Safe Logging & Sanitization:** Automated redaction preventing credentials, bearer tokens, or database internals from appearing in logs.
-- **Append-Only Audit Trail:** Tamper-evident recording of all state mutations in `platform.audit`.
+This note describes the authorization, security posture, data protection, and audit logging of the ERP-2 module.
 
 ---
 
-## 2. Authentication & Asymmetric Token Verification
+## 1. The Declared Policy Matrix
 
-Every request to `/api/v1/erp-vendors/*` must present a Bearer token in the `Authorization` HTTP header:
+The module owns **no** independent identity or custom role list. Every route is bound to declared capability guards (`src/policies/rbac.ts`), and the allowed role sets strictly mirror the central matrix of PLT-06 and SDS §4.2, §4.9:
 
-```http
-Authorization: Bearer <Ed25519_JWT>
+| Policy | Entity / Resource | Central Capability | Allowed Roles | Default Deny Roles |
+|---|---|---|---|---|
+| `vendors.read` | `vendors` | `records:read` (`module.read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `vendors.create` | `vendors` | `records:write` / `migrations:run` | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `vendors.update` | `vendors` | `records:write` (`module.write`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `purchase_orders.read` | `purchase_orders` | `records:read` (`module.read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `purchase_orders.create` | `purchase_orders` | `records:write` / `migrations:run` | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `purchase_orders.update` | `purchase_orders` | `records:write` (`module.write`) | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `duplicates.read` | `duplicates` | `records:read` (`module.read`) | Viewer, Editor, Migration Runner, Analyst, Admin | None (with valid token) |
+| `duplicates.review` | `duplicates` | `duplicates:review` / `records:write` | Editor, Migration Runner, Admin | Viewer, Analyst |
+| `import.load` | `import` | `migrations:run` / `records:write` | Editor, Migration Runner, Admin | Viewer, Analyst |
+
+**Invariant: DEFAULT DENY.** Any route without an explicit policy, an unauthenticated request, or an identity holding insufficient capabilities fails closed with HTTP `401 Unauthorized` or `403 Forbidden`.
+
+---
+
+## 2. Authentication & Token Verification
+
+| Path | Behavior |
+|---|---|
+| Real access token (three-part Ed25519 signed JWT) | Verified with the **shared** Hub verifier (`verifyAccessToken` from `@cs/identity`): EdDSA signature, issuer (`clearshift-hub`), audience (`clearshift`), and token expiration (`exp`) are validated. Inactive or disabled accounts are refused with `401 Unauthorized`. |
+| Synthetic local test token (`role:<role>`, `valid-test-token`) | Accepted for hermetic unit and local integration tests. It is a **test affordance, not a production credential**, granting role assignments only within the test process. |
+| Malformed, tampered, or expired token | Refused with `401 Unauthorized` and standard error envelope `{ statusCode: 401, error: 'Unauthorized', code: 'UNAUTHORIZED' }`. |
+| Missing `Authorization` header | `401 Unauthorized` when authentication is enforced; otherwise local development fallback. |
+| Unknown role | Yields zero capabilities → `403 Forbidden`. |
+
+---
+
+## 3. Object-Level Authorization & Boundary Guards
+
+ERP-2 enforces two layers of object-level protection:
+
+### 3.1 Multi-Tenant Boundary Isolation (`assertTenantAccess`)
+- If a tenant identity is established (via `x-tenant-id` header or JWT `tenant_id` claim), any operation attempting to access or mutate records belonging to a different tenant is rejected with `403 Forbidden` (`OBJECT_ACCESS_DENIED`).
+- Dual-write ingestion (`POST /vendors`, `POST /purchase-orders`, `POST /import/batch`) binds created target records and dual-write receipts to the active tenant ID (`registerEntityTenant`).
+
+### 3.2 Cross-User Mutation Safety (`assertObjectMutationAccess`)
+- Updates to existing records (`PATCH /vendors/:id`, `PATCH /purchase-orders/:id`) enforce creator ownership.
+- If a record has an associated creator ID (`created_by`), only the user who created the record or a user holding the `Roles.ADMIN` role is permitted to modify it.
+- Non-admin attempts to overwrite another operator's record are rejected with `403 Forbidden` (`CROSS_USER_MUTATION_FORBIDDEN`).
+
+---
+
+## 4. Field-Level Protection & Data Masking
+
+| Field | Rule | Implementation |
+|---|---|---|
+| `bank_details` | Banking coordinates are masked in all read outputs (`XXXX-XXXX-7890`). Plaintext coordinates are never stored in unhashed form or returned to callers. | `src/policies/field-masking.ts` / `src/services/vendor.service.ts` |
+| `tax_number` | Verified against format rules; exact-match key for duplicate candidate detection. | `src/domain/rules.ts` |
+| Internal tokens / secrets / SQL | Erp2 application error handler scrubs database messages and connection strings. Uncaught errors return a sanitized generic message with a correlation ID handle. | `src/app.ts` |
+
+---
+
+## 5. Safe Error Sanitization
+
+500 Internal Server Error responses never leak database details, SQL snippets, connection strings, or secrets. Uncaught exceptions return a sanitized generic message:
+
+```json
+{
+  "statusCode": 500,
+  "error": "Internal Server Error",
+  "code": "INTERNAL_SERVER_ERROR",
+  "message": "An unexpected internal error occurred.",
+  "details": [],
+  "correlation_id": "corr-uuid"
+}
 ```
 
-### 2.1 Verification Pipeline
-1. **Signature Verification:** Validated using the Hub Identity public key (Ed25519) retrieved via `@cs/identity`.
-2. **Issuer & Audience:**
-   - Issuer (`iss`): must equal `clearshift-hub`.
-   - Audience (`aud`): must equal `clearshift`.
-3. **Expiration:** `exp` claim must be in the future (`exp > currentTime`). Expired tokens immediately return `401 Unauthorized`.
-4. **Account Status:** Tokens issued to inactive or disabled users are rejected with `401 Unauthorized`.
-5. **Context Population:** Upon verification, Fastify decorates `request.user` with `{ sub, roles, employee_id, jti }`.
-
 ---
 
-## 3. RBAC Policy & Endpoint Matrix
-
-The role matrix conforms strictly to the SDS ClearShift ERP v2.0 specification:
-
-| Method | Endpoint | Description | Allowed Roles | Forbidden Roles (403) |
-|---|---|---|---|---|
-| `GET` | `/api/v1/erp-vendors/vendors` | Search & list vendors (paged) | `viewer`, `editor`, `analyst`, `admin` | `migration_runner` (without elevation) |
-| `POST` | `/api/v1/erp-vendors/vendors` | Create vendor | `editor`, `migration_runner`, `admin` | `viewer`, `analyst` |
-| `PATCH` | `/api/v1/erp-vendors/vendors/:id` | Edit vendor | `editor`, `migration_runner`, `admin` | `viewer`, `analyst` |
-| `GET` | `/api/v1/erp-vendors/purchase-orders` | Search & list purchase orders | `viewer`, `editor`, `analyst`, `admin` | `migration_runner` |
-| `GET` | `/api/v1/erp-vendors/purchase-orders/:id` | Get purchase order by ID | `viewer`, `editor`, `analyst`, `admin` | `migration_runner` |
-| `POST` | `/api/v1/erp-vendors/purchase-orders` | Create purchase order | `editor`, `migration_runner`, `admin` | `viewer`, `analyst` |
-| `PATCH` | `/api/v1/erp-vendors/purchase-orders/:id` | Allowed status transition only | `editor`, `migration_runner`, `admin` | `viewer`, `analyst` |
-
-### 3.1 Failure Response Codes
-- **Missing or Invalid Token:** `401 Unauthorized`
-  ```json
-  {
-    "code": "UNAUTHORIZED",
-    "message": "Missing Authorization header. Bearer token required.",
-    "details": [],
-    "correlation_id": "corr-12345"
-  }
-  ```
-- **Insufficient Role Permissions:** `403 Forbidden`
-  ```json
-  {
-    "code": "FORBIDDEN",
-    "message": "Access denied. Allowed roles: [editor, migration_runner, admin]. Current roles: [viewer].",
-    "details": [],
-    "correlation_id": "corr-12345"
-  }
-  ```
-
----
-
-## 4. Sensitive Field Protection & Server-Side Masking
-
-### 4.1 Bank Account Masking (FR-ERP2-06)
-- **Standard format:** `XXXX-XXXX-7890`.
-- **Server-side normalizer:** When saving or updating a vendor, any submitted bank details string is parsed:
-  - If it contains at least 4 alphanumeric characters, the last 4 are preserved: `XXXX-XXXX-<last4>`.
-  - If shorter or missing, the standard default `XXXX-XXXX-7890` is assigned.
-- **Serialization guarantee:**
-  - `GET /vendors` and `GET /vendors/:id` return `bank_masked: "XXXX-XXXX-7890"`.
-  - Raw unmasked bank numbers are never stored in plain text or emitted to the client.
-  - CSV exports and event emissions apply identical masking.
-
-### 4.2 Salary Masking
-- If employee references are serialized, salary values are masked as `XX,XXX` or omitted entirely.
-
----
-
-## 5. Safe Logging & PII Redaction
-
-Log serialization via Fastify/Pino is guarded by recursive sanitization:
-1. **Redacted Headers:** `Authorization`, `Cookie`, `Set-Cookie`.
-2. **Redacted Payload Keys:** `password`, `token`, `secret`, `jwt`, `bank_details`, `bank_account`, `salary`.
-3. **Database Error Sanitization:** When unexpected database or system errors occur (`500 Internal Server Error`), error messages containing SQL syntax (`SELECT`, `INSERT`, `FROM`, `WHERE`) or sensitive tokens are masked to:
-   ```json
-   {
-     "code": "INTERNAL_SERVER_ERROR",
-     "message": "An unexpected internal error occurred.",
-     "details": [],
-     "correlation_id": "corr-uuid"
-   }
-   ```
-
----
-
-## 6. Audit Trail Integration
+## 6. Audit Trail Integration (PLT-10)
 
 State-changing actions write append-only records to `platform.audit`:
 
@@ -120,8 +97,19 @@ State-changing actions write append-only records to `platform.audit`:
 | `VENDOR_UPDATED` | `PATCH /vendors/:id` | `erp2_vendors` | Changed vendor fields (bank masked) |
 | `PO_CREATED` | `POST /purchase-orders` | `erp2_purchase_orders` | `{ po_number, vendor_id, status, total, line_count }` |
 | `PO_STATUS_CHANGED` | `PATCH /purchase-orders/:id` | `erp2_purchase_orders` | `{ previous_status, new_status }` |
+| `merge.decided` | `POST /duplicates/review` | `erp2_vendors` | `{ candidateId, keptId, mergedId, decision, matchingKey }` |
 
 ### 6.2 Audit Invariants
 - Audit records capture `actor` (user subject), `action`, `entity`, `entityId`, `correlationId`, and timestamp.
 - Audit records never store raw bank account numbers or credentials.
 - Audit failures are handled gracefully without aborting the business mutation.
+
+---
+
+## 7. Test Evidence
+
+| Suite | Description |
+|---|---|
+| `apps/erp/modules/erp-2/tests/security/authorization.test.ts` | Complete suite for ERP2-09: 43 tests verifying SDS matrix, masking, audit events, token variants, error scrubbing, and client role helpers. |
+| `apps/erp/modules/erp-2/tests/api/authorization-and-policy.test.ts` | Tests Hub JWT verification (valid, forged, expired, disabled), the 5-role capability matrix across endpoints (Viewer, Editor, Migration Runner, Analyst, Admin), multi-tenant boundary checks, and cross-user mutation safety (16 tests). |
+| `apps/erp/modules/erp-2/tests/contract/openapi-parity.test.ts` | Tests OpenAPI parity ensuring all registered routes conform to `erp-2.yaml`. |

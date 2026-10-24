@@ -32,13 +32,15 @@ import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
 import { InvoiceDetailPage } from './InvoiceDetailPage.js';
 import { OrderCreateModal } from '../components/forms/OrderCreateModal.js';
+import { OrdersRejectionReviewPage } from './OrdersRejectionReviewPage.js';
 
 export type OrdersViewMode =
   | 'list'
   | 'create-order'
   | 'order-detail'
   | 'create-invoice'
-  | 'invoice-detail';
+  | 'invoice-detail'
+  | 'rejections';
 
 export interface PageErrorState {
   message: string;
@@ -50,7 +52,9 @@ export interface OrdersListPageProps {
   initialTab?: 'orders' | 'invoices';
   initialCreateModalOpen?: boolean;
   createMode?: 'modal' | 'page';
+  initialView?: OrdersViewMode;
   onOrderCreated?: (order: SalesOrder) => void;
+  onNavigateRejections?: () => void;
 }
 
 // ─── URL Query State Helpers ──────────────────────────────────────────────────
@@ -121,12 +125,14 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   initialTab = 'orders',
   initialCreateModalOpen = false,
   createMode = 'page',
+  initialView = 'list',
   onOrderCreated,
+  onNavigateRejections,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(() =>
     parseInitialTabFromUrl(initialTab)
   );
-  const [viewMode, setViewMode] = useState<OrdersViewMode>('list');
+  const [viewMode, setViewMode] = useState<OrdersViewMode>(initialView);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(initialCreateModalOpen);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -449,6 +455,17 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
     );
   }
 
+  if (viewMode === 'rejections') {
+    return (
+      <OrdersRejectionReviewPage
+        onNavigateBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="cs-module-root">
       {/* Page Header with Action Buttons */}
@@ -461,6 +478,18 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
             </p>
           </div>
           <div className="cs-top-actions">
+            <button
+              type="button"
+              className="cs-btn-secondary"
+              data-testid="btn-view-rejections"
+              onClick={() => {
+                onNavigateRejections?.();
+                setViewMode('rejections');
+              }}
+              aria-label="View migration rejections"
+            >
+              Migration Rejections
+            </button>
             <button
               type="button"
               className="cs-btn-primary"

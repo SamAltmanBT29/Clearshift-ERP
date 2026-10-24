@@ -2,16 +2,14 @@
  * ERP-2 Purchase Orders Routes
  *
  * Implements:
- *   - GET /purchase-orders (list with vendor/status filters, bounded paging)
+ *   - GET /purchase-orders (list with vendor/status filter, bounded pagination)
+ *   - POST /purchase-orders (create with lines, product validation via ERP-1 contract, server-side totals)
  *   - GET /purchase-orders/:id (retrieve PO with line items)
- *   - POST /purchase-orders (create PO with lines, server-side calculated totals, ERP-1 product validation)
- *   - PATCH /purchase-orders/:id (allowed status transition only: Draft -> Sent -> Received -> Closed)
+ *   - PATCH /purchase-orders/:id (allowed status transitions only: Draft -> Sent -> Received -> Closed)
  *
  * Security:
- *   - RBAC route guards via requireRoles()
- *   - EdDSA/Ed25519 JWT verification via Fastify auth hook
- *   - Domain invariant validation (BR-ERP2-01, FR-ERP2-04, FR-ERP2-05)
- *   - Audit logging of mutations to platform.audit
+ *   - RBAC matrix enforcement (ERP2_ENDPOINT_ROLES)
+ *   - Object-level tenant and cross-user mutation guards (assertTenantAccess, assertObjectMutationAccess)
  *
  * @module erp2/routes/purchase-orders
  */
@@ -24,10 +22,16 @@ import {
   UpdatePurchaseOrderStatusRequestSchema,
   UuidSchema,
 } from '@clearshift/contracts';
-import { ERP2_ENDPOINT_ROLES } from '../policies/rbac.js';
-import { requireRoles } from '../plugins/auth.js';
 import type { Erp2Service } from '../services/erp2.service.js';
 import type { PurchaseOrderService } from '../services/purchase-order.service.js';
+import {
+  ERP2_ENDPOINT_ROLES,
+  assertTenantAccess,
+  assertObjectMutationAccess,
+  registerEntityTenant,
+  registerEntityCreator,
+} from './guard.js';
+import { requireRoles } from '../plugins/auth.js';
 
 export interface PurchaseOrderRoutesOptions {
   erp2Service?: Erp2Service | undefined;
@@ -41,7 +45,7 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
   const service = opts.erp2Service;
   const poService = opts.purchaseOrderService;
 
-  // 1. GET /purchase-orders — list/filter POs
+  // 1. GET /purchase-orders — list with filter & pagination
   fastify.get(
     '/purchase-orders',
     {
@@ -51,8 +55,8 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = PurchaseOrderListQuerySchema.safeParse(request.query);
       if (!parsed.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -85,7 +89,7 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
     }
   );
 
-  // 2. GET /purchase-orders/:id — get PO by ID
+  // 2. GET /purchase-orders/:id — get by UUID
   fastify.get(
     '/purchase-orders/:id',
     {
@@ -96,8 +100,8 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -112,17 +116,21 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
         });
       }
 
-      if (poService) {
-        const po = await poService.getPurchaseOrderById(id);
-        return reply.status(200).send(po);
-      }
+      const po = poService
+        ? await poService.getPurchaseOrderById(id)
+        : await service!.getPurchaseOrderById(id);
 
-      const po = await service!.getPurchaseOrderById(id);
+      assertTenantAccess(
+        request.user,
+        po,
+        request.headers['x-tenant-id'] as string | undefined
+      );
+
       return reply.status(200).send(po);
     }
   );
 
-  // 3. POST /purchase-orders — create PO
+  // 3. POST /purchase-orders — create PO with lines
   fastify.post(
     '/purchase-orders',
     {
@@ -140,8 +148,8 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = CreatePurchaseOrderRequestSchema.safeParse(bodyToValidate);
       if (!parsed.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -160,39 +168,50 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
         });
       }
 
-      const actor = request.user?.sub || 'system';
-      const correlationId =
-        (request as any).correlationId ??
-        (typeof request.headers['x-correlation-id'] === 'string'
-          ? request.headers['x-correlation-id']
-          : undefined);
+      const requestTenant = request.headers['x-tenant-id'] as string | undefined;
 
-      // If batch_id and idempotency_key are present, execute via atomic import dual-write
-      if (parsed.data.batch_id && parsed.data.idempotency_key && service) {
+      // If batch_id and idempotency_key are present and service is available, execute via atomic import dual-write
+      if (service && parsed.data.batch_id && parsed.data.idempotency_key) {
         const importRes = await service.importRow({
           batch_id: parsed.data.batch_id,
           source_row: parsed.data.source_row ?? 0,
-          source_system: (parsed.data as any).source_system ?? null,
-          source_id: (parsed.data as any).source_id ?? null,
+          source_system: null,
+          source_id: null,
           idempotency_key: parsed.data.idempotency_key,
           entity: 'purchase_order',
           record: parsed.data as unknown as Record<string, unknown>,
         });
         const po = await service.getPurchaseOrderById(importRes.target_id);
+
+        registerEntityTenant(po.id, requestTenant ?? (request.user as any)?.tenant_id);
+        registerEntityCreator(po.id, request.user?.sub);
+
         return reply.status(importRes.prior_result ? 200 : 201).send(po);
       }
 
+      const actor = request.user?.sub || 'system';
+      const correlationId =
+        (reply.getHeader('x-correlation-id') as string | undefined) ??
+        (request as any).correlationId ??
+        (typeof request.headers['x-correlation-id'] === 'string'
+          ? request.headers['x-correlation-id']
+          : undefined);
+
+      let created;
       if (poService) {
-        const created = await poService.createPurchaseOrder(parsed.data, { actor, correlationId });
-        return reply.status(201).send(created);
+        created = await poService.createPurchaseOrder(parsed.data, { actor, correlationId });
+      } else {
+        created = await service!.createPurchaseOrder(parsed.data);
       }
 
-      const po = await service!.createPurchaseOrder(parsed.data);
-      return reply.status(201).send(po);
+      registerEntityTenant(created.id, requestTenant ?? (request.user as any)?.tenant_id);
+      registerEntityCreator(created.id, request.user?.sub);
+
+      return reply.status(201).send(created);
     }
   );
 
-  // 4. PATCH /purchase-orders/:id — allowed status transitions only
+  // 4. PATCH /purchase-orders/:id — update status transition
   fastify.patch(
     '/purchase-orders/:id',
     {
@@ -206,8 +225,8 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const validUuid = UuidSchema.safeParse(id);
       if (!validUuid.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -225,8 +244,8 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
       const parsed = UpdatePurchaseOrderStatusRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         const correlationId =
-          (request as any).correlationId ??
           (reply.getHeader('x-correlation-id') as string | undefined) ??
+          (request as any).correlationId ??
           (request.headers['x-correlation-id'] as string | undefined) ??
           (request.headers['x-request-id'] as string | undefined) ??
           randomUUID();
@@ -241,8 +260,19 @@ export const purchaseOrderRoutes: FastifyPluginAsync<PurchaseOrderRoutesOptions>
         });
       }
 
+      const existing = poService
+        ? await poService.getPurchaseOrderById(id)
+        : await service!.getPurchaseOrderById(id);
+
+      assertObjectMutationAccess(
+        request.user,
+        existing,
+        request.headers['x-tenant-id'] as string | undefined
+      );
+
       const actor = request.user?.sub || 'system';
       const correlationId =
+        (reply.getHeader('x-correlation-id') as string | undefined) ??
         (request as any).correlationId ??
         (typeof request.headers['x-correlation-id'] === 'string'
           ? request.headers['x-correlation-id']

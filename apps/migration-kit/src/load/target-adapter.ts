@@ -5,8 +5,18 @@ import {
   type MigrationTargetAdapter,
   type MigrationTargetAdapterResult,
   type MigrationTargetAdapterError,
+  TerminalOutcome,
+  SKIP_POLICY_CODE,
+  DryRunTokenInvalidatedError,
+  RollbackAction,
+  type RollbackActionType,
+  type RollbackConflictCheck,
+  type RollbackCompensationResult,
 } from '@clearshift/contracts';
 import { RowOutcome, evaluateReconciliation, type ReconciliationCounts } from '@cs/kit';
+import type { IKitRowOutcomeStore } from '../reconcile/outcome-ledger.js';
+import type { IDryRunTokenManager } from '../reconcile/dry-run-token.js';
+
 
 /**
  * Default chunk size for Migration Kit V1 Real Load (Decision KIT-08 & SDS §11.1)
@@ -103,7 +113,11 @@ export abstract class BaseTargetAdapter<TRow = Record<string, unknown>>
   public abstract readonly schemaVersion: number;
 
   protected receiptStore: IImportReceiptStore;
-  protected targetRecords: Map<string, { id: string; data: TRow; createdAt: Date }> = new Map();
+  protected targetRecords: Map<
+    string,
+    { id: string; data: TRow; createdAt: Date; version: number; updatedAt?: Date }
+  > = new Map();
+  protected childReferences: Map<string, Array<{ childEntity: string; childId: string }>> = new Map();
 
   constructor(receiptStore?: IImportReceiptStore) {
     this.receiptStore = receiptStore ?? new InMemoryImportReceiptStore();
@@ -113,12 +127,144 @@ export abstract class BaseTargetAdapter<TRow = Record<string, unknown>>
     return this.receiptStore;
   }
 
-  public getTargetRecords(): Array<{ id: string; data: TRow; createdAt: Date }> {
+  public getTargetRecords(): Array<{ id: string; data: TRow; createdAt: Date; version: number }> {
     return Array.from(this.targetRecords.values());
   }
 
-  public getRecordById(id: string): { id: string; data: TRow; createdAt: Date } | undefined {
+  public getRecordById(
+    id: string
+  ): { id: string; data: TRow; createdAt: Date; version: number; updatedAt?: Date } | undefined {
     return this.targetRecords.get(id);
+  }
+
+  public addChildReference(targetId: string, childEntity: string, childId: string): void {
+    const list = this.childReferences.get(targetId) ?? [];
+    list.push({ childEntity, childId });
+    this.childReferences.set(targetId, list);
+  }
+
+  public updateRecord(targetId: string, updatedData: Partial<TRow>): void {
+    const rec = this.targetRecords.get(targetId);
+    if (rec) {
+      this.targetRecords.set(targetId, {
+        ...rec,
+        data: { ...rec.data, ...updatedData },
+        version: rec.version + 1,
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  public async checkRollbackConflict(
+    targetId: string,
+    postLoadVersion: number
+  ): Promise<RollbackConflictCheck> {
+    const record = this.targetRecords.get(targetId);
+    if (!record) {
+      return {
+        canRollback: false,
+        currentVersion: 0,
+        expectedVersion: postLoadVersion,
+        hasChildReferences: false,
+        reason: `Target record '${targetId}' was not found.`,
+      };
+    }
+
+    const children = this.childReferences.get(targetId) ?? [];
+    if (children.length > 0) {
+      return {
+        canRollback: false,
+        currentVersion: record.version,
+        expectedVersion: postLoadVersion,
+        hasChildReferences: true,
+        childReferences: children,
+        reason: `Cannot rollback record '${targetId}': ${children.length} child reference(s) exist.`,
+      };
+    }
+
+    if (record.version !== postLoadVersion) {
+      return {
+        canRollback: false,
+        currentVersion: record.version,
+        expectedVersion: postLoadVersion,
+        hasChildReferences: false,
+        reason: `Cannot rollback record '${targetId}': current version (${record.version}) does not match post-load version (${postLoadVersion}).`,
+      };
+    }
+
+    return {
+      canRollback: true,
+      currentVersion: record.version,
+      expectedVersion: postLoadVersion,
+      hasChildReferences: false,
+    };
+  }
+
+  public async compensateRow(
+    targetId: string,
+    action: RollbackActionType,
+    options?: {
+      beforeState?: Record<string, unknown> | null;
+      expectedVersion?: number;
+    }
+  ): Promise<RollbackCompensationResult> {
+    if (action === RollbackAction.REMOVE_CREATED) {
+      const exists = this.targetRecords.has(targetId);
+      if (!exists) {
+        return {
+          ok: false,
+          targetId,
+          action,
+          error: `Record '${targetId}' not found for removal`,
+        };
+      }
+      this.targetRecords.delete(targetId);
+      return {
+        ok: true,
+        targetId,
+        action,
+      };
+    }
+
+    if (action === RollbackAction.RESTORE_UPDATED) {
+      const record = this.targetRecords.get(targetId);
+      if (!record) {
+        return {
+          ok: false,
+          targetId,
+          action,
+          error: `Record '${targetId}' not found for restore`,
+        };
+      }
+      if (options?.expectedVersion !== undefined && record.version !== options.expectedVersion) {
+        return {
+          ok: false,
+          targetId,
+          action,
+          error: `Target version mismatch: current ${record.version} !== expected ${options.expectedVersion}`,
+        };
+      }
+      if (options?.beforeState) {
+        this.targetRecords.set(targetId, {
+          ...record,
+          data: options.beforeState as unknown as TRow,
+          version: record.version + 1,
+          updatedAt: new Date(),
+        });
+      }
+      return {
+        ok: true,
+        targetId,
+        action,
+      };
+    }
+
+    return {
+      ok: false,
+      targetId,
+      action,
+      error: `Unknown rollback action '${action}'`,
+    };
   }
 
   /**
@@ -226,6 +372,7 @@ export abstract class BaseTargetAdapter<TRow = Record<string, unknown>>
       id: targetId,
       data: cleanData,
       createdAt: new Date(),
+      version: this.schemaVersion,
     });
     await this.receiptStore.saveReceipt(receipt);
 
@@ -327,6 +474,7 @@ export interface BatchLoadSummary {
   chunksProcessed: number;
   halted: boolean;
   haltReason?: string | undefined;
+  dryRunToken?: string | undefined;
   rowResults: LoadRowResult[];
 }
 
@@ -337,6 +485,8 @@ export interface TargetBatchLoaderOptions {
   chunkSize?: number | undefined;
   maxFailureRatePercent?: number | undefined;
   isDryRun?: boolean | undefined;
+  dryRunToken?: string | undefined;
+  requireDryRunToken?: boolean | undefined;
 }
 
 /**
@@ -347,9 +497,15 @@ export interface TargetBatchLoaderOptions {
  * - Stable idempotency key derivation
  * - 10% failure rate circuit breaker (STP-01)
  * - Row outcome conservation: source = loaded + rejected + merged + skipped (unaccounted = 0)
+ * - Durable outcome ledger recording (KIT-09)
+ * - Dry-run token validation & invalidation (KIT-09)
  */
 export class TargetBatchLoader {
-  constructor(private registry: GenericTargetAdapterRegistry) {}
+  constructor(
+    private registry: GenericTargetAdapterRegistry,
+    private outcomeStore?: IKitRowOutcomeStore | undefined,
+    private dryRunTokenManager?: IDryRunTokenManager | undefined
+  ) {}
 
   public async loadBatch<TRow = Record<string, unknown>>(
     batchId: string,
@@ -365,6 +521,25 @@ export class TargetBatchLoader {
     const adapter = this.registry.get(module, entity);
     if (!adapter) {
       throw new Error(`No TargetAdapter registered for target '${module}:${entity}'`);
+    }
+
+    // 1. Dry-run token guard (KIT-09)
+    let dryRunToken: string | undefined = options.dryRunToken;
+    if (isDryRun) {
+      if (this.dryRunTokenManager) {
+        const issued = await this.dryRunTokenManager.issueToken(batchId);
+        dryRunToken = issued.token;
+      }
+    } else {
+      if (this.dryRunTokenManager && (options.dryRunToken || options.requireDryRunToken)) {
+        if (!options.dryRunToken) {
+          throw new DryRunTokenInvalidatedError(
+            batchId,
+            `Batch '${batchId}' requires a valid dry-run token for real load.`
+          );
+        }
+        await this.dryRunTokenManager.assertValidToken(batchId, options.dryRunToken);
+      }
     }
 
     const rowResults: LoadRowResult[] = [];
@@ -435,6 +610,7 @@ export class TargetBatchLoader {
         reconciliationStatus: reconciliation.result,
         chunksProcessed: 1,
         halted: false,
+        dryRunToken,
         rowResults,
       };
     }
@@ -461,6 +637,21 @@ export class TargetBatchLoader {
             outcome: RowOutcome.SKIPPED,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            const alreadyRecorded = await this.outcomeStore.hasOutcome(batchId, row.sourceRow);
+            if (!alreadyRecorded) {
+              await this.outcomeStore.recordOutcome({
+                batchId,
+                sourceRow: row.sourceRow,
+                outcome: TerminalOutcome.SKIPPED,
+                policyCode: SKIP_POLICY_CODE,
+                reasonCode: 'OPERATOR_APPROVED_SKIP',
+                reasonText: row.skipReason ?? 'Skipped before real load',
+                idempotencyKey: idempKey,
+              });
+            }
+          }
           continue;
         }
 
@@ -476,6 +667,16 @@ export class TargetBatchLoader {
             isExisting: res.value.isExisting ?? false,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            await this.outcomeStore.recordOutcome({
+              batchId,
+              sourceRow: row.sourceRow,
+              outcome: TerminalOutcome.LOADED,
+              targetId: res.value.targetId,
+              idempotencyKey: idempKey,
+            });
+          }
         } else {
           rejectedCount++;
           rowResults.push({
@@ -484,6 +685,17 @@ export class TargetBatchLoader {
             error: res.error,
             idempotencyKey: idempKey,
           });
+
+          if (this.outcomeStore) {
+            await this.outcomeStore.recordOutcome({
+              batchId,
+              sourceRow: row.sourceRow,
+              outcome: TerminalOutcome.REJECTED,
+              reasonCode: res.error.reasonCode,
+              reasonText: res.error.message,
+              idempotencyKey: idempKey,
+            });
+          }
         }
 
         // 3. Circuit breaker: Check 10% row failure threshold
@@ -526,16 +738,40 @@ export class TargetBatchLoader {
           },
           idempotencyKey: idempKey,
         });
+
+        if (this.outcomeStore) {
+          await this.outcomeStore.recordOutcome({
+            batchId,
+            sourceRow: rem.sourceRow,
+            outcome: TerminalOutcome.REJECTED,
+            reasonCode: 'STOP_THRESHOLD_EXCEEDED',
+            reasonText: haltReason ?? 'Batch halted due to excessive failures',
+            idempotencyKey: idempKey,
+          });
+        }
       }
     }
 
     // Enforce row conservation: source = loaded + rejected + merged + skipped
+    let derivedLoaded = loadedCount;
+    let derivedRejected = rejectedCount;
+    let derivedMerged = mergedCount;
+    let derivedSkipped = skippedCount;
+
+    if (this.outcomeStore) {
+      const ledgerCounts = await this.outcomeStore.countOutcomesByBatch(batchId);
+      derivedLoaded = ledgerCounts.loaded;
+      derivedRejected = ledgerCounts.rejected;
+      derivedMerged = ledgerCounts.merged;
+      derivedSkipped = ledgerCounts.skipped;
+    }
+
     const reconciliationCounts: ReconciliationCounts = {
       source: rows.length,
-      loaded: loadedCount,
-      rejected: rejectedCount,
-      merged: mergedCount,
-      skipped: skippedCount,
+      loaded: derivedLoaded,
+      rejected: derivedRejected,
+      merged: derivedMerged,
+      skipped: derivedSkipped,
       pending: 0,
     };
     const reconciliation = evaluateReconciliation(reconciliationCounts);
@@ -546,15 +782,16 @@ export class TargetBatchLoader {
       entity,
       totalSourceRows: rows.length,
       attemptedRows: rowResults.length,
-      loadedCount,
-      rejectedCount,
-      mergedCount,
-      skippedCount,
+      loadedCount: derivedLoaded,
+      rejectedCount: derivedRejected,
+      mergedCount: derivedMerged,
+      skippedCount: derivedSkipped,
       unaccountedCount: reconciliation.unaccounted,
       reconciliationStatus: reconciliation.result,
       chunksProcessed,
       halted,
       haltReason,
+      dryRunToken,
       rowResults,
     };
   }

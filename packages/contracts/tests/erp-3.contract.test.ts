@@ -54,6 +54,15 @@ import {
   PaginatedInvoicesResponseSchema,
   CreatePaymentInputSchema,
   ALLOWED_ORDER_STATUS_TRANSITIONS,
+  ERP3_SALES_ORDER_STATUSES,
+  ERP3_SALES_ORDER_TERMINAL_STATUSES,
+  ERP3_SALES_ORDER_STATUS_TRANSITIONS,
+  ERP3_INVOICE_STATUSES,
+  ERP3_INVOICE_TERMINAL_STATUSES,
+  ERP3_INVOICE_STATUS_TRANSITIONS,
+  ERP3_PAYMENT_METHODS,
+  ERP3_OPTIONAL_REFERENCE_ABSENT,
+  ERP3_DOMAIN_RULES,
   calculateLineAmounts,
   validateOrderLineTotals,
   deriveInvoiceStatus,
@@ -601,6 +610,38 @@ describe("ERP-3 Relationship Error Codes", () => {
     expect(ERP3_RELATIONSHIP_ERROR_CODES.ORDER_REF_NOT_FOUND).toBe(
       "ORDER_REF_NOT_FOUND",
     );
+    expect(
+      ERP3_RELATIONSHIP_ERROR_CODES.INVALID_INVOICE_STATUS_TRANSITION,
+    ).toBe("INVALID_INVOICE_STATUS_TRANSITION");
+    expect(ERP3_RELATIONSHIP_ERROR_CODES.READ_MODEL_INCONSISTENT).toBe(
+      "READ_MODEL_INCONSISTENT",
+    );
+    expect(ERP3_RELATIONSHIP_ERROR_CODES.SOURCE_IDENTITY_INCOMPLETE).toBe(
+      "SOURCE_IDENTITY_INCOMPLETE",
+    );
+    expect(ERP3_RELATIONSHIP_ERROR_CODES.CURRENCY_MISMATCH).toBe(
+      "CURRENCY_MISMATCH",
+    );
+    expect(ERP3_DOMAIN_RULES).toBe(ERP3_RELATIONSHIP_ERROR_CODES);
+    expect(ERP3_OPTIONAL_REFERENCE_ABSENT).toBe(
+      "ERP3_OPTIONAL_REFERENCE_ABSENT",
+    );
+  });
+
+  it("exports ERP3-06 status sets, terminal statuses, and invoice transition matrix", () => {
+    expect(ERP3_SALES_ORDER_STATUSES).toEqual(["Open", "Invoiced", "Closed"]);
+    expect(ERP3_SALES_ORDER_TERMINAL_STATUSES).toEqual(["Closed"]);
+    expect(ERP3_SALES_ORDER_STATUS_TRANSITIONS).toBe(
+      ALLOWED_ORDER_STATUS_TRANSITIONS,
+    );
+    expect(ERP3_INVOICE_STATUSES).toEqual(["Open", "Paid", "Overdue"]);
+    expect(ERP3_INVOICE_TERMINAL_STATUSES).toEqual(["Paid"]);
+    expect(ERP3_INVOICE_STATUS_TRANSITIONS).toEqual({
+      Open: ["Paid", "Overdue"],
+      Overdue: ["Paid"],
+      Paid: [],
+    });
+    expect(ERP3_PAYMENT_METHODS).toEqual(["cash", "bank", "card"]);
   });
 });
 

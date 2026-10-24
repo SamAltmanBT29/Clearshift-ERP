@@ -1,7 +1,7 @@
 /**
- * ERP-2 Vendors & Purchasing — Module Entrypoint
+ * ERP-2 Vendors & Purchasing Module Definition & Public Exports
  *
- * @module @cs/mod-erp2
+ * @module erp2
  */
 
 import { erp2Resolver } from './public.js';
@@ -18,19 +18,19 @@ export { maskSalary, sanitizeForLogging } from './policies/field-masking.js';
 export * from './policies/rbac.js';
 export * from './policies/status-transitions.js';
 export * from './plugins/auth.js';
-export * from './routes/index.js';
 export * from './migration/target-adapter.js';
+export * from './kit/field-registry.js';
+export * from './routes/index.js';
 export * from './domain/index.js';
 export * from './client.js';
 
 export const moduleDefinition = {
   id: 'erp2',
-  schema: 'erp2',
-  routePrefix: '/api/v1/erp-vendors',
-  referenceResolvers: erp2Resolver,
+  name: 'Vendors & Purchasing',
+  version: '1.0.0',
+  description: 'Vendor management, purchase orders, duplicate detection, and migration ingest',
   routes: erpVendorsRoutes,
+  resolver: erp2Resolver,
 };
 
 export const erp2Descriptor = moduleDefinition;
-
-export default moduleDefinition;
