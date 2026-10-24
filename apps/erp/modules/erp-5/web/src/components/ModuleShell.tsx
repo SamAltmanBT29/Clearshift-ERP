@@ -17,6 +17,7 @@ import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { ModuleBreadcrumbs } from './ModuleBreadcrumbs.js';
 import { ModuleNav } from './ModuleNav.js';
+import { ToastProvider } from '../hooks/useToast.js';
 import { ERP5_MODULE_LABEL, resolveErp5DocumentTitle } from '../route-manifest.js';
 
 /** The id of the main region — the target of the skip link. */
@@ -31,7 +32,8 @@ export const ModuleShell: React.FC = () => {
   }, [documentTitle]);
 
   return (
-    <div className="cs-erp5-shell">
+    <ToastProvider>
+      <div className="cs-erp5-shell">
       <a className="cs-erp5-skip-link" href={`#${ERP5_MAIN_REGION_ID}`}>
         Skip to main content
       </a>
@@ -66,7 +68,8 @@ export const ModuleShell: React.FC = () => {
           </main>
         </div>
       </div>
-    </div>
+      </div>
+    </ToastProvider>
   );
 };
 
