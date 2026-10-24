@@ -11,12 +11,7 @@ import type {
   CreateOpeningBalancesInput,
   OpeningBalancesResponse,
 } from '@clearshift/contracts';
-<<<<<<< HEAD
-import { isJournalEntryBalanced } from '@clearshift/contracts';
-export { isJournalEntryBalanced };
-=======
 export { isJournalEntryBalanced } from '@clearshift/contracts';
->>>>>>> origin/main
 
 const API_BASE = '/api/v1/erp-finance';
 

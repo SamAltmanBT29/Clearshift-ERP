@@ -1,6 +1,8 @@
-import { Roles, RoleType, Actions, ActionType, Resources, ResourceType } from "@clearshift/contracts";
+import { Roles, Actions, Resources } from "@clearshift/contracts";
+import type { RoleType, ActionType, ResourceType } from "@clearshift/contracts";
 
-export { Roles, RoleType, Actions, ActionType, Resources, ResourceType };
+export { Roles, Actions, Resources };
+export type { RoleType, ActionType, ResourceType };
 
 /**
  * Fixed Role Permission Matrix (PLT-06 / SDS §9.3)

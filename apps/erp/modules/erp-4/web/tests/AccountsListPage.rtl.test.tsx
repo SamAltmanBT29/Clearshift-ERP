@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { AccountsListPage } from '../src/pages/AccountsListPage.js';
 import * as api from '../src/api/erp-4.js';
 import type { Account, JournalEntry, TrialBalanceResponse } from '@clearshift/contracts';
@@ -117,8 +118,15 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
     vi.clearAllMocks();
   });
 
+  const renderComponent = () =>
+    render(
+      <MemoryRouter>
+        <AccountsListPage />
+      </MemoryRouter>
+    );
+
   it('renders page header, metric cards, and accounts table on mount', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     expect(screen.getByText('Finance & Accounting (ERP-4)')).toBeDefined();
 
@@ -130,7 +138,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('handles search input change and calls fetchAccounts with query', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -145,7 +153,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('handles account type filter selection', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -160,7 +168,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('switches between Chart of Accounts, Trial Balance, and Journal Entries tabs', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -184,7 +192,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('navigates to create new journal entry view when clicking + New Journal Entry', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -205,7 +213,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
   });
 
   it('opens account create modal when clicking + New Account', async () => {
-    render(<AccountsListPage />);
+    renderComponent();
 
     await screen.findByText('Operating Cash');
 
@@ -213,7 +221,7 @@ describe('AccountsListPage — React Testing Library Integration Tests', () => {
     fireEvent.click(createAccBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Create GL Account')).toBeDefined();
+      expect(screen.getByText('Create General Ledger Account')).toBeDefined();
     });
   });
 });
