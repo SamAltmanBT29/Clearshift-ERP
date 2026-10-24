@@ -73,16 +73,21 @@ export { maskBankDetails } from '../domain/rules.js';
 // Repository Interface
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ServiceContext {
+  actor: string;
+  correlationId?: string | undefined;
+}
+
 export interface Erp2Repository {
   // Vendors
-  listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; total: number }>;
+  listVendors(query: any): Promise<{ vendors: Vendor[]; items: Vendor[]; total: number }>;
   getVendorById(id: string): Promise<Vendor | null>;
   getVendorByTaxNumber(taxNumber: string): Promise<Vendor | null>;
   createVendor(data: CreateVendorRequest, maskedBank: string | null): Promise<Vendor>;
   updateVendor(id: string, updates: Partial<Vendor>): Promise<Vendor>;
 
   // Purchase Orders
-  listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; total: number }>;
+  listPurchaseOrders(query: any): Promise<{ purchaseOrders: PurchaseOrder[]; items: PurchaseOrder[]; total: number }>;
   getPurchaseOrderById(id: string): Promise<PurchaseOrder | null>;
   getPurchaseOrderByNumber(poNumber: string): Promise<PurchaseOrder | null>;
   createPurchaseOrder(po: Omit<PurchaseOrder, 'created_at' | 'updated_at'>): Promise<PurchaseOrder>;
@@ -134,7 +139,7 @@ export class InMemoryErp2Repository implements Erp2Repository {
     });
   }
 
-  async listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; total: number }> {
+  async listVendors(query: any): Promise<{ vendors: Vendor[]; items: Vendor[]; total: number }> {
     let items = Array.from(this.vendors.values());
 
     if (query.search) {
@@ -147,12 +152,12 @@ export class InMemoryErp2Repository implements Erp2Repository {
     items.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
     const total = items.length;
 
-    const page = query.page;
-    const pageSize = query.pageSize;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const start = (page - 1) * pageSize;
     const paged = items.slice(start, start + pageSize);
 
-    return { vendors: paged, total };
+    return { vendors: paged, items: paged, total };
   }
 
   async getVendorById(id: string): Promise<Vendor | null> {
@@ -205,11 +210,12 @@ export class InMemoryErp2Repository implements Erp2Repository {
     return updated;
   }
 
-  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; total: number }> {
+  async listPurchaseOrders(query: any): Promise<{ purchaseOrders: PurchaseOrder[]; items: PurchaseOrder[]; total: number }> {
     let items = Array.from(this.purchaseOrders.values());
 
-    if (query.vendor_id) {
-      items = items.filter((po) => po.vendor_id === query.vendor_id);
+    const vendorId = query.vendor_id ?? query.vendorId;
+    if (vendorId) {
+      items = items.filter((po) => po.vendor_id === vendorId);
     }
     if (query.status) {
       items = items.filter((po) => po.status === query.status);
@@ -219,12 +225,12 @@ export class InMemoryErp2Repository implements Erp2Repository {
 
     const total = items.length;
 
-    const page = query.page;
-    const pageSize = query.pageSize;
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const start = (page - 1) * pageSize;
     const paged = items.slice(start, start + pageSize);
 
-    return { purchaseOrders: paged, total };
+    return { purchaseOrders: paged, items: paged, total };
   }
 
   async getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
@@ -241,13 +247,15 @@ export class InMemoryErp2Repository implements Erp2Repository {
   }
 
   async createPurchaseOrder(po: Omit<PurchaseOrder, 'created_at' | 'updated_at'>): Promise<PurchaseOrder> {
+    const id = po.id || randomUUID();
     const now = new Date().toISOString();
     const created: PurchaseOrder = {
       ...po,
+      id,
       created_at: now,
       updated_at: now,
     };
-    this.purchaseOrders.set(po.id, created);
+    this.purchaseOrders.set(id, created);
     return created;
   }
 
@@ -330,7 +338,7 @@ function escapeLike(value: string): string {
 export class DrizzleErp2Repository implements Erp2Repository {
   constructor(private readonly db: NodePgDatabase) {}
 
-  async listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; total: number }> {
+  async listVendors(query: VendorListQuery): Promise<{ vendors: Vendor[]; items: Vendor[]; total: number }> {
     const page = query.page;
     const pageSize = query.pageSize;
     const offset = (page - 1) * pageSize;
@@ -367,7 +375,7 @@ export class DrizzleErp2Repository implements Erp2Repository {
       updated_at: r.updated_at.toISOString(),
     }));
 
-    return { vendors, total: Number(countVal) };
+    return { vendors, items: vendors, total: Number(countVal) };
   }
 
   async getVendorById(id: string): Promise<Vendor | null> {
@@ -492,7 +500,7 @@ export class DrizzleErp2Repository implements Erp2Repository {
     };
   }
 
-  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; total: number }> {
+  async listPurchaseOrders(query: PurchaseOrderListQuery): Promise<{ purchaseOrders: PurchaseOrder[]; items: PurchaseOrder[]; total: number }> {
     const page = query.page;
     const pageSize = query.pageSize;
     const offset = (page - 1) * pageSize;
@@ -536,7 +544,7 @@ export class DrizzleErp2Repository implements Erp2Repository {
       });
     }
 
-    return { purchaseOrders, total: Number(countVal) };
+    return { purchaseOrders, items: purchaseOrders, total: Number(countVal) };
   }
 
   async getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {

@@ -1,4 +1,10 @@
-import { erp3Resolver, Erp3ReferenceResolver } from "./public.js";
+import {
+  erp3Resolver,
+  Erp3ReferenceResolver,
+  type SalesOrderPublicSummary,
+  type InvoicePublicSummary,
+  type PaymentPublicSummary,
+} from "./public.js";
 import { buildApp, type AppOptions } from "./app.js";
 import {
   Erp3Service,
@@ -17,11 +23,20 @@ import {
 } from "./services/repository.js";
 import { erpOrdersRoutes } from "./routes/index.js";
 import * as domainRules from "./domain/index.js";
+export * from "./migration/mapping-config.js";
+export * from "./migration/profiling-config.js";
 export * from "./migration/cleaning-config.js";
+export { hasFormulaPrefix } from "./migration/cleaning-config.js";
+export * from "./kit/rejection-context.js";
+
+export * from "./domain/index.js";
 
 export {
   erp3Resolver,
   Erp3ReferenceResolver,
+  type SalesOrderPublicSummary,
+  type InvoicePublicSummary,
+  type PaymentPublicSummary,
   buildApp,
   type AppOptions,
   Erp3Service,

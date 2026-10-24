@@ -49,15 +49,26 @@ import {
 import {
   ERP3_DOMAIN_ERROR_CODES,
   Erp3DomainError,
-  assertValidCustomerGoldenId,
   assertValidFullPayment,
   assertValidInvoiceDates,
-  assertValidOrderStatusTransition,
   calculateDocumentLinesAndTotal,
   formatScaledDecimal4Dp,
   parseScaledDecimal4Dp,
   resolveInvoiceStatus,
 } from "../domain/rules.js";
+import {
+  assertInvoiceReadConsistency,
+  assertInvoiceStatusTransition,
+  assertOrderInvoiceCurrencyConsistency,
+  assertPaymentReadConsistency,
+  assertSalesOrderReadConsistency,
+  assertSalesOrderStatusTransition,
+  assertSourceIdentityIsComplete,
+  assertValidCurrencyCode,
+  assertValidPaymentMethod,
+  handleOptionalRelationship,
+  validateCrossModuleReference,
+} from "../domain/relationships.js";
 import {
   computeRequestHash,
   type Erp3Repository,
@@ -182,32 +193,48 @@ export class Erp3Service {
   }
 
   private async verifyCustomerGoldenId(customerGoldenId: string): Promise<void> {
-    assertValidCustomerGoldenId(customerGoldenId);
-    if (this.resolver) {
-      const exists = await this.resolver.exists("customer", customerGoldenId);
-      if (!exists) {
-        throw new DomainError(
-          ERP3_DOMAIN_ERROR_CODES.CUSTOMER_NOT_FOUND,
-          `Customer Golden ID '${customerGoldenId}' was not found in Hub / CRM-1 (BR-ERP3-03).`,
-          { field: "customer_golden_id", customer_golden_id: customerGoldenId },
-        );
+    try {
+      await validateCrossModuleReference(
+        this.resolver,
+        "customer",
+        customerGoldenId,
+        true,
+        "customer_golden_id",
+        ERP3_DOMAIN_ERROR_CODES.CUSTOMER_NOT_FOUND,
+      );
+    } catch (err) {
+      if (err instanceof Erp3DomainError) {
+        throw new DomainError(err.code, err.message, {
+          ...(err.field ? { field: err.field } : {}),
+          ...err.context,
+        });
       }
+      throw err;
     }
   }
 
   private async verifyProductReferences(
     lines: ReadonlyArray<{ product_id: string }>,
   ): Promise<void> {
-    if (!this.resolver) return;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
-      const exists = await this.resolver.exists("product", line.product_id);
-      if (!exists) {
-        throw new DomainError(
+      try {
+        await validateCrossModuleReference(
+          this.resolver,
+          "product",
+          line.product_id,
+          true,
+          `lines.${i}.product_id`,
           ERP3_DOMAIN_ERROR_CODES.PRODUCT_NOT_FOUND,
-          `Line ${i + 1} references unknown ERP-1 product ID '${line.product_id}'.`,
-          { field: `lines.${i}.product_id`, product_id: line.product_id },
         );
+      } catch (err) {
+        if (err instanceof Erp3DomainError) {
+          throw new DomainError(err.code, err.message, {
+            ...(err.field ? { field: err.field } : {}),
+            ...err.context,
+          });
+        }
+        throw err;
       }
     }
   }
@@ -227,6 +254,7 @@ export class Erp3Service {
         id,
       );
     }
+    assertSalesOrderReadConsistency(order);
     return order;
   }
 
@@ -243,10 +271,15 @@ export class Erp3Service {
     // 1. BR-ERP3-03: Verify customer Golden ID format & existence
     await this.verifyCustomerGoldenId(data.customer_golden_id);
 
-    // 2. Verify all line product references via ERP-1 resolver
+    // 2. Verify currency & source provenance completeness (ERP3-06)
+    const currency = data.currency ?? "USD";
+    assertValidCurrencyCode(currency);
+    assertSourceIdentityIsComplete(data.source_system, data.source_id);
+
+    // 3. Verify all line product references via ERP-1 resolver
     await this.verifyProductReferences(data.lines);
 
-    // 3. Check duplicate order_number
+    // 4. Check duplicate order_number
     if (data.order_number) {
       const existing = await txRepo.getSalesOrderByNumber(data.order_number);
       if (existing) {
@@ -258,7 +291,7 @@ export class Erp3Service {
       }
     }
 
-    // 4. BR-ERP3-01 & BR-ERP3-02: Compute line taxes and totals server-side
+    // 5. BR-ERP3-01 & BR-ERP3-02: Compute line taxes and totals server-side
     const calculated = calculateDocumentLinesAndTotal(data.lines, {
       strictDr1Exact4Dp: this.strictDr1Exact4Dp,
     });
@@ -279,13 +312,13 @@ export class Erp3Service {
       created_at: now,
     }));
 
-    return txRepo.createSalesOrder({
+    const createdOrder = await txRepo.createSalesOrder({
       id: orderId,
       order_number: orderNumber,
       customer_golden_id: data.customer_golden_id,
       order_date: data.order_date,
       status: "Open",
-      currency: data.currency ?? "USD",
+      currency,
       total: calculated.total,
       lines: orderLines,
       source_system: data.source_system ?? null,
@@ -293,6 +326,9 @@ export class Erp3Service {
       created_at: now,
       updated_at: now,
     });
+
+    assertSalesOrderReadConsistency(createdOrder);
+    return createdOrder;
   }
 
   async updateSalesOrderStatus(
@@ -309,11 +345,13 @@ export class Erp3Service {
         );
       }
 
-      assertValidOrderStatusTransition(existing.status, targetStatus, {
+      assertSalesOrderStatusTransition(existing.status, targetStatus, {
         allowDirectOpenToClosed: this.allowDirectOpenToClosed,
       });
 
-      return txRepo.updateSalesOrderStatus(id, targetStatus);
+      const updated = await txRepo.updateSalesOrderStatus(id, targetStatus);
+      assertSalesOrderReadConsistency(updated);
+      return updated;
     });
   }
 
@@ -359,20 +397,24 @@ export class Erp3Service {
       (sum, p) => sum + parseScaledDecimal4Dp(p.amount),
       0n,
     );
+    const nowDate = this.nowUtcDate();
     const derivedStatus = resolveInvoiceStatus(
       invoice.total,
       formatScaledDecimal4Dp(paidScaled),
       invoice.due_date,
-      this.nowUtcDate(),
+      nowDate,
     );
 
-    if (derivedStatus !== invoice.status) {
-      return {
-        ...invoice,
-        status: derivedStatus,
-      };
-    }
-    return invoice;
+    const projectedInvoice =
+      derivedStatus !== invoice.status
+        ? {
+            ...invoice,
+            status: derivedStatus,
+          }
+        : invoice;
+
+    assertInvoiceReadConsistency(projectedInvoice, payments, nowDate);
+    return projectedInvoice;
   }
 
   async createInvoice(data: CreateInvoiceRequest): Promise<Invoice> {
@@ -388,13 +430,18 @@ export class Erp3Service {
     // 1. BR-ERP3-03: Verify customer Golden ID
     await this.verifyCustomerGoldenId(data.customer_golden_id);
 
-    // 2. FR-ERP3-02: Validate mandatory due_date >= invoice_date
+    // 2. Verify currency & source provenance completeness (ERP3-06)
+    const currency = data.currency ?? "USD";
+    assertValidCurrencyCode(currency);
+    assertSourceIdentityIsComplete(data.source_system, data.source_id);
+
+    // 3. FR-ERP3-02: Validate mandatory due_date >= invoice_date
     assertValidInvoiceDates(data.invoice_date, data.due_date);
 
-    // 3. Verify all line product references via ERP-1 resolver
+    // 4. Verify all line product references via ERP-1 resolver
     await this.verifyProductReferences(data.lines);
 
-    // 4. Unique invoice_number check
+    // 5. Unique invoice_number check
     if (data.invoice_number) {
       const existingByNumber = await txRepo.getInvoiceByNumber(
         data.invoice_number,
@@ -408,14 +455,22 @@ export class Erp3Service {
       }
     }
 
-    // 5. Sales order reference & 1:1 V1 invoice constraint
-    if (data.order_id) {
-      const linkedOrder = await txRepo.getSalesOrderById(data.order_id);
+    // 6. Optional sales order reference & 1:1 V1 invoice constraint
+    const optionalOrderRef = handleOptionalRelationship(
+      data.order_id,
+      "order_id",
+      "INVOICE_ORDER",
+    );
+
+    if (optionalOrderRef.value) {
+      const linkedOrder = await txRepo.getSalesOrderById(
+        optionalOrderRef.value,
+      );
       if (!linkedOrder) {
         throw new DomainError(
           ERP3_DOMAIN_ERROR_CODES.ORDER_REF_NOT_FOUND,
-          `Referenced sales order '${data.order_id}' does not exist.`,
-          { field: "order_id", order_id: data.order_id },
+          `Referenced sales order '${optionalOrderRef.value}' does not exist.`,
+          { field: "order_id", order_id: optionalOrderRef.value },
         );
       }
 
@@ -431,16 +486,18 @@ export class Erp3Service {
         );
       }
 
+      assertOrderInvoiceCurrencyConsistency(linkedOrder.currency, currency);
+
       const existingOrderInvoice = await txRepo.getInvoiceByOrderId(
-        data.order_id,
+        optionalOrderRef.value,
       );
       if (existingOrderInvoice) {
         throw new ConflictError(
           ERP3_DOMAIN_ERROR_CODES.ORDER_ALREADY_INVOICED,
-          `Sales order '${data.order_id}' already has a V1 invoice ('${existingOrderInvoice.invoice_number}'). Split invoicing is out of scope.`,
+          `Sales order '${optionalOrderRef.value}' already has a V1 invoice ('${existingOrderInvoice.invoice_number}'). Split invoicing is out of scope.`,
           {
             field: "order_id",
-            order_id: data.order_id,
+            order_id: optionalOrderRef.value,
             existing_invoice_id: existingOrderInvoice.id,
           },
         );
@@ -448,11 +505,12 @@ export class Erp3Service {
 
       // Transition Open order to Invoiced when its V1 invoice is created
       if (linkedOrder.status === "Open") {
+        assertSalesOrderStatusTransition(linkedOrder.status, "Invoiced");
         await txRepo.updateSalesOrderStatus(linkedOrder.id, "Invoiced");
       }
     }
 
-    // 6. Compute line taxes and invoice total server-side
+    // 7. Compute line taxes and invoice total server-side
     const calculated = calculateDocumentLinesAndTotal(data.lines, {
       strictDr1Exact4Dp: this.strictDr1Exact4Dp,
     });
@@ -474,22 +532,23 @@ export class Erp3Service {
       created_at: now,
     }));
 
+    const nowDate = this.nowUtcDate();
     const initialStatus = resolveInvoiceStatus(
       calculated.total,
       "0.0000",
       data.due_date,
-      this.nowUtcDate(),
+      nowDate,
     );
 
-    return txRepo.createInvoice({
+    const createdInvoice = await txRepo.createInvoice({
       id: invoiceId,
       invoice_number: invoiceNumber,
-      order_id: data.order_id ?? null,
+      order_id: optionalOrderRef.value,
       customer_golden_id: data.customer_golden_id,
       invoice_date: data.invoice_date,
       due_date: data.due_date,
       status: initialStatus,
-      currency: data.currency ?? "USD",
+      currency,
       total: calculated.total,
       lines: invoiceLines,
       source_system: data.source_system ?? null,
@@ -497,6 +556,9 @@ export class Erp3Service {
       created_at: now,
       updated_at: now,
     });
+
+    assertInvoiceReadConsistency(createdInvoice, [], nowDate);
+    return createdInvoice;
   }
 
   // ── Payments ───────────────────────────────────────────────────────────────
@@ -515,6 +577,8 @@ export class Erp3Service {
     txRepo: Erp3Repository,
     data: CreatePaymentRequest,
   ): Promise<Payment> {
+    assertValidPaymentMethod(data.method);
+
     const invoice = await txRepo.getInvoiceById(data.invoice_id);
     if (!invoice) {
       throw new NotFoundError(
@@ -540,6 +604,8 @@ export class Erp3Service {
       paymentAmount: data.amount,
     });
 
+    assertInvoiceStatusTransition(invoice.status, nextInvoiceStatus);
+
     const now = new Date().toISOString();
     const paymentId = randomUUID();
     const normalizedAmount = formatScaledDecimal4Dp(
@@ -556,7 +622,17 @@ export class Erp3Service {
     });
 
     // FR-ERP3-04: Automatically transition invoice status to Paid in the same transaction
-    await txRepo.updateInvoiceStatus(data.invoice_id, nextInvoiceStatus);
+    const updatedInvoice = await txRepo.updateInvoiceStatus(
+      data.invoice_id,
+      nextInvoiceStatus,
+    );
+
+    assertPaymentReadConsistency(payment, updatedInvoice);
+    assertInvoiceReadConsistency(
+      updatedInvoice,
+      [...existingPayments, payment],
+      this.nowUtcDate(),
+    );
 
     return payment;
   }
