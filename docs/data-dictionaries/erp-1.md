@@ -36,7 +36,9 @@
 22. [Public Import Endpoints & Idempotent Ingestion (ERP1-11)](#22-public-import-endpoints--idempotent-ingestion-erp1-11)
 23. [Exact Duplicate Key Matching Policy & Human Review (ERP1-12)](#23-exact-duplicate-key-matching-policy--human-review-erp1-12)
 24. [Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)](#24-idempotent-retry-and-partial-load-stop-behavior-erp1-13)
-25. [Module Authorization and Policy Integration (ERP1-15)](#25-module-authorization-and-policy-integration-erp1-15)
+25. [Module Authorization and Policy Integration (ERP1-15)](#27-module-authorization-and-policy-integration-erp1-15)
+26. [Module Route and Page Registration in Shared Shell (ERP1-16)](#28-module-route-and-page-registration-in-shared-shell-erp1-16)
+27. [Main Paginated Data Table (ERP1-17)](#29-main-paginated-data-table-erp1-17)
 
 ---
 
@@ -1079,3 +1081,85 @@ All `401 Unauthorized` and `403 Forbidden` responses strictly conform to the sta
 }
 ```
 
+---
+
+## 28. Module Route and Page Registration in Shared Shell (ERP1-16)
+
+**Issue Reference**: [#112](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/112)<br />
+**Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.8, §7.9; PLT-08 Shared Web Shell<br />
+**Implementation**: `apps/erp/modules/erp-1/web/src/route-manifest.ts`, `apps/erp/modules/erp-1/web/src/routes.tsx`, `apps/erp/modules/erp-1/web/src/components/ModuleShell.tsx`
+
+### 28.1 Route Manifest & Navigation Structure (AC1 & AC2)
+
+ERP-1 registers its client-side route manifest conforming to the platform shared shell specifications:
+- **Base Path**: `/erp-1`
+- **Navigation Links**:
+  - Products Master Catalog: `/erp-1/products`
+  - Product Categories: `/erp-1/categories`
+  - Stock Quantities: `/erp-1/stock`
+  - Migration Kit Ingestion & Review: `/erp-1/migration`
+- **Action & Detail Subroutes**:
+  - Create Product: `/erp-1/products/new` (accessible to `editor` and `admin`)
+  - Product Detail: `/erp-1/products/:productId` (accessible to `viewer`, `editor`, `admin`, `analyst`)
+  - Edit Product: `/erp-1/products/:productId/edit` (accessible to `editor` and `admin`)
+- **Fallback Route**:
+  - Module 404 Not Found: `/erp-1/*` with navigation back to Products list.
+
+### 28.2 Shared Shell Accessibility & Layout Conformance (AC3)
+
+All ERP-1 routes render within `ModuleShell`:
+- **Skip Link**: `<a href="#erp1-main" className="cs-skip-link">Skip to main content</a>` ensures WCAG 2.1 AA keyboard accessibility.
+- **Header & Navigation Landmark**: `<header>` banner with module branding, tenant display, user profile info, and sign-out action; `<nav aria-label="ERP-1 Module Navigation">` with active link indications (`aria-current="page"`).
+- **Breadcrumb Trail**: Dynamic breadcrumbs hierarchy (`Home > ERP-1 > Products > [Product Name]`) rendered using `@cs/ui` tokens.
+- **Main Landmark**: Single `<main id="erp1-main" tabIndex={-1}>` container for primary page contents.
+- **Design Tokens**: Standardized CSS variables from `@cs/ui` (`--cs-color-surface-bg`, `--cs-color-surface-card`, `--cs-space-4`, etc.).
+
+### 28.3 Client-Side Authentication & Session Integration (AC4)
+
+Route protection via `RequireAuth` wrapper:
+- Intercepts unauthenticated sessions and redirects to Hub login with return URL parameter (`/login?redirect=...`).
+- Checks user role against route permission requirements (e.g. restricts product creation/editing to `editor` / `admin`).
+- Emits standard access-denied state if the user lacks the required role.
+
+---
+
+## 29. Main Paginated Data Table (ERP1-17)
+
+**Issue Reference**: [#113](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/113)<br />
+**Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.2, §4.7; PLT-04 Bounded Pagination, PLT-08 Shared Web Shell<br />
+**Implementation**: `apps/erp/modules/erp-1/web/src/components/ProductsTable.tsx`, `apps/erp/modules/erp-1/web/src/pages/ProductsListPage.tsx`
+
+### 29.1 Stable Columns Matching Data Dictionary (AC1)
+
+The primary collection table screen renders entity rows with stable columns directly mapping to `erp1.products` master data and `erp1.stock_levels`:
+
+| Column Header | Field Name | Data Type / Representation | Sortable | Accessibility & Formatting Notes |
+|---|---|---|---|---|
+| **Product Name** | `name` | `VARCHAR(255)` / string | Yes (`name`) | Primary entity identifier; interactive button for detail/edit drawer; optional source system metadata |
+| **SKU** | `sku` | `VARCHAR(64)` / string | Yes (`sku`) | Monospace `code` pill; normalized uppercase alphanumeric key |
+| **Category** | `categoryId` | UUID FK -> `erp1.categories` | No | Rendered as category name badge from cached category map; fallback `—` |
+| **Unit** | `unitOfMeasure` | `erp1.unit_of_measure` enum | No | Restricted to fixed V1 unit list: `pcs`, `kg`, `g`, `litre`, `metre`, `box` |
+| **Price** | `price` | `NUMERIC(14,4)` decimal string | Yes (`price`) | Formatted 2-4 decimal places with ISO currency code (e.g. `185.50 USD`) |
+| **Tax Rate** | `taxRate` | `NUMERIC(5,2)` decimal string | No | Right-aligned percentage string (e.g. `5.00%`) |
+| **Stock Status** | `stockQuantity` | `NUMERIC(14,4)` from stock levels | Yes (`quantity`) | `StatusBadge`: `In Stock` (>10), `Low` (<=10), `Out of Stock` (<=0), or `Unknown` |
+
+### 29.2 Server-Side Pagination & Bounded Paging (AC2 & AC4)
+
+1. **Query Parameter Binding**:
+   - `page`: 1-based integer index sent to `/api/v1/erp-products/products?page=...`
+   - `pageSize`: Bound to standard bounded options `[10, 25, 50, 100]`.
+   - Modifying `pageSize` immediately resets `page` to `1` and updates URL search parameters via `replaceState`.
+2. **DOM Performance & Bounded Limits**:
+   - Strictly conforms to platform constraint: `pageSize <= 100`.
+   - DOM node creation is capped at <= 100 rows per rendered page window, preventing browser DOM thrashing and layout thrash.
+   - Previous and Next buttons enforce disabled states at page boundaries (`currentPage <= 1` and `currentPage >= totalPages`).
+
+### 29.3 Predictable Column Header Sorting (AC3)
+
+1. **Sort Direction Toggle**:
+   - Clicking an active sorted column toggles between `asc` and `desc`.
+   - Clicking an inactive column switches `sortBy` to that field with initial direction `asc`.
+2. **WAI-ARIA & Keyboard Accessibility**:
+   - Headers declare `aria-sort="ascending"`, `aria-sort="descending"`, or `aria-sort="none"`.
+   - Accessible descriptions announce the current sort state and next action (`aria-label`).
+   - Supports keyboard activation via `Enter` and `Space` (`tabIndex={0}`).
