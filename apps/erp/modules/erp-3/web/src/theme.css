@@ -1443,3 +1443,90 @@
     max-height: none;
   }
 }
+
+/* ─── ERP-3 Creation Modal & Form Validation Styles (Issue #156 / ERP3-20) ──── */
+
+.cs-erp3-create-modal {
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.cs-erp3-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cs-erp3-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 600px) {
+  .cs-erp3-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cs-erp3-form-alert {
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp3-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cs-erp3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  border: 1px solid transparent;
+}
+
+.cs-erp3-btn-primary {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+
+.cs-erp3-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.cs-erp3-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cs-erp3-btn-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--border-subtle);
+}
+
+.cs-erp3-btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+  border-color: var(--border-strong);
+}
+
+.cs-erp3-btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cs-erp3-toast-container {
+  margin-bottom: var(--space-4);
+}

@@ -33,6 +33,8 @@
 19. [Requirement-to-Test Traceability Matrix (ERP1-24)](#19-requirement-to-test-traceability-matrix-erp1-24)
 20. [Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)](#20-canonical-dirty-data-pack-plan--defect-distribution-erp1-24)
 21. [Gate G1 Review & Design Artifact Sign-Off (ERP1-24)](#21-gate-g1-review--design-artifact-sign-off-erp1-24)
+22. [QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)](#22-qa-evidence-automated-test-mapping-and-team-handoff-erp1-10)
+23. [Profiling Configuration & Expected-Result Assertions (ERP1-26)](#23-profiling-configuration--expected-result-assertions-erp1-26)
 
 ---
 
@@ -866,4 +868,32 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Author**: Samarth (`Samarth-ITM`)
 - **Role**: Group 6 / Role 4 — Data & QA Lead
 - **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
+---
+
+## 23. Profiling Configuration & Expected-Result Assertions (ERP1-26)
+
+**Issue Reference**: Resolves [#122](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/122) (ERP1-26 / KIT-03)  
+**Implementation**: `apps/erp/modules/erp-1/src/migration/profiling-config.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/migration/profiling.test.ts`  
+**Detailed Specification**: `docs/data-dictionaries/erp-1-profiling.md`  
+
+### 23.1 Shared Migration Kit Profiler Integration (KIT-03)
+ERP-1 registers domain rules for module columns (`category`, `warehouse`, `product`, `stock_level`) with `@cs/kit`'s `profileDataset`.
+- Computes `totalRows` (131), `nullCount`, `populatedCount`, `distinctCount`, `invalidFormatCount`, `invalidFormatRate`, and `topValues` (max 5).
+- Enforces V1 domain invariants: single warehouse `WH-01`, fixed UOM enum, non-negative price/tax/stock, RFC email/phone regex, and OWASP formula injection prevention.
+- All column defect counts match pre-calculated manifest numbers from `sample-data/erp-1/expected-profile.json`.
+
+### 23.2 Exact Duplicate Key Matching Policy
+Configures 3 exact duplicate matching rules:
+1. `category_code`: trimmed uppercase category code (2 candidates: `R012`, `R013` matching `R001`)
+2. `product_sku`: normalized uppercase SKU (3 candidates: `R057`, `R058` matching `R022`, `R059` matching `R023`)
+3. `stock_level_key`: composite `${sku}::${warehouse}` (2 candidates: `R112`, `R113` matching `R087`)
+
+Total duplicate candidates = 7, exactly matching manifest `review: 7`. Zero fuzzy scoring or V2 compensating rollback sagas.
+
+### 23.3 Non-Destructive Guarantee & Sensitive Data Masking
+- Source data immutability: input CSV text and parsed objects are never mutated. SHA-256 digest is verified against manifest `fixture_sha256`.
+- Sensitive fields `supplier_bank_account` and `employee_ssn` are excluded from column rules and masked before profiling; zero raw financial/personal numbers in reports or formula-safe CSV exports.
+
 
