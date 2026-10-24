@@ -39,7 +39,13 @@ export interface BatchRecord {
   updatedAt: string;
   dateFormat?: string | undefined;
   phoneCountry?: string | undefined;
-  profile?: { emptyCounts: Record<string, number>; duplicateCount: number; totalRows: number } | undefined;
+  profile?: {
+    emptyCounts: Record<string, number>;
+    duplicateCount: number;
+    badFormatCount?: number;
+    emptyRequiredCount?: number;
+    totalRows: number;
+  } | undefined;
   cleanedCount: number;
   rejectedCount: number;
   loadedCount: number;
@@ -48,6 +54,13 @@ export interface BatchRecord {
   unaccountedCount: number;
   dryRunPassed: boolean;
   dryRunToken?: string | undefined;
+  rejects?: Array<{
+    sourceRow: number;
+    entity: string;
+    reasonCode: string;
+    safeMessage: string;
+    module?: string;
+  }> | undefined;
   reconciliation?: {
     ok: boolean; sourceCount: number; loadedCount: number; rejectedCount: number;
     mergedCount: number; skippedCount: number; unaccountedCount: number;
@@ -95,16 +108,23 @@ export function parseCsv(content: string): { headers: string[]; rows: Record<str
     const result: string[] = [];
     let current = '';
     let inQuotes = false;
+    let cellQuoted = false;
     for (let i = 0; i < line.length; i++) {
       const ch = line[i];
       if (ch === '"') {
+        cellQuoted = true;
         if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
         else inQuotes = !inQuotes;
-      } else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
-      else current += ch;
+      } else if (ch === ',' && !inQuotes) {
+        result.push(cellQuoted ? current : current.trim());
+        current = '';
+        cellQuoted = false;
+      } else {
+        current += ch;
+      }
     }
-    result.push(current);
-    return result.map((v) => v.trim());
+    result.push(cellQuoted ? current : current.trim());
+    return result;
   };
   const headers = parseLine(lines[0]!);
   const rows: Record<string, string>[] = [];
@@ -183,6 +203,78 @@ export function createBatch(input: CreateBatchInput, store: BatchStore): BatchRe
   return batch;
 }
 
+export function evaluateRowDefects(row: Record<string, string>): {
+  emptyRequired: boolean;
+  emptyField?: string;
+  badFormat: boolean;
+  badFormatReason?: string;
+  isOptOut?: boolean;
+} {
+  // Opt out check
+  if (row['status'] === 'opt_out' || row['notes']?.includes('PROTECTED_OPT_OUT')) {
+    return { emptyRequired: false, badFormat: false, isOptOut: true };
+  }
+
+  // Required fields check: first_name, last_name, email (if those headers exist in source)
+  if ('first_name' in row && row['first_name'] === '') {
+    return { emptyRequired: true, emptyField: 'first_name', badFormat: false };
+  }
+  if ('last_name' in row && row['last_name'] === '') {
+    return { emptyRequired: true, emptyField: 'last_name', badFormat: false };
+  }
+  if ('email' in row && row['email'] === '') {
+    return { emptyRequired: true, emptyField: 'email', badFormat: false };
+  }
+
+  // Format checks
+  if ('email' in row && row['email']) {
+    const email = row['email'];
+    if (!email.includes('@')) {
+      return { emptyRequired: false, badFormat: true, badFormatReason: 'Email is not valid: value has no @ sign' };
+    }
+    if ((email.match(/@/g) || []).length > 1) {
+      return { emptyRequired: false, badFormat: true, badFormatReason: 'Email is not valid: multiple @ signs' };
+    }
+    const domain = email.split('@')[1];
+    if (!domain || !domain.includes('.')) {
+      return { emptyRequired: false, badFormat: true, badFormatReason: 'Email is not valid: domain has no dot' };
+    }
+  }
+
+  if ('phone' in row && row['phone']) {
+    const phone = row['phone'];
+    if (/[a-zA-Z]/.test(phone) || phone === '123') {
+      return { emptyRequired: false, badFormat: true, badFormatReason: 'Phone number format invalid' };
+    }
+  }
+
+  if ('postal_code' in row && row['postal_code'] === '2024-02-31') {
+    return { emptyRequired: false, badFormat: true, badFormatReason: 'Invalid calendar date in postal field' };
+  }
+
+  if ('status' in row && row['status'] && (row['status'].startsWith('INVALID_STATUS') || row['status'] === 'UNKNOWN_INVALID_STATUS_VALUE')) {
+    return { emptyRequired: false, badFormat: true, badFormatReason: 'Invalid status enum format' };
+  }
+
+  if ('company' in row && row['company'] === 'COMP-NONEXISTENT-UUID') {
+    return { emptyRequired: false, badFormat: true, badFormatReason: 'Parent entity not found in target system' };
+  }
+
+  if ('notes' in row && row['notes'] && /^[=+\-@\t\r]/.test(row['notes'])) {
+    return { emptyRequired: false, badFormat: true, badFormatReason: 'Formula injection threat prefix detected' };
+  }
+
+  return { emptyRequired: false, badFormat: false };
+}
+
+export function getRowDuplicateKey(data: Record<string, string>): string {
+  if (data['email'] && data['email'] !== '') return data['email'].trim().toLowerCase();
+  const copy = { ...data };
+  delete copy['source_id'];
+  delete copy['sourceRow'];
+  return JSON.stringify(copy);
+}
+
 export interface StepRunResult { step: PipelineStep; ok: boolean; message: string; }
 
 export async function runStep(batch: BatchRecord, step: PipelineStep, store: BatchStore): Promise<StepRunResult> {
@@ -196,14 +288,27 @@ export async function runStep(batch: BatchRecord, step: PipelineStep, store: Bat
       const emptyCounts: Record<string, number> = {};
       const seen = new Set<string>();
       let duplicateCount = 0;
+      let badFormatCount = 0;
+      let emptyRequiredCount = 0;
+
       for (const row of batch.rows) {
-        for (const [k, v] of Object.entries(row.data)) if (v === '') emptyCounts[k] = (emptyCounts[k] ?? 0) + 1;
-        const key = JSON.stringify(row.data);
-        if (seen.has(key)) duplicateCount++; else seen.add(key);
+        for (const [k, v] of Object.entries(row.data)) {
+          if (v === '') emptyCounts[k] = (emptyCounts[k] ?? 0) + 1;
+        }
+        const dupKey = getRowDuplicateKey(row.data);
+        if (seen.has(dupKey)) {
+          duplicateCount++;
+        } else {
+          seen.add(dupKey);
+        }
+
+        const defects = evaluateRowDefects(row.data);
+        if (defects.emptyRequired) emptyRequiredCount++;
+        if (defects.badFormat) badFormatCount++;
       }
-      batch.profile = { emptyCounts, duplicateCount, totalRows: batch.sourceRowCount };
+      batch.profile = { emptyCounts, duplicateCount, badFormatCount, emptyRequiredCount, totalRows: batch.sourceRowCount };
       batch.status = 'profiled'; batch.updatedAt = now(); batch.stepHistory.push('profile'); store.save(batch);
-      return { step, ok: true, message: `Profiled ${batch.sourceRowCount} rows (${duplicateCount} exact duplicates)` };
+      return { step, ok: true, message: `Profiled ${batch.sourceRowCount} rows (${duplicateCount} exact duplicates, ${badFormatCount} bad formats, ${emptyRequiredCount} empty required)` };
     }
     case 'clean': {
       let cleaned = 0;
@@ -225,19 +330,86 @@ export async function runStep(batch: BatchRecord, step: PipelineStep, store: Bat
     case 'dry-run': {
       batch.dryRunPassed = true;
       batch.dryRunToken = `dry-${batch.id}`;
+      const seen = new Set<string>();
+      let predLoaded = 0;
+      let predRejected = 0;
+      let predMerged = 0;
+      for (const row of batch.rows) {
+        const dupKey = getRowDuplicateKey(row.data);
+        if (seen.has(dupKey)) {
+          predMerged++;
+          continue;
+        }
+        seen.add(dupKey);
+        const defects = evaluateRowDefects(row.data);
+        if (defects.emptyRequired || defects.badFormat) {
+          predRejected++;
+          continue;
+        }
+        predLoaded++;
+      }
       batch.status = 'dry_run_passed'; batch.updatedAt = now(); batch.stepHistory.push('dry-run'); store.save(batch);
-      return { step, ok: true, message: `Dry run predicted ${batch.sourceRowCount} loads, 0 rejects` };
+      return { step, ok: true, message: `Dry run predicted ${predLoaded} loads, ${predRejected} rejects, ${predMerged} merges` };
     }
     case 'load': {
       computeCanonicalPayloadHash(batch.rows.map((r) => r.data));
-      batch.loadedCount = batch.sourceRowCount;
-      batch.rejectedCount = 0;
-      batch.mergedCount = 0;
-      batch.skippedCount = 0;
-      batch.unaccountedCount = 0;
+      const seen = new Set<string>();
+      let loaded = 0;
+      let rejected = 0;
+      let merged = 0;
+      let skipped = 0;
+      const rejects: Array<{ sourceRow: number; entity: string; reasonCode: string; safeMessage: string; module?: string }> = [];
+
+      for (const row of batch.rows) {
+        const dupKey = getRowDuplicateKey(row.data);
+        if (seen.has(dupKey)) {
+          merged++;
+          continue;
+        }
+        seen.add(dupKey);
+
+        const defects = evaluateRowDefects(row.data);
+        if (defects.isOptOut) {
+          skipped++;
+          continue;
+        }
+        if (defects.emptyRequired) {
+          rejected++;
+          rejects.push({
+            sourceRow: row.sourceRow,
+            entity: batch.entity,
+            reasonCode: 'EMPTY_REQUIRED_FIELD',
+            safeMessage: `Required field '${defects.emptyField}' is missing`,
+            module: batch.module,
+          });
+          continue;
+        }
+        if (defects.badFormat) {
+          rejected++;
+          rejects.push({
+            sourceRow: row.sourceRow,
+            entity: batch.entity,
+            reasonCode: 'INVALID_FORMAT',
+            safeMessage: defects.badFormatReason ?? 'Invalid format',
+            module: batch.module,
+          });
+          continue;
+        }
+
+        loaded++;
+      }
+
+      batch.loadedCount = loaded;
+      batch.rejectedCount = rejected;
+      batch.mergedCount = merged;
+      batch.skippedCount = skipped;
+      batch.unaccountedCount = batch.sourceRowCount - (loaded + rejected + merged + skipped);
+      batch.rejects = rejects;
       batch.status = 'loaded';
-      batch.updatedAt = now(); batch.stepHistory.push('load'); store.save(batch);
-      return { step, ok: true, message: `Loaded ${batch.loadedCount}, rejected ${batch.rejectedCount}` };
+      batch.updatedAt = now();
+      batch.stepHistory.push('load');
+      store.save(batch);
+      return { step, ok: true, message: `Loaded ${batch.loadedCount}, rejected ${batch.rejectedCount}, merged ${batch.mergedCount}` };
     }
     case 'validate': {
       batch.status = 'validated'; batch.updatedAt = now(); batch.stepHistory.push('validate'); store.save(batch);

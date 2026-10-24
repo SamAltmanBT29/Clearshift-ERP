@@ -1,0 +1,21 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+B5-ENUM-001,EnumUser1,Constraint1,enum1@example.com,+1-555-0401,EnumCorp,US,10005,UNKNOWN_INVALID_STATUS_VALUE,INVALID_ENUM_VALUE
+B5-ENUM-002,EnumUser2,Constraint2,enum2@example.com,+1-555-0402,EnumCorp,US,10005,UNKNOWN_INVALID_STATUS_VALUE,INVALID_ENUM_VALUE
+B5-ENUM-003,EnumUser3,Constraint3,enum3@example.com,+1-555-0403,EnumCorp,US,10005,UNKNOWN_INVALID_STATUS_VALUE,INVALID_ENUM_VALUE
+B5-ENUM-004,EnumUser4,Constraint4,enum4@example.com,+1-555-0404,EnumCorp,US,10005,UNKNOWN_INVALID_STATUS_VALUE,INVALID_ENUM_VALUE
+B5-ENUM-005,EnumUser5,Constraint5,enum5@example.com,+1-555-0405,EnumCorp,US,10005,UNKNOWN_INVALID_STATUS_VALUE,INVALID_ENUM_VALUE
+B5-ENUM-006,EnumUser6,Constraint6,enum6@example.com,+1-555-0406,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-007,EnumUser7,Constraint7,enum7@example.com,+1-555-0407,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-008,EnumUser8,Constraint8,enum8@example.com,+1-555-0408,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-009,EnumUser9,Constraint9,enum9@example.com,+1-555-0409,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-010,EnumUser10,Constraint10,enum10@example.com,+1-555-0410,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-011,EnumUser11,Constraint11,enum11@example.com,+1-555-0411,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-012,EnumUser12,Constraint12,enum12@example.com,+1-555-0412,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-013,EnumUser13,Constraint13,enum13@example.com,+1-555-0413,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-014,EnumUser14,Constraint14,enum14@example.com,+1-555-0414,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-015,EnumUser15,Constraint15,enum15@example.com,+1-555-0415,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-016,EnumUser16,Constraint16,enum16@example.com,+1-555-0416,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-017,EnumUser17,Constraint17,enum17@example.com,+1-555-0417,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-018,EnumUser18,Constraint18,enum18@example.com,+1-555-0418,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-019,EnumUser19,Constraint19,enum19@example.com,+1-555-0419,EnumCorp,US,10005,active,Valid enum value
+B5-ENUM-020,EnumUser20,Constraint20,enum20@example.com,+1-555-0420,EnumCorp,US,10005,active,Valid enum value
