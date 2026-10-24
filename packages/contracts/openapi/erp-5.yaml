@@ -140,8 +140,8 @@ paths:
       summary: List pending duplicate candidates
       description: Returns a bounded page of candidates requiring human review.
       parameters:
-        - : "#/components/parameters/Page"
-        - : "#/components/parameters/PageSize"
+        - : 1
+        - : 1
       responses:
         "200":
           description: Successful response
@@ -167,7 +167,7 @@ paths:
       summary: Inspect a single duplicate candidate
       description: Returns detailed information about a duplicate candidate.
       parameters:
-        - : "#/components/parameters/ResourceId"
+        - : 1
       responses:
         "200":
           description: Successful response
@@ -195,7 +195,7 @@ paths:
       summary: Resolve a duplicate candidate
       description: Marks a duplicate candidate as either MERGED or REJECTED.
       parameters:
-        - : "#/components/parameters/ResourceId"
+        - : 1
       requestBody:
         required: true
         content:
