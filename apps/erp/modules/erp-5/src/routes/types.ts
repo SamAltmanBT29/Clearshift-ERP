@@ -8,8 +8,13 @@
  * @module erp5/routes/types
  */
 
-import type { HrService } from '../services/hr.service.js';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { HrService as HrServiceType } from '../services/hr.service.js';
 
 export interface HrRouteOptions {
-  hrService: HrService;
+  hrService: HrServiceType;
+}
+
+export interface HrFastifyInstance extends FastifyInstance {
+  resolveCorrelationId: (request: FastifyRequest) => string;
 }

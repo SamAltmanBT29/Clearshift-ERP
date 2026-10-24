@@ -20,6 +20,7 @@ See the canonical global reference copy at [`docs/data-dictionaries/erp-3.md`](.
 - **Zod Schemas & Types**: `packages/contracts/src/erp-3.ts` (`@clearshift/contracts/erp-3`)
 - **Event Envelopes & Payloads**: `packages/contracts/src/erp-3-events.ts` (`@clearshift/contracts/erp-3-events`)
 - **Deterministic Mock Server**: `packages/contracts/src/erp-3-mock.ts` (`@clearshift/contracts/erp-3-mock`, `createErp3MockServer()`, `ERP3_MOCK_DEFAULT_PORT = 4013`)
+- **Data Quality Rules & Migration Engine (`ERP3-08`, Issue #33)**: [`apps/erp/modules/erp-3/docs/data-quality-rules.md`](data-quality-rules.md), `sample-data/erp-3/dirty-data-v1.csv`, `sample-data/erp-3/expected-profile.json`, `sample-data/erp-3/mapping-template.json`
 
 ## 3. Core Invariants & Reconciled Contract Rules
 

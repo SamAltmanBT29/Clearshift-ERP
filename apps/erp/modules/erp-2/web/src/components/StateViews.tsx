@@ -77,9 +77,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 };
 
 interface ErrorStateProps {
-  title?: string;
-  message?: string;
-  onRetry?: () => void;
+  title?: string | undefined;
+  message?: string | undefined;
+  onRetry?: (() => void) | undefined;
 }
 
 /**

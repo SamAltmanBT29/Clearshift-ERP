@@ -15,13 +15,14 @@ For the contract and mock architecture decision record see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-3 Sales Orders & Invoices (Group 8) |
-| **Issues** | #26 (Data Model), #27 (List/Read API), #28 (Mutation API & Domain Validation), #29 (`[ERP3-04]` List Screen & UI States), #30 (`[ERP3-05]` Create/Edit/Detail Workflow), #31 (Relationships), #150 (`[ERP3-14]` OpenAPI, Event & Mock Contract Package) |
+| **Issues** | #26 (Data Model), #27 (List/Read API), #28 (Mutation API & Domain Validation), #29 (`[ERP3-04]` List Screen & UI States), #30 (`[ERP3-05]` Create/Edit/Detail Workflow), #31 (Relationships), #33 (`[ERP3-08]` Profiling, Cleaning, Mapping & Dirty-Data Pack), #150 (`[ERP3-14]` OpenAPI, Event & Mock Contract Package) |
 | **PostgreSQL Schema** | `erp3` |
 | **API Base** | `/api/v1/erp-orders` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-3.yaml` (OpenAPI 3.1.0) |
 | **TypeScript / Zod Contracts** | `packages/contracts/src/erp-3.ts` (`@clearshift/contracts/erp-3`) |
 | **Domain Event Contracts** | `packages/contracts/src/erp-3-events.ts` (`@clearshift/contracts/erp-3-events`, PLT-04 / PLT-09 transactional envelopes) |
 | **Mock Contract Package** | `packages/contracts/src/erp-3-mock.ts` (`@clearshift/contracts/erp-3-mock`, `createErp3MockServer()`, default port `4013`) |
+| **Data Quality & Profiling (`ERP3-08`)** | [`apps/erp/modules/erp-3/docs/data-quality-rules.md`](../../apps/erp/modules/erp-3/docs/data-quality-rules.md), `sample-data/erp-3/dirty-data-v1.csv`, `sample-data/erp-3/expected-profile.json` |
 | **Logical Tables (SDS §4.7 & Master Spec §5c)** | `erp3_sales_orders`, `erp3_so_lines`, `erp3_invoices`, `erp3_invoice_lines`, `erp3_payments` (plus `erp3.import_receipts` per KIT-08) |
 | **Version** | `1.0.0` (Proposed — Pending Gate G1 Sign-Off) |
 | **Authoritative References** | `CLEARSHIFT_V1_MASTER_ARCHITECTURE_SPEC.md` (Decisions `C1`, `M2`, `H1`, §5c ERD); `V1_30_ISSUE_STANDARDIZATION_PLAN.md` (§7, §8); `SDS_ClearShift_ERP.md` (§3.2, §4.4 `FR-ERP3-01..05`, `BR-ERP3-01..03`, §4.7, §4.8, §4.10 `EV-09`, §4.11); `ADR-002`; `ADR-003`; `ADR-005` |
@@ -120,15 +121,24 @@ For the contract and mock architecture decision record see:
 | `method` | `VARCHAR(20)` | Yes | Payment method (`FR-ERP3-03`) | `bank` | Enum (`PaymentMethodEnum`): `cash`, `bank`, `card` |
 | `created_at` | `TIMESTAMPTZ` | Yes (response) | UTC creation timestamp | `2026-01-20T14:30:00.000Z` | ISO 8601 `date-time` |
 
-### 6. Migration Kit Idempotency Request Fields (`CreateSalesOrderRequest`, `CreateInvoiceRequest`, `CreatePaymentRequest`)
+### 6. `erp3.import_receipts` (`ImportReceiptRecordSchema`, KIT-08 / Decision C4)
 
-In this branch's `ERP3-14` contract (`packages/contracts/src/erp-3.ts` and `packages/contracts/openapi/erp-3.yaml`), the following optional/nullable fields are defined on `CreateSalesOrderRequestSchema`, `CreateInvoiceRequestSchema`, and `CreatePaymentRequestSchema`. They are **not** returned on response entities (`SalesOrderSchema`, `InvoiceSchema`, `PaymentSchema`), are **not** used for deduplication by the in-memory mock (`erp-3-mock.ts`), and are **absent** from the competing `origin/main` `Create*InputSchema` definitions.
-
-| Field | Contract Type | Required | Description |
-|---|---|---|---|
-| `idempotency_key` | `string \| null` (max 128) | Optional & nullable (create requests only) | Stable idempotency key (`batch ID + source row + target entity/schema version`) |
-| `batch_id` | `UUID \| null` | Optional & nullable (create requests only) | Migration Kit batch UUID |
-| `source_row` | `integer >= 0 \| null` | Optional & nullable (create requests only) | Non-negative integer source row index in migration batch |
+| Field | Storage / Contract Type | Required | Description | Example | Validation & Authority Rule |
+|---|---|---|---|---|---|
+| `id` | `UUID` | Yes | Primary key | `35000000-0000-4000-8000-000000000001` | UUID (`UuidSchema`) |
+| `batch_id` | `UUID` | Yes | Migration Kit batch identifier | `3b000000-0000-4000-8000-000000000001` | UUID (`UuidSchema`) |
+| `source_row` | `INTEGER` | Yes | 1-indexed source row number | `42` | Non-negative integer |
+| `source_system` | `VARCHAR(64)` | No | Source system name | `legacy_erp` | Nullable string, max 64 |
+| `source_id` | `VARCHAR(128)` | No | Source record identifier | `LEGACY-001` | Nullable string, max 128 |
+| `entity` | `VARCHAR(64)` | Yes | Entity name | `sales_order` | `sales_order`, `invoice`, or `payment` |
+| `schema_version` | `INTEGER` | Yes | Target schema version | `1` | Default `1` |
+| `idempotency_key` | `VARCHAR(128)` | Yes | Unique idempotency key (`batch_id + row + version`) | `3b000000-0000-4000-8000-000000000001:42:1` | Unique constraint (`import_receipts_erp3_idempotency_key_unique`) |
+| `request_hash` | `VARCHAR(64)` | Yes | SHA-256 canonical hash | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` | 64 hex chars |
+| `target_id` | `UUID` | Yes | Primary key of loaded business record | `30000000-0000-4000-8000-000000000001` | UUID |
+| `kind` | `VARCHAR(16)` | Yes | Receipt kind | `created` | `created` \| `linked` |
+| `outcome` | `VARCHAR(16)` | Yes | Row outcome | `loaded` | `loaded` \| `rejected` \| `merged` \| `skipped` |
+| `response_payload`| `TEXT` | No | Serialized response JSON payload | `{"id":"..."}` | JSON string or null |
+| `created_at` | `TIMESTAMPTZ` | Yes | Creation timestamp | `2026-10-23T12:00:00.000Z` | ISO 8601 `date-time` |
 
 ---
 
@@ -136,7 +146,7 @@ In this branch's `ERP3-14` contract (`packages/contracts/src/erp-3.ts` and `pack
 
 All collection endpoints enforce bounded pagination (`page >= 1`, `pageSize` 1..100, default `20`). All error responses conform to ADR-002 / PLT-04 (`Erp3ApiErrorSchema` / `ErrorEnvelopeSchema`).
 
-> **Note on `UpdateSalesOrderStatusRequestSchema`:** `packages/contracts/src/erp-3.ts` exports `UpdateSalesOrderStatusRequestSchema` (`{ status: SalesOrderStatusEnum }`), but `PATCH /api/v1/erp-orders/sales-orders/{id}` is **not** one of the 7 routes documented in `packages/contracts/openapi/erp-3.yaml` or implemented in `packages/contracts/src/erp-3-mock.ts`.
+All 9 V1 baseline endpoints are documented in `packages/contracts/openapi/erp-3.yaml`:
 
 | Method | Endpoint | Operation ID | Authority Source | Description |
 |---|---|---|---|---|

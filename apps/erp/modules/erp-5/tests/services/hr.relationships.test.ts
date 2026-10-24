@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { HR_DOMAIN_RULES, type CreateHrLeaveRequest, type UpdateHrLeaveRequest } from '@clearshift/contracts';
 import { HrService } from '../../src/services/hr.service.js';
 import { InMemoryHrRepository } from '../../src/services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import { HrServiceError } from '../../src/services/errors.js';
 import {
   FIXTURE_DEPARTMENT_ENGINEERING,
@@ -35,13 +36,17 @@ const VALID_LEAVE: CreateHrLeaveRequest = {
   type: 'sick',
 };
 
+const DEFAULT_ACTOR = { sub: 'test-actor', roles: ['editor'] };
+const DEFAULT_CORRELATION_ID = 'test-correlation-id';
+
 describe('ERP-5 HR Service — relationships, state transitions and read model (#51)', () => {
   let repository: InMemoryHrRepository;
   let service: HrService;
 
   beforeEach(() => {
     repository = new InMemoryHrRepository(true);
-    service = new HrService(repository);
+    const auditService = new AuditService(new InMemoryAuditRepository());
+    service = new HrService(repository, auditService);
   });
 
   // ── Relationships ─────────────────────────────────────────────────────────
@@ -49,7 +54,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
   describe('Relationship validation before commit', () => {
     it('rejects a leave for an unknown employee without writing the row', async () => {
       const error = await service
-        .createLeave({ ...VALID_LEAVE, employee_id: randomUUID() })
+        .createLeave({ ...VALID_LEAVE, employee_id: randomUUID() }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -75,7 +80,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
           department_id: randomUUID(),
           job_title: 'Engineer',
           salary: '100000.0000',
-        })
+        }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -91,7 +96,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
           department_id: randomUUID(),
           month: '2026-09',
           total_amount: '1000.0000',
-        })
+        }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -113,7 +118,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
           source_row: 1,
           idempotency_key: `erp5-${randomUUID()}`,
           source_system: 'legacy_hr_csv',
-        })
+        }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -129,7 +134,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
     it('applies pending → approved', async () => {
       const updated = await service.updateLeave(FIXTURE_LEAVE_SICK.id, {
         status: 'approved',
-      } as UpdateHrLeaveRequest);
+      } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(updated.status).toBe('approved');
     });
@@ -137,7 +142,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
     it('applies pending → rejected', async () => {
       const updated = await service.updateLeave(FIXTURE_LEAVE_SICK.id, {
         status: 'rejected',
-      } as UpdateHrLeaveRequest);
+      } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(updated.status).toBe('rejected');
     });
@@ -145,16 +150,16 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
     it('treats the same status as a no-op', async () => {
       const updated = await service.updateLeave(FIXTURE_LEAVE_SICK.id, {
         status: 'pending',
-      } as UpdateHrLeaveRequest);
+      } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(updated.status).toBe('pending');
     });
 
     it('forbids reversing a decision with 422 and leaves the row untouched', async () => {
-      await service.updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'approved' } as UpdateHrLeaveRequest);
+      await service.updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'approved' } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'rejected' } as UpdateHrLeaveRequest)
+        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'rejected' } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -168,10 +173,10 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
     });
 
     it('forbids un-deciding a leave with 422', async () => {
-      await service.updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'approved' } as UpdateHrLeaveRequest);
+      await service.updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'approved' } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'pending' } as UpdateHrLeaveRequest)
+        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'pending' } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect((error as HrServiceError).statusCode).toBe(422);
@@ -179,7 +184,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
 
     it('rejects an unknown status with 422 at the service level', async () => {
       const error = await service
-        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'cancelled' } as unknown as UpdateHrLeaveRequest)
+        .updateLeave(FIXTURE_LEAVE_SICK.id, { status: 'cancelled' } as unknown as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -190,7 +195,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
 
     it('rejects an unknown type with 422 at the service level', async () => {
       const error = await service
-        .createLeave({ ...VALID_LEAVE, type: 'unpaid' } as unknown as CreateHrLeaveRequest)
+        .createLeave({ ...VALID_LEAVE, type: 'unpaid' } as unknown as CreateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -201,7 +206,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
 
     it('rejects an edit of an unknown leave with 404', async () => {
       const error = await service
-        .updateLeave(randomUUID(), { status: 'approved' } as UpdateHrLeaveRequest)
+        .updateLeave(randomUUID(), { status: 'approved' } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect((error as HrServiceError).statusCode).toBe(404);
@@ -212,7 +217,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
 
   describe('Optional relationship warning', () => {
     it('warns for a root department and invents no parent', async () => {
-      const result = await service.createDepartment({ name: 'Quality Assurance', code: 'QA' });
+      const result = await service.createDepartment({ name: 'Quality Assurance', code: 'QA' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings?.[0]?.code).toBe('HR_OPTIONAL_REFERENCE_ABSENT');
@@ -225,7 +230,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
         name: 'Platform West',
         code: 'PLAT-W',
         parent_id: FIXTURE_DEPARTMENT_ENGINEERING.id,
-      });
+      }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.warnings).toBeUndefined();
       expect(result.entity.parent_id).toBe(FIXTURE_DEPARTMENT_ENGINEERING.id);
@@ -236,7 +241,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
 
   describe('Read-model consistency', () => {
     it('returns the persisted department, not the request payload', async () => {
-      const result = await service.createDepartment({ name: 'Finance & Accounts', code: 'FIN2' });
+      const result = await service.createDepartment({ name: 'Finance & Accounts', code: 'FIN2' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const stored = await repository.getDepartmentById(result.entity.id);
       expect(stored?.name).toBe(result.entity.name);
@@ -247,7 +252,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
     it('returns the persisted leave status after a transition', async () => {
       const updated = await service.updateLeave(FIXTURE_LEAVE_SICK.id, {
         status: 'approved',
-      } as UpdateHrLeaveRequest);
+      } as UpdateHrLeaveRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const stored = await repository.getLeaveById(FIXTURE_LEAVE_SICK.id);
       expect(stored?.status).toBe(updated.status);
@@ -260,7 +265,7 @@ describe('ERP-5 HR Service — relationships, state transitions and read model (
         month: '2026-09',
         total_amount: '500000.0000',
         headcount: 2,
-      });
+      }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const stored = await repository.getPayrollTotalById(result.entity.id);
       expect(stored?.department_id).toBe(FIXTURE_DEPARTMENT_PLATFORM.id);

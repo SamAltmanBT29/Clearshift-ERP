@@ -250,6 +250,58 @@ paths:
           $ref: "#/components/responses/InternalError"
       security:
         - BearerAuth: []
+    patch:
+      operationId: updateSalesOrderStatus
+      tags: [Sales Orders]
+      summary: Update sales order status
+      description: |
+        Updates the lifecycle status of a sales order. Allowed forward transitions only:
+        Open -> Invoiced, Invoiced -> Closed, Open -> Closed.
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSalesOrderStatusRequest"
+      responses:
+        "200":
+          description: Sales order status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrder"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Sales order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 404
+                error: Not Found
+                code: ORDER_NOT_FOUND
+                message: "Sales order not found."
+        "422":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                statusCode: 422
+                error: Unprocessable Entity
+                code: INVALID_STATUS_TRANSITION
+                message: "Invalid sales order status transition."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
 
   # ── Invoices ────────────────────────────────────────────────────────────────
   /invoices:
@@ -506,6 +558,49 @@ paths:
                     error: Unprocessable Entity
                     code: PAYMENT_EXCEEDS_INVOICE_TOTAL
                     message: "Payment amount would exceed the invoice total."
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+    get:
+      operationId: listPayments
+      tags: [Payments]
+      summary: List payments (paged)
+      description: |
+        Retrieves a paginated list of recorded payments with optional invoice filtering.
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number (1-indexed)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Page size (hard cap of 100)
+        - name: invoice_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by invoice UUID
+      responses:
+        "200":
+          description: Paginated payment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -1033,6 +1128,41 @@ components:
         source_row:
           type: [integer, "null"]
           minimum: 0
+
+    PaymentListResponse:
+      type: object
+      required:
+        - data
+        - total
+        - page
+        - pageSize
+        - totalPages
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Payment"
+        total:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalPages:
+          type: integer
+          minimum: 0
+
+    UpdateSalesOrderStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/SalesOrderStatus"
 
     # ── Error Envelope (ADR-002 / PLT-04) ─────────────────────────────────────
     ApiError:
