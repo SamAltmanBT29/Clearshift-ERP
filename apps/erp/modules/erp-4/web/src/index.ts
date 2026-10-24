@@ -14,6 +14,7 @@ export * from './components/ModuleShell.js';
 export * from './components/ModuleNav.js';
 export * from './components/ModuleBreadcrumbs.js';
 export * from './components/AccountsTable.js';
+export * from './components/JournalEntriesTable.js';
 export * from './components/TrialBalanceTable.js';
 export * from './components/FilterBar.js';
 export * from './components/StateViews.js';
