@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchReconciliation, type ReconciliationReport } from '../api/migration-kit.js';
 import { SkeletonTable, EmptyState, ErrorState } from '@cs/ui';
+import { ReportDownload } from '../components/ReportDownload.js';
 
 export const ReconciliationPage: React.FC = () => {
   const { batchId } = useParams();
@@ -30,6 +31,7 @@ export const ReconciliationPage: React.FC = () => {
   return (
     <div data-testid="reconciliation-page">
       <h1>Reconciliation</h1>
+      {batchId && <ReportDownload batchId={batchId} reportType="reconciliation" />}
       <p data-testid="recon-ok">{report.ok ? 'OK' : 'NOT OK'}</p>
       <p data-testid="recon-equation">
         {report.source} = {report.loaded} + {report.rejected} + {report.merged} + {report.skipped}

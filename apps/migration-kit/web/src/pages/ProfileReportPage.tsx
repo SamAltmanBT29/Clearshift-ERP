@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchProfile, type ProfileReport } from '../api/migration-kit.js';
 import { SkeletonTable, EmptyState, ErrorState } from '@cs/ui';
+import { ReportDownload } from '../components/ReportDownload.js';
 
 export const ProfileReportPage: React.FC = () => {
   const { batchId } = useParams();
@@ -31,6 +32,7 @@ export const ProfileReportPage: React.FC = () => {
   return (
     <div data-testid="profile-report-page">
       <h1>Profile Report</h1>
+      {batchId && <ReportDownload batchId={batchId} reportType="profile" />}
       <p data-testid="total-rows">Total rows: {report.totalRows}</p>
       <p data-testid="duplicate-count">Duplicates: {report.duplicateCount}</p>
       <table data-testid="profile-columns">
