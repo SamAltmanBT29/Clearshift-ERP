@@ -10,17 +10,21 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run"
   },
   "dependencies": {
     "@clearshift/contracts": "*",
     "@cs/core": "*",
     "@cs/db": "*",
+    "@cs/identity": "*",
     "@cs/kernel": "*",
     "@cs/kit": "*",
+    "@cs/rbac": "*",
     "@cs/ui": "*",
     "drizzle-orm": "^0.36.0",
     "fastify": "^5.12.7",
+    "fastify-plugin": "^5.0.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {

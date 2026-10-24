@@ -12,7 +12,7 @@ For the canonical, detailed version see:
 | Field | Value |
 |---|---|
 | **Module** | ERP-2 Vendors and Purchasing (Group 7) |
-| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #25: ERP2-10 (QA Evidence & Seed), #132: ERP2-16 (Frontend Route Registration) |
+| **Issues** | #16: ERP2-01 (Schema, Drizzle Models & Guarded Migrations), #17: ERP2-02 (List/Read API with Bounded Paging & OpenAPI), #18: ERP2-03 (Mutation API and Domain Validation), #21: ERP2-06 (Relationships, State Transitions & Read Model Consistency), #22: ERP2-07 (Migration Kit Adapter), #24: ERP2-09 (Authorization, Sensitive Field Protection, Audit & Safe Logging), #25: ERP2-10 (QA Evidence & Seed), #132: ERP2-16 (Frontend Route Registration) |
 | **PostgreSQL Schema** | `erp2` |
 | **API Base** | `/api/v1/erp-vendors` |
 | **OpenAPI Contract** | `packages/contracts/openapi/erp-2.yaml` |
@@ -522,8 +522,8 @@ Active filter values are synced to the browser URL using `window.history.replace
 
 | Tab | URL parameters |
 |---|---|
-| Vendors | `?search=X&currency=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
-| Purchase Orders | `?status=X&vendor_id=Y&page=N&pageSize=M&sort=F&order=asc\|desc` |
+| Vendors | `?search=X&currency=Y&page=N&pageSize=M&sort=F&order=asc|desc` |
+| Purchase Orders | `?status=X&vendor_id=Y&page=N&pageSize=M&sort=F&order=asc|desc` |
 
 - Default values (`page=1`, `pageSize=20`, no sort) are omitted from the URL.
 - Parameters are parsed on mount to restore filter state from shared/bookmarked URLs.
@@ -920,3 +920,35 @@ To guarantee that incomplete mappings never proceed to destructive operations or
 
 | **`1.8.0`** | 2026-10-24 | Sprint 2 / Authorization Policy | Role 3 / Mahek Yadav (Issue #131 / ERP2-15) | Integrated module authorization and access control policy conforming to SDS §4.2, §4.9, and ADR-0006. Enforced 5-role capability matrix, Ed25519 Hub JWT validation, multi-tenant isolation, object-level creator mutation guards, and standard error envelopes. |
 | **`1.9.0`** | 2026-10-24 | Sprint 2 / Migration Kit Metadata | Ninad Deodhare (Issue #138 / ERP2-22) | Integrated ERP-2 target schema metadata across vendors, purchase_orders, and po_lines with central migration kit wizard. Enforced dynamic field rendering, type compatibility warnings, and required unmapped field guards. |
+
+---
+
+## 20. Security, Sensitivity & Audit Policies (ERP2-09)
+
+### 20.1 Bank Details Masking (FR-ERP2-06)
+- **Invariant:** Bank details are masked everywhere: screens, API JSON responses, error logs, and application logs show `XXXX-XXXX-7890`.
+- **Normalization:** Any input string containing a bank account number is stripped of spaces and hyphens. The last 4 alphanumeric characters are preserved, yielding `XXXX-XXXX-<last4>`. If input has fewer than 4 characters, default `XXXX-XXXX-7890` is applied.
+- Raw unmasked bank numbers are never stored in plain text or serialized to clients.
+
+### 20.2 Authorization & RBAC Matrix
+All API operations enforce JWT verification via `@cs/identity` and role capabilities:
+- `GET /api/v1/erp-vendors/vendors`: `viewer`, `editor`, `analyst`, `admin`
+- `POST /api/v1/erp-vendors/vendors`: `editor`, `migration_runner`, `admin`
+- `PATCH /api/v1/erp-vendors/vendors/:id`: `editor`, `migration_runner`, `admin`
+- `GET /api/v1/erp-vendors/purchase-orders`: `viewer`, `editor`, `analyst`, `admin`
+- `GET /api/v1/erp-vendors/purchase-orders/:id`: `viewer`, `editor`, `analyst`, `admin`
+- `POST /api/v1/erp-vendors/purchase-orders`: `editor`, `migration_runner`, `admin`
+- `PATCH /api/v1/erp-vendors/purchase-orders/:id`: `editor`, `migration_runner`, `admin` (status transition only)
+- `POST /api/v1/erp-vendors/import`: `migration_runner`, `admin`
+
+Unauthenticated callers receive `401 Unauthorized`. Authenticated callers lacking permission receive `403 Forbidden`.
+
+### 20.3 Safe Logging Policy
+- Fastify/Pino loggers redact headers (`Authorization`, `Cookie`) and payload keys (`bank_details`, `password`, `token`, `salary`).
+- Raw database rows containing private data are never logged in full.
+
+### 20.4 Audit Trail Integration (`platform.audit`)
+- Material state changes (`VENDOR_CREATED`, `VENDOR_UPDATED`, `PO_CREATED`, `PO_STATUS_CHANGED`, `ROW_IMPORTED`) write structured audit records to `platform.audit`.
+- Audit logs capture `actor`, `action`, `entity`, `entity_id`, and `diff_redacted` without copying sensitive plain-text values.
+
+| **`1.7.0`** | 2026-10-24 | Sprint 3 / Gate G4 Security Baseline | Mahek Yadav (Issue #24 / ERP2-09) | Implemented authorization, sensitive field protection (bank masking), audit logging, and domain invariants. |

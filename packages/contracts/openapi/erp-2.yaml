@@ -1,5 +1,4 @@
-openapi: "3.1.0"
-
+openapi: 3.1.0
 info:
   title: ClearShift ERP — Vendors & Purchasing API
   description: |
@@ -18,18 +17,16 @@ info:
 
     Amounts are string-encoded decimals (2 decimal places) with ISO currency codes.
     Bank details are masked server-side (`XXXX-XXXX-7890`) and never exposed unmasked.
-  version: "1.0.0"
+  version: 1.0.0
   contact:
     name: ClearShift Engineering — ERP-2 Team
   license:
     name: Private
-
 servers:
   - url: http://localhost:3000/api/v1/erp-vendors
     description: Local development server
   - url: https://api.clearshift.internal/api/v1/erp-vendors
     description: Staging / production
-
 tags:
   - name: Vendors
     description: Vendor catalog management and search
@@ -39,12 +36,12 @@ tags:
     description: Migration Kit target adapter and durable import receipts (KIT-08)
   - name: Duplicates
     description: Exact duplicate key matching, candidates queue, and audited human review (KIT-10 / ERP2-12)
-
 paths:
   /vendors:
     get:
       operationId: listVendors
-      tags: [Vendors]
+      tags:
+        - Vendors
       summary: List vendors with search and bounded pagination
       parameters:
         - name: page
@@ -66,18 +63,22 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: Paginated vendor list
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedVendorsResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-
+                $ref: '#/components/schemas/PaginatedVendorsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createVendor
-      tags: [Vendors]
+      tags:
+        - Vendors
       summary: Create a vendor record
       parameters:
         - name: Idempotency-Key
@@ -89,29 +90,33 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateVendorRequest"
+              $ref: '#/components/schemas/CreateVendorRequest'
       responses:
-        "201":
-          description: Vendor created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Vendor"
-        "200":
+        '200':
           description: Idempotent replay of existing vendor
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Vendor"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-
+                $ref: '#/components/schemas/Vendor'
+        '201':
+          description: Vendor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /vendors/{id}:
     get:
       operationId: getVendor
-      tags: [Vendors]
+      tags:
+        - Vendors
       summary: Retrieve a single vendor by UUID
       parameters:
         - name: id
@@ -121,18 +126,22 @@ paths:
             type: string
             format: uuid
       responses:
-        "200":
+        '200':
           description: Vendor record
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Vendor"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
+                $ref: '#/components/schemas/Vendor'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       operationId: updateVendor
-      tags: [Vendors]
+      tags:
+        - Vendors
       summary: Update editable fields of a vendor
       parameters:
         - name: id
@@ -146,23 +155,27 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateVendorRequest"
+              $ref: '#/components/schemas/UpdateVendorRequest'
       responses:
-        "200":
+        '200':
           description: Vendor updated successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Vendor"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
+                $ref: '#/components/schemas/Vendor'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /purchase-orders:
     get:
       operationId: listPurchaseOrders
-      tags: [Purchase Orders]
+      tags:
+        - Purchase Orders
       summary: List purchase orders with filtering and bounded pagination
       parameters:
         - name: page
@@ -186,20 +199,24 @@ paths:
         - name: status
           in: query
           schema:
-            $ref: "#/components/schemas/PurchaseOrderStatus"
+            $ref: '#/components/schemas/PurchaseOrderStatus'
       responses:
-        "200":
+        '200':
           description: Paginated purchase order list
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PaginatedPurchaseOrdersResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-
+                $ref: '#/components/schemas/PaginatedPurchaseOrdersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createPurchaseOrder
-      tags: [Purchase Orders]
+      tags:
+        - Purchase Orders
       summary: Create purchase order with line items and server-computed total
       parameters:
         - name: Idempotency-Key
@@ -211,31 +228,35 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePurchaseOrderRequest"
+              $ref: '#/components/schemas/CreatePurchaseOrderRequest'
       responses:
-        "201":
-          description: Purchase order created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PurchaseOrder"
-        "200":
+        '200':
           description: Idempotent replay of existing purchase order
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PurchaseOrder"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-
+                $ref: '#/components/schemas/PurchaseOrder'
+        '201':
+          description: Purchase order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /purchase-orders/{id}:
     get:
       operationId: getPurchaseOrder
-      tags: [Purchase Orders]
+      tags:
+        - Purchase Orders
       summary: Retrieve purchase order by UUID with lines
       parameters:
         - name: id
@@ -245,18 +266,22 @@ paths:
             type: string
             format: uuid
       responses:
-        "200":
+        '200':
           description: Purchase order with line items
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PurchaseOrder"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
+                $ref: '#/components/schemas/PurchaseOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       operationId: updatePurchaseOrderStatus
-      tags: [Purchase Orders]
+      tags:
+        - Purchase Orders
       summary: Update purchase order status (strict forward transitions only)
       parameters:
         - name: id
@@ -270,23 +295,27 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdatePurchaseOrderStatusRequest"
+              $ref: '#/components/schemas/UpdatePurchaseOrderStatusRequest'
       responses:
-        "200":
+        '200':
           description: Purchase order status updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PurchaseOrder"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-
+                $ref: '#/components/schemas/PurchaseOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
   /import:
     post:
       operationId: importRow
-      tags: [Migration Import]
+      tags:
+        - Migration Import
       summary: Import row via KIT-08 target adapter contract with durable receipts
       parameters:
         - name: Idempotency-Key
@@ -298,28 +327,32 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ImportRowRequest"
+              $ref: '#/components/schemas/ImportRowRequest'
       responses:
-        "201":
-          description: Target row and receipt committed atomically
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ImportRowResponse"
-        "200":
+        '200':
           description: Idempotent replay of identical prior import
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ImportRowResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          $ref: "#/components/responses/Conflict"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
+                $ref: '#/components/schemas/ImportRowResponse'
+        '201':
+          description: Target row and receipt committed atomically
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportRowResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /import/batch:
     post:
@@ -454,8 +487,11 @@ components:
   schemas:
     PurchaseOrderStatus:
       type: string
-      enum: [Draft, Sent, Received, Closed]
-
+      enum:
+        - Draft
+        - Sent
+        - Received
+        - Closed
     Vendor:
       type: object
       required:
@@ -492,11 +528,11 @@ components:
           nullable: true
         bank_masked:
           type: string
-          pattern: "^XXXX-XXXX-\\d{4}$"
-          example: "XXXX-XXXX-7890"
+          pattern: ^XXXX-XXXX-\d{4}$
+          example: XXXX-XXXX-7890
         currency:
           type: string
-          example: "USD"
+          example: USD
         source_system:
           type: string
           nullable: true
@@ -509,7 +545,6 @@ components:
         updated_at:
           type: string
           format: date-time
-
     CreateVendorRequest:
       type: object
       required:
@@ -542,7 +577,7 @@ components:
           description: Raw bank account number. Server masks this immediately to XXXX-XXXX-7890.
         currency:
           type: string
-          default: "USD"
+          default: USD
         source_system:
           type: string
           nullable: true
@@ -557,7 +592,6 @@ components:
         source_row:
           type: integer
           minimum: 0
-
     UpdateVendorRequest:
       type: object
       properties:
@@ -604,7 +638,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Vendor"
+            $ref: '#/components/schemas/Vendor'
         total:
           type: integer
           minimum: 0
@@ -617,7 +651,6 @@ components:
         totalPages:
           type: integer
           minimum: 0
-
     PurchaseOrderLine:
       type: object
       required:
@@ -639,14 +672,13 @@ components:
           format: uuid
         quantity:
           type: string
-          example: "5.00"
+          example: '5.00'
         price:
           type: string
-          example: "120.00"
+          example: '120.00'
         line_total:
           type: string
-          example: "600.00"
-
+          example: '600.00'
     CreatePurchaseOrderLineRequest:
       type: object
       required:
@@ -659,11 +691,10 @@ components:
           format: uuid
         quantity:
           type: string
-          example: "10.00"
+          example: '10.00'
         price:
           type: string
-          example: "25.50"
-
+          example: '25.50'
     PurchaseOrder:
       type: object
       required:
@@ -690,24 +721,23 @@ components:
           type: string
           format: date
         status:
-          $ref: "#/components/schemas/PurchaseOrderStatus"
+          $ref: '#/components/schemas/PurchaseOrderStatus'
         currency:
           type: string
-          example: "USD"
+          example: USD
         total:
           type: string
-          example: "255.00"
+          example: '255.00'
         lines:
           type: array
           items:
-            $ref: "#/components/schemas/PurchaseOrderLine"
+            $ref: '#/components/schemas/PurchaseOrderLine'
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-
     CreatePurchaseOrderRequest:
       type: object
       required:
@@ -725,12 +755,12 @@ components:
           format: date
         currency:
           type: string
-          default: "USD"
+          default: USD
         lines:
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/CreatePurchaseOrderLineRequest"
+            $ref: '#/components/schemas/CreatePurchaseOrderLineRequest'
         idempotency_key:
           type: string
         batch_id:
@@ -739,15 +769,13 @@ components:
         source_row:
           type: integer
           minimum: 0
-
     UpdatePurchaseOrderStatusRequest:
       type: object
       required:
         - status
       properties:
         status:
-          $ref: "#/components/schemas/PurchaseOrderStatus"
-
+          $ref: '#/components/schemas/PurchaseOrderStatus'
     PaginatedPurchaseOrdersResponse:
       type: object
       required:
@@ -760,7 +788,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/PurchaseOrder"
+            $ref: '#/components/schemas/PurchaseOrder'
         total:
           type: integer
           minimum: 0
@@ -773,7 +801,6 @@ components:
         totalPages:
           type: integer
           minimum: 0
-
     ImportRowRequest:
       type: object
       required:
@@ -802,10 +829,11 @@ components:
           nullable: true
         entity:
           type: string
-          enum: [vendor, purchase_order]
+          enum:
+            - vendor
+            - purchase_order
         record:
           type: object
-
     ImportRowResponse:
       type: object
       required:
@@ -822,12 +850,15 @@ components:
           type: integer
         outcome:
           type: string
-          enum: [loaded, rejected, merged, skipped]
+          enum:
+            - loaded
+            - rejected
+            - merged
+            - skipped
         receipt:
-          $ref: "#/components/schemas/ImportReceiptRecord"
+          $ref: '#/components/schemas/ImportReceiptRecord'
         prior_result:
           type: boolean
-
     ImportReceiptRecord:
       type: object
       required:
@@ -870,10 +901,16 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [created, linked]
+          enum:
+            - created
+            - linked
         outcome:
           type: string
-          enum: [loaded, rejected, merged, skipped]
+          enum:
+            - loaded
+            - rejected
+            - merged
+            - skipped
         response_payload:
           type: object
           nullable: true
@@ -1176,34 +1213,48 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
     Forbidden:
       description: Access Denied / Insufficient Role Permissions
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
     NotFound:
       description: Resource Not Found
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
     Conflict:
       description: Idempotency Key Payload Mismatch
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
     UnprocessableEntity:
       description: Domain Invariant Violation
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
     ServiceUnavailable:
       description: Transient Infrastructure Failure (Retryable)
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ApiError"
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Missing, expired, or invalid JWT Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Ed25519 asymmetric access token issued by ClearShift Hub Identity.
+security:
+  - BearerAuth: []

@@ -27,4 +27,6 @@ export * from './components/VendorAuditPanel.js';
 export * from './components/VendorLinkedOrdersTable.js';
 export * from './components/VendorEditDrawer.js';
 export * from './pages/VendorImportPage.js';
+export * from './pages/VendorRejectionReviewPage.js';
 export * from './kit-metadata.js';
+export * from './rejection-context.js';

@@ -1,0 +1,1001 @@
+source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes
+SRC-00001,CanonicalUser1,DuplicateTarget1,dup.target1@example.com,+1-555-1001,TargetCorp 1,US,20001,active,Original record to be deduplicated in step 5 (1)
+SRC-00002,CanonicalUser2,DuplicateTarget2,dup.target2@example.com,+1-555-1002,TargetCorp 2,US,20002,active,Original record to be deduplicated in step 5 (2)
+SRC-00003,CanonicalUser3,DuplicateTarget3,dup.target3@example.com,+1-555-1003,TargetCorp 3,US,20003,active,Original record to be deduplicated in step 5 (3)
+SRC-00004,CanonicalUser4,DuplicateTarget4,dup.target4@example.com,+1-555-1004,TargetCorp 4,US,20004,active,Original record to be deduplicated in step 5 (4)
+SRC-00005,CanonicalUser5,DuplicateTarget5,dup.target5@example.com,+1-555-1005,TargetCorp 5,US,20005,active,Original record to be deduplicated in step 5 (5)
+SRC-00006,CanonicalUser6,DuplicateTarget6,dup.target6@example.com,+1-555-1006,TargetCorp 6,US,20006,active,Original record to be deduplicated in step 5 (6)
+SRC-00007,CanonicalUser7,DuplicateTarget7,dup.target7@example.com,+1-555-1007,TargetCorp 7,US,20007,active,Original record to be deduplicated in step 5 (7)
+SRC-00008,CanonicalUser8,DuplicateTarget8,dup.target8@example.com,+1-555-1008,TargetCorp 8,US,20008,active,Original record to be deduplicated in step 5 (8)
+SRC-00009,CanonicalUser9,DuplicateTarget9,dup.target9@example.com,+1-555-1009,TargetCorp 9,US,20009,active,Original record to be deduplicated in step 5 (9)
+SRC-00010,CanonicalUser10,DuplicateTarget10,dup.target10@example.com,+1-555-1010,TargetCorp 10,US,20010,active,Original record to be deduplicated in step 5 (10)
+SRC-00011,CanonicalUser11,DuplicateTarget11,dup.target11@example.com,+1-555-1011,TargetCorp 11,US,20011,active,Original record to be deduplicated in step 5 (11)
+SRC-00012,CanonicalUser12,DuplicateTarget12,dup.target12@example.com,+1-555-1012,TargetCorp 12,US,20012,active,Original record to be deduplicated in step 5 (12)
+SRC-00013,CanonicalUser13,DuplicateTarget13,dup.target13@example.com,+1-555-1013,TargetCorp 13,US,20013,active,Original record to be deduplicated in step 5 (13)
+SRC-00014,CanonicalUser14,DuplicateTarget14,dup.target14@example.com,+1-555-1014,TargetCorp 14,US,20014,active,Original record to be deduplicated in step 5 (14)
+SRC-00015,CanonicalUser15,DuplicateTarget15,dup.target15@example.com,+1-555-1015,TargetCorp 15,US,20015,active,Original record to be deduplicated in step 5 (15)
+SRC-00016,,Smith1,smith1@example.com,+1-555-0101,Acme Corp 1,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00017,CanonicalUser16,DuplicateTarget16,dup.target16@example.com,+1-555-1016,TargetCorp 16,US,20016,active,Original record to be deduplicated in step 5 (16)
+SRC-00018,CanonicalUser17,DuplicateTarget17,dup.target17@example.com,+1-555-1017,TargetCorp 17,US,20017,active,Original record to be deduplicated in step 5 (17)
+SRC-00019,CanonicalUser18,DuplicateTarget18,dup.target18@example.com,+1-555-1018,TargetCorp 18,US,20018,active,Original record to be deduplicated in step 5 (18)
+SRC-00020,CanonicalUser19,DuplicateTarget19,dup.target19@example.com,+1-555-1019,TargetCorp 19,US,20019,active,Original record to be deduplicated in step 5 (19)
+SRC-00021,CanonicalUser20,DuplicateTarget20,dup.target20@example.com,+1-555-1020,TargetCorp 20,US,20020,active,Original record to be deduplicated in step 5 (20)
+SRC-00022,CanonicalUser21,DuplicateTarget21,dup.target21@example.com,+1-555-1021,TargetCorp 21,US,20021,active,Original record to be deduplicated in step 5 (21)
+SRC-00023,CanonicalUser22,DuplicateTarget22,dup.target22@example.com,+1-555-1022,TargetCorp 22,US,20022,active,Original record to be deduplicated in step 5 (22)
+SRC-00024,CanonicalUser23,DuplicateTarget23,dup.target23@example.com,+1-555-1023,TargetCorp 23,US,20023,active,Original record to be deduplicated in step 5 (23)
+SRC-00025,,Smith2,smith2@example.com,+1-555-0102,Acme Corp 2,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00026,CanonicalUser24,DuplicateTarget24,dup.target24@example.com,+1-555-1024,TargetCorp 24,US,20024,active,Original record to be deduplicated in step 5 (24)
+SRC-00027,CanonicalUser25,DuplicateTarget25,dup.target25@example.com,+1-555-1025,TargetCorp 25,US,20025,active,Original record to be deduplicated in step 5 (25)
+SRC-00028,CanonicalUser26,DuplicateTarget26,dup.target26@example.com,+1-555-1026,TargetCorp 26,US,20026,active,Original record to be deduplicated in step 5 (26)
+SRC-00029,CanonicalUser27,DuplicateTarget27,dup.target27@example.com,+1-555-1027,TargetCorp 27,US,20027,active,Original record to be deduplicated in step 5 (27)
+SRC-00030,CanonicalUser28,DuplicateTarget28,dup.target28@example.com,+1-555-1028,TargetCorp 28,US,20028,active,Original record to be deduplicated in step 5 (28)
+SRC-00031,CanonicalUser29,DuplicateTarget29,dup.target29@example.com,+1-555-1029,TargetCorp 29,US,20029,active,Original record to be deduplicated in step 5 (29)
+SRC-00032,CanonicalUser30,DuplicateTarget30,dup.target30@example.com,+1-555-1030,TargetCorp 30,US,20030,active,Original record to be deduplicated in step 5 (30)
+SRC-00033,CanonicalUser31,DuplicateTarget31,dup.target31@example.com,+1-555-1031,TargetCorp 31,US,20031,active,Original record to be deduplicated in step 5 (31)
+SRC-00034,,Smith3,smith3@example.com,+1-555-0103,Acme Corp 3,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00035,CanonicalUser32,DuplicateTarget32,dup.target32@example.com,+1-555-1032,TargetCorp 32,US,20032,active,Original record to be deduplicated in step 5 (32)
+SRC-00036,CanonicalUser33,DuplicateTarget33,dup.target33@example.com,+1-555-1033,TargetCorp 33,US,20033,active,Original record to be deduplicated in step 5 (33)
+SRC-00037,CanonicalUser34,DuplicateTarget34,dup.target34@example.com,+1-555-1034,TargetCorp 34,US,20034,active,Original record to be deduplicated in step 5 (34)
+SRC-00038,CanonicalUser35,DuplicateTarget35,dup.target35@example.com,+1-555-1035,TargetCorp 35,US,20035,active,Original record to be deduplicated in step 5 (35)
+SRC-00039,CanonicalUser36,DuplicateTarget36,dup.target36@example.com,+1-555-1036,TargetCorp 36,US,20036,active,Original record to be deduplicated in step 5 (36)
+SRC-00040,CanonicalUser37,DuplicateTarget37,dup.target37@example.com,+1-555-1037,TargetCorp 37,US,20037,active,Original record to be deduplicated in step 5 (37)
+SRC-00041,CanonicalUser38,DuplicateTarget38,dup.target38@example.com,+1-555-1038,TargetCorp 38,US,20038,active,Original record to be deduplicated in step 5 (38)
+SRC-00042,CanonicalUser39,DuplicateTarget39,dup.target39@example.com,+1-555-1039,TargetCorp 39,US,20039,active,Original record to be deduplicated in step 5 (39)
+SRC-00043,,Smith4,smith4@example.com,+1-555-0104,Acme Corp 4,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00044,CanonicalUser40,DuplicateTarget40,dup.target40@example.com,+1-555-1040,TargetCorp 40,US,20040,active,Original record to be deduplicated in step 5 (40)
+SRC-00045,CanonicalUser41,DuplicateTarget41,dup.target41@example.com,+1-555-1041,TargetCorp 41,US,20041,active,Original record to be deduplicated in step 5 (41)
+SRC-00046,CanonicalUser42,DuplicateTarget42,dup.target42@example.com,+1-555-1042,TargetCorp 42,US,20042,active,Original record to be deduplicated in step 5 (42)
+SRC-00047,CanonicalUser43,DuplicateTarget43,dup.target43@example.com,+1-555-1043,TargetCorp 43,US,20043,active,Original record to be deduplicated in step 5 (43)
+SRC-00048,CanonicalUser44,DuplicateTarget44,dup.target44@example.com,+1-555-1044,TargetCorp 44,US,20044,active,Original record to be deduplicated in step 5 (44)
+SRC-00049,CanonicalUser45,DuplicateTarget45,dup.target45@example.com,+1-555-1045,TargetCorp 45,US,20045,active,Original record to be deduplicated in step 5 (45)
+SRC-00050,CanonicalUser46,DuplicateTarget46,dup.target46@example.com,+1-555-1046,TargetCorp 46,US,20046,active,Original record to be deduplicated in step 5 (46)
+SRC-00051,CanonicalUser47,DuplicateTarget47,dup.target47@example.com,+1-555-1047,TargetCorp 47,US,20047,active,Original record to be deduplicated in step 5 (47)
+SRC-00052,,Smith5,smith5@example.com,+1-555-0105,Acme Corp 5,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00053,CanonicalUser48,DuplicateTarget48,dup.target48@example.com,+1-555-1048,TargetCorp 48,US,20048,active,Original record to be deduplicated in step 5 (48)
+SRC-00054,CanonicalUser49,DuplicateTarget49,dup.target49@example.com,+1-555-1049,TargetCorp 49,US,20049,active,Original record to be deduplicated in step 5 (49)
+SRC-00055,CanonicalUser50,DuplicateTarget50,dup.target50@example.com,+1-555-1050,TargetCorp 50,US,20050,active,Original record to be deduplicated in step 5 (50)
+SRC-00056,CanonicalUser51,DuplicateTarget51,dup.target51@example.com,+1-555-1051,TargetCorp 51,US,20051,active,Original record to be deduplicated in step 5 (51)
+SRC-00057,CanonicalUser52,DuplicateTarget52,dup.target52@example.com,+1-555-1052,TargetCorp 52,US,20052,active,Original record to be deduplicated in step 5 (52)
+SRC-00058,CanonicalUser53,DuplicateTarget53,dup.target53@example.com,+1-555-1053,TargetCorp 53,US,20053,active,Original record to be deduplicated in step 5 (53)
+SRC-00059,CanonicalUser54,DuplicateTarget54,dup.target54@example.com,+1-555-1054,TargetCorp 54,US,20054,active,Original record to be deduplicated in step 5 (54)
+SRC-00060,CanonicalUser55,DuplicateTarget55,dup.target55@example.com,+1-555-1055,TargetCorp 55,US,20055,active,Original record to be deduplicated in step 5 (55)
+SRC-00061,,Smith6,smith6@example.com,+1-555-0106,Acme Corp 6,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00062,CanonicalUser56,DuplicateTarget56,dup.target56@example.com,+1-555-1056,TargetCorp 56,US,20056,active,Original record to be deduplicated in step 5 (56)
+SRC-00063,CanonicalUser57,DuplicateTarget57,dup.target57@example.com,+1-555-1057,TargetCorp 57,US,20057,active,Original record to be deduplicated in step 5 (57)
+SRC-00064,CanonicalUser58,DuplicateTarget58,dup.target58@example.com,+1-555-1058,TargetCorp 58,US,20058,active,Original record to be deduplicated in step 5 (58)
+SRC-00065,CanonicalUser59,DuplicateTarget59,dup.target59@example.com,+1-555-1059,TargetCorp 59,US,20059,active,Original record to be deduplicated in step 5 (59)
+SRC-00066,CanonicalUser60,DuplicateTarget60,dup.target60@example.com,+1-555-1060,TargetCorp 60,US,20060,active,Original record to be deduplicated in step 5 (60)
+SRC-00067,CanonicalUser61,DuplicateTarget61,dup.target61@example.com,+1-555-1061,TargetCorp 61,US,20061,active,Original record to be deduplicated in step 5 (61)
+SRC-00068,CanonicalUser62,DuplicateTarget62,dup.target62@example.com,+1-555-1062,TargetCorp 62,US,20062,active,Original record to be deduplicated in step 5 (62)
+SRC-00069,CanonicalUser63,DuplicateTarget63,dup.target63@example.com,+1-555-1063,TargetCorp 63,US,20063,active,Original record to be deduplicated in step 5 (63)
+SRC-00070,,Smith7,smith7@example.com,+1-555-0107,Acme Corp 7,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00071,CanonicalUser64,DuplicateTarget64,dup.target64@example.com,+1-555-1064,TargetCorp 64,US,20064,active,Original record to be deduplicated in step 5 (64)
+SRC-00072,CanonicalUser65,DuplicateTarget65,dup.target65@example.com,+1-555-1065,TargetCorp 65,US,20065,active,Original record to be deduplicated in step 5 (65)
+SRC-00073,CanonicalUser66,DuplicateTarget66,dup.target66@example.com,+1-555-1066,TargetCorp 66,US,20066,active,Original record to be deduplicated in step 5 (66)
+SRC-00074,CanonicalUser67,DuplicateTarget67,dup.target67@example.com,+1-555-1067,TargetCorp 67,US,20067,active,Original record to be deduplicated in step 5 (67)
+SRC-00075,CanonicalUser68,DuplicateTarget68,dup.target68@example.com,+1-555-1068,TargetCorp 68,US,20068,active,Original record to be deduplicated in step 5 (68)
+SRC-00076,CanonicalUser69,DuplicateTarget69,dup.target69@example.com,+1-555-1069,TargetCorp 69,US,20069,active,Original record to be deduplicated in step 5 (69)
+SRC-00077,CanonicalUser70,DuplicateTarget70,dup.target70@example.com,+1-555-1070,TargetCorp 70,US,20070,active,Original record to be deduplicated in step 5 (70)
+SRC-00078,CanonicalUser71,DuplicateTarget71,dup.target71@example.com,+1-555-1071,TargetCorp 71,US,20071,active,Original record to be deduplicated in step 5 (71)
+SRC-00079,,Smith8,smith8@example.com,+1-555-0108,Acme Corp 8,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00080,CanonicalUser72,DuplicateTarget72,dup.target72@example.com,+1-555-1072,TargetCorp 72,US,20072,active,Original record to be deduplicated in step 5 (72)
+SRC-00081,CanonicalUser73,DuplicateTarget73,dup.target73@example.com,+1-555-1073,TargetCorp 73,US,20073,active,Original record to be deduplicated in step 5 (73)
+SRC-00082,CanonicalUser74,DuplicateTarget74,dup.target74@example.com,+1-555-1074,TargetCorp 74,US,20074,active,Original record to be deduplicated in step 5 (74)
+SRC-00083,CanonicalUser75,DuplicateTarget75,dup.target75@example.com,+1-555-1075,TargetCorp 75,US,20075,active,Original record to be deduplicated in step 5 (75)
+SRC-00084,CanonicalUser76,DuplicateTarget76,dup.target76@example.com,+1-555-1076,TargetCorp 76,US,20076,active,Original record to be deduplicated in step 5 (76)
+SRC-00085,CanonicalUser77,DuplicateTarget77,dup.target77@example.com,+1-555-1077,TargetCorp 77,US,20077,active,Original record to be deduplicated in step 5 (77)
+SRC-00086,CanonicalUser78,DuplicateTarget78,dup.target78@example.com,+1-555-1078,TargetCorp 78,US,20078,active,Original record to be deduplicated in step 5 (78)
+SRC-00087,CanonicalUser79,DuplicateTarget79,dup.target79@example.com,+1-555-1079,TargetCorp 79,US,20079,active,Original record to be deduplicated in step 5 (79)
+SRC-00088,,Smith9,smith9@example.com,+1-555-0109,Acme Corp 9,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00089,CanonicalUser80,DuplicateTarget80,dup.target80@example.com,+1-555-1080,TargetCorp 80,US,20080,active,Original record to be deduplicated in step 5 (80)
+SRC-00090,James,Smith,valid.user1@example.org,+1-555-0201,Company 1 Inc,UK,10001,active,Valid production-ready synthetic row 1
+SRC-00091,Mary,Johnson,valid.user2@example.net,+1-555-0202,Company 2 Inc,US,10002,active,Valid production-ready synthetic row 2
+SRC-00092,Robert,Williams,valid.user3@example.com,+1-555-0203,Company 3 Inc,US,10003,active,Valid production-ready synthetic row 3
+SRC-00093,Patricia,Brown,valid.user4@example.org,+1-555-0204,Company 4 Inc,CA,10004,active,Valid production-ready synthetic row 4
+SRC-00094,John,Jones,valid.user5@example.net,+1-555-0205,Company 5 Inc,UK,10005,active,Valid production-ready synthetic row 5
+SRC-00095,Jennifer,Garcia,valid.user6@example.com,+1-555-0206,Company 6 Inc,US,10006,active,Valid production-ready synthetic row 6
+SRC-00096,Michael,Miller,valid.user7@example.org,5550107,Company 7 Inc,US,10007,active,Valid production-ready synthetic row 7
+SRC-00097,,Smith10,smith10@example.com,+1-555-0110,Acme Corp 10,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00098,Linda,Davis,valid.user8@example.net,+1-555-0208,Company 8 Inc,CA,10008,active,Valid production-ready synthetic row 8
+SRC-00099,David,Rodriguez,valid.user9@example.com,+1-555-0209,Company 9 Inc,UK,10009,active,Valid production-ready synthetic row 9
+SRC-00100,"  Elizabeth  ","  Martinez  ",valid.user10@example.org,+1-555-0210,Company 10 Inc,US,10010,active,Valid production-ready synthetic row 10
+SRC-00101,William,Hernandez,valid.user11@example.net,+1-555-0211,Company 11 Inc,US,10011,active,Valid production-ready synthetic row 11
+SRC-00102,Barbara,Lopez,valid.user12@example.com,+1-555-0212,Company 12 Inc,CA,10012,active,Valid production-ready synthetic row 12
+SRC-00103,Richard,Gonzalez,valid.user13@example.org,+1-555-0213,Company 13 Inc,UK,10013,active,Valid production-ready synthetic row 13
+SRC-00104,Susan,Wilson,valid.user14@example.net,5550114,Company 14 Inc,US,10014,active,Valid production-ready synthetic row 14
+SRC-00105,Joseph,Anderson,valid.user15@example.com,+1-555-0215,Company 15 Inc,US,10015,inactive,Valid production-ready synthetic row 15
+SRC-00106,,Smith11,smith11@example.com,+1-555-0111,Acme Corp 11,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00107,Jessica,Thomas,valid.user16@example.org,+1-555-0216,Company 16 Inc,CA,10016,active,Valid production-ready synthetic row 16
+SRC-00108,Thomas,Taylor,valid.user17@example.net,+1-555-0217,Company 17 Inc,UK,10017,active,Valid production-ready synthetic row 17
+SRC-00109,Sarah,Moore,valid.user18@example.com,+1-555-0218,Company 18 Inc,US,10018,active,Valid production-ready synthetic row 18
+SRC-00110,Charles,Jackson,valid.user19@example.org,+1-555-0219,Company 19 Inc,US,10019,active,Valid production-ready synthetic row 19
+SRC-00111,"  Karen  ","  Martin  ",valid.user20@example.net,+1-555-0220,Company 20 Inc,CA,10020,active,Valid production-ready synthetic row 20
+SRC-00112,Christopher,Lee,valid.user21@example.com,5550121,Company 21 Inc,UK,10021,active,Valid production-ready synthetic row 21
+SRC-00113,Nancy,Perez,valid.user22@example.org,+1-555-0222,Company 22 Inc,US,10022,active,Valid production-ready synthetic row 22
+SRC-00114,Daniel,Thompson,valid.user23@example.net,+1-555-0223,Company 23 Inc,US,10023,active,Valid production-ready synthetic row 23
+SRC-00115,,Smith12,smith12@example.com,+1-555-0112,Acme Corp 12,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00116,Lisa,White,valid.user24@example.com,+1-555-0224,Company 24 Inc,CA,10024,active,Valid production-ready synthetic row 24
+SRC-00117,Matthew,Harris,valid.user25@example.org,+1-555-0225,Company 25 Inc,UK,10025,active,Valid production-ready synthetic row 25
+SRC-00118,Betty,Sanchez,valid.user26@example.net,+1-555-0226,Company 26 Inc,US,10026,active,Valid production-ready synthetic row 26
+SRC-00119,Anthony,Clark,valid.user27@example.com,+1-555-0227,Company 27 Inc,US,10027,active,Valid production-ready synthetic row 27
+SRC-00120,Margaret,Ramirez,valid.user28@example.org,5550128,Company 28 Inc,CA,10028,active,Valid production-ready synthetic row 28
+SRC-00121,Mark,Lewis,valid.user29@example.net,+1-555-0229,Company 29 Inc,UK,10029,active,Valid production-ready synthetic row 29
+SRC-00122,"  Sandra  ","  Robinson  ",valid.user30@example.com,+1-555-0230,Company 30 Inc,US,10030,inactive,Valid production-ready synthetic row 30
+SRC-00123,Donald,Walker,valid.user31@example.org,+1-555-0231,Company 31 Inc,US,10031,active,Valid production-ready synthetic row 31
+SRC-00124,,Smith13,smith13@example.com,+1-555-0113,Acme Corp 13,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00125,Ashley,Müller,valid.user32@example.net,+1-555-0232,Company 32 Inc,CA,10032,active,Valid production-ready synthetic row 32
+SRC-00126,Steven,Renard,valid.user33@example.com,+1-555-0233,Company 33 Inc,UK,10033,active,Valid production-ready synthetic row 33
+SRC-00127,Kimberly,Kierkegaard,valid.user34@example.org,+1-555-0234,Company 34 Inc,US,10034,active,Valid production-ready synthetic row 34
+SRC-00128,Paul,García,valid.user35@example.net,5550135,Company 35 Inc,US,10035,active,Valid production-ready synthetic row 35
+SRC-00129,Emily,De La Cruz,valid.user36@example.com,+1-555-0236,Company 36 Inc,CA,10036,active,Valid production-ready synthetic row 36
+SRC-00130,Andrew,Smith,valid.user37@example.org,+1-555-0237,Company 37 Inc,UK,10037,active,Valid production-ready synthetic row 37
+SRC-00131,Donna,Johnson,valid.user38@example.net,+1-555-0238,Company 38 Inc,US,10038,active,Valid production-ready synthetic row 38
+SRC-00132,Joshua,Williams,valid.user39@example.com,+1-555-0239,Company 39 Inc,US,10039,active,Valid production-ready synthetic row 39
+SRC-00133,,Smith14,smith14@example.com,+1-555-0114,Acme Corp 14,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00134,"  Michelle  ","  Brown  ",valid.user40@example.org,+1-555-0240,Company 40 Inc,CA,10040,active,Valid production-ready synthetic row 40
+SRC-00135,François,Jones,valid.user41@example.net,+1-555-0241,Company 41 Inc,UK,10041,active,Valid production-ready synthetic row 41
+SRC-00136,Élodie,Garcia,valid.user42@example.com,5550142,Company 42 Inc,US,10042,active,Valid production-ready synthetic row 42
+SRC-00137,Patrick O'Brien,Miller,valid.user43@example.org,+1-555-0243,Company 43 Inc,US,10043,active,Valid production-ready synthetic row 43
+SRC-00138,Sean McDonald,Davis,valid.user44@example.net,+1-555-0244,Company 44 Inc,CA,10044,active,Valid production-ready synthetic row 44
+SRC-00139,José,Rodriguez,valid.user45@example.com,+1-555-0245,Company 45 Inc,UK,10045,inactive,Valid production-ready synthetic row 45
+SRC-00140,Søren,Martinez,valid.user46@example.org,+1-555-0246,Company 46 Inc,US,10046,active,Valid production-ready synthetic row 46
+SRC-00141,James,Hernandez,valid.user47@example.net,+1-555-0247,Company 47 Inc,US,10047,active,Valid production-ready synthetic row 47
+SRC-00142,,Smith15,smith15@example.com,+1-555-0115,Acme Corp 15,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00143,Mary,Lopez,valid.user48@example.com,+1-555-0248,Company 48 Inc,CA,10048,active,Valid production-ready synthetic row 48
+SRC-00144,Robert,Gonzalez,valid.user49@example.org,5550149,Company 49 Inc,UK,10049,active,Valid production-ready synthetic row 49
+SRC-00145,"  Patricia  ","  Wilson  ",valid.user50@example.net,+1-555-0250,Company 50 Inc,US,10050,active,Valid production-ready synthetic row 50
+SRC-00146,John,Anderson,valid.user51@example.com,+1-555-0251,Company 51 Inc,US,10051,active,Valid production-ready synthetic row 51
+SRC-00147,Jennifer,Thomas,valid.user52@example.org,+1-555-0252,Company 52 Inc,CA,10052,active,Valid production-ready synthetic row 52
+SRC-00148,Michael,Taylor,valid.user53@example.net,+1-555-0253,Company 53 Inc,UK,10053,active,Valid production-ready synthetic row 53
+SRC-00149,Linda,Moore,valid.user54@example.com,+1-555-0254,Company 54 Inc,US,10054,active,Valid production-ready synthetic row 54
+SRC-00150,David,Jackson,valid.user55@example.org,+1-555-0255,Company 55 Inc,US,10055,active,Valid production-ready synthetic row 55
+SRC-00151,,Smith16,smith16@example.com,+1-555-0116,Acme Corp 16,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00152,Elizabeth,Martin,valid.user56@example.net,5550156,Company 56 Inc,CA,10056,active,Valid production-ready synthetic row 56
+SRC-00153,William,Lee,valid.user57@example.com,+1-555-0257,Company 57 Inc,UK,10057,active,Valid production-ready synthetic row 57
+SRC-00154,Barbara,Perez,valid.user58@example.org,+1-555-0258,Company 58 Inc,US,10058,active,Valid production-ready synthetic row 58
+SRC-00155,Richard,Thompson,valid.user59@example.net,+1-555-0259,Company 59 Inc,US,10059,active,Valid production-ready synthetic row 59
+SRC-00156,"  Susan  ","  White  ",valid.user60@example.com,+1-555-0260,Company 60 Inc,CA,10060,inactive,Valid production-ready synthetic row 60
+SRC-00157,Joseph,Harris,valid.user61@example.org,+1-555-0261,Company 61 Inc,UK,10061,active,Valid production-ready synthetic row 61
+SRC-00158,Jessica,Sanchez,valid.user62@example.net,+1-555-0262,Company 62 Inc,US,10062,active,Valid production-ready synthetic row 62
+SRC-00159,Thomas,Clark,valid.user63@example.com,5550163,Company 63 Inc,US,10063,active,Valid production-ready synthetic row 63
+SRC-00160,,Smith17,smith17@example.com,+1-555-0117,Acme Corp 17,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00161,Sarah,Ramirez,valid.user64@example.org,+1-555-0264,Company 64 Inc,CA,10064,active,Valid production-ready synthetic row 64
+SRC-00162,Charles,Lewis,valid.user65@example.net,+1-555-0265,Company 65 Inc,UK,10065,active,Valid production-ready synthetic row 65
+SRC-00163,Karen,Robinson,valid.user66@example.com,+1-555-0266,Company 66 Inc,US,10066,active,Valid production-ready synthetic row 66
+SRC-00164,Christopher,Walker,valid.user67@example.org,+1-555-0267,Company 67 Inc,US,10067,active,Valid production-ready synthetic row 67
+SRC-00165,Nancy,Müller,valid.user68@example.net,+1-555-0268,Company 68 Inc,CA,10068,active,Valid production-ready synthetic row 68
+SRC-00166,Daniel,Renard,valid.user69@example.com,+1-555-0269,Company 69 Inc,UK,10069,active,Valid production-ready synthetic row 69
+SRC-00167,"  Lisa  ","  Kierkegaard  ",valid.user70@example.org,5550170,Company 70 Inc,US,10070,active,Valid production-ready synthetic row 70
+SRC-00168,Matthew,García,valid.user71@example.net,+1-555-0271,Company 71 Inc,US,10071,active,Valid production-ready synthetic row 71
+SRC-00169,,Smith18,smith18@example.com,+1-555-0118,Acme Corp 18,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00170,Betty,De La Cruz,valid.user72@example.com,+1-555-0272,Company 72 Inc,CA,10072,active,Valid production-ready synthetic row 72
+SRC-00171,Anthony,Smith,valid.user73@example.org,+1-555-0273,Company 73 Inc,UK,10073,active,Valid production-ready synthetic row 73
+SRC-00172,Margaret,Johnson,valid.user74@example.net,+1-555-0274,Company 74 Inc,US,10074,active,Valid production-ready synthetic row 74
+SRC-00173,Mark,Williams,valid.user75@example.com,+1-555-0275,Company 75 Inc,US,10075,inactive,Valid production-ready synthetic row 75
+SRC-00174,Sandra,Brown,valid.user76@example.org,+1-555-0276,Company 76 Inc,CA,10076,active,Valid production-ready synthetic row 76
+SRC-00175,Donald,Jones,valid.user77@example.net,5550177,Company 77 Inc,UK,10077,active,Valid production-ready synthetic row 77
+SRC-00176,Ashley,Garcia,valid.user78@example.com,+1-555-0278,Company 78 Inc,US,10078,active,Valid production-ready synthetic row 78
+SRC-00177,Steven,Miller,valid.user79@example.org,+1-555-0279,Company 79 Inc,US,10079,active,Valid production-ready synthetic row 79
+SRC-00178,,Smith19,smith19@example.com,+1-555-0119,Acme Corp 19,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00179,"  Kimberly  ","  Davis  ",valid.user80@example.net,+1-555-0280,Company 80 Inc,CA,10080,active,Valid production-ready synthetic row 80
+SRC-00180,Paul,Rodriguez,valid.user81@example.com,+1-555-0281,Company 81 Inc,UK,10081,active,Valid production-ready synthetic row 81
+SRC-00181,Emily,Martinez,valid.user82@example.org,+1-555-0282,Company 82 Inc,US,10082,active,Valid production-ready synthetic row 82
+SRC-00182,Andrew,Hernandez,valid.user83@example.net,+1-555-0283,Company 83 Inc,US,10083,active,Valid production-ready synthetic row 83
+SRC-00183,Donna,Lopez,valid.user84@example.com,5550184,Company 84 Inc,CA,10084,active,Valid production-ready synthetic row 84
+SRC-00184,Joshua,Gonzalez,valid.user85@example.org,+1-555-0285,Company 85 Inc,UK,10085,active,Valid production-ready synthetic row 85
+SRC-00185,Michelle,Wilson,valid.user86@example.net,+1-555-0286,Company 86 Inc,US,10086,active,Valid production-ready synthetic row 86
+SRC-00186,François,Anderson,valid.user87@example.com,+1-555-0287,Company 87 Inc,US,10087,active,Valid production-ready synthetic row 87
+SRC-00187,,Smith20,smith20@example.com,+1-555-0120,Acme Corp 20,US,10001,active,Synthetic fixture: empty required first_name
+SRC-00188,Élodie,Thomas,valid.user88@example.org,+1-555-0288,Company 88 Inc,CA,10088,active,Valid production-ready synthetic row 88
+SRC-00189,Patrick O'Brien,Taylor,valid.user89@example.net,+1-555-0289,Company 89 Inc,UK,10089,active,Valid production-ready synthetic row 89
+SRC-00190,"  Sean McDonald  ","  Moore  ",valid.user90@example.com,+1-555-0290,Company 90 Inc,US,10090,inactive,Valid production-ready synthetic row 90
+SRC-00191,José,Jackson,valid.user91@example.org,5550191,Company 91 Inc,US,10091,active,Valid production-ready synthetic row 91
+SRC-00192,Søren,Martin,valid.user92@example.net,+1-555-0292,Company 92 Inc,CA,10092,active,Valid production-ready synthetic row 92
+SRC-00193,James,Lee,valid.user93@example.com,+1-555-0293,Company 93 Inc,UK,10093,active,Valid production-ready synthetic row 93
+SRC-00194,Mary,Perez,valid.user94@example.org,+1-555-0294,Company 94 Inc,US,10094,active,Valid production-ready synthetic row 94
+SRC-00195,Robert,Thompson,valid.user95@example.net,+1-555-0295,Company 95 Inc,US,10095,active,Valid production-ready synthetic row 95
+SRC-00196,Alice1,,alice1@example.org,+1-555-0201,Apex Global 1,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00197,Patricia,White,valid.user96@example.com,+1-555-0296,Company 96 Inc,CA,10096,active,Valid production-ready synthetic row 96
+SRC-00198,John,Harris,valid.user97@example.org,+1-555-0297,Company 97 Inc,UK,10097,active,Valid production-ready synthetic row 97
+SRC-00199,Jennifer,Sanchez,valid.user98@example.net,5550198,Company 98 Inc,US,10098,active,Valid production-ready synthetic row 98
+SRC-00200,Michael,Clark,valid.user99@example.com,+1-555-0299,Company 99 Inc,US,10099,active,Valid production-ready synthetic row 99
+SRC-00201,"  Linda  ","  Ramirez  ",valid.user100@example.org,+1-555-0300,Company 100 Inc,CA,10100,active,Valid production-ready synthetic row 100
+SRC-00202,David,Lewis,valid.user101@example.net,+1-555-0301,Company 101 Inc,UK,10101,active,Valid production-ready synthetic row 101
+SRC-00203,Elizabeth,Robinson,valid.user102@example.com,+1-555-0302,Company 102 Inc,US,10102,active,Valid production-ready synthetic row 102
+SRC-00204,William,Walker,valid.user103@example.org,+1-555-0303,Company 103 Inc,US,10103,active,Valid production-ready synthetic row 103
+SRC-00205,Alice2,,alice2@example.org,+1-555-0202,Apex Global 2,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00206,Barbara,Müller,valid.user104@example.net,+1-555-0304,Company 104 Inc,CA,10104,active,Valid production-ready synthetic row 104
+SRC-00207,Richard,Renard,valid.user105@example.com,5550105,Company 105 Inc,UK,10105,inactive,Valid production-ready synthetic row 105
+SRC-00208,Susan,Kierkegaard,valid.user106@example.org,+1-555-0306,Company 106 Inc,US,10106,active,Valid production-ready synthetic row 106
+SRC-00209,Joseph,García,valid.user107@example.net,+1-555-0307,Company 107 Inc,US,10107,active,Valid production-ready synthetic row 107
+SRC-00210,Jessica,De La Cruz,valid.user108@example.com,+1-555-0308,Company 108 Inc,CA,10108,active,Valid production-ready synthetic row 108
+SRC-00211,Thomas,Smith,valid.user109@example.org,+1-555-0309,Company 109 Inc,UK,10109,active,Valid production-ready synthetic row 109
+SRC-00212,"  Sarah  ","  Johnson  ",valid.user110@example.net,+1-555-0310,Company 110 Inc,US,10110,active,Valid production-ready synthetic row 110
+SRC-00213,Charles,Williams,valid.user111@example.com,+1-555-0311,Company 111 Inc,US,10111,active,Valid production-ready synthetic row 111
+SRC-00214,Alice3,,alice3@example.org,+1-555-0203,Apex Global 3,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00215,Karen,Brown,valid.user112@example.org,5550112,Company 112 Inc,CA,10112,active,Valid production-ready synthetic row 112
+SRC-00216,Christopher,Jones,valid.user113@example.net,+1-555-0313,Company 113 Inc,UK,10113,active,Valid production-ready synthetic row 113
+SRC-00217,Nancy,Garcia,valid.user114@example.com,+1-555-0314,Company 114 Inc,US,10114,active,Valid production-ready synthetic row 114
+SRC-00218,Daniel,Miller,valid.user115@example.org,+1-555-0315,Company 115 Inc,US,10115,active,Valid production-ready synthetic row 115
+SRC-00219,Lisa,Davis,valid.user116@example.net,+1-555-0316,Company 116 Inc,CA,10116,active,Valid production-ready synthetic row 116
+SRC-00220,Matthew,Rodriguez,valid.user117@example.com,+1-555-0317,Company 117 Inc,UK,10117,active,Valid production-ready synthetic row 117
+SRC-00221,Betty,Martinez,valid.user118@example.org,+1-555-0318,Company 118 Inc,US,10118,active,Valid production-ready synthetic row 118
+SRC-00222,Anthony,Hernandez,valid.user119@example.net,5550119,Company 119 Inc,US,10119,active,Valid production-ready synthetic row 119
+SRC-00223,Alice4,,alice4@example.org,+1-555-0204,Apex Global 4,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00224,"  Margaret  ","  Lopez  ",valid.user120@example.com,+1-555-0320,Company 120 Inc,CA,10120,inactive,Valid production-ready synthetic row 120
+SRC-00225,Mark,Gonzalez,valid.user121@example.org,+1-555-0321,Company 121 Inc,UK,10121,active,Valid production-ready synthetic row 121
+SRC-00226,Sandra,Wilson,valid.user122@example.net,+1-555-0322,Company 122 Inc,US,10122,active,Valid production-ready synthetic row 122
+SRC-00227,Donald,Anderson,valid.user123@example.com,+1-555-0323,Company 123 Inc,US,10123,active,Valid production-ready synthetic row 123
+SRC-00228,Ashley,Thomas,valid.user124@example.org,+1-555-0324,Company 124 Inc,CA,10124,active,Valid production-ready synthetic row 124
+SRC-00229,Steven,Taylor,valid.user125@example.net,+1-555-0325,Company 125 Inc,UK,10125,active,Valid production-ready synthetic row 125
+SRC-00230,Kimberly,Moore,valid.user126@example.com,5550126,Company 126 Inc,US,10126,active,Valid production-ready synthetic row 126
+SRC-00231,Paul,Jackson,valid.user127@example.org,+1-555-0327,Company 127 Inc,US,10127,active,Valid production-ready synthetic row 127
+SRC-00232,Alice5,,alice5@example.org,+1-555-0205,Apex Global 5,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00233,Emily,Martin,valid.user128@example.net,+1-555-0328,Company 128 Inc,CA,10128,active,Valid production-ready synthetic row 128
+SRC-00234,Andrew,Lee,valid.user129@example.com,+1-555-0329,Company 129 Inc,UK,10129,active,Valid production-ready synthetic row 129
+SRC-00235,"  Donna  ","  Perez  ",valid.user130@example.org,+1-555-0330,Company 130 Inc,US,10130,active,Valid production-ready synthetic row 130
+SRC-00236,Joshua,Thompson,valid.user131@example.net,+1-555-0331,Company 131 Inc,US,10131,active,Valid production-ready synthetic row 131
+SRC-00237,Michelle,White,valid.user132@example.com,+1-555-0332,Company 132 Inc,CA,10132,active,Valid production-ready synthetic row 132
+SRC-00238,François,Harris,valid.user133@example.org,5550133,Company 133 Inc,UK,10133,active,Valid production-ready synthetic row 133
+SRC-00239,Élodie,Sanchez,valid.user134@example.net,+1-555-0334,Company 134 Inc,US,10134,active,Valid production-ready synthetic row 134
+SRC-00240,Patrick O'Brien,Clark,valid.user135@example.com,+1-555-0335,Company 135 Inc,US,10135,inactive,Valid production-ready synthetic row 135
+SRC-00241,Alice6,,alice6@example.org,+1-555-0206,Apex Global 6,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00242,Sean McDonald,Ramirez,valid.user136@example.org,+1-555-0336,Company 136 Inc,CA,10136,active,Valid production-ready synthetic row 136
+SRC-00243,José,Lewis,valid.user137@example.net,+1-555-0337,Company 137 Inc,UK,10137,active,Valid production-ready synthetic row 137
+SRC-00244,Søren,Robinson,valid.user138@example.com,+1-555-0338,Company 138 Inc,US,10138,active,Valid production-ready synthetic row 138
+SRC-00245,James,Walker,valid.user139@example.org,+1-555-0339,Company 139 Inc,US,10139,active,Valid production-ready synthetic row 139
+SRC-00246,"  Mary  ","  Müller  ",valid.user140@example.net,5550140,Company 140 Inc,CA,10140,active,Valid production-ready synthetic row 140
+SRC-00247,Robert,Renard,valid.user141@example.com,+1-555-0341,Company 141 Inc,UK,10141,active,Valid production-ready synthetic row 141
+SRC-00248,Patricia,Kierkegaard,valid.user142@example.org,+1-555-0342,Company 142 Inc,US,10142,active,Valid production-ready synthetic row 142
+SRC-00249,John,García,valid.user143@example.net,+1-555-0343,Company 143 Inc,US,10143,active,Valid production-ready synthetic row 143
+SRC-00250,Alice7,,alice7@example.org,+1-555-0207,Apex Global 7,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00251,Jennifer,De La Cruz,valid.user144@example.com,+1-555-0344,Company 144 Inc,CA,10144,active,Valid production-ready synthetic row 144
+SRC-00252,Michael,Smith,valid.user145@example.org,+1-555-0345,Company 145 Inc,UK,10145,active,Valid production-ready synthetic row 145
+SRC-00253,Linda,Johnson,valid.user146@example.net,+1-555-0346,Company 146 Inc,US,10146,active,Valid production-ready synthetic row 146
+SRC-00254,David,Williams,valid.user147@example.com,5550147,Company 147 Inc,US,10147,active,Valid production-ready synthetic row 147
+SRC-00255,Elizabeth,Brown,valid.user148@example.org,+1-555-0348,Company 148 Inc,CA,10148,active,Valid production-ready synthetic row 148
+SRC-00256,William,Jones,valid.user149@example.net,+1-555-0349,Company 149 Inc,UK,10149,active,Valid production-ready synthetic row 149
+SRC-00257,"  Barbara  ","  Garcia  ",valid.user150@example.com,+1-555-0350,Company 150 Inc,US,10150,inactive,Valid production-ready synthetic row 150
+SRC-00258,Richard,Miller,valid.user151@example.org,+1-555-0351,Company 151 Inc,US,10151,active,Valid production-ready synthetic row 151
+SRC-00259,Alice8,,alice8@example.org,+1-555-0208,Apex Global 8,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00260,Susan,Davis,valid.user152@example.net,+1-555-0352,Company 152 Inc,CA,10152,active,Valid production-ready synthetic row 152
+SRC-00261,Joseph,Rodriguez,valid.user153@example.com,+1-555-0353,Company 153 Inc,UK,10153,active,Valid production-ready synthetic row 153
+SRC-00262,Jessica,Martinez,valid.user154@example.org,5550154,Company 154 Inc,US,10154,active,Valid production-ready synthetic row 154
+SRC-00263,Thomas,Hernandez,valid.user155@example.net,+1-555-0355,Company 155 Inc,US,10155,active,Valid production-ready synthetic row 155
+SRC-00264,Sarah,Lopez,valid.user156@example.com,+1-555-0356,Company 156 Inc,CA,10156,active,Valid production-ready synthetic row 156
+SRC-00265,Charles,Gonzalez,valid.user157@example.org,+1-555-0357,Company 157 Inc,UK,10157,active,Valid production-ready synthetic row 157
+SRC-00266,Karen,Wilson,valid.user158@example.net,+1-555-0358,Company 158 Inc,US,10158,active,Valid production-ready synthetic row 158
+SRC-00267,Christopher,Anderson,valid.user159@example.com,+1-555-0359,Company 159 Inc,US,10159,active,Valid production-ready synthetic row 159
+SRC-00268,Alice9,,alice9@example.org,+1-555-0209,Apex Global 9,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00269,"  Nancy  ","  Thomas  ",valid.user160@example.org,+1-555-0360,Company 160 Inc,CA,10160,active,Valid production-ready synthetic row 160
+SRC-00270,Daniel,Taylor,valid.user161@example.net,5550161,Company 161 Inc,UK,10161,active,Valid production-ready synthetic row 161
+SRC-00271,Lisa,Moore,valid.user162@example.com,+1-555-0362,Company 162 Inc,US,10162,active,Valid production-ready synthetic row 162
+SRC-00272,Matthew,Jackson,valid.user163@example.org,+1-555-0363,Company 163 Inc,US,10163,active,Valid production-ready synthetic row 163
+SRC-00273,Betty,Martin,valid.user164@example.net,+1-555-0364,Company 164 Inc,CA,10164,active,Valid production-ready synthetic row 164
+SRC-00274,Anthony,Lee,valid.user165@example.com,+1-555-0365,Company 165 Inc,UK,10165,inactive,Valid production-ready synthetic row 165
+SRC-00275,Margaret,Perez,valid.user166@example.org,+1-555-0366,Company 166 Inc,US,10166,active,Valid production-ready synthetic row 166
+SRC-00276,Mark,Thompson,valid.user167@example.net,+1-555-0367,Company 167 Inc,US,10167,active,Valid production-ready synthetic row 167
+SRC-00277,Alice10,,alice10@example.org,+1-555-0210,Apex Global 10,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00278,Sandra,White,valid.user168@example.com,5550168,Company 168 Inc,CA,10168,active,Valid production-ready synthetic row 168
+SRC-00279,Donald,Harris,valid.user169@example.org,+1-555-0369,Company 169 Inc,UK,10169,active,Valid production-ready synthetic row 169
+SRC-00280,"  Ashley  ","  Sanchez  ",valid.user170@example.net,+1-555-0370,Company 170 Inc,US,10170,active,Valid production-ready synthetic row 170
+SRC-00281,Steven,Clark,valid.user171@example.com,+1-555-0371,Company 171 Inc,US,10171,active,Valid production-ready synthetic row 171
+SRC-00282,Kimberly,Ramirez,valid.user172@example.org,+1-555-0372,Company 172 Inc,CA,10172,active,Valid production-ready synthetic row 172
+SRC-00283,Paul,Lewis,valid.user173@example.net,+1-555-0373,Company 173 Inc,UK,10173,active,Valid production-ready synthetic row 173
+SRC-00284,Emily,Robinson,valid.user174@example.com,+1-555-0374,Company 174 Inc,US,10174,active,Valid production-ready synthetic row 174
+SRC-00285,Andrew,Walker,valid.user175@example.org,5550175,Company 175 Inc,US,10175,active,Valid production-ready synthetic row 175
+SRC-00286,Alice11,,alice11@example.org,+1-555-0211,Apex Global 11,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00287,Donna,Müller,valid.user176@example.net,+1-555-0376,Company 176 Inc,CA,10176,active,Valid production-ready synthetic row 176
+SRC-00288,Joshua,Renard,valid.user177@example.com,+1-555-0377,Company 177 Inc,UK,10177,active,Valid production-ready synthetic row 177
+SRC-00289,Michelle,Kierkegaard,valid.user178@example.org,+1-555-0378,Company 178 Inc,US,10178,active,Valid production-ready synthetic row 178
+SRC-00290,François,García,valid.user179@example.net,+1-555-0379,Company 179 Inc,US,10179,active,Valid production-ready synthetic row 179
+SRC-00291,"  Élodie  ","  De La Cruz  ",valid.user180@example.com,+1-555-0380,Company 180 Inc,CA,10180,inactive,Valid production-ready synthetic row 180
+SRC-00292,Patrick O'Brien,Smith,valid.user181@example.org,+1-555-0381,Company 181 Inc,UK,10181,active,Valid production-ready synthetic row 181
+SRC-00293,Sean McDonald,Johnson,valid.user182@example.net,5550182,Company 182 Inc,US,10182,active,Valid production-ready synthetic row 182
+SRC-00294,José,Williams,valid.user183@example.com,+1-555-0383,Company 183 Inc,US,10183,active,Valid production-ready synthetic row 183
+SRC-00295,Alice12,,alice12@example.org,+1-555-0212,Apex Global 12,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00296,Søren,Brown,valid.user184@example.org,+1-555-0384,Company 184 Inc,CA,10184,active,Valid production-ready synthetic row 184
+SRC-00297,James,Jones,valid.user185@example.net,+1-555-0385,Company 185 Inc,UK,10185,active,Valid production-ready synthetic row 185
+SRC-00298,Mary,Garcia,valid.user186@example.com,+1-555-0386,Company 186 Inc,US,10186,active,Valid production-ready synthetic row 186
+SRC-00299,Robert,Miller,valid.user187@example.org,+1-555-0387,Company 187 Inc,US,10187,active,Valid production-ready synthetic row 187
+SRC-00300,Patricia,Davis,valid.user188@example.net,+1-555-0388,Company 188 Inc,CA,10188,active,Valid production-ready synthetic row 188
+SRC-00301,John,Rodriguez,valid.user189@example.com,5550189,Company 189 Inc,UK,10189,active,Valid production-ready synthetic row 189
+SRC-00302,"  Jennifer  ","  Martinez  ",valid.user190@example.org,+1-555-0390,Company 190 Inc,US,10190,active,Valid production-ready synthetic row 190
+SRC-00303,Michael,Hernandez,valid.user191@example.net,+1-555-0391,Company 191 Inc,US,10191,active,Valid production-ready synthetic row 191
+SRC-00304,Alice13,,alice13@example.org,+1-555-0213,Apex Global 13,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00305,Linda,Lopez,valid.user192@example.com,+1-555-0392,Company 192 Inc,CA,10192,active,Valid production-ready synthetic row 192
+SRC-00306,David,Gonzalez,valid.user193@example.org,+1-555-0393,Company 193 Inc,UK,10193,active,Valid production-ready synthetic row 193
+SRC-00307,Elizabeth,Wilson,valid.user194@example.net,+1-555-0394,Company 194 Inc,US,10194,active,Valid production-ready synthetic row 194
+SRC-00308,William,Anderson,valid.user195@example.com,+1-555-0395,Company 195 Inc,US,10195,inactive,Valid production-ready synthetic row 195
+SRC-00309,Barbara,Thomas,valid.user196@example.org,5550196,Company 196 Inc,CA,10196,active,Valid production-ready synthetic row 196
+SRC-00310,Richard,Taylor,valid.user197@example.net,+1-555-0397,Company 197 Inc,UK,10197,active,Valid production-ready synthetic row 197
+SRC-00311,Susan,Moore,valid.user198@example.com,+1-555-0398,Company 198 Inc,US,10198,active,Valid production-ready synthetic row 198
+SRC-00312,Joseph,Jackson,valid.user199@example.org,+1-555-0399,Company 199 Inc,US,10199,active,Valid production-ready synthetic row 199
+SRC-00313,Alice14,,alice14@example.org,+1-555-0214,Apex Global 14,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00314,"  Jessica  ","  Martin  ",valid.user200@example.net,+1-555-0400,Company 200 Inc,CA,10200,active,Valid production-ready synthetic row 200
+SRC-00315,Thomas,Lee,valid.user201@example.com,+1-555-0401,Company 201 Inc,UK,10201,active,Valid production-ready synthetic row 201
+SRC-00316,Sarah,Perez,valid.user202@example.org,+1-555-0402,Company 202 Inc,US,10202,active,Valid production-ready synthetic row 202
+SRC-00317,Charles,Thompson,valid.user203@example.net,5550103,Company 203 Inc,US,10203,active,Valid production-ready synthetic row 203
+SRC-00318,Karen,White,valid.user204@example.com,+1-555-0404,Company 204 Inc,CA,10204,active,Valid production-ready synthetic row 204
+SRC-00319,Christopher,Harris,valid.user205@example.org,+1-555-0405,Company 205 Inc,UK,10205,active,Valid production-ready synthetic row 205
+SRC-00320,Nancy,Sanchez,valid.user206@example.net,+1-555-0406,Company 206 Inc,US,10206,active,Valid production-ready synthetic row 206
+SRC-00321,Daniel,Clark,valid.user207@example.com,+1-555-0407,Company 207 Inc,US,10207,active,Valid production-ready synthetic row 207
+SRC-00322,Alice15,,alice15@example.org,+1-555-0215,Apex Global 15,US,10002,active,Synthetic fixture: empty required last_name
+SRC-00323,Lisa,Ramirez,valid.user208@example.org,+1-555-0408,Company 208 Inc,CA,10208,active,Valid production-ready synthetic row 208
+SRC-00324,Matthew,Lewis,valid.user209@example.net,+1-555-0409,Company 209 Inc,UK,10209,active,Valid production-ready synthetic row 209
+SRC-00325,"  Betty  ","  Robinson  ",valid.user210@example.com,5550110,Company 210 Inc,US,10210,inactive,Valid production-ready synthetic row 210
+SRC-00326,Anthony,Walker,valid.user211@example.org,+1-555-0411,Company 211 Inc,US,10211,active,Valid production-ready synthetic row 211
+SRC-00327,Margaret,Müller,valid.user212@example.net,+1-555-0412,Company 212 Inc,CA,10212,active,Valid production-ready synthetic row 212
+SRC-00328,Mark,Renard,valid.user213@example.com,+1-555-0413,Company 213 Inc,UK,10213,active,Valid production-ready synthetic row 213
+SRC-00329,Sandra,Kierkegaard,valid.user214@example.org,+1-555-0414,Company 214 Inc,US,10214,active,Valid production-ready synthetic row 214
+SRC-00330,Donald,García,valid.user215@example.net,+1-555-0415,Company 215 Inc,US,10215,active,Valid production-ready synthetic row 215
+SRC-00331,Bob1,Jones1,,+1-555-0301,Beta Technologies 1,US,10003,active,Synthetic fixture: empty required email
+SRC-00332,Ashley,De La Cruz,valid.user216@example.com,+1-555-0416,Company 216 Inc,CA,10216,active,Valid production-ready synthetic row 216
+SRC-00333,Steven,Smith,valid.user217@example.org,5550117,Company 217 Inc,UK,10217,active,Valid production-ready synthetic row 217
+SRC-00334,Kimberly,Johnson,valid.user218@example.net,+1-555-0418,Company 218 Inc,US,10218,active,Valid production-ready synthetic row 218
+SRC-00335,Paul,Williams,valid.user219@example.com,+1-555-0419,Company 219 Inc,US,10219,active,Valid production-ready synthetic row 219
+SRC-00336,"  Emily  ","  Brown  ",valid.user220@example.org,+1-555-0420,Company 220 Inc,CA,10220,active,Valid production-ready synthetic row 220
+SRC-00337,Andrew,Jones,valid.user221@example.net,+1-555-0421,Company 221 Inc,UK,10221,active,Valid production-ready synthetic row 221
+SRC-00338,Donna,Garcia,valid.user222@example.com,+1-555-0422,Company 222 Inc,US,10222,active,Valid production-ready synthetic row 222
+SRC-00339,Joshua,Miller,valid.user223@example.org,+1-555-0423,Company 223 Inc,US,10223,active,Valid production-ready synthetic row 223
+SRC-00340,Bob2,Jones2,,+1-555-0302,Beta Technologies 2,US,10003,active,Synthetic fixture: empty required email
+SRC-00341,Michelle,Davis,valid.user224@example.net,5550124,Company 224 Inc,CA,10224,active,Valid production-ready synthetic row 224
+SRC-00342,François,Rodriguez,valid.user225@example.com,+1-555-0425,Company 225 Inc,UK,10225,inactive,Valid production-ready synthetic row 225
+SRC-00343,Élodie,Martinez,valid.user226@example.org,+1-555-0426,Company 226 Inc,US,10226,active,Valid production-ready synthetic row 226
+SRC-00344,Patrick O'Brien,Hernandez,valid.user227@example.net,+1-555-0427,Company 227 Inc,US,10227,active,Valid production-ready synthetic row 227
+SRC-00345,Sean McDonald,Lopez,valid.user228@example.com,+1-555-0428,Company 228 Inc,CA,10228,active,Valid production-ready synthetic row 228
+SRC-00346,José,Gonzalez,valid.user229@example.org,+1-555-0429,Company 229 Inc,UK,10229,active,Valid production-ready synthetic row 229
+SRC-00347,"  Søren  ","  Wilson  ",valid.user230@example.net,+1-555-0430,Company 230 Inc,US,10230,active,Valid production-ready synthetic row 230
+SRC-00348,James,Anderson,valid.user231@example.com,5550131,Company 231 Inc,US,10231,active,Valid production-ready synthetic row 231
+SRC-00349,Bob3,Jones3,,+1-555-0303,Beta Technologies 3,US,10003,active,Synthetic fixture: empty required email
+SRC-00350,Mary,Thomas,valid.user232@example.org,+1-555-0432,Company 232 Inc,CA,10232,active,Valid production-ready synthetic row 232
+SRC-00351,Robert,Taylor,valid.user233@example.net,+1-555-0433,Company 233 Inc,UK,10233,active,Valid production-ready synthetic row 233
+SRC-00352,Patricia,Moore,valid.user234@example.com,+1-555-0434,Company 234 Inc,US,10234,active,Valid production-ready synthetic row 234
+SRC-00353,John,Jackson,valid.user235@example.org,+1-555-0435,Company 235 Inc,US,10235,active,Valid production-ready synthetic row 235
+SRC-00354,Jennifer,Martin,valid.user236@example.net,+1-555-0436,Company 236 Inc,CA,10236,active,Valid production-ready synthetic row 236
+SRC-00355,Michael,Lee,valid.user237@example.com,+1-555-0437,Company 237 Inc,UK,10237,active,Valid production-ready synthetic row 237
+SRC-00356,Linda,Perez,valid.user238@example.org,5550138,Company 238 Inc,US,10238,active,Valid production-ready synthetic row 238
+SRC-00357,David,Thompson,valid.user239@example.net,+1-555-0439,Company 239 Inc,US,10239,active,Valid production-ready synthetic row 239
+SRC-00358,Bob4,Jones4,,+1-555-0304,Beta Technologies 4,US,10003,active,Synthetic fixture: empty required email
+SRC-00359,"  Elizabeth  ","  White  ",valid.user240@example.com,+1-555-0440,Company 240 Inc,CA,10240,inactive,Valid production-ready synthetic row 240
+SRC-00360,William,Harris,valid.user241@example.org,+1-555-0441,Company 241 Inc,UK,10241,active,Valid production-ready synthetic row 241
+SRC-00361,Barbara,Sanchez,valid.user242@example.net,+1-555-0442,Company 242 Inc,US,10242,active,Valid production-ready synthetic row 242
+SRC-00362,Richard,Clark,valid.user243@example.com,+1-555-0443,Company 243 Inc,US,10243,active,Valid production-ready synthetic row 243
+SRC-00363,Susan,Ramirez,valid.user244@example.org,+1-555-0444,Company 244 Inc,CA,10244,active,Valid production-ready synthetic row 244
+SRC-00364,Joseph,Lewis,valid.user245@example.net,5550145,Company 245 Inc,UK,10245,active,Valid production-ready synthetic row 245
+SRC-00365,Jessica,Robinson,valid.user246@example.com,+1-555-0446,Company 246 Inc,US,10246,active,Valid production-ready synthetic row 246
+SRC-00366,Thomas,Walker,valid.user247@example.org,+1-555-0447,Company 247 Inc,US,10247,active,Valid production-ready synthetic row 247
+SRC-00367,Bob5,Jones5,,+1-555-0305,Beta Technologies 5,US,10003,active,Synthetic fixture: empty required email
+SRC-00368,Sarah,Müller,valid.user248@example.net,+1-555-0448,Company 248 Inc,CA,10248,active,Valid production-ready synthetic row 248
+SRC-00369,Charles,Renard,valid.user249@example.com,+1-555-0449,Company 249 Inc,UK,10249,active,Valid production-ready synthetic row 249
+SRC-00370,"  Karen  ","  Kierkegaard  ",valid.user250@example.org,+1-555-0450,Company 250 Inc,US,10250,active,Valid production-ready synthetic row 250
+SRC-00371,Christopher,García,valid.user251@example.net,+1-555-0451,Company 251 Inc,US,10251,active,Valid production-ready synthetic row 251
+SRC-00372,Nancy,De La Cruz,valid.user252@example.com,5550152,Company 252 Inc,CA,10252,active,Valid production-ready synthetic row 252
+SRC-00373,Daniel,Smith,valid.user253@example.org,+1-555-0453,Company 253 Inc,UK,10253,active,Valid production-ready synthetic row 253
+SRC-00374,Lisa,Johnson,valid.user254@example.net,+1-555-0454,Company 254 Inc,US,10254,active,Valid production-ready synthetic row 254
+SRC-00375,Matthew,Williams,valid.user255@example.com,+1-555-0455,Company 255 Inc,US,10255,inactive,Valid production-ready synthetic row 255
+SRC-00376,Bob6,Jones6,,+1-555-0306,Beta Technologies 6,US,10003,active,Synthetic fixture: empty required email
+SRC-00377,Betty,Brown,valid.user256@example.org,+1-555-0456,Company 256 Inc,CA,10256,active,Valid production-ready synthetic row 256
+SRC-00378,Anthony,Jones,valid.user257@example.net,+1-555-0457,Company 257 Inc,UK,10257,active,Valid production-ready synthetic row 257
+SRC-00379,Margaret,Garcia,valid.user258@example.com,+1-555-0458,Company 258 Inc,US,10258,active,Valid production-ready synthetic row 258
+SRC-00380,Mark,Miller,valid.user259@example.org,5550159,Company 259 Inc,US,10259,active,Valid production-ready synthetic row 259
+SRC-00381,"  Sandra  ","  Davis  ",valid.user260@example.net,+1-555-0460,Company 260 Inc,CA,10260,active,Valid production-ready synthetic row 260
+SRC-00382,Donald,Rodriguez,valid.user261@example.com,+1-555-0461,Company 261 Inc,UK,10261,active,Valid production-ready synthetic row 261
+SRC-00383,Ashley,Martinez,valid.user262@example.org,+1-555-0462,Company 262 Inc,US,10262,active,Valid production-ready synthetic row 262
+SRC-00384,Steven,Hernandez,valid.user263@example.net,+1-555-0463,Company 263 Inc,US,10263,active,Valid production-ready synthetic row 263
+SRC-00385,Bob7,Jones7,,+1-555-0307,Beta Technologies 7,US,10003,active,Synthetic fixture: empty required email
+SRC-00386,Kimberly,Lopez,valid.user264@example.com,+1-555-0464,Company 264 Inc,CA,10264,active,Valid production-ready synthetic row 264
+SRC-00387,Paul,Gonzalez,valid.user265@example.org,+1-555-0465,Company 265 Inc,UK,10265,active,Valid production-ready synthetic row 265
+SRC-00388,Emily,Wilson,valid.user266@example.net,5550166,Company 266 Inc,US,10266,active,Valid production-ready synthetic row 266
+SRC-00389,Andrew,Anderson,valid.user267@example.com,+1-555-0467,Company 267 Inc,US,10267,active,Valid production-ready synthetic row 267
+SRC-00390,Donna,Thomas,valid.user268@example.org,+1-555-0468,Company 268 Inc,CA,10268,active,Valid production-ready synthetic row 268
+SRC-00391,Joshua,Taylor,valid.user269@example.net,+1-555-0469,Company 269 Inc,UK,10269,active,Valid production-ready synthetic row 269
+SRC-00392,"  Michelle  ","  Moore  ",valid.user270@example.com,+1-555-0470,Company 270 Inc,US,10270,inactive,Valid production-ready synthetic row 270
+SRC-00393,François,Jackson,valid.user271@example.org,+1-555-0471,Company 271 Inc,US,10271,active,Valid production-ready synthetic row 271
+SRC-00394,Bob8,Jones8,,+1-555-0308,Beta Technologies 8,US,10003,active,Synthetic fixture: empty required email
+SRC-00395,Élodie,Martin,valid.user272@example.net,+1-555-0472,Company 272 Inc,CA,10272,active,Valid production-ready synthetic row 272
+SRC-00396,Patrick O'Brien,Lee,valid.user273@example.com,5550173,Company 273 Inc,UK,10273,active,Valid production-ready synthetic row 273
+SRC-00397,Sean McDonald,Perez,valid.user274@example.org,+1-555-0474,Company 274 Inc,US,10274,active,Valid production-ready synthetic row 274
+SRC-00398,José,Thompson,valid.user275@example.net,+1-555-0475,Company 275 Inc,US,10275,active,Valid production-ready synthetic row 275
+SRC-00399,Søren,White,valid.user276@example.com,+1-555-0476,Company 276 Inc,CA,10276,active,Valid production-ready synthetic row 276
+SRC-00400,James,Harris,valid.user277@example.org,+1-555-0477,Company 277 Inc,UK,10277,active,Valid production-ready synthetic row 277
+SRC-00401,Mary,Sanchez,valid.user278@example.net,+1-555-0478,Company 278 Inc,US,10278,active,Valid production-ready synthetic row 278
+SRC-00402,Robert,Clark,valid.user279@example.com,+1-555-0479,Company 279 Inc,US,10279,active,Valid production-ready synthetic row 279
+SRC-00403,Bob9,Jones9,,+1-555-0309,Beta Technologies 9,US,10003,active,Synthetic fixture: empty required email
+SRC-00404,"  Patricia  ","  Ramirez  ",valid.user280@example.org,5550180,Company 280 Inc,CA,10280,active,Valid production-ready synthetic row 280
+SRC-00405,John,Lewis,valid.user281@example.net,+1-555-0481,Company 281 Inc,UK,10281,active,Valid production-ready synthetic row 281
+SRC-00406,Jennifer,Robinson,valid.user282@example.com,+1-555-0482,Company 282 Inc,US,10282,active,Valid production-ready synthetic row 282
+SRC-00407,Michael,Walker,valid.user283@example.org,+1-555-0483,Company 283 Inc,US,10283,active,Valid production-ready synthetic row 283
+SRC-00408,Linda,Müller,valid.user284@example.net,+1-555-0484,Company 284 Inc,CA,10284,active,Valid production-ready synthetic row 284
+SRC-00409,David,Renard,valid.user285@example.com,+1-555-0485,Company 285 Inc,UK,10285,inactive,Valid production-ready synthetic row 285
+SRC-00410,Elizabeth,Kierkegaard,valid.user286@example.org,+1-555-0486,Company 286 Inc,US,10286,active,Valid production-ready synthetic row 286
+SRC-00411,William,García,valid.user287@example.net,5550187,Company 287 Inc,US,10287,active,Valid production-ready synthetic row 287
+SRC-00412,Bob10,Jones10,,+1-555-0310,Beta Technologies 10,US,10003,active,Synthetic fixture: empty required email
+SRC-00413,Barbara,De La Cruz,valid.user288@example.com,+1-555-0488,Company 288 Inc,CA,10288,active,Valid production-ready synthetic row 288
+SRC-00414,Richard,Smith,valid.user289@example.org,+1-555-0489,Company 289 Inc,UK,10289,active,Valid production-ready synthetic row 289
+SRC-00415,"  Susan  ","  Johnson  ",valid.user290@example.net,+1-555-0490,Company 290 Inc,US,10290,active,Valid production-ready synthetic row 290
+SRC-00416,Joseph,Williams,valid.user291@example.com,+1-555-0491,Company 291 Inc,US,10291,active,Valid production-ready synthetic row 291
+SRC-00417,Jessica,Brown,valid.user292@example.org,+1-555-0492,Company 292 Inc,CA,10292,active,Valid production-ready synthetic row 292
+SRC-00418,Thomas,Jones,valid.user293@example.net,+1-555-0493,Company 293 Inc,UK,10293,active,Valid production-ready synthetic row 293
+SRC-00419,Sarah,Garcia,valid.user294@example.com,5550194,Company 294 Inc,US,10294,active,Valid production-ready synthetic row 294
+SRC-00420,Charles,Miller,valid.user295@example.org,+1-555-0495,Company 295 Inc,US,10295,active,Valid production-ready synthetic row 295
+SRC-00421,Bob11,Jones11,,+1-555-0311,Beta Technologies 11,US,10003,active,Synthetic fixture: empty required email
+SRC-00422,Karen,Davis,valid.user296@example.net,+1-555-0496,Company 296 Inc,CA,10296,active,Valid production-ready synthetic row 296
+SRC-00423,Christopher,Rodriguez,valid.user297@example.com,+1-555-0497,Company 297 Inc,UK,10297,active,Valid production-ready synthetic row 297
+SRC-00424,Nancy,Martinez,valid.user298@example.org,+1-555-0498,Company 298 Inc,US,10298,active,Valid production-ready synthetic row 298
+SRC-00425,Daniel,Hernandez,valid.user299@example.net,+1-555-0499,Company 299 Inc,US,10299,active,Valid production-ready synthetic row 299
+SRC-00426,"  Lisa  ","  Lopez  ",valid.user300@example.com,+1-555-0500,Company 300 Inc,CA,10300,inactive,Valid production-ready synthetic row 300
+SRC-00427,Matthew,Gonzalez,valid.user301@example.org,5550101,Company 301 Inc,UK,10301,active,Valid production-ready synthetic row 301
+SRC-00428,Betty,Wilson,valid.user302@example.net,+1-555-0502,Company 302 Inc,US,10302,active,Valid production-ready synthetic row 302
+SRC-00429,Anthony,Anderson,valid.user303@example.com,+1-555-0503,Company 303 Inc,US,10303,active,Valid production-ready synthetic row 303
+SRC-00430,Bob12,Jones12,,+1-555-0312,Beta Technologies 12,US,10003,active,Synthetic fixture: empty required email
+SRC-00431,Margaret,Thomas,valid.user304@example.org,+1-555-0504,Company 304 Inc,CA,10304,active,Valid production-ready synthetic row 304
+SRC-00432,Mark,Taylor,valid.user305@example.net,+1-555-0505,Company 305 Inc,UK,10305,active,Valid production-ready synthetic row 305
+SRC-00433,Sandra,Moore,valid.user306@example.com,+1-555-0506,Company 306 Inc,US,10306,active,Valid production-ready synthetic row 306
+SRC-00434,Donald,Jackson,valid.user307@example.org,+1-555-0507,Company 307 Inc,US,10307,active,Valid production-ready synthetic row 307
+SRC-00435,Ashley,Martin,valid.user308@example.net,5550108,Company 308 Inc,CA,10308,active,Valid production-ready synthetic row 308
+SRC-00436,Steven,Lee,valid.user309@example.com,+1-555-0509,Company 309 Inc,UK,10309,active,Valid production-ready synthetic row 309
+SRC-00437,"  Kimberly  ","  Perez  ",valid.user310@example.org,+1-555-0510,Company 310 Inc,US,10310,active,Valid production-ready synthetic row 310
+SRC-00438,Paul,Thompson,valid.user311@example.net,+1-555-0511,Company 311 Inc,US,10311,active,Valid production-ready synthetic row 311
+SRC-00439,Bob13,Jones13,,+1-555-0313,Beta Technologies 13,US,10003,active,Synthetic fixture: empty required email
+SRC-00440,Emily,White,valid.user312@example.com,+1-555-0512,Company 312 Inc,CA,10312,active,Valid production-ready synthetic row 312
+SRC-00441,Andrew,Harris,valid.user313@example.org,+1-555-0513,Company 313 Inc,UK,10313,active,Valid production-ready synthetic row 313
+SRC-00442,Donna,Sanchez,valid.user314@example.net,+1-555-0514,Company 314 Inc,US,10314,active,Valid production-ready synthetic row 314
+SRC-00443,Joshua,Clark,valid.user315@example.com,5550115,Company 315 Inc,US,10315,inactive,Valid production-ready synthetic row 315
+SRC-00444,Michelle,Ramirez,valid.user316@example.org,+1-555-0516,Company 316 Inc,CA,10316,active,Valid production-ready synthetic row 316
+SRC-00445,François,Lewis,valid.user317@example.net,+1-555-0517,Company 317 Inc,UK,10317,active,Valid production-ready synthetic row 317
+SRC-00446,Élodie,Robinson,valid.user318@example.com,+1-555-0518,Company 318 Inc,US,10318,active,Valid production-ready synthetic row 318
+SRC-00447,Patrick O'Brien,Walker,valid.user319@example.org,+1-555-0519,Company 319 Inc,US,10319,active,Valid production-ready synthetic row 319
+SRC-00448,Bob14,Jones14,,+1-555-0314,Beta Technologies 14,US,10003,active,Synthetic fixture: empty required email
+SRC-00449,"  Sean McDonald  ","  Müller  ",valid.user320@example.net,+1-555-0520,Company 320 Inc,CA,10320,active,Valid production-ready synthetic row 320
+SRC-00450,José,Renard,valid.user321@example.com,+1-555-0521,Company 321 Inc,UK,10321,active,Valid production-ready synthetic row 321
+SRC-00451,Søren,Kierkegaard,valid.user322@example.org,5550122,Company 322 Inc,US,10322,active,Valid production-ready synthetic row 322
+SRC-00452,James,García,valid.user323@example.net,+1-555-0523,Company 323 Inc,US,10323,active,Valid production-ready synthetic row 323
+SRC-00453,Mary,De La Cruz,valid.user324@example.com,+1-555-0524,Company 324 Inc,CA,10324,active,Valid production-ready synthetic row 324
+SRC-00454,Robert,Smith,valid.user325@example.org,+1-555-0525,Company 325 Inc,UK,10325,active,Valid production-ready synthetic row 325
+SRC-00455,Patricia,Johnson,valid.user326@example.net,+1-555-0526,Company 326 Inc,US,10326,active,Valid production-ready synthetic row 326
+SRC-00456,John,Williams,valid.user327@example.com,+1-555-0527,Company 327 Inc,US,10327,active,Valid production-ready synthetic row 327
+SRC-00457,Bob15,Jones15,,+1-555-0315,Beta Technologies 15,US,10003,active,Synthetic fixture: empty required email
+SRC-00458,Jennifer,Brown,valid.user328@example.org,+1-555-0528,Company 328 Inc,CA,10328,active,Valid production-ready synthetic row 328
+SRC-00459,Michael,Jones,valid.user329@example.net,5550129,Company 329 Inc,UK,10329,active,Valid production-ready synthetic row 329
+SRC-00460,"  Linda  ","  Garcia  ",valid.user330@example.com,+1-555-0530,Company 330 Inc,US,10330,inactive,Valid production-ready synthetic row 330
+SRC-00461,David,Miller,valid.user331@example.org,+1-555-0531,Company 331 Inc,US,10331,active,Valid production-ready synthetic row 331
+SRC-00462,Elizabeth,Davis,valid.user332@example.net,+1-555-0532,Company 332 Inc,CA,10332,active,Valid production-ready synthetic row 332
+SRC-00463,William,Rodriguez,valid.user333@example.com,+1-555-0533,Company 333 Inc,UK,10333,active,Valid production-ready synthetic row 333
+SRC-00464,Barbara,Martinez,valid.user334@example.org,+1-555-0534,Company 334 Inc,US,10334,active,Valid production-ready synthetic row 334
+SRC-00465,Richard,Hernandez,valid.user335@example.net,+1-555-0535,Company 335 Inc,US,10335,active,Valid production-ready synthetic row 335
+SRC-00466,John1,NoAt1,john.smith1.example.com,+1-555-0401,Gamma Ltd 1,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00467,Susan,Lopez,valid.user336@example.com,5550136,Company 336 Inc,CA,10336,active,Valid production-ready synthetic row 336
+SRC-00468,Joseph,Gonzalez,valid.user337@example.org,+1-555-0537,Company 337 Inc,UK,10337,active,Valid production-ready synthetic row 337
+SRC-00469,Jessica,Wilson,valid.user338@example.net,+1-555-0538,Company 338 Inc,US,10338,active,Valid production-ready synthetic row 338
+SRC-00470,Thomas,Anderson,valid.user339@example.com,+1-555-0539,Company 339 Inc,US,10339,active,Valid production-ready synthetic row 339
+SRC-00471,"  Sarah  ","  Thomas  ",valid.user340@example.org,+1-555-0540,Company 340 Inc,CA,10340,active,Valid production-ready synthetic row 340
+SRC-00472,Charles,Taylor,valid.user341@example.net,+1-555-0541,Company 341 Inc,UK,10341,active,Valid production-ready synthetic row 341
+SRC-00473,Karen,Moore,valid.user342@example.com,+1-555-0542,Company 342 Inc,US,10342,active,Valid production-ready synthetic row 342
+SRC-00474,Christopher,Jackson,valid.user343@example.org,5550143,Company 343 Inc,US,10343,active,Valid production-ready synthetic row 343
+SRC-00475,John2,NoAt2,john.smith2.example.com,+1-555-0402,Gamma Ltd 2,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00476,Nancy,Martin,valid.user344@example.net,+1-555-0544,Company 344 Inc,CA,10344,active,Valid production-ready synthetic row 344
+SRC-00477,Daniel,Lee,valid.user345@example.com,+1-555-0545,Company 345 Inc,UK,10345,inactive,Valid production-ready synthetic row 345
+SRC-00478,Lisa,Perez,valid.user346@example.org,+1-555-0546,Company 346 Inc,US,10346,active,Valid production-ready synthetic row 346
+SRC-00479,Matthew,Thompson,valid.user347@example.net,+1-555-0547,Company 347 Inc,US,10347,active,Valid production-ready synthetic row 347
+SRC-00480,Betty,White,valid.user348@example.com,+1-555-0548,Company 348 Inc,CA,10348,active,Valid production-ready synthetic row 348
+SRC-00481,Anthony,Harris,valid.user349@example.org,+1-555-0549,Company 349 Inc,UK,10349,active,Valid production-ready synthetic row 349
+SRC-00482,"  Margaret  ","  Sanchez  ",valid.user350@example.net,5550150,Company 350 Inc,US,10350,active,Valid production-ready synthetic row 350
+SRC-00483,Mark,Clark,valid.user351@example.com,+1-555-0551,Company 351 Inc,US,10351,active,Valid production-ready synthetic row 351
+SRC-00484,John3,NoAt3,john.smith3.example.com,+1-555-0403,Gamma Ltd 3,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00485,Sandra,Ramirez,valid.user352@example.org,+1-555-0552,Company 352 Inc,CA,10352,active,Valid production-ready synthetic row 352
+SRC-00486,Donald,Lewis,valid.user353@example.net,+1-555-0553,Company 353 Inc,UK,10353,active,Valid production-ready synthetic row 353
+SRC-00487,Ashley,Robinson,valid.user354@example.com,+1-555-0554,Company 354 Inc,US,10354,active,Valid production-ready synthetic row 354
+SRC-00488,Steven,Walker,valid.user355@example.org,+1-555-0555,Company 355 Inc,US,10355,active,Valid production-ready synthetic row 355
+SRC-00489,Kimberly,Müller,valid.user356@example.net,+1-555-0556,Company 356 Inc,CA,10356,active,Valid production-ready synthetic row 356
+SRC-00490,Paul,Renard,valid.user357@example.com,5550157,Company 357 Inc,UK,10357,active,Valid production-ready synthetic row 357
+SRC-00491,Emily,Kierkegaard,valid.user358@example.org,+1-555-0558,Company 358 Inc,US,10358,active,Valid production-ready synthetic row 358
+SRC-00492,Andrew,García,valid.user359@example.net,+1-555-0559,Company 359 Inc,US,10359,active,Valid production-ready synthetic row 359
+SRC-00493,John4,NoAt4,john.smith4.example.com,+1-555-0404,Gamma Ltd 4,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00494,"  Donna  ","  De La Cruz  ",valid.user360@example.com,+1-555-0560,Company 360 Inc,CA,10360,inactive,Valid production-ready synthetic row 360
+SRC-00495,Joshua,Smith,valid.user361@example.org,+1-555-0561,Company 361 Inc,UK,10361,active,Valid production-ready synthetic row 361
+SRC-00496,Michelle,Johnson,valid.user362@example.net,+1-555-0562,Company 362 Inc,US,10362,active,Valid production-ready synthetic row 362
+SRC-00497,François,Williams,valid.user363@example.com,+1-555-0563,Company 363 Inc,US,10363,active,Valid production-ready synthetic row 363
+SRC-00498,Élodie,Brown,valid.user364@example.org,5550164,Company 364 Inc,CA,10364,active,Valid production-ready synthetic row 364
+SRC-00499,Patrick O'Brien,Jones,valid.user365@example.net,+1-555-0565,Company 365 Inc,UK,10365,active,Valid production-ready synthetic row 365
+SRC-00500,Sean McDonald,Garcia,valid.user366@example.com,+1-555-0566,Company 366 Inc,US,10366,active,Valid production-ready synthetic row 366
+SRC-00501,CanonicalUser1,DuplicateTarget1,dup.target1@example.com,+1-555-1001,TargetCorp 1,US,20001,active,Original record to be deduplicated in step 5 (1)
+SRC-00502,John5,NoAt5,john.smith5.example.com,+1-555-0405,Gamma Ltd 5,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00503,CanonicalUser2,DuplicateTarget2,dup.target2@example.com,+1-555-1002,TargetCorp 2,US,20002,active,Original record to be deduplicated in step 5 (2)
+SRC-00504,CanonicalUser3,DuplicateTarget3,dup.target3@example.com,+1-555-1003,TargetCorp 3,US,20003,active,Original record to be deduplicated in step 5 (3)
+SRC-00505,CanonicalUser4,DuplicateTarget4,dup.target4@example.com,+1-555-1004,TargetCorp 4,US,20004,active,Original record to be deduplicated in step 5 (4)
+SRC-00506,CanonicalUser5,DuplicateTarget5,dup.target5@example.com,+1-555-1005,TargetCorp 5,US,20005,active,Original record to be deduplicated in step 5 (5)
+SRC-00507,CanonicalUser6,DuplicateTarget6,dup.target6@example.com,+1-555-1006,TargetCorp 6,US,20006,active,Original record to be deduplicated in step 5 (6)
+SRC-00508,CanonicalUser7,DuplicateTarget7,dup.target7@example.com,+1-555-1007,TargetCorp 7,US,20007,active,Original record to be deduplicated in step 5 (7)
+SRC-00509,CanonicalUser8,DuplicateTarget8,dup.target8@example.com,+1-555-1008,TargetCorp 8,US,20008,active,Original record to be deduplicated in step 5 (8)
+SRC-00510,CanonicalUser9,DuplicateTarget9,dup.target9@example.com,+1-555-1009,TargetCorp 9,US,20009,active,Original record to be deduplicated in step 5 (9)
+SRC-00511,John6,NoAt6,john.smith6.example.com,+1-555-0406,Gamma Ltd 6,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00512,CanonicalUser10,DuplicateTarget10,dup.target10@example.com,+1-555-1010,TargetCorp 10,US,20010,active,Original record to be deduplicated in step 5 (10)
+SRC-00513,CanonicalUser11,DuplicateTarget11,dup.target11@example.com,+1-555-1011,TargetCorp 11,US,20011,active,Original record to be deduplicated in step 5 (11)
+SRC-00514,CanonicalUser12,DuplicateTarget12,dup.target12@example.com,+1-555-1012,TargetCorp 12,US,20012,active,Original record to be deduplicated in step 5 (12)
+SRC-00515,CanonicalUser13,DuplicateTarget13,dup.target13@example.com,+1-555-1013,TargetCorp 13,US,20013,active,Original record to be deduplicated in step 5 (13)
+SRC-00516,CanonicalUser14,DuplicateTarget14,dup.target14@example.com,+1-555-1014,TargetCorp 14,US,20014,active,Original record to be deduplicated in step 5 (14)
+SRC-00517,CanonicalUser15,DuplicateTarget15,dup.target15@example.com,+1-555-1015,TargetCorp 15,US,20015,active,Original record to be deduplicated in step 5 (15)
+SRC-00518,CanonicalUser16,DuplicateTarget16,dup.target16@example.com,+1-555-1016,TargetCorp 16,US,20016,active,Original record to be deduplicated in step 5 (16)
+SRC-00519,CanonicalUser17,DuplicateTarget17,dup.target17@example.com,+1-555-1017,TargetCorp 17,US,20017,active,Original record to be deduplicated in step 5 (17)
+SRC-00520,John7,NoAt7,john.smith7.example.com,+1-555-0407,Gamma Ltd 7,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00521,CanonicalUser18,DuplicateTarget18,dup.target18@example.com,+1-555-1018,TargetCorp 18,US,20018,active,Original record to be deduplicated in step 5 (18)
+SRC-00522,CanonicalUser19,DuplicateTarget19,dup.target19@example.com,+1-555-1019,TargetCorp 19,US,20019,active,Original record to be deduplicated in step 5 (19)
+SRC-00523,CanonicalUser20,DuplicateTarget20,dup.target20@example.com,+1-555-1020,TargetCorp 20,US,20020,active,Original record to be deduplicated in step 5 (20)
+SRC-00524,CanonicalUser21,DuplicateTarget21,dup.target21@example.com,+1-555-1021,TargetCorp 21,US,20021,active,Original record to be deduplicated in step 5 (21)
+SRC-00525,CanonicalUser22,DuplicateTarget22,dup.target22@example.com,+1-555-1022,TargetCorp 22,US,20022,active,Original record to be deduplicated in step 5 (22)
+SRC-00526,CanonicalUser23,DuplicateTarget23,dup.target23@example.com,+1-555-1023,TargetCorp 23,US,20023,active,Original record to be deduplicated in step 5 (23)
+SRC-00527,CanonicalUser24,DuplicateTarget24,dup.target24@example.com,+1-555-1024,TargetCorp 24,US,20024,active,Original record to be deduplicated in step 5 (24)
+SRC-00528,CanonicalUser25,DuplicateTarget25,dup.target25@example.com,+1-555-1025,TargetCorp 25,US,20025,active,Original record to be deduplicated in step 5 (25)
+SRC-00529,John8,NoAt8,john.smith8.example.com,+1-555-0408,Gamma Ltd 8,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00530,CanonicalUser26,DuplicateTarget26,dup.target26@example.com,+1-555-1026,TargetCorp 26,US,20026,active,Original record to be deduplicated in step 5 (26)
+SRC-00531,CanonicalUser27,DuplicateTarget27,dup.target27@example.com,+1-555-1027,TargetCorp 27,US,20027,active,Original record to be deduplicated in step 5 (27)
+SRC-00532,CanonicalUser28,DuplicateTarget28,dup.target28@example.com,+1-555-1028,TargetCorp 28,US,20028,active,Original record to be deduplicated in step 5 (28)
+SRC-00533,CanonicalUser29,DuplicateTarget29,dup.target29@example.com,+1-555-1029,TargetCorp 29,US,20029,active,Original record to be deduplicated in step 5 (29)
+SRC-00534,CanonicalUser30,DuplicateTarget30,dup.target30@example.com,+1-555-1030,TargetCorp 30,US,20030,active,Original record to be deduplicated in step 5 (30)
+SRC-00535,CanonicalUser31,DuplicateTarget31,dup.target31@example.com,+1-555-1031,TargetCorp 31,US,20031,active,Original record to be deduplicated in step 5 (31)
+SRC-00536,CanonicalUser32,DuplicateTarget32,dup.target32@example.com,+1-555-1032,TargetCorp 32,US,20032,active,Original record to be deduplicated in step 5 (32)
+SRC-00537,CanonicalUser33,DuplicateTarget33,dup.target33@example.com,+1-555-1033,TargetCorp 33,US,20033,active,Original record to be deduplicated in step 5 (33)
+SRC-00538,John9,NoAt9,john.smith9.example.com,+1-555-0409,Gamma Ltd 9,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00539,CanonicalUser34,DuplicateTarget34,dup.target34@example.com,+1-555-1034,TargetCorp 34,US,20034,active,Original record to be deduplicated in step 5 (34)
+SRC-00540,CanonicalUser35,DuplicateTarget35,dup.target35@example.com,+1-555-1035,TargetCorp 35,US,20035,active,Original record to be deduplicated in step 5 (35)
+SRC-00541,CanonicalUser36,DuplicateTarget36,dup.target36@example.com,+1-555-1036,TargetCorp 36,US,20036,active,Original record to be deduplicated in step 5 (36)
+SRC-00542,CanonicalUser37,DuplicateTarget37,dup.target37@example.com,+1-555-1037,TargetCorp 37,US,20037,active,Original record to be deduplicated in step 5 (37)
+SRC-00543,CanonicalUser38,DuplicateTarget38,dup.target38@example.com,+1-555-1038,TargetCorp 38,US,20038,active,Original record to be deduplicated in step 5 (38)
+SRC-00544,CanonicalUser39,DuplicateTarget39,dup.target39@example.com,+1-555-1039,TargetCorp 39,US,20039,active,Original record to be deduplicated in step 5 (39)
+SRC-00545,CanonicalUser40,DuplicateTarget40,dup.target40@example.com,+1-555-1040,TargetCorp 40,US,20040,active,Original record to be deduplicated in step 5 (40)
+SRC-00546,CanonicalUser41,DuplicateTarget41,dup.target41@example.com,+1-555-1041,TargetCorp 41,US,20041,active,Original record to be deduplicated in step 5 (41)
+SRC-00547,John10,NoAt10,john.smith10.example.com,+1-555-0410,Gamma Ltd 10,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00548,CanonicalUser42,DuplicateTarget42,dup.target42@example.com,+1-555-1042,TargetCorp 42,US,20042,active,Original record to be deduplicated in step 5 (42)
+SRC-00549,CanonicalUser43,DuplicateTarget43,dup.target43@example.com,+1-555-1043,TargetCorp 43,US,20043,active,Original record to be deduplicated in step 5 (43)
+SRC-00550,CanonicalUser44,DuplicateTarget44,dup.target44@example.com,+1-555-1044,TargetCorp 44,US,20044,active,Original record to be deduplicated in step 5 (44)
+SRC-00551,CanonicalUser45,DuplicateTarget45,dup.target45@example.com,+1-555-1045,TargetCorp 45,US,20045,active,Original record to be deduplicated in step 5 (45)
+SRC-00552,CanonicalUser46,DuplicateTarget46,dup.target46@example.com,+1-555-1046,TargetCorp 46,US,20046,active,Original record to be deduplicated in step 5 (46)
+SRC-00553,CanonicalUser47,DuplicateTarget47,dup.target47@example.com,+1-555-1047,TargetCorp 47,US,20047,active,Original record to be deduplicated in step 5 (47)
+SRC-00554,CanonicalUser48,DuplicateTarget48,dup.target48@example.com,+1-555-1048,TargetCorp 48,US,20048,active,Original record to be deduplicated in step 5 (48)
+SRC-00555,CanonicalUser49,DuplicateTarget49,dup.target49@example.com,+1-555-1049,TargetCorp 49,US,20049,active,Original record to be deduplicated in step 5 (49)
+SRC-00556,John11,NoAt11,john.smith11.example.com,+1-555-0411,Gamma Ltd 11,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00557,CanonicalUser50,DuplicateTarget50,dup.target50@example.com,+1-555-1050,TargetCorp 50,US,20050,active,Original record to be deduplicated in step 5 (50)
+SRC-00558,CanonicalUser51,DuplicateTarget51,dup.target51@example.com,+1-555-1051,TargetCorp 51,US,20051,active,Original record to be deduplicated in step 5 (51)
+SRC-00559,CanonicalUser52,DuplicateTarget52,dup.target52@example.com,+1-555-1052,TargetCorp 52,US,20052,active,Original record to be deduplicated in step 5 (52)
+SRC-00560,CanonicalUser53,DuplicateTarget53,dup.target53@example.com,+1-555-1053,TargetCorp 53,US,20053,active,Original record to be deduplicated in step 5 (53)
+SRC-00561,CanonicalUser54,DuplicateTarget54,dup.target54@example.com,+1-555-1054,TargetCorp 54,US,20054,active,Original record to be deduplicated in step 5 (54)
+SRC-00562,CanonicalUser55,DuplicateTarget55,dup.target55@example.com,+1-555-1055,TargetCorp 55,US,20055,active,Original record to be deduplicated in step 5 (55)
+SRC-00563,CanonicalUser56,DuplicateTarget56,dup.target56@example.com,+1-555-1056,TargetCorp 56,US,20056,active,Original record to be deduplicated in step 5 (56)
+SRC-00564,CanonicalUser57,DuplicateTarget57,dup.target57@example.com,+1-555-1057,TargetCorp 57,US,20057,active,Original record to be deduplicated in step 5 (57)
+SRC-00565,John12,NoAt12,john.smith12.example.com,+1-555-0412,Gamma Ltd 12,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00566,CanonicalUser58,DuplicateTarget58,dup.target58@example.com,+1-555-1058,TargetCorp 58,US,20058,active,Original record to be deduplicated in step 5 (58)
+SRC-00567,CanonicalUser59,DuplicateTarget59,dup.target59@example.com,+1-555-1059,TargetCorp 59,US,20059,active,Original record to be deduplicated in step 5 (59)
+SRC-00568,CanonicalUser60,DuplicateTarget60,dup.target60@example.com,+1-555-1060,TargetCorp 60,US,20060,active,Original record to be deduplicated in step 5 (60)
+SRC-00569,CanonicalUser61,DuplicateTarget61,dup.target61@example.com,+1-555-1061,TargetCorp 61,US,20061,active,Original record to be deduplicated in step 5 (61)
+SRC-00570,CanonicalUser62,DuplicateTarget62,dup.target62@example.com,+1-555-1062,TargetCorp 62,US,20062,active,Original record to be deduplicated in step 5 (62)
+SRC-00571,CanonicalUser63,DuplicateTarget63,dup.target63@example.com,+1-555-1063,TargetCorp 63,US,20063,active,Original record to be deduplicated in step 5 (63)
+SRC-00572,CanonicalUser64,DuplicateTarget64,dup.target64@example.com,+1-555-1064,TargetCorp 64,US,20064,active,Original record to be deduplicated in step 5 (64)
+SRC-00573,CanonicalUser65,DuplicateTarget65,dup.target65@example.com,+1-555-1065,TargetCorp 65,US,20065,active,Original record to be deduplicated in step 5 (65)
+SRC-00574,John13,NoAt13,john.smith13.example.com,+1-555-0413,Gamma Ltd 13,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00575,CanonicalUser66,DuplicateTarget66,dup.target66@example.com,+1-555-1066,TargetCorp 66,US,20066,active,Original record to be deduplicated in step 5 (66)
+SRC-00576,CanonicalUser67,DuplicateTarget67,dup.target67@example.com,+1-555-1067,TargetCorp 67,US,20067,active,Original record to be deduplicated in step 5 (67)
+SRC-00577,CanonicalUser68,DuplicateTarget68,dup.target68@example.com,+1-555-1068,TargetCorp 68,US,20068,active,Original record to be deduplicated in step 5 (68)
+SRC-00578,CanonicalUser69,DuplicateTarget69,dup.target69@example.com,+1-555-1069,TargetCorp 69,US,20069,active,Original record to be deduplicated in step 5 (69)
+SRC-00579,CanonicalUser70,DuplicateTarget70,dup.target70@example.com,+1-555-1070,TargetCorp 70,US,20070,active,Original record to be deduplicated in step 5 (70)
+SRC-00580,CanonicalUser71,DuplicateTarget71,dup.target71@example.com,+1-555-1071,TargetCorp 71,US,20071,active,Original record to be deduplicated in step 5 (71)
+SRC-00581,CanonicalUser72,DuplicateTarget72,dup.target72@example.com,+1-555-1072,TargetCorp 72,US,20072,active,Original record to be deduplicated in step 5 (72)
+SRC-00582,CanonicalUser73,DuplicateTarget73,dup.target73@example.com,+1-555-1073,TargetCorp 73,US,20073,active,Original record to be deduplicated in step 5 (73)
+SRC-00583,John14,NoAt14,john.smith14.example.com,+1-555-0414,Gamma Ltd 14,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00584,CanonicalUser74,DuplicateTarget74,dup.target74@example.com,+1-555-1074,TargetCorp 74,US,20074,active,Original record to be deduplicated in step 5 (74)
+SRC-00585,CanonicalUser75,DuplicateTarget75,dup.target75@example.com,+1-555-1075,TargetCorp 75,US,20075,active,Original record to be deduplicated in step 5 (75)
+SRC-00586,CanonicalUser76,DuplicateTarget76,dup.target76@example.com,+1-555-1076,TargetCorp 76,US,20076,active,Original record to be deduplicated in step 5 (76)
+SRC-00587,CanonicalUser77,DuplicateTarget77,dup.target77@example.com,+1-555-1077,TargetCorp 77,US,20077,active,Original record to be deduplicated in step 5 (77)
+SRC-00588,CanonicalUser78,DuplicateTarget78,dup.target78@example.com,+1-555-1078,TargetCorp 78,US,20078,active,Original record to be deduplicated in step 5 (78)
+SRC-00589,CanonicalUser79,DuplicateTarget79,dup.target79@example.com,+1-555-1079,TargetCorp 79,US,20079,active,Original record to be deduplicated in step 5 (79)
+SRC-00590,CanonicalUser80,DuplicateTarget80,dup.target80@example.com,+1-555-1080,TargetCorp 80,US,20080,active,Original record to be deduplicated in step 5 (80)
+SRC-00591,José,Miller,valid.user367@example.org,+1-555-0567,Company 367 Inc,US,10367,active,Valid production-ready synthetic row 367
+SRC-00592,John15,NoAt15,john.smith15.example.com,+1-555-0415,Gamma Ltd 15,US,10004,active,Synthetic fixture: email missing @ sign (TS-05)
+SRC-00593,Søren,Davis,valid.user368@example.net,+1-555-0568,Company 368 Inc,CA,10368,active,Valid production-ready synthetic row 368
+SRC-00594,James,Rodriguez,valid.user369@example.com,+1-555-0569,Company 369 Inc,UK,10369,active,Valid production-ready synthetic row 369
+SRC-00595,"  Mary  ","  Martinez  ",valid.user370@example.org,+1-555-0570,Company 370 Inc,US,10370,active,Valid production-ready synthetic row 370
+SRC-00596,Robert,Hernandez,valid.user371@example.net,5550171,Company 371 Inc,US,10371,active,Valid production-ready synthetic row 371
+SRC-00597,Patricia,Lopez,valid.user372@example.com,+1-555-0572,Company 372 Inc,CA,10372,active,Valid production-ready synthetic row 372
+SRC-00598,John,Gonzalez,valid.user373@example.org,+1-555-0573,Company 373 Inc,UK,10373,active,Valid production-ready synthetic row 373
+SRC-00599,Jennifer,Wilson,valid.user374@example.net,+1-555-0574,Company 374 Inc,US,10374,active,Valid production-ready synthetic row 374
+SRC-00600,Michael,Anderson,valid.user375@example.com,+1-555-0575,Company 375 Inc,US,10375,inactive,Valid production-ready synthetic row 375
+SRC-00601,Multi1,AtSign1,user1@@example.org,+1-555-0501,Delta Corp 1,US,10005,active,Synthetic fixture: email with multiple @ signs
+SRC-00602,Linda,Thomas,valid.user376@example.org,+1-555-0576,Company 376 Inc,CA,10376,active,Valid production-ready synthetic row 376
+SRC-00603,David,Taylor,valid.user377@example.net,+1-555-0577,Company 377 Inc,UK,10377,active,Valid production-ready synthetic row 377
+SRC-00604,Elizabeth,Moore,valid.user378@example.com,5550178,Company 378 Inc,US,10378,active,Valid production-ready synthetic row 378
+SRC-00605,William,Jackson,valid.user379@example.org,+1-555-0579,Company 379 Inc,US,10379,active,Valid production-ready synthetic row 379
+SRC-00606,"  Barbara  ","  Martin  ",valid.user380@example.net,+1-555-0580,Company 380 Inc,CA,10380,active,Valid production-ready synthetic row 380
+SRC-00607,Richard,Lee,valid.user381@example.com,+1-555-0581,Company 381 Inc,UK,10381,active,Valid production-ready synthetic row 381
+SRC-00608,Susan,Perez,valid.user382@example.org,+1-555-0582,Company 382 Inc,US,10382,active,Valid production-ready synthetic row 382
+SRC-00609,Joseph,Thompson,valid.user383@example.net,+1-555-0583,Company 383 Inc,US,10383,active,Valid production-ready synthetic row 383
+SRC-00610,Multi2,AtSign2,user2@@example.org,+1-555-0502,Delta Corp 2,US,10005,active,Synthetic fixture: email with multiple @ signs
+SRC-00611,Jessica,White,valid.user384@example.com,+1-555-0584,Company 384 Inc,CA,10384,active,Valid production-ready synthetic row 384
+SRC-00612,Thomas,Harris,valid.user385@example.org,5550185,Company 385 Inc,UK,10385,active,Valid production-ready synthetic row 385
+SRC-00613,Sarah,Sanchez,valid.user386@example.net,+1-555-0586,Company 386 Inc,US,10386,active,Valid production-ready synthetic row 386
+SRC-00614,Charles,Clark,valid.user387@example.com,+1-555-0587,Company 387 Inc,US,10387,active,Valid production-ready synthetic row 387
+SRC-00615,Karen,Ramirez,valid.user388@example.org,+1-555-0588,Company 388 Inc,CA,10388,active,Valid production-ready synthetic row 388
+SRC-00616,Christopher,Lewis,valid.user389@example.net,+1-555-0589,Company 389 Inc,UK,10389,active,Valid production-ready synthetic row 389
+SRC-00617,"  Nancy  ","  Robinson  ",valid.user390@example.com,+1-555-0590,Company 390 Inc,US,10390,inactive,Valid production-ready synthetic row 390
+SRC-00618,Daniel,Walker,valid.user391@example.org,+1-555-0591,Company 391 Inc,US,10391,active,Valid production-ready synthetic row 391
+SRC-00619,Multi3,AtSign3,user3@@example.org,+1-555-0503,Delta Corp 3,US,10005,active,Synthetic fixture: email with multiple @ signs
+SRC-00620,Lisa,Müller,valid.user392@example.net,5550192,Company 392 Inc,CA,10392,active,Valid production-ready synthetic row 392
+SRC-00621,Matthew,Renard,valid.user393@example.com,+1-555-0593,Company 393 Inc,UK,10393,active,Valid production-ready synthetic row 393
+SRC-00622,Betty,Kierkegaard,valid.user394@example.org,+1-555-0594,Company 394 Inc,US,10394,active,Valid production-ready synthetic row 394
+SRC-00623,Anthony,García,valid.user395@example.net,+1-555-0595,Company 395 Inc,US,10395,active,Valid production-ready synthetic row 395
+SRC-00624,Margaret,De La Cruz,valid.user396@example.com,+1-555-0596,Company 396 Inc,CA,10396,active,Valid production-ready synthetic row 396
+SRC-00625,Mark,Smith,valid.user397@example.org,+1-555-0597,Company 397 Inc,UK,10397,active,Valid production-ready synthetic row 397
+SRC-00626,Sandra,Johnson,valid.user398@example.net,+1-555-0598,Company 398 Inc,US,10398,active,Valid production-ready synthetic row 398
+SRC-00627,Donald,Williams,valid.user399@example.com,5550199,Company 399 Inc,US,10399,active,Valid production-ready synthetic row 399
+SRC-00628,Multi4,AtSign4,user4@@example.org,+1-555-0504,Delta Corp 4,US,10005,active,Synthetic fixture: email with multiple @ signs
+SRC-00629,"  Ashley  ","  Brown  ",valid.user400@example.org,+1-555-0600,Company 400 Inc,CA,10400,active,Valid production-ready synthetic row 400
+SRC-00630,Steven,Jones,valid.user401@example.net,+1-555-0601,Company 401 Inc,UK,10401,active,Valid production-ready synthetic row 401
+SRC-00631,Kimberly,Garcia,valid.user402@example.com,+1-555-0602,Company 402 Inc,US,10402,active,Valid production-ready synthetic row 402
+SRC-00632,Paul,Miller,valid.user403@example.org,+1-555-0603,Company 403 Inc,US,10403,active,Valid production-ready synthetic row 403
+SRC-00633,Emily,Davis,valid.user404@example.net,+1-555-0604,Company 404 Inc,CA,10404,active,Valid production-ready synthetic row 404
+SRC-00634,Andrew,Rodriguez,valid.user405@example.com,+1-555-0605,Company 405 Inc,UK,10405,inactive,Valid production-ready synthetic row 405
+SRC-00635,Donna,Martinez,valid.user406@example.org,5550106,Company 406 Inc,US,10406,active,Valid production-ready synthetic row 406
+SRC-00636,Joshua,Hernandez,valid.user407@example.net,+1-555-0607,Company 407 Inc,US,10407,active,Valid production-ready synthetic row 407
+SRC-00637,Multi5,AtSign5,user5@@example.org,+1-555-0505,Delta Corp 5,US,10005,active,Synthetic fixture: email with multiple @ signs
+SRC-00638,Michelle,Lopez,valid.user408@example.com,+1-555-0608,Company 408 Inc,CA,10408,active,Valid production-ready synthetic row 408
+SRC-00639,François,Gonzalez,valid.user409@example.org,+1-555-0609,Company 409 Inc,UK,10409,active,Valid production-ready synthetic row 409
+SRC-00640,"  Élodie  ","  Wilson  ",valid.user410@example.net,+1-555-0610,Company 410 Inc,US,10410,active,Valid production-ready synthetic row 410
+SRC-00641,Patrick O'Brien,Anderson,valid.user411@example.com,+1-555-0611,Company 411 Inc,US,10411,active,Valid production-ready synthetic row 411
+SRC-00642,Sean McDonald,Thomas,valid.user412@example.org,+1-555-0612,Company 412 Inc,CA,10412,active,Valid production-ready synthetic row 412
+SRC-00643,José,Taylor,valid.user413@example.net,5550113,Company 413 Inc,UK,10413,active,Valid production-ready synthetic row 413
+SRC-00644,Søren,Moore,valid.user414@example.com,+1-555-0614,Company 414 Inc,US,10414,active,Valid production-ready synthetic row 414
+SRC-00645,James,Jackson,valid.user415@example.org,+1-555-0615,Company 415 Inc,US,10415,active,Valid production-ready synthetic row 415
+SRC-00646,NoDot1,Domain1,user1@localdomain,+1-555-0601,Epsilon LLC 1,US,10006,active,Synthetic fixture: email domain missing dot
+SRC-00647,Mary,Martin,valid.user416@example.net,+1-555-0616,Company 416 Inc,CA,10416,active,Valid production-ready synthetic row 416
+SRC-00648,Robert,Lee,valid.user417@example.com,+1-555-0617,Company 417 Inc,UK,10417,active,Valid production-ready synthetic row 417
+SRC-00649,Patricia,Perez,valid.user418@example.org,+1-555-0618,Company 418 Inc,US,10418,active,Valid production-ready synthetic row 418
+SRC-00650,John,Thompson,valid.user419@example.net,+1-555-0619,Company 419 Inc,US,10419,active,Valid production-ready synthetic row 419
+SRC-00651,"  Jennifer  ","  White  ",valid.user420@example.com,5550120,Company 420 Inc,CA,10420,inactive,Valid production-ready synthetic row 420
+SRC-00652,Michael,Harris,valid.user421@example.org,+1-555-0621,Company 421 Inc,UK,10421,active,Valid production-ready synthetic row 421
+SRC-00653,Linda,Sanchez,valid.user422@example.net,+1-555-0622,Company 422 Inc,US,10422,active,Valid production-ready synthetic row 422
+SRC-00654,David,Clark,valid.user423@example.com,+1-555-0623,Company 423 Inc,US,10423,active,Valid production-ready synthetic row 423
+SRC-00655,NoDot2,Domain2,user2@localdomain,+1-555-0602,Epsilon LLC 2,US,10006,active,Synthetic fixture: email domain missing dot
+SRC-00656,Elizabeth,Ramirez,valid.user424@example.org,+1-555-0624,Company 424 Inc,CA,10424,active,Valid production-ready synthetic row 424
+SRC-00657,William,Lewis,valid.user425@example.net,+1-555-0625,Company 425 Inc,UK,10425,active,Valid production-ready synthetic row 425
+SRC-00658,Barbara,Robinson,valid.user426@example.com,+1-555-0626,Company 426 Inc,US,10426,active,Valid production-ready synthetic row 426
+SRC-00659,Richard,Walker,valid.user427@example.org,5550127,Company 427 Inc,US,10427,active,Valid production-ready synthetic row 427
+SRC-00660,Susan,Müller,valid.user428@example.net,+1-555-0628,Company 428 Inc,CA,10428,active,Valid production-ready synthetic row 428
+SRC-00661,Joseph,Renard,valid.user429@example.com,+1-555-0629,Company 429 Inc,UK,10429,active,Valid production-ready synthetic row 429
+SRC-00662,"  Jessica  ","  Kierkegaard  ",valid.user430@example.org,+1-555-0630,Company 430 Inc,US,10430,active,Valid production-ready synthetic row 430
+SRC-00663,Thomas,García,valid.user431@example.net,+1-555-0631,Company 431 Inc,US,10431,active,Valid production-ready synthetic row 431
+SRC-00664,NoDot3,Domain3,user3@localdomain,+1-555-0603,Epsilon LLC 3,US,10006,active,Synthetic fixture: email domain missing dot
+SRC-00665,Sarah,De La Cruz,valid.user432@example.com,+1-555-0632,Company 432 Inc,CA,10432,active,Valid production-ready synthetic row 432
+SRC-00666,Charles,Smith,valid.user433@example.org,+1-555-0633,Company 433 Inc,UK,10433,active,Valid production-ready synthetic row 433
+SRC-00667,Karen,Johnson,valid.user434@example.net,5550134,Company 434 Inc,US,10434,active,Valid production-ready synthetic row 434
+SRC-00668,Christopher,Williams,valid.user435@example.com,+1-555-0635,Company 435 Inc,US,10435,inactive,Valid production-ready synthetic row 435
+SRC-00669,Nancy,Brown,valid.user436@example.org,+1-555-0636,Company 436 Inc,CA,10436,active,Valid production-ready synthetic row 436
+SRC-00670,Daniel,Jones,valid.user437@example.net,+1-555-0637,Company 437 Inc,UK,10437,active,Valid production-ready synthetic row 437
+SRC-00671,Lisa,Garcia,valid.user438@example.com,+1-555-0638,Company 438 Inc,US,10438,active,Valid production-ready synthetic row 438
+SRC-00672,Matthew,Miller,valid.user439@example.org,+1-555-0639,Company 439 Inc,US,10439,active,Valid production-ready synthetic row 439
+SRC-00673,NoDot4,Domain4,user4@localdomain,+1-555-0604,Epsilon LLC 4,US,10006,active,Synthetic fixture: email domain missing dot
+SRC-00674,"  Betty  ","  Davis  ",valid.user440@example.net,+1-555-0640,Company 440 Inc,CA,10440,active,Valid production-ready synthetic row 440
+SRC-00675,Anthony,Rodriguez,valid.user441@example.com,5550141,Company 441 Inc,UK,10441,active,Valid production-ready synthetic row 441
+SRC-00676,Margaret,Martinez,valid.user442@example.org,+1-555-0642,Company 442 Inc,US,10442,active,Valid production-ready synthetic row 442
+SRC-00677,Mark,Hernandez,valid.user443@example.net,+1-555-0643,Company 443 Inc,US,10443,active,Valid production-ready synthetic row 443
+SRC-00678,Sandra,Lopez,valid.user444@example.com,+1-555-0644,Company 444 Inc,CA,10444,active,Valid production-ready synthetic row 444
+SRC-00679,Donald,Gonzalez,valid.user445@example.org,+1-555-0645,Company 445 Inc,UK,10445,active,Valid production-ready synthetic row 445
+SRC-00680,Ashley,Wilson,valid.user446@example.net,+1-555-0646,Company 446 Inc,US,10446,active,Valid production-ready synthetic row 446
+SRC-00681,Steven,Anderson,valid.user447@example.com,+1-555-0647,Company 447 Inc,US,10447,active,Valid production-ready synthetic row 447
+SRC-00682,NoDot5,Domain5,user5@localdomain,+1-555-0605,Epsilon LLC 5,US,10006,active,Synthetic fixture: email domain missing dot
+SRC-00683,Kimberly,Thomas,valid.user448@example.org,5550148,Company 448 Inc,CA,10448,active,Valid production-ready synthetic row 448
+SRC-00684,Paul,Taylor,valid.user449@example.net,+1-555-0649,Company 449 Inc,UK,10449,active,Valid production-ready synthetic row 449
+SRC-00685,"  Emily  ","  Moore  ",valid.user450@example.com,+1-555-0650,Company 450 Inc,US,10450,inactive,Valid production-ready synthetic row 450
+SRC-00686,Andrew,Jackson,valid.user451@example.org,+1-555-0651,Company 451 Inc,US,10451,active,Valid production-ready synthetic row 451
+SRC-00687,Donna,Martin,valid.user452@example.net,+1-555-0652,Company 452 Inc,CA,10452,active,Valid production-ready synthetic row 452
+SRC-00688,Joshua,Lee,valid.user453@example.com,+1-555-0653,Company 453 Inc,UK,10453,active,Valid production-ready synthetic row 453
+SRC-00689,Michelle,Perez,valid.user454@example.org,+1-555-0654,Company 454 Inc,US,10454,active,Valid production-ready synthetic row 454
+SRC-00690,François,Thompson,valid.user455@example.net,5550155,Company 455 Inc,US,10455,active,Valid production-ready synthetic row 455
+SRC-00691,PhoneLetter1,User1,phone.letter1@example.net,+1-555-CALL-01,Zeta Holdings 1,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00692,Élodie,White,valid.user456@example.com,+1-555-0656,Company 456 Inc,CA,10456,active,Valid production-ready synthetic row 456
+SRC-00693,Patrick O'Brien,Harris,valid.user457@example.org,+1-555-0657,Company 457 Inc,UK,10457,active,Valid production-ready synthetic row 457
+SRC-00694,Sean McDonald,Sanchez,valid.user458@example.net,+1-555-0658,Company 458 Inc,US,10458,active,Valid production-ready synthetic row 458
+SRC-00695,José,Clark,valid.user459@example.com,+1-555-0659,Company 459 Inc,US,10459,active,Valid production-ready synthetic row 459
+SRC-00696,"  Søren  ","  Ramirez  ",valid.user460@example.org,+1-555-0660,Company 460 Inc,CA,10460,active,Valid production-ready synthetic row 460
+SRC-00697,James,Lewis,valid.user461@example.net,+1-555-0661,Company 461 Inc,UK,10461,active,Valid production-ready synthetic row 461
+SRC-00698,Mary,Robinson,valid.user462@example.com,5550162,Company 462 Inc,US,10462,active,Valid production-ready synthetic row 462
+SRC-00699,Robert,Walker,valid.user463@example.org,+1-555-0663,Company 463 Inc,US,10463,active,Valid production-ready synthetic row 463
+SRC-00700,PhoneLetter2,User2,phone.letter2@example.net,+1-555-CALL-02,Zeta Holdings 2,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00701,Patricia,Müller,valid.user464@example.net,+1-555-0664,Company 464 Inc,CA,10464,active,Valid production-ready synthetic row 464
+SRC-00702,John,Renard,valid.user465@example.com,+1-555-0665,Company 465 Inc,UK,10465,inactive,Valid production-ready synthetic row 465
+SRC-00703,Jennifer,Kierkegaard,valid.user466@example.org,+1-555-0666,Company 466 Inc,US,10466,active,Valid production-ready synthetic row 466
+SRC-00704,Michael,García,valid.user467@example.net,+1-555-0667,Company 467 Inc,US,10467,active,Valid production-ready synthetic row 467
+SRC-00705,Linda,De La Cruz,valid.user468@example.com,+1-555-0668,Company 468 Inc,CA,10468,active,Valid production-ready synthetic row 468
+SRC-00706,David,Smith,valid.user469@example.org,5550169,Company 469 Inc,UK,10469,active,Valid production-ready synthetic row 469
+SRC-00707,"  Elizabeth  ","  Johnson  ",valid.user470@example.net,+1-555-0670,Company 470 Inc,US,10470,active,Valid production-ready synthetic row 470
+SRC-00708,William,Williams,valid.user471@example.com,+1-555-0671,Company 471 Inc,US,10471,active,Valid production-ready synthetic row 471
+SRC-00709,PhoneLetter3,User3,phone.letter3@example.net,+1-555-CALL-03,Zeta Holdings 3,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00710,Barbara,Brown,valid.user472@example.org,+1-555-0672,Company 472 Inc,CA,10472,active,Valid production-ready synthetic row 472
+SRC-00711,Richard,Jones,valid.user473@example.net,+1-555-0673,Company 473 Inc,UK,10473,active,Valid production-ready synthetic row 473
+SRC-00712,Susan,Garcia,valid.user474@example.com,+1-555-0674,Company 474 Inc,US,10474,active,Valid production-ready synthetic row 474
+SRC-00713,Joseph,Miller,valid.user475@example.org,+1-555-0675,Company 475 Inc,US,10475,active,Valid production-ready synthetic row 475
+SRC-00714,Jessica,Davis,valid.user476@example.net,5550176,Company 476 Inc,CA,10476,active,Valid production-ready synthetic row 476
+SRC-00715,Thomas,Rodriguez,valid.user477@example.com,+1-555-0677,Company 477 Inc,UK,10477,active,Valid production-ready synthetic row 477
+SRC-00716,Sarah,Martinez,valid.user478@example.org,+1-555-0678,Company 478 Inc,US,10478,active,Valid production-ready synthetic row 478
+SRC-00717,Charles,Hernandez,valid.user479@example.net,+1-555-0679,Company 479 Inc,US,10479,active,Valid production-ready synthetic row 479
+SRC-00718,PhoneLetter4,User4,phone.letter4@example.net,+1-555-CALL-04,Zeta Holdings 4,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00719,"  Karen  ","  Lopez  ",valid.user480@example.com,+1-555-0680,Company 480 Inc,CA,10480,inactive,Valid production-ready synthetic row 480
+SRC-00720,Christopher,Gonzalez,valid.user481@example.org,+1-555-0681,Company 481 Inc,UK,10481,active,Valid production-ready synthetic row 481
+SRC-00721,Nancy,Wilson,valid.user482@example.net,+1-555-0682,Company 482 Inc,US,10482,active,Valid production-ready synthetic row 482
+SRC-00722,Daniel,Anderson,valid.user483@example.com,5550183,Company 483 Inc,US,10483,active,Valid production-ready synthetic row 483
+SRC-00723,Lisa,Thomas,valid.user484@example.org,+1-555-0684,Company 484 Inc,CA,10484,active,Valid production-ready synthetic row 484
+SRC-00724,Matthew,Taylor,valid.user485@example.net,+1-555-0685,Company 485 Inc,UK,10485,active,Valid production-ready synthetic row 485
+SRC-00725,Betty,Moore,valid.user486@example.com,+1-555-0686,Company 486 Inc,US,10486,active,Valid production-ready synthetic row 486
+SRC-00726,Anthony,Jackson,valid.user487@example.org,+1-555-0687,Company 487 Inc,US,10487,active,Valid production-ready synthetic row 487
+SRC-00727,PhoneLetter5,User5,phone.letter5@example.net,+1-555-CALL-05,Zeta Holdings 5,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00728,Margaret,Martin,valid.user488@example.net,+1-555-0688,Company 488 Inc,CA,10488,active,Valid production-ready synthetic row 488
+SRC-00729,Mark,Lee,valid.user489@example.com,+1-555-0689,Company 489 Inc,UK,10489,active,Valid production-ready synthetic row 489
+SRC-00730,"  Sandra  ","  Perez  ",valid.user490@example.org,5550190,Company 490 Inc,US,10490,active,Valid production-ready synthetic row 490
+SRC-00731,Donald,Thompson,valid.user491@example.net,+1-555-0691,Company 491 Inc,US,10491,active,Valid production-ready synthetic row 491
+SRC-00732,Ashley,White,valid.user492@example.com,+1-555-0692,Company 492 Inc,CA,10492,active,Valid production-ready synthetic row 492
+SRC-00733,Steven,Harris,valid.user493@example.org,+1-555-0693,Company 493 Inc,UK,10493,active,Valid production-ready synthetic row 493
+SRC-00734,Kimberly,Sanchez,valid.user494@example.net,+1-555-0694,Company 494 Inc,US,10494,active,Valid production-ready synthetic row 494
+SRC-00735,Paul,Clark,valid.user495@example.com,+1-555-0695,Company 495 Inc,US,10495,inactive,Valid production-ready synthetic row 495
+SRC-00736,PhoneLetter6,User6,phone.letter6@example.net,+1-555-CALL-06,Zeta Holdings 6,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00737,Emily,Ramirez,valid.user496@example.org,+1-555-0696,Company 496 Inc,CA,10496,active,Valid production-ready synthetic row 496
+SRC-00738,Andrew,Lewis,valid.user497@example.net,5550197,Company 497 Inc,UK,10497,active,Valid production-ready synthetic row 497
+SRC-00739,Donna,Robinson,valid.user498@example.com,+1-555-0698,Company 498 Inc,US,10498,active,Valid production-ready synthetic row 498
+SRC-00740,Joshua,Walker,valid.user499@example.org,+1-555-0699,Company 499 Inc,US,10499,active,Valid production-ready synthetic row 499
+SRC-00741,"  Michelle  ","  Müller  ",valid.user500@example.net,+1-555-0700,Company 500 Inc,CA,10500,active,Valid production-ready synthetic row 500
+SRC-00742,François,Renard,valid.user501@example.com,+1-555-0701,Company 501 Inc,UK,10501,active,Valid production-ready synthetic row 501
+SRC-00743,Élodie,Kierkegaard,valid.user502@example.org,+1-555-0702,Company 502 Inc,US,10502,active,Valid production-ready synthetic row 502
+SRC-00744,Patrick O'Brien,García,valid.user503@example.net,+1-555-0703,Company 503 Inc,US,10503,active,Valid production-ready synthetic row 503
+SRC-00745,PhoneLetter7,User7,phone.letter7@example.net,+1-555-CALL-07,Zeta Holdings 7,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00746,Sean McDonald,De La Cruz,valid.user504@example.com,5550104,Company 504 Inc,CA,10504,active,Valid production-ready synthetic row 504
+SRC-00747,José,Smith,valid.user505@example.org,+1-555-0705,Company 505 Inc,UK,10505,active,Valid production-ready synthetic row 505
+SRC-00748,Søren,Johnson,valid.user506@example.net,+1-555-0706,Company 506 Inc,US,10506,active,Valid production-ready synthetic row 506
+SRC-00749,James,Williams,valid.user507@example.com,+1-555-0707,Company 507 Inc,US,10507,active,Valid production-ready synthetic row 507
+SRC-00750,Mary,Brown,valid.user508@example.org,+1-555-0708,Company 508 Inc,CA,10508,active,Valid production-ready synthetic row 508
+SRC-00751,Robert,Jones,valid.user509@example.net,+1-555-0709,Company 509 Inc,UK,10509,active,Valid production-ready synthetic row 509
+SRC-00752,"  Patricia  ","  Garcia  ",valid.user510@example.com,+1-555-0710,Company 510 Inc,US,10510,inactive,Valid production-ready synthetic row 510
+SRC-00753,John,Miller,valid.user511@example.org,5550111,Company 511 Inc,US,10511,active,Valid production-ready synthetic row 511
+SRC-00754,PhoneLetter8,User8,phone.letter8@example.net,+1-555-CALL-08,Zeta Holdings 8,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00755,Jennifer,Davis,valid.user512@example.net,+1-555-0712,Company 512 Inc,CA,10512,active,Valid production-ready synthetic row 512
+SRC-00756,Michael,Rodriguez,valid.user513@example.com,+1-555-0713,Company 513 Inc,UK,10513,active,Valid production-ready synthetic row 513
+SRC-00757,Linda,Martinez,valid.user514@example.org,+1-555-0714,Company 514 Inc,US,10514,active,Valid production-ready synthetic row 514
+SRC-00758,David,Hernandez,valid.user515@example.net,+1-555-0715,Company 515 Inc,US,10515,active,Valid production-ready synthetic row 515
+SRC-00759,Elizabeth,Lopez,valid.user516@example.com,+1-555-0716,Company 516 Inc,CA,10516,active,Valid production-ready synthetic row 516
+SRC-00760,William,Gonzalez,valid.user517@example.org,+1-555-0717,Company 517 Inc,UK,10517,active,Valid production-ready synthetic row 517
+SRC-00761,Barbara,Wilson,valid.user518@example.net,5550118,Company 518 Inc,US,10518,active,Valid production-ready synthetic row 518
+SRC-00762,Richard,Anderson,valid.user519@example.com,+1-555-0719,Company 519 Inc,US,10519,active,Valid production-ready synthetic row 519
+SRC-00763,PhoneLetter9,User9,phone.letter9@example.net,+1-555-CALL-09,Zeta Holdings 9,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00764,"  Susan  ","  Thomas  ",valid.user520@example.org,+1-555-0720,Company 520 Inc,CA,10520,active,Valid production-ready synthetic row 520
+SRC-00765,Joseph,Taylor,valid.user521@example.net,+1-555-0721,Company 521 Inc,UK,10521,active,Valid production-ready synthetic row 521
+SRC-00766,Jessica,Moore,valid.user522@example.com,+1-555-0722,Company 522 Inc,US,10522,active,Valid production-ready synthetic row 522
+SRC-00767,Thomas,Jackson,valid.user523@example.org,+1-555-0723,Company 523 Inc,US,10523,active,Valid production-ready synthetic row 523
+SRC-00768,Sarah,Martin,valid.user524@example.net,+1-555-0724,Company 524 Inc,CA,10524,active,Valid production-ready synthetic row 524
+SRC-00769,Charles,Lee,valid.user525@example.com,5550125,Company 525 Inc,UK,10525,inactive,Valid production-ready synthetic row 525
+SRC-00770,Karen,Perez,valid.user526@example.org,+1-555-0726,Company 526 Inc,US,10526,active,Valid production-ready synthetic row 526
+SRC-00771,Christopher,Thompson,valid.user527@example.net,+1-555-0727,Company 527 Inc,US,10527,active,Valid production-ready synthetic row 527
+SRC-00772,PhoneLetter10,User10,phone.letter10@example.net,+1-555-CALL-10,Zeta Holdings 10,US,10007,active,Synthetic fixture: phone containing letters
+SRC-00773,Nancy,White,valid.user528@example.com,+1-555-0728,Company 528 Inc,CA,10528,active,Valid production-ready synthetic row 528
+SRC-00774,Daniel,Harris,valid.user529@example.org,+1-555-0729,Company 529 Inc,UK,10529,active,Valid production-ready synthetic row 529
+SRC-00775,"  Lisa  ","  Sanchez  ",valid.user530@example.net,+1-555-0730,Company 530 Inc,US,10530,active,Valid production-ready synthetic row 530
+SRC-00776,Matthew,Clark,valid.user531@example.com,+1-555-0731,Company 531 Inc,US,10531,active,Valid production-ready synthetic row 531
+SRC-00777,Betty,Ramirez,valid.user532@example.org,5550132,Company 532 Inc,CA,10532,active,Valid production-ready synthetic row 532
+SRC-00778,Anthony,Lewis,valid.user533@example.net,+1-555-0733,Company 533 Inc,UK,10533,active,Valid production-ready synthetic row 533
+SRC-00779,Margaret,Robinson,valid.user534@example.com,+1-555-0734,Company 534 Inc,US,10534,active,Valid production-ready synthetic row 534
+SRC-00780,Mark,Walker,valid.user535@example.org,+1-555-0735,Company 535 Inc,US,10535,active,Valid production-ready synthetic row 535
+SRC-00781,ShortPhone1,User1,short.phone1@example.net,123,Eta Partners 1,US,10008,active,Synthetic fixture: phone too short
+SRC-00782,Sandra,Müller,valid.user536@example.net,+1-555-0736,Company 536 Inc,CA,10536,active,Valid production-ready synthetic row 536
+SRC-00783,Donald,Renard,valid.user537@example.com,+1-555-0737,Company 537 Inc,UK,10537,active,Valid production-ready synthetic row 537
+SRC-00784,Ashley,Kierkegaard,valid.user538@example.org,+1-555-0738,Company 538 Inc,US,10538,active,Valid production-ready synthetic row 538
+SRC-00785,Steven,García,valid.user539@example.net,5550139,Company 539 Inc,US,10539,active,Valid production-ready synthetic row 539
+SRC-00786,"  Kimberly  ","  De La Cruz  ",valid.user540@example.com,+1-555-0740,Company 540 Inc,CA,10540,inactive,Valid production-ready synthetic row 540
+SRC-00787,Paul,Smith,valid.user541@example.org,+1-555-0741,Company 541 Inc,UK,10541,active,Valid production-ready synthetic row 541
+SRC-00788,Emily,Johnson,valid.user542@example.net,+1-555-0742,Company 542 Inc,US,10542,active,Valid production-ready synthetic row 542
+SRC-00789,Andrew,Williams,valid.user543@example.com,+1-555-0743,Company 543 Inc,US,10543,active,Valid production-ready synthetic row 543
+SRC-00790,ShortPhone2,User2,short.phone2@example.net,123,Eta Partners 2,US,10008,active,Synthetic fixture: phone too short
+SRC-00791,Donna,Brown,valid.user544@example.org,+1-555-0744,Company 544 Inc,CA,10544,active,Valid production-ready synthetic row 544
+SRC-00792,Joshua,Jones,valid.user545@example.net,+1-555-0745,Company 545 Inc,UK,10545,active,Valid production-ready synthetic row 545
+SRC-00793,Michelle,Garcia,valid.user546@example.com,5550146,Company 546 Inc,US,10546,active,Valid production-ready synthetic row 546
+SRC-00794,François,Miller,valid.user547@example.org,+1-555-0747,Company 547 Inc,US,10547,active,Valid production-ready synthetic row 547
+SRC-00795,Élodie,Davis,valid.user548@example.net,+1-555-0748,Company 548 Inc,CA,10548,active,Valid production-ready synthetic row 548
+SRC-00796,Patrick O'Brien,Rodriguez,valid.user549@example.com,+1-555-0749,Company 549 Inc,UK,10549,active,Valid production-ready synthetic row 549
+SRC-00797,"  Sean McDonald  ","  Martinez  ",valid.user550@example.org,+1-555-0750,Company 550 Inc,US,10550,active,Valid production-ready synthetic row 550
+SRC-00798,José,Hernandez,valid.user551@example.net,+1-555-0751,Company 551 Inc,US,10551,active,Valid production-ready synthetic row 551
+SRC-00799,ShortPhone3,User3,short.phone3@example.net,123,Eta Partners 3,US,10008,active,Synthetic fixture: phone too short
+SRC-00800,Søren,Lopez,valid.user552@example.com,+1-555-0752,Company 552 Inc,CA,10552,active,Valid production-ready synthetic row 552
+SRC-00801,James,Gonzalez,valid.user553@example.org,5550153,Company 553 Inc,UK,10553,active,Valid production-ready synthetic row 553
+SRC-00802,Mary,Wilson,valid.user554@example.net,+1-555-0754,Company 554 Inc,US,10554,active,Valid production-ready synthetic row 554
+SRC-00803,Robert,Anderson,valid.user555@example.com,+1-555-0755,Company 555 Inc,US,10555,inactive,Valid production-ready synthetic row 555
+SRC-00804,Patricia,Thomas,valid.user556@example.org,+1-555-0756,Company 556 Inc,CA,10556,active,Valid production-ready synthetic row 556
+SRC-00805,John,Taylor,valid.user557@example.net,+1-555-0757,Company 557 Inc,UK,10557,active,Valid production-ready synthetic row 557
+SRC-00806,Jennifer,Moore,valid.user558@example.com,+1-555-0758,Company 558 Inc,US,10558,active,Valid production-ready synthetic row 558
+SRC-00807,Michael,Jackson,valid.user559@example.org,+1-555-0759,Company 559 Inc,US,10559,active,Valid production-ready synthetic row 559
+SRC-00808,ShortPhone4,User4,short.phone4@example.net,123,Eta Partners 4,US,10008,active,Synthetic fixture: phone too short
+SRC-00809,"  Linda  ","  Martin  ",valid.user560@example.net,5550160,Company 560 Inc,CA,10560,active,Valid production-ready synthetic row 560
+SRC-00810,David,Lee,valid.user561@example.com,+1-555-0761,Company 561 Inc,UK,10561,active,Valid production-ready synthetic row 561
+SRC-00811,Elizabeth,Perez,valid.user562@example.org,+1-555-0762,Company 562 Inc,US,10562,active,Valid production-ready synthetic row 562
+SRC-00812,William,Thompson,valid.user563@example.net,+1-555-0763,Company 563 Inc,US,10563,active,Valid production-ready synthetic row 563
+SRC-00813,Barbara,White,valid.user564@example.com,+1-555-0764,Company 564 Inc,CA,10564,active,Valid production-ready synthetic row 564
+SRC-00814,Richard,Harris,valid.user565@example.org,+1-555-0765,Company 565 Inc,UK,10565,active,Valid production-ready synthetic row 565
+SRC-00815,Susan,Sanchez,valid.user566@example.net,+1-555-0766,Company 566 Inc,US,10566,active,Valid production-ready synthetic row 566
+SRC-00816,Joseph,Clark,valid.user567@example.com,5550167,Company 567 Inc,US,10567,active,Valid production-ready synthetic row 567
+SRC-00817,ShortPhone5,User5,short.phone5@example.net,123,Eta Partners 5,US,10008,active,Synthetic fixture: phone too short
+SRC-00818,Jessica,Ramirez,valid.user568@example.org,+1-555-0768,Company 568 Inc,CA,10568,active,Valid production-ready synthetic row 568
+SRC-00819,Thomas,Lewis,valid.user569@example.net,+1-555-0769,Company 569 Inc,UK,10569,active,Valid production-ready synthetic row 569
+SRC-00820,"  Sarah  ","  Robinson  ",valid.user570@example.com,+1-555-0770,Company 570 Inc,US,10570,inactive,Valid production-ready synthetic row 570
+SRC-00821,Charles,Walker,valid.user571@example.org,+1-555-0771,Company 571 Inc,US,10571,active,Valid production-ready synthetic row 571
+SRC-00822,Karen,Müller,valid.user572@example.net,+1-555-0772,Company 572 Inc,CA,10572,active,Valid production-ready synthetic row 572
+SRC-00823,Christopher,Renard,valid.user573@example.com,+1-555-0773,Company 573 Inc,UK,10573,active,Valid production-ready synthetic row 573
+SRC-00824,Nancy,Kierkegaard,valid.user574@example.org,5550174,Company 574 Inc,US,10574,active,Valid production-ready synthetic row 574
+SRC-00825,Daniel,García,valid.user575@example.net,+1-555-0775,Company 575 Inc,US,10575,active,Valid production-ready synthetic row 575
+SRC-00826,BadDate1,User1,bad.date1@example.com,+1-555-0701,Theta Inc 1,US,2024-02-31,active,Synthetic fixture: impossible calendar date in postal field
+SRC-00827,Lisa,De La Cruz,valid.user576@example.com,+1-555-0776,Company 576 Inc,CA,10576,active,Valid production-ready synthetic row 576
+SRC-00828,Matthew,Smith,valid.user577@example.org,+1-555-0777,Company 577 Inc,UK,10577,active,Valid production-ready synthetic row 577
+SRC-00829,Betty,Johnson,valid.user578@example.net,+1-555-0778,Company 578 Inc,US,10578,active,Valid production-ready synthetic row 578
+SRC-00830,Anthony,Williams,valid.user579@example.com,+1-555-0779,Company 579 Inc,US,10579,active,Valid production-ready synthetic row 579
+SRC-00831,"  Margaret  ","  Brown  ",valid.user580@example.org,+1-555-0780,Company 580 Inc,CA,10580,active,Valid production-ready synthetic row 580
+SRC-00832,Mark,Jones,valid.user581@example.net,5550181,Company 581 Inc,UK,10581,active,Valid production-ready synthetic row 581
+SRC-00833,Sandra,Garcia,valid.user582@example.com,+1-555-0782,Company 582 Inc,US,10582,active,Valid production-ready synthetic row 582
+SRC-00834,Donald,Miller,valid.user583@example.org,+1-555-0783,Company 583 Inc,US,10583,active,Valid production-ready synthetic row 583
+SRC-00835,BadDate2,User2,bad.date2@example.com,+1-555-0702,Theta Inc 2,US,2024-02-31,active,Synthetic fixture: impossible calendar date in postal field
+SRC-00836,Ashley,Davis,valid.user584@example.net,+1-555-0784,Company 584 Inc,CA,10584,active,Valid production-ready synthetic row 584
+SRC-00837,Steven,Rodriguez,valid.user585@example.com,+1-555-0785,Company 585 Inc,UK,10585,inactive,Valid production-ready synthetic row 585
+SRC-00838,Kimberly,Martinez,valid.user586@example.org,+1-555-0786,Company 586 Inc,US,10586,active,Valid production-ready synthetic row 586
+SRC-00839,Paul,Hernandez,valid.user587@example.net,+1-555-0787,Company 587 Inc,US,10587,active,Valid production-ready synthetic row 587
+SRC-00840,Emily,Lopez,valid.user588@example.com,5550188,Company 588 Inc,CA,10588,active,Valid production-ready synthetic row 588
+SRC-00841,Andrew,Gonzalez,valid.user589@example.org,+1-555-0789,Company 589 Inc,UK,10589,active,Valid production-ready synthetic row 589
+SRC-00842,"  Donna  ","  Wilson  ",valid.user590@example.net,+1-555-0790,Company 590 Inc,US,10590,active,Valid production-ready synthetic row 590
+SRC-00843,Joshua,Anderson,valid.user591@example.com,+1-555-0791,Company 591 Inc,US,10591,active,Valid production-ready synthetic row 591
+SRC-00844,BadDate3,User3,bad.date3@example.com,+1-555-0703,Theta Inc 3,US,2024-02-31,active,Synthetic fixture: impossible calendar date in postal field
+SRC-00845,Michelle,Thomas,valid.user592@example.org,+1-555-0792,Company 592 Inc,CA,10592,active,Valid production-ready synthetic row 592
+SRC-00846,François,Taylor,valid.user593@example.net,+1-555-0793,Company 593 Inc,UK,10593,active,Valid production-ready synthetic row 593
+SRC-00847,Élodie,Moore,valid.user594@example.com,+1-555-0794,Company 594 Inc,US,10594,active,Valid production-ready synthetic row 594
+SRC-00848,Patrick O'Brien,Jackson,valid.user595@example.org,5550195,Company 595 Inc,US,10595,active,Valid production-ready synthetic row 595
+SRC-00849,Sean McDonald,Martin,valid.user596@example.net,+1-555-0796,Company 596 Inc,CA,10596,active,Valid production-ready synthetic row 596
+SRC-00850,José,Lee,valid.user597@example.com,+1-555-0797,Company 597 Inc,UK,10597,active,Valid production-ready synthetic row 597
+SRC-00851,Søren,Perez,valid.user598@example.org,+1-555-0798,Company 598 Inc,US,10598,active,Valid production-ready synthetic row 598
+SRC-00852,James,Thompson,valid.user599@example.net,+1-555-0799,Company 599 Inc,US,10599,active,Valid production-ready synthetic row 599
+SRC-00853,BadDate4,User4,bad.date4@example.com,+1-555-0704,Theta Inc 4,US,2024-02-31,active,Synthetic fixture: impossible calendar date in postal field
+SRC-00854,"  Mary  ","  White  ",valid.user600@example.com,+1-555-0800,Company 600 Inc,CA,10600,inactive,Valid production-ready synthetic row 600
+SRC-00855,Robert,Harris,valid.user601@example.org,+1-555-0801,Company 601 Inc,UK,10601,active,Valid production-ready synthetic row 601
+SRC-00856,Patricia,Sanchez,valid.user602@example.net,5550102,Company 602 Inc,US,10602,active,Valid production-ready synthetic row 602
+SRC-00857,John,Clark,valid.user603@example.com,+1-555-0803,Company 603 Inc,US,10603,active,Valid production-ready synthetic row 603
+SRC-00858,Jennifer,Ramirez,valid.user604@example.org,+1-555-0804,Company 604 Inc,CA,10604,active,Valid production-ready synthetic row 604
+SRC-00859,Michael,Lewis,valid.user605@example.net,+1-555-0805,Company 605 Inc,UK,10605,active,Valid production-ready synthetic row 605
+SRC-00860,Linda,Robinson,valid.user606@example.com,+1-555-0806,Company 606 Inc,US,10606,active,Valid production-ready synthetic row 606
+SRC-00861,David,Walker,valid.user607@example.org,+1-555-0807,Company 607 Inc,US,10607,active,Valid production-ready synthetic row 607
+SRC-00862,BadDate5,User5,bad.date5@example.com,+1-555-0705,Theta Inc 5,US,2024-02-31,active,Synthetic fixture: impossible calendar date in postal field
+SRC-00863,Elizabeth,Müller,valid.user608@example.net,+1-555-0808,Company 608 Inc,CA,10608,active,Valid production-ready synthetic row 608
+SRC-00864,William,Renard,valid.user609@example.com,5550109,Company 609 Inc,UK,10609,active,Valid production-ready synthetic row 609
+SRC-00865,"  Barbara  ","  Kierkegaard  ",valid.user610@example.org,+1-555-0810,Company 610 Inc,US,10610,active,Valid production-ready synthetic row 610
+SRC-00866,Richard,García,valid.user611@example.net,+1-555-0811,Company 611 Inc,US,10611,active,Valid production-ready synthetic row 611
+SRC-00867,Susan,De La Cruz,valid.user612@example.com,+1-555-0812,Company 612 Inc,CA,10612,active,Valid production-ready synthetic row 612
+SRC-00868,Joseph,Smith,valid.user613@example.org,+1-555-0813,Company 613 Inc,UK,10613,active,Valid production-ready synthetic row 613
+SRC-00869,Jessica,Johnson,valid.user614@example.net,+1-555-0814,Company 614 Inc,US,10614,active,Valid production-ready synthetic row 614
+SRC-00870,Thomas,Williams,valid.user615@example.com,+1-555-0815,Company 615 Inc,US,10615,inactive,Valid production-ready synthetic row 615
+SRC-00871,BadStatus1,User1,bad.status1@example.com,+1-555-0801,Iota Group 1,US,10010,INVALID_STATUS_CODE_1,Synthetic fixture: malformed status string
+SRC-00872,Sarah,Brown,valid.user616@example.org,5550116,Company 616 Inc,CA,10616,active,Valid production-ready synthetic row 616
+SRC-00873,Charles,Jones,valid.user617@example.net,+1-555-0817,Company 617 Inc,UK,10617,active,Valid production-ready synthetic row 617
+SRC-00874,Karen,Garcia,valid.user618@example.com,+1-555-0818,Company 618 Inc,US,10618,active,Valid production-ready synthetic row 618
+SRC-00875,Christopher,Miller,valid.user619@example.org,+1-555-0819,Company 619 Inc,US,10619,active,Valid production-ready synthetic row 619
+SRC-00876,"  Nancy  ","  Davis  ",valid.user620@example.net,+1-555-0820,Company 620 Inc,CA,10620,active,Valid production-ready synthetic row 620
+SRC-00877,Daniel,Rodriguez,valid.user621@example.com,+1-555-0821,Company 621 Inc,UK,10621,active,Valid production-ready synthetic row 621
+SRC-00878,Lisa,Martinez,valid.user622@example.org,+1-555-0822,Company 622 Inc,US,10622,active,Valid production-ready synthetic row 622
+SRC-00879,Matthew,Hernandez,valid.user623@example.net,5550123,Company 623 Inc,US,10623,active,Valid production-ready synthetic row 623
+SRC-00880,BadStatus2,User2,bad.status2@example.com,+1-555-0802,Iota Group 2,US,10010,INVALID_STATUS_CODE_2,Synthetic fixture: malformed status string
+SRC-00881,Betty,Lopez,valid.user624@example.com,+1-555-0824,Company 624 Inc,CA,10624,active,Valid production-ready synthetic row 624
+SRC-00882,Anthony,Gonzalez,valid.user625@example.org,+1-555-0825,Company 625 Inc,UK,10625,active,Valid production-ready synthetic row 625
+SRC-00883,Margaret,Wilson,valid.user626@example.net,+1-555-0826,Company 626 Inc,US,10626,active,Valid production-ready synthetic row 626
+SRC-00884,Mark,Anderson,valid.user627@example.com,+1-555-0827,Company 627 Inc,US,10627,active,Valid production-ready synthetic row 627
+SRC-00885,Sandra,Thomas,valid.user628@example.org,+1-555-0828,Company 628 Inc,CA,10628,active,Valid production-ready synthetic row 628
+SRC-00886,Donald,Taylor,valid.user629@example.net,+1-555-0829,Company 629 Inc,UK,10629,active,Valid production-ready synthetic row 629
+SRC-00887,"  Ashley  ","  Moore  ",valid.user630@example.com,5550130,Company 630 Inc,US,10630,inactive,Valid production-ready synthetic row 630
+SRC-00888,Steven,Jackson,valid.user631@example.org,+1-555-0831,Company 631 Inc,US,10631,active,Valid production-ready synthetic row 631
+SRC-00889,BadStatus3,User3,bad.status3@example.com,+1-555-0803,Iota Group 3,US,10010,INVALID_STATUS_CODE_3,Synthetic fixture: malformed status string
+SRC-00890,Kimberly,Martin,valid.user632@example.net,+1-555-0832,Company 632 Inc,CA,10632,active,Valid production-ready synthetic row 632
+SRC-00891,Paul,Lee,valid.user633@example.com,+1-555-0833,Company 633 Inc,UK,10633,active,Valid production-ready synthetic row 633
+SRC-00892,Emily,Perez,valid.user634@example.org,+1-555-0834,Company 634 Inc,US,10634,active,Valid production-ready synthetic row 634
+SRC-00893,Andrew,Thompson,valid.user635@example.net,+1-555-0835,Company 635 Inc,US,10635,active,Valid production-ready synthetic row 635
+SRC-00894,Donna,White,valid.user636@example.com,+1-555-0836,Company 636 Inc,CA,10636,active,Valid production-ready synthetic row 636
+SRC-00895,Joshua,Harris,valid.user637@example.org,5550137,Company 637 Inc,UK,10637,active,Valid production-ready synthetic row 637
+SRC-00896,Michelle,Sanchez,valid.user638@example.net,+1-555-0838,Company 638 Inc,US,10638,active,Valid production-ready synthetic row 638
+SRC-00897,François,Clark,valid.user639@example.com,+1-555-0839,Company 639 Inc,US,10639,active,Valid production-ready synthetic row 639
+SRC-00898,BadStatus4,User4,bad.status4@example.com,+1-555-0804,Iota Group 4,US,10010,INVALID_STATUS_CODE_4,Synthetic fixture: malformed status string
+SRC-00899,"  Élodie  ","  Ramirez  ",valid.user640@example.org,+1-555-0840,Company 640 Inc,CA,10640,active,Valid production-ready synthetic row 640
+SRC-00900,Patrick O'Brien,Lewis,valid.user641@example.net,+1-555-0841,Company 641 Inc,UK,10641,active,Valid production-ready synthetic row 641
+SRC-00901,Sean McDonald,Robinson,valid.user642@example.com,+1-555-0842,Company 642 Inc,US,10642,active,Valid production-ready synthetic row 642
+SRC-00902,José,Walker,valid.user643@example.org,+1-555-0843,Company 643 Inc,US,10643,active,Valid production-ready synthetic row 643
+SRC-00903,Søren,Müller,valid.user644@example.net,5550144,Company 644 Inc,CA,10644,active,Valid production-ready synthetic row 644
+SRC-00904,James,Renard,valid.user645@example.com,+1-555-0845,Company 645 Inc,UK,10645,inactive,Valid production-ready synthetic row 645
+SRC-00905,Mary,Kierkegaard,valid.user646@example.org,+1-555-0846,Company 646 Inc,US,10646,active,Valid production-ready synthetic row 646
+SRC-00906,Robert,García,valid.user647@example.net,+1-555-0847,Company 647 Inc,US,10647,active,Valid production-ready synthetic row 647
+SRC-00907,BadStatus5,User5,bad.status5@example.com,+1-555-0805,Iota Group 5,US,10010,INVALID_STATUS_CODE_5,Synthetic fixture: malformed status string
+SRC-00908,Patricia,De La Cruz,valid.user648@example.com,+1-555-0848,Company 648 Inc,CA,10648,active,Valid production-ready synthetic row 648
+SRC-00909,John,Smith,valid.user649@example.org,+1-555-0849,Company 649 Inc,UK,10649,active,Valid production-ready synthetic row 649
+SRC-00910,"  Jennifer  ","  Johnson  ",valid.user650@example.net,+1-555-0850,Company 650 Inc,US,10650,active,Valid production-ready synthetic row 650
+SRC-00911,Michael,Williams,valid.user651@example.com,5550151,Company 651 Inc,US,10651,active,Valid production-ready synthetic row 651
+SRC-00912,Linda,Brown,valid.user652@example.org,+1-555-0852,Company 652 Inc,CA,10652,active,Valid production-ready synthetic row 652
+SRC-00913,David,Jones,valid.user653@example.net,+1-555-0853,Company 653 Inc,UK,10653,active,Valid production-ready synthetic row 653
+SRC-00914,Elizabeth,Garcia,valid.user654@example.com,+1-555-0854,Company 654 Inc,US,10654,active,Valid production-ready synthetic row 654
+SRC-00915,William,Miller,valid.user655@example.org,+1-555-0855,Company 655 Inc,US,10655,active,Valid production-ready synthetic row 655
+SRC-00916,FormulaThreat1,User1,formula1@example.org,+1-555-0901,Kappa Enterprises 1,US,10011,active,=cmd|' /C calc'!A0
+SRC-00917,Barbara,Davis,valid.user656@example.net,+1-555-0856,Company 656 Inc,CA,10656,active,Valid production-ready synthetic row 656
+SRC-00918,Richard,Rodriguez,valid.user657@example.com,+1-555-0857,Company 657 Inc,UK,10657,active,Valid production-ready synthetic row 657
+SRC-00919,Susan,Martinez,valid.user658@example.org,5550158,Company 658 Inc,US,10658,active,Valid production-ready synthetic row 658
+SRC-00920,Joseph,Hernandez,valid.user659@example.net,+1-555-0859,Company 659 Inc,US,10659,active,Valid production-ready synthetic row 659
+SRC-00921,"  Jessica  ","  Lopez  ",valid.user660@example.com,+1-555-0860,Company 660 Inc,CA,10660,inactive,Valid production-ready synthetic row 660
+SRC-00922,Thomas,Gonzalez,valid.user661@example.org,+1-555-0861,Company 661 Inc,UK,10661,active,Valid production-ready synthetic row 661
+SRC-00923,Sarah,Wilson,valid.user662@example.net,+1-555-0862,Company 662 Inc,US,10662,active,Valid production-ready synthetic row 662
+SRC-00924,Charles,Anderson,valid.user663@example.com,+1-555-0863,Company 663 Inc,US,10663,active,Valid production-ready synthetic row 663
+SRC-00925,FormulaThreat2,User2,formula2@example.org,+1-555-0902,Kappa Enterprises 2,US,10011,active,+2+2=4
+SRC-00926,Karen,Thomas,valid.user664@example.org,+1-555-0864,Company 664 Inc,CA,10664,active,Valid production-ready synthetic row 664
+SRC-00927,Christopher,Taylor,valid.user665@example.net,5550165,Company 665 Inc,UK,10665,active,Valid production-ready synthetic row 665
+SRC-00928,Nancy,Moore,valid.user666@example.com,+1-555-0866,Company 666 Inc,US,10666,active,Valid production-ready synthetic row 666
+SRC-00929,Daniel,Jackson,valid.user667@example.org,+1-555-0867,Company 667 Inc,US,10667,active,Valid production-ready synthetic row 667
+SRC-00930,Lisa,Martin,valid.user668@example.net,+1-555-0868,Company 668 Inc,CA,10668,active,Valid production-ready synthetic row 668
+SRC-00931,Matthew,Lee,valid.user669@example.com,+1-555-0869,Company 669 Inc,UK,10669,active,Valid production-ready synthetic row 669
+SRC-00932,"  Betty  ","  Perez  ",valid.user670@example.org,+1-555-0870,Company 670 Inc,US,10670,active,Valid production-ready synthetic row 670
+SRC-00933,Anthony,Thompson,valid.user671@example.net,+1-555-0871,Company 671 Inc,US,10671,active,Valid production-ready synthetic row 671
+SRC-00934,FormulaThreat3,User3,formula3@example.org,+1-555-0903,Kappa Enterprises 3,US,10011,active,@SUM(A1:B10)
+SRC-00935,Margaret,White,valid.user672@example.com,5550172,Company 672 Inc,CA,10672,active,Valid production-ready synthetic row 672
+SRC-00936,Mark,Harris,valid.user673@example.org,+1-555-0873,Company 673 Inc,UK,10673,active,Valid production-ready synthetic row 673
+SRC-00937,Sandra,Sanchez,valid.user674@example.net,+1-555-0874,Company 674 Inc,US,10674,active,Valid production-ready synthetic row 674
+SRC-00938,Donald,Clark,valid.user675@example.com,+1-555-0875,Company 675 Inc,US,10675,inactive,Valid production-ready synthetic row 675
+SRC-00939,Ashley,Ramirez,valid.user676@example.org,+1-555-0876,Company 676 Inc,CA,10676,active,Valid production-ready synthetic row 676
+SRC-00940,Steven,Lewis,valid.user677@example.net,+1-555-0877,Company 677 Inc,UK,10677,active,Valid production-ready synthetic row 677
+SRC-00941,Kimberly,Robinson,valid.user678@example.com,+1-555-0878,Company 678 Inc,US,10678,active,Valid production-ready synthetic row 678
+SRC-00942,Paul,Walker,valid.user679@example.org,5550179,Company 679 Inc,US,10679,active,Valid production-ready synthetic row 679
+SRC-00943,FormulaThreat4,User4,formula4@example.org,+1-555-0904,Kappa Enterprises 4,US,10011,active,-12345+HYPERLINK('http://example.com')
+SRC-00944,"  Emily  ","  Müller  ",valid.user680@example.net,+1-555-0880,Company 680 Inc,CA,10680,active,Valid production-ready synthetic row 680
+SRC-00945,Andrew,Renard,valid.user681@example.com,+1-555-0881,Company 681 Inc,UK,10681,active,Valid production-ready synthetic row 681
+SRC-00946,Donna,Kierkegaard,valid.user682@example.org,+1-555-0882,Company 682 Inc,US,10682,active,Valid production-ready synthetic row 682
+SRC-00947,Joshua,García,valid.user683@example.net,+1-555-0883,Company 683 Inc,US,10683,active,Valid production-ready synthetic row 683
+SRC-00948,Michelle,De La Cruz,valid.user684@example.com,+1-555-0884,Company 684 Inc,CA,10684,active,Valid production-ready synthetic row 684
+SRC-00949,François,Smith,valid.user685@example.org,+1-555-0885,Company 685 Inc,UK,10685,active,Valid production-ready synthetic row 685
+SRC-00950,Élodie,Johnson,valid.user686@example.net,5550186,Company 686 Inc,US,10686,active,Valid production-ready synthetic row 686
+SRC-00951,Patrick O'Brien,Williams,valid.user687@example.com,+1-555-0887,Company 687 Inc,US,10687,active,Valid production-ready synthetic row 687
+SRC-00952,FormulaThreat5,User5,formula5@example.org,+1-555-0905,Kappa Enterprises 5,US,10011,active,	=1+1
+SRC-00953,Sean McDonald,Brown,valid.user688@example.org,+1-555-0888,Company 688 Inc,CA,10688,active,Valid production-ready synthetic row 688
+SRC-00954,José,Jones,valid.user689@example.net,+1-555-0889,Company 689 Inc,UK,10689,active,Valid production-ready synthetic row 689
+SRC-00955,"  Søren  ","  Garcia  ",valid.user690@example.com,+1-555-0890,Company 690 Inc,US,10690,inactive,Valid production-ready synthetic row 690
+SRC-00956,James,Miller,valid.user691@example.org,+1-555-0891,Company 691 Inc,US,10691,active,Valid production-ready synthetic row 691
+SRC-00957,Mary,Davis,valid.user692@example.net,+1-555-0892,Company 692 Inc,CA,10692,active,Valid production-ready synthetic row 692
+SRC-00958,Robert,Rodriguez,valid.user693@example.com,5550193,Company 693 Inc,UK,10693,active,Valid production-ready synthetic row 693
+SRC-00959,Patricia,Martinez,valid.user694@example.org,+1-555-0894,Company 694 Inc,US,10694,active,Valid production-ready synthetic row 694
+SRC-00960,John,Hernandez,valid.user695@example.net,+1-555-0895,Company 695 Inc,US,10695,active,Valid production-ready synthetic row 695
+SRC-00961,FormulaThreat6,User6,formula6@example.org,+1-555-0906,Kappa Enterprises 6,US,10011,active,=SYSTEM('whoami')
+SRC-00962,Jennifer,Lopez,valid.user696@example.com,+1-555-0896,Company 696 Inc,CA,10696,active,Valid production-ready synthetic row 696
+SRC-00963,Michael,Gonzalez,valid.user697@example.org,+1-555-0897,Company 697 Inc,UK,10697,active,Valid production-ready synthetic row 697
+SRC-00964,Linda,Wilson,valid.user698@example.net,+1-555-0898,Company 698 Inc,US,10698,active,Valid production-ready synthetic row 698
+SRC-00965,David,Anderson,valid.user699@example.com,+1-555-0899,Company 699 Inc,US,10699,active,Valid production-ready synthetic row 699
+SRC-00966,"  Elizabeth  ","  Thomas  ",valid.user700@example.org,5550100,Company 700 Inc,CA,10700,active,Valid production-ready synthetic row 700
+SRC-00967,William,Taylor,valid.user701@example.net,+1-555-0901,Company 701 Inc,UK,10701,active,Valid production-ready synthetic row 701
+SRC-00968,Barbara,Moore,valid.user702@example.com,+1-555-0902,Company 702 Inc,US,10702,active,Valid production-ready synthetic row 702
+SRC-00969,Richard,Jackson,valid.user703@example.org,+1-555-0903,Company 703 Inc,US,10703,active,Valid production-ready synthetic row 703
+SRC-00970,FormulaThreat7,User7,formula7@example.org,+1-555-0907,Kappa Enterprises 7,US,10011,active,+cmd|'/c calc'!A0
+SRC-00971,Susan,Martin,valid.user704@example.net,+1-555-0904,Company 704 Inc,CA,10704,active,Valid production-ready synthetic row 704
+SRC-00972,Joseph,Lee,valid.user705@example.com,+1-555-0905,Company 705 Inc,UK,10705,inactive,Valid production-ready synthetic row 705
+SRC-00973,Jessica,Perez,valid.user706@example.org,+1-555-0906,Company 706 Inc,US,10706,active,Valid production-ready synthetic row 706
+SRC-00974,Thomas,Thompson,valid.user707@example.net,5550107,Company 707 Inc,US,10707,active,Valid production-ready synthetic row 707
+SRC-00975,Sarah,White,valid.user708@example.com,+1-555-0908,Company 708 Inc,CA,10708,active,Valid production-ready synthetic row 708
+SRC-00976,Charles,Harris,valid.user709@example.org,+1-555-0909,Company 709 Inc,UK,10709,active,Valid production-ready synthetic row 709
+SRC-00977,"  Karen  ","  Sanchez  ",valid.user710@example.net,+1-555-0910,Company 710 Inc,US,10710,active,Valid production-ready synthetic row 710
+SRC-00978,Christopher,Clark,valid.user711@example.com,+1-555-0911,Company 711 Inc,US,10711,active,Valid production-ready synthetic row 711
+SRC-00979,FormulaThreat8,User8,formula8@example.org,+1-555-0908,Kappa Enterprises 8,US,10011,active,@IMPORT('https://example.com/evil')
+SRC-00980,Nancy,Ramirez,valid.user712@example.org,+1-555-0912,Company 712 Inc,CA,10712,active,Valid production-ready synthetic row 712
+SRC-00981,Daniel,Lewis,valid.user713@example.net,+1-555-0913,Company 713 Inc,UK,10713,active,Valid production-ready synthetic row 713
+SRC-00982,Lisa,Robinson,valid.user714@example.com,5550114,Company 714 Inc,US,10714,active,Valid production-ready synthetic row 714
+SRC-00983,Matthew,Walker,valid.user715@example.org,+1-555-0915,Company 715 Inc,US,10715,active,Valid production-ready synthetic row 715
+SRC-00984,Betty,Müller,valid.user716@example.net,+1-555-0916,Company 716 Inc,CA,10716,active,Valid production-ready synthetic row 716
+SRC-00985,Anthony,Renard,valid.user717@example.com,+1-555-0917,Company 717 Inc,UK,10717,active,Valid production-ready synthetic row 717
+SRC-00986,Margaret,Kierkegaard,valid.user718@example.org,+1-555-0918,Company 718 Inc,US,10718,active,Valid production-ready synthetic row 718
+SRC-00987,Mark,García,valid.user719@example.net,+1-555-0919,Company 719 Inc,US,10719,active,Valid production-ready synthetic row 719
+SRC-00988,FormulaThreat9,User9,formula9@example.org,+1-555-0909,Kappa Enterprises 9,US,10011,active,-2+5*10
+SRC-00989,"  Sandra  ","  De La Cruz  ",valid.user720@example.com,+1-555-0920,Company 720 Inc,CA,10720,inactive,Valid production-ready synthetic row 720
+SRC-00990,Donald,Smith,valid.user721@example.org,5550121,Company 721 Inc,UK,10721,active,Valid production-ready synthetic row 721
+SRC-00991,Ashley,Johnson,valid.user722@example.net,+1-555-0922,Company 722 Inc,US,10722,active,Valid production-ready synthetic row 722
+SRC-00992,Steven,Williams,valid.user723@example.com,+1-555-0923,Company 723 Inc,US,10723,active,Valid production-ready synthetic row 723
+SRC-00993,Kimberly,Brown,valid.user724@example.org,+1-555-0924,Company 724 Inc,CA,10724,active,Valid production-ready synthetic row 724
+SRC-00994,Paul,Jones,valid.user725@example.net,+1-555-0925,Company 725 Inc,UK,10725,active,Valid production-ready synthetic row 725
+SRC-00995,Emily,Garcia,valid.user726@example.com,+1-555-0926,Company 726 Inc,US,10726,active,Valid production-ready synthetic row 726
+SRC-00996,Andrew,Miller,valid.user727@example.org,+1-555-0927,Company 727 Inc,US,10727,active,Valid production-ready synthetic row 727
+SRC-00997,FormulaThreat10,User10,formula10@example.org,+1-555-0910,Kappa Enterprises 10,US,10011,active,"=CONCATENATE('A','B')"
+SRC-00998,Donna,Davis,valid.user728@example.net,5550128,Company 728 Inc,CA,10728,active,Valid production-ready synthetic row 728
+SRC-00999,Joshua,Rodriguez,valid.user729@example.com,+1-555-0929,Company 729 Inc,UK,10729,active,Valid production-ready synthetic row 729
+SRC-01000,"  Michelle  ","  Martinez  ",valid.user730@example.org,+1-555-0930,Company 730 Inc,US,10730,active,Valid production-ready synthetic row 730
