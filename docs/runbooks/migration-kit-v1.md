@@ -271,3 +271,18 @@ Every compensation decision is audited durably in PostgreSQL:
    - Completed compensation actions remain stamped `compensated` in the append-only journal.
    - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
    - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
+
+### 6. KIT-14 Operator Workflow (Screens)
+
+The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides:
+
+1. Batch list (`/kit/batches`) with loading/empty/error states.
+2. Four-step new batch wizard (`/kit/batches/new`): upload/create → profile → mapping/rules → dry-run/load.
+3. Profile report (`/kit/batches/:batchId/profile`).
+4. Mapping & rules (`/kit/batches/:batchId/mapping`).
+5. Duplicate review (`/kit/batches/:batchId/duplicates`).
+6. Run result (`/kit/batches/:batchId/result`).
+7. Reconciliation (`/kit/batches/:batchId/reconciliation`).
+8. Reject list with paged, formula-safe CSV export (`/kit/batches/:batchId/rejects`).
+
+State-transition actions are disabled until prerequisites pass; load requires a current dry-run pass and operator role permission. Synthetic data only.
