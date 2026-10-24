@@ -18,15 +18,21 @@ import {
   Erp3IdParamSchema,
   InvoiceListQuerySchema,
 } from "@clearshift/contracts";
+import { requireErp3Policy } from "../policies/authorization.js";
+import { auditRequest, type Erp3AuditService } from "../services/audit.js";
 import type { Erp3Service } from "../services/erp3.service.js";
 
 export const invoiceRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
+  auditService: Erp3AuditService;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+  const auditService = opts.auditService;
 
   // GET /invoices (paginated list/search)
-  fastify.get("/invoices", async (request, reply) => {
+  fastify.get("/invoices", {
+    preHandler: [requireErp3Policy("INVOICES_READ", auditService)],
+  }, async (request, reply) => {
     const parsedQuery = InvoiceListQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
       const correlationId =
@@ -52,7 +58,9 @@ export const invoiceRoutes: FastifyPluginAsync<{
   });
 
   // Minimal by-ID read-back for mutation verification (list/search is #27 scope)
-  fastify.get("/invoices/:id", async (request, reply) => {
+  fastify.get("/invoices/:id", {
+    preHandler: [requireErp3Policy("INVOICES_READ", auditService)],
+  }, async (request, reply) => {
     const parsedParams = Erp3IdParamSchema.safeParse(request.params);
     if (!parsedParams.success) {
       const correlationId =
@@ -78,7 +86,9 @@ export const invoiceRoutes: FastifyPluginAsync<{
   });
 
   // POST /invoices
-  fastify.post("/invoices", async (request, reply) => {
+  fastify.post("/invoices", {
+    preHandler: [requireErp3Policy("INVOICES_CREATE", auditService)],
+  }, async (request, reply) => {
     const idempotencyHeader = request.headers["idempotency-key"] as
       | string
       | undefined;
@@ -127,10 +137,26 @@ export const invoiceRoutes: FastifyPluginAsync<{
         record: parsed.data as unknown as Record<string, unknown>,
       });
       const invoice = await service.getInvoiceById(importRes.target_id);
+      if (!importRes.prior_result) {
+        await auditRequest(auditService, request, {
+          action: "load.requested",
+          targetEntity: "invoice",
+          targetId: invoice.id,
+          batchId: parsed.data.batch_id,
+          result: "success",
+          metadata: { module: "erp-3", rowCount: 1 },
+        });
+      }
       return reply.status(importRes.prior_result ? 200 : 201).send(invoice);
     }
 
     const created = await service.createInvoice(parsed.data);
+    await auditRequest(auditService, request, {
+      action: "erp.invoice.created",
+      targetEntity: "invoice",
+      targetId: created.id,
+      result: "success",
+    });
     return reply.status(201).send(created);
   });
 };
