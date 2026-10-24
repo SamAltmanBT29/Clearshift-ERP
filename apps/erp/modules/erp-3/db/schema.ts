@@ -29,7 +29,9 @@ import {
   uniqueIndex,
   index,
   text,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module-scoped PostgreSQL schema (namespace isolation)
@@ -83,6 +85,10 @@ export const salesOrders = erp3Schema.table(
     index('sales_orders_customer_idx').on(table.customer_golden_id),
     index('sales_orders_status_idx').on(table.status),
     index('sales_orders_date_idx').on(table.order_date),
+    check('sales_orders_number_not_empty', sql`length(trim(${table.order_number})) > 0`),
+    check('sales_orders_subtotal_non_negative', sql`${table.subtotal} >= 0`),
+    check('sales_orders_tax_total_non_negative', sql`${table.tax_total} >= 0`),
+    check('sales_orders_total_non_negative', sql`${table.total} >= 0`),
   ],
 );
 
@@ -106,8 +112,13 @@ export const soLines = erp3Schema.table(
     created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('so_lines_order_line_unique').on(table.order_id, table.line_number),
     index('so_lines_order_id_idx').on(table.order_id),
-    uniqueIndex('so_lines_order_line_idx').on(table.order_id, table.line_number),
+    check('so_lines_quantity_positive', sql`${table.quantity} > 0`),
+    check('so_lines_unit_price_non_negative', sql`${table.unit_price} >= 0`),
+    check('so_lines_tax_rate_range', sql`${table.tax_rate} >= 0 AND ${table.tax_rate} <= 100`),
+    check('so_lines_tax_amount_non_negative', sql`${table.tax_amount} >= 0`),
+    check('so_lines_line_total_non_negative', sql`${table.line_total} >= 0`),
   ],
 );
 
@@ -140,6 +151,11 @@ export const invoices = erp3Schema.table(
     index('invoices_customer_idx').on(table.customer_golden_id),
     index('invoices_status_idx').on(table.status),
     index('invoices_due_date_idx').on(table.due_date),
+    check('invoices_number_not_empty', sql`length(trim(${table.invoice_number})) > 0`),
+    check('invoices_due_date_after_or_equal_invoice_date', sql`${table.due_date} >= ${table.invoice_date}`),
+    check('invoices_subtotal_non_negative', sql`${table.subtotal} >= 0`),
+    check('invoices_tax_total_non_negative', sql`${table.tax_total} >= 0`),
+    check('invoices_total_non_negative', sql`${table.total} >= 0`),
   ],
 );
 
@@ -163,8 +179,13 @@ export const invoiceLines = erp3Schema.table(
     created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('invoice_lines_invoice_line_unique').on(table.invoice_id, table.line_number),
     index('invoice_lines_invoice_id_idx').on(table.invoice_id),
-    uniqueIndex('invoice_lines_invoice_line_idx').on(table.invoice_id, table.line_number),
+    check('invoice_lines_quantity_positive', sql`${table.quantity} > 0`),
+    check('invoice_lines_unit_price_non_negative', sql`${table.unit_price} >= 0`),
+    check('invoice_lines_tax_rate_range', sql`${table.tax_rate} >= 0 AND ${table.tax_rate} <= 100`),
+    check('invoice_lines_tax_amount_non_negative', sql`${table.tax_amount} >= 0`),
+    check('invoice_lines_line_total_non_negative', sql`${table.line_total} >= 0`),
   ],
 );
 
@@ -189,6 +210,7 @@ export const payments = erp3Schema.table(
   (table) => [
     index('payments_invoice_id_idx').on(table.invoice_id),
     index('payments_date_idx').on(table.payment_date),
+    check('payments_amount_positive', sql`${table.amount} > 0`),
   ],
 );
 
@@ -214,10 +236,18 @@ export const importReceipts = erp3Schema.table(
     created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('erp3_import_receipts_key_unique').on(table.idempotency_key),
-    index('erp3_import_receipts_batch_row_idx').on(table.batch_id, table.source_row),
+    uniqueIndex('import_receipts_erp3_idempotency_key_unique').on(table.idempotency_key),
+    index('import_receipts_erp3_batch_row_idx').on(table.batch_id, table.source_row),
   ],
 );
+
+// Aliases for consistent naming across modules (erp2Vendors, erp5Employees, etc.)
+export const erp3SalesOrders = salesOrders;
+export const erp3SoLines = soLines;
+export const erp3Invoices = invoices;
+export const erp3InvoiceLines = invoiceLines;
+export const erp3Payments = payments;
+export const erp3ImportReceipts = importReceipts;
 
 export type SalesOrderRecord = typeof salesOrders.$inferSelect;
 export type SoLineRecord = typeof soLines.$inferSelect;

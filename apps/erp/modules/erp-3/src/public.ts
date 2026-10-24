@@ -5,7 +5,27 @@ export interface SalesOrderPublicSummary {
   id: string;
   orderNumber: string;
   customerGoldenId: string;
+  status?: string;
+  currency?: string;
   total: string;
+}
+
+export interface InvoicePublicSummary {
+  id: string;
+  invoiceNumber: string;
+  orderId: string | null;
+  customerGoldenId: string;
+  status: string;
+  currency: string;
+  total: string;
+}
+
+export interface PaymentPublicSummary {
+  id: string;
+  invoiceId: string;
+  amount: string;
+  method: string;
+  paidAt: string;
 }
 
 export class Erp3ReferenceResolver implements ReferenceResolver {
@@ -39,15 +59,44 @@ export class Erp3ReferenceResolver implements ReferenceResolver {
     entityType: string,
     id: string,
   ): Promise<T | null> {
-    if (this.repository && entityType === "sales_order") {
-      const order = await this.repository.getSalesOrderById(id);
-      if (!order) return null;
-      return {
-        id: order.id,
-        orderNumber: order.order_number,
-        customerGoldenId: order.customer_golden_id,
-        total: order.total,
-      } as unknown as T;
+    if (this.repository) {
+      if (entityType === "sales_order") {
+        const order = await this.repository.getSalesOrderById(id);
+        if (!order) return null;
+        return {
+          id: order.id,
+          orderNumber: order.order_number,
+          customerGoldenId: order.customer_golden_id,
+          status: order.status,
+          currency: order.currency,
+          total: order.total,
+        } as unknown as T;
+      }
+      if (entityType === "invoice") {
+        const invoice = await this.repository.getInvoiceById(id);
+        if (!invoice) return null;
+        return {
+          id: invoice.id,
+          invoiceNumber: invoice.invoice_number,
+          orderId: invoice.order_id,
+          customerGoldenId: invoice.customer_golden_id,
+          status: invoice.status,
+          currency: invoice.currency,
+          total: invoice.total,
+        } as unknown as T;
+      }
+      if (entityType === "payment") {
+        const payment = await this.repository.getPaymentById(id);
+        if (!payment) return null;
+        return {
+          id: payment.id,
+          invoiceId: payment.invoice_id,
+          amount: payment.amount,
+          method: payment.method,
+          paidAt: payment.paid_at,
+        } as unknown as T;
+      }
+      return null;
     }
 
     if (entityType === "sales_order") {

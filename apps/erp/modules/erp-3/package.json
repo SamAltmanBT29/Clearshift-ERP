@@ -16,6 +16,7 @@
     "@clearshift/contracts": "*",
     "@cs/core": "*",
     "@cs/db": "*",
+    "@cs/identity": "*",
     "@cs/kernel": "*",
     "@cs/kit": "*",
     "@cs/ui": "*",
