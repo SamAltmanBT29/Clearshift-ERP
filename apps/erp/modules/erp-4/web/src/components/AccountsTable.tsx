@@ -68,17 +68,17 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
                   <StatusBadge type={acc.type} />
                 </td>
                 <td className="cs-td">
-                  <span className="cs-code">{acc.currencyCode || (acc as any).currency_code || 'INR'}</span>
+                  <span className="cs-code">{acc.currency_code || (acc as any).currencyCode || 'USD'}</span>
                 </td>
                 <td className="cs-td cs-text-right">
                   <span
                     style={{
                       fontWeight: 600,
                       fontFamily: 'var(--font-mono)',
-                      color: (acc.balance ?? 0) < 0 ? 'var(--color-error)' : 'var(--color-text)',
+                      color: Number((acc as any).balance ?? (acc as any).currentBalance ?? 0) < 0 ? 'var(--color-error)' : 'var(--color-text)',
                     }}
                   >
-                    {(acc.balance ?? 0).toLocaleString('en-US', {
+                    {Number((acc as any).balance ?? (acc as any).currentBalance ?? 0).toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -86,8 +86,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
                 </td>
                 <td className="cs-td">
                   <StatusBadge
-                    label={(acc.isActive ?? (acc as any).is_active ?? true) ? 'Active' : 'Archived'}
-                    variant={(acc.isActive ?? (acc as any).is_active ?? true) ? 'success' : 'muted'}
+                    label={(acc.is_active ?? (acc as any).isActive ?? true) ? 'Active' : 'Archived'}
+                    variant={(acc.is_active ?? (acc as any).isActive ?? true) ? 'success' : 'muted'}
                   />
                 </td>
               </tr>
