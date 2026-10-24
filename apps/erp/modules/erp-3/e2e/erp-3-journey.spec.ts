@@ -53,7 +53,7 @@ async function createOrderThroughForm(
   await page.getByLabel('Line 1 Quantity').fill(qty);
   await page.getByLabel('Line 1 Unit Price').fill(price);
   await page.getByLabel('Line 1 Tax Rate').fill(taxRate);
-  await page.getByRole('button', { name: 'Create Sales Order' }).click();
+  await page.getByRole('button', { name: /save sales order|create sales order/i }).click();
   await expect(page).toHaveURL(/\/erp3\/sales-orders\/[0-9a-f-]{36}$/);
 }
 
@@ -110,7 +110,7 @@ test('sales order journey: empty list, create, detail view, list, and search fil
   await expect(table.getByText(CUSTOMER_B)).toHaveCount(0);
 
   // 6. Resetting filters restores the full list
-  await page.getByRole('button', { name: 'Reset Filters' }).click();
+  await page.getByRole('button', { name: /reset filters/i }).click();
   await expect(table.getByText(CUSTOMER_A)).toBeVisible();
   await expect(table.getByText(CUSTOMER_B)).toBeVisible();
 
@@ -158,7 +158,7 @@ test('order status transition and status filter journey', async ({ page, request
   // Transition Order A: Open -> Invoiced in the UI
   await page.goto(`/erp3/sales-orders/${createdA.id}`);
   await expect(page.locator('.cs-badge')).toHaveText('Open');
-  await page.getByRole('button', { name: 'Mark Invoiced' }).click();
+  await page.getByRole('button', { name: /mark order as invoiced|mark invoiced/i }).click();
   await page.getByRole('button', { name: 'Yes, Update Status' }).click();
   await expect(page.locator('.cs-badge')).toHaveText('Invoiced');
 
