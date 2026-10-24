@@ -9,3 +9,4 @@ export * from '../../../../../../packages/ui/src/components/StateViews.js';
 export * from '../../../../../../packages/ui/src/components/Dialog.js';
 export * from '../../../../../../packages/ui/src/components/StatusBadge.js';
 export * from '../../../../../../packages/ui/src/components/CsvAction.js';
+export * from '../../../../../../packages/ui/src/components/MigrationKitWizard.js';
