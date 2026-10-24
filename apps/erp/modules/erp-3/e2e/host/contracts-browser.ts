@@ -7,4 +7,7 @@ export * from '../../../../../../packages/contracts/src/erp-3.js';
 export * from '../../../../../../packages/contracts/src/roles.js';
 export * from '../../../../../../packages/contracts/src/golden-id.js';
 export * from '../../../../../../packages/contracts/src/import-target.js';
-export * from '../../../../../../packages/contracts/src/migration-target.js';
+export * from '../../../../../../packages/contracts/src/events.js';
+export const RoleType = undefined;
+export const ActionType = undefined;
+export const ResourceType = undefined;
