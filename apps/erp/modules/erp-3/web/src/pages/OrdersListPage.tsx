@@ -18,14 +18,14 @@ import type {
   Invoice,
   InvoicesFilterQuery,
 } from '@clearshift/contracts';
-import { fetchSalesOrders, fetchInvoices } from '../api/erp-3.js';
+import { fetchSalesOrders, fetchInvoices, ApiError } from '../api/erp-3.js';
 import { OrdersTable } from '../components/OrdersTable.js';
 import { InvoicesTable } from '../components/InvoicesTable.js';
 import { FilterBar, InvoiceFilterBar } from '../components/FilterBar.js';
 import { SalesOrderFilterSidebar, InvoiceFilterSidebar } from '../components/FilterSidebar.js';
 import { FilterPillTags } from '../components/FilterPillTags.js';
 import type { Erp3ActiveFilters, Erp3FilterKey } from '../components/FilterPillTags.js';
-import { ErrorState } from '../components/StateViews.js';
+import { ErrorState, AccessDeniedState, sanitizeErrorMessage } from '../components/StateViews.js';
 import { OrderCreatePage } from './OrderCreatePage.js';
 import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
@@ -37,6 +37,12 @@ export type OrdersViewMode =
   | 'order-detail'
   | 'create-invoice'
   | 'invoice-detail';
+
+export interface PageErrorState {
+  message: string;
+  isForbidden: boolean;
+  correlationId?: string | undefined;
+}
 
 export interface OrdersListPageProps {
   initialTab?: 'orders' | 'invoices';
@@ -124,7 +130,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [ordersError, setOrdersError] = useState<PageErrorState | null>(null);
 
   const [orderFilters, setOrderFilters] = useState<Partial<SalesOrdersFilterQuery>>(() => ({
     page: 1,
@@ -143,7 +149,7 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
   const [invoicesTotal, setInvoicesTotal] = useState(0);
   const [invoicesTotalPages, setInvoicesTotalPages] = useState(1);
   const [isInvoicesLoading, setIsInvoicesLoading] = useState(false);
-  const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const [invoicesError, setInvoicesError] = useState<PageErrorState | null>(null);
 
   const [invoiceFilters, setInvoiceFilters] = useState<Partial<InvoicesFilterQuery>>(() => ({
     page: 1,
@@ -263,7 +269,23 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
       setOrdersTotal(response.total);
       setOrdersTotalPages(response.totalPages);
     } catch (err: any) {
-      setOrdersError(err?.message || 'Failed to fetch sales orders from server.');
+      const isForbidden =
+        (err instanceof ApiError && err.status === 403) ||
+        err?.status === 403 ||
+        err?.code === 'FORBIDDEN';
+
+      let correlationId: string | undefined;
+      if (err?.correlationId) correlationId = String(err.correlationId);
+      else if (err?.details?.correlationId) correlationId = String(err.details.correlationId);
+
+      const rawMsg = err?.message || 'Failed to fetch sales orders from server.';
+      const sanitized = sanitizeErrorMessage(rawMsg);
+
+      setOrdersError({
+        message: sanitized,
+        isForbidden: Boolean(isForbidden),
+        correlationId,
+      });
     } finally {
       setIsOrdersLoading(false);
     }
@@ -279,7 +301,23 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
       setInvoicesTotal(response.total);
       setInvoicesTotalPages(response.totalPages);
     } catch (err: any) {
-      setInvoicesError(err?.message || 'Failed to fetch invoices from server.');
+      const isForbidden =
+        (err instanceof ApiError && err.status === 403) ||
+        err?.status === 403 ||
+        err?.code === 'FORBIDDEN';
+
+      let correlationId: string | undefined;
+      if (err?.correlationId) correlationId = String(err.correlationId);
+      else if (err?.details?.correlationId) correlationId = String(err.details.correlationId);
+
+      const rawMsg = err?.message || 'Failed to fetch invoices from server.';
+      const sanitized = sanitizeErrorMessage(rawMsg);
+
+      setInvoicesError({
+        message: sanitized,
+        isForbidden: Boolean(isForbidden),
+        correlationId,
+      });
     } finally {
       setIsInvoicesLoading(false);
     }
@@ -496,11 +534,20 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
             />
 
             {ordersError ? (
-              <ErrorState
-                title="Failed to Load Sales Orders"
-                message={ordersError}
-                onRetry={() => loadOrders(orderFilters)}
-              />
+              ordersError.isForbidden ? (
+                <AccessDeniedState
+                  title="Access Denied"
+                  message="You do not have permission to view sales orders in ERP-3. Please check your role assignments."
+                  requiredCapability="orders:read"
+                />
+              ) : (
+                <ErrorState
+                  title="Failed to Load Sales Orders"
+                  message={ordersError.message}
+                  correlationId={ordersError.correlationId}
+                  onRetry={() => loadOrders(orderFilters)}
+                />
+              )
             ) : (
               <OrdersTable
                 orders={orders}
@@ -522,6 +569,14 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
                   setSelectedOrder(ord);
                   setViewMode('order-detail');
                 }}
+                hasActiveFilters={Boolean(
+                  orderFilters.search ||
+                    orderFilters.status ||
+                    orderFilters.currency ||
+                    orderFilters.customer_golden_id
+                )}
+                onCreateOrder={() => setViewMode('create-order')}
+                onClearFilters={handleClearAllOrderFilters}
               />
             )}
           </div>
@@ -565,11 +620,20 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
             />
 
             {invoicesError ? (
-              <ErrorState
-                title="Failed to Load Invoices"
-                message={invoicesError}
-                onRetry={() => loadInvoices(invoiceFilters)}
-              />
+              invoicesError.isForbidden ? (
+                <AccessDeniedState
+                  title="Access Denied"
+                  message="You do not have permission to view billing invoices in ERP-3. Please check your role assignments."
+                  requiredCapability="orders:read"
+                />
+              ) : (
+                <ErrorState
+                  title="Failed to Load Invoices"
+                  message={invoicesError.message}
+                  correlationId={invoicesError.correlationId}
+                  onRetry={() => loadInvoices(invoiceFilters)}
+                />
+              )
             ) : (
               <InvoicesTable
                 invoices={invoices}
@@ -590,6 +654,18 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
                   setSelectedInvoiceId(inv.id);
                   setViewMode('invoice-detail');
                 }}
+                hasActiveFilters={Boolean(
+                  invoiceFilters.search ||
+                    invoiceFilters.status ||
+                    invoiceFilters.currency ||
+                    invoiceFilters.customer_golden_id ||
+                    invoiceFilters.order_id
+                )}
+                onCreateInvoice={() => {
+                  setSelectedOrder(null);
+                  setViewMode('create-invoice');
+                }}
+                onClearFilters={handleClearAllInvoiceFilters}
               />
             )}
           </div>
