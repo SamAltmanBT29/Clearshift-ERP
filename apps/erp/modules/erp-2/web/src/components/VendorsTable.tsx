@@ -23,6 +23,8 @@ export interface VendorsTableProps {
   totalPages: number;
   sortField?: string | undefined;
   sortDirection?: 'asc' | 'desc' | undefined;
+  hasActiveFilters?: boolean | undefined;
+  onCreateVendor?: (() => void) | undefined;
   onSortChange?: (field: string) => void;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newPageSize: number) => void;
@@ -38,16 +40,28 @@ export const VendorsTable: React.FC<VendorsTableProps> = ({
   totalPages,
   sortField,
   sortDirection = 'asc',
+  hasActiveFilters,
+  onCreateVendor,
   onSortChange,
   onPageChange,
   onPageSizeChange,
   onRefresh,
 }) => {
   if (isLoading) {
-    return <SkeletonTable columns={7} rows={pageSize > 10 ? 8 : pageSize} />;
+    return <SkeletonTable columns={7} rows={pageSize > 10 ? 8 : pageSize} ariaLabel="Loading data" />;
   }
 
   if (vendors.length === 0) {
+    if (!hasActiveFilters && total === 0 && onCreateVendor) {
+      return (
+        <EmptyState
+          title="No vendors in supplier master"
+          message="No vendor profiles have been recorded in the supplier master yet. Add your first vendor to establish supplier coordinates."
+          actionLabel="Add Vendor"
+          onAction={onCreateVendor}
+        />
+      );
+    }
     return (
       <EmptyState
         title="No vendors found"
