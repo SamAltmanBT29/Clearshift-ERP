@@ -191,6 +191,28 @@ $$\text{unaccountedRows} = \text{sourceRows} - (\text{loaded} + \text{rejected} 
   - **Verdict `reconciliation_failed`:** If `unaccountedRows !== 0`, counts do not match, or double-count duplicates exist, the batch status remains `reconciliation_failed` and signoff is strictly disabled (`signoffAllowed: false`).
 - **Formula-Safe Export Defense:** All reconciliation summary and outcome CSV exports sanitize dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`), neutralizing CSV injection attacks per OWASP guidelines.
 
+### 4.6 Exact Duplicate Candidate Review & Audited Merge Decisions (KIT-10)
+
+**Traceability:** Issue #77 `[KIT-10]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17.
+
+1. **V1 Deterministic Exact Rules (Zero Fuzzy Auto-Merge):**
+   - ClearShift V1 strictly prohibits fuzzy duplicate matching, probabilistic scoring, or automatic merging.
+   - Exact deduplication enforces three deterministic rules with confidence 1.0:
+     - `RULE_DUP_EMAIL_EXACT`: Same canonical normalized email (`normalizeEmail`).
+     - `RULE_DUP_PHONE_NAME_EXACT`: Same canonical normalized phone + name (`normalizePhone` + `normalizeName`).
+     - `RULE_DUP_TAX_ID_EXACT`: Same tax number scoped strictly to target entity and legal jurisdiction (`normalizeTaxNumber`).
+   - A different company or jurisdiction with a shared name stays separate; cross-tenant/cross-jurisdiction merging is prevented.
+2. **Duplicate Scope & Candidate Lifecycle:**
+   - **In-File Duplicates:** Identified before load and consolidated as `in_file_merged`. First row wins; secondary duplicate rows are marked with terminal outcome `merged`.
+   - **Target-Existing Duplicates:** Routed to human review (`pending_review`). Zero auto-merge to target business data.
+3. **Audited Human Review Decisions:**
+   - Reviewer explicitly chooses **Keep both** (load as separate target entity) or **Merge** (merge into golden target record).
+   - The decision records surviving kept ID, absorbed source rows/IDs, matching rule, version, evidence, reviewer actor, timestamp, and field choices.
+4. **Security & Governance Invariants:**
+   - **No Auto-Merge:** Target duplicate choices strictly require an authorized human review decision.
+   - **Pre-Load Guard:** An unreviewed duplicate candidate cannot load as merged (`UnreviewedCandidateMergeError`).
+   - **Reauthorization & Separation of Duties:** Duplicate review requires Editor or Admin role; a migration runner cannot review or approve their own duplicate decisions (`UnauthorizedDuplicateReviewError`).
+
 ---
 
 ## 5. Step 5b: Resumable Compensating-Saga Rollback with Conflict Preflight (KIT-12)
@@ -272,6 +294,31 @@ Every compensation decision is audited durably in PostgreSQL:
    - Completed compensation actions remain stamped `compensated` in the append-only journal.
    - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
    - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
+
+### 5.6 BullMQ Worker Execution, Bounded Retries & Partial-Load Recovery (KIT-11)
+
+**Traceability:** Issue #78 `[KIT-11]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17.
+
+1. **BullMQ Worker Architecture & Pinned Stack:**
+   - Extraction, profiling, cleaning, mapping, dry-run, load, and validation jobs execute in BullMQ workers, not request handlers.
+   - Pinned Redis Open Source 8.10.1 (`redis:8.10.1-alpine`).
+   - Default concurrency: 4 workers.
+   - Per-job execution timeout: 15 minutes (900,000 ms).
+2. **Bounded Retries & Exponential Backoff:**
+   - Maximum attempt count: 3 attempts.
+   - Exponential backoff: base 1 second (1,000 ms), maximum backoff 30 seconds (30,000 ms):
+     $$\text{delayMs} = \min(30000, 1000 \times 2^{\text{attempt} - 1})$$
+   - Retries strictly reuse the same stable idempotency key (`batchId:sourceRow:module:entity:v#`).
+3. **10% Chunk Error Circuit Breaker:**
+   - Records are processed in bounded 500-row chunks.
+   - If row failures exceed 10.0% inside a chunk, the loader halts immediately and stops scheduling new chunks.
+4. **Unresolved Write Failure & `load_failed_partial` Transition:**
+   - If target writes fail and retry attempts are exhausted, the batch status moves to `load_failed_partial` and checkpoint is set to `load_checkpoint`.
+   - **Core Invariant:** An unresolved write error does NOT become marked as `rejected`. It remains an uncommitted write failure, preserving audit trail and recovery eligibility.
+5. **Crash Resumption & Reconciliation Guard:**
+   - An interrupted or crashed worker resumes from the latest committed checkpoint (`load_checkpoint` for partial chunks).
+   - Completed row receipts and outcomes survive in PostgreSQL. Re-executing replays existing receipts without duplicating target rows.
+   - Any batch in `load_failed_partial` or `failed` strictly blocks reconciliation (`ReconciliationBlockedError`) until resumption or rollback is completed.
 
 ---
 
