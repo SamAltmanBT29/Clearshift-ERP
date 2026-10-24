@@ -526,16 +526,74 @@ All new CSS classes use the `cs-erp2-*` prefix to avoid collision with other mod
 
 ---
 
-## 14. Loading, Empty, Error, and Access-Denied States Specification (ERP2-19 / Issue #135)
+## 14. Create/Edit/Detail Workflow & Client-Side Validation Specification (ERP2-05 / Issue #20)
 
-### 14.1 Overview & Architecture Boundaries
+### 14.1 Overview & Architecture
+
+Issue #20 (`[ERP2-05]`) establishes the full create, edit, and detail workflows for both Vendors and Purchase Orders in ERP-2. Consistent with SDS ClearShift ERP v2.0 §4.3 and §4.9:
+- All forms provide real-time, field-level client-side validation for instant feedback while preserving the server's authoritative validation.
+- Server-returned validation errors are mapped back to individual form fields with accessible alert labels.
+- Sensitive banking coordinates are displayed masked (`XXXX-XXXX-7890`) upon read and edit operations.
+- Purchase order lines compute exact line totals (`quantity * price`) live using decimal arithmetic, with the overall order total presented as read-only.
+- Status transitions are strictly unidirectional (`Draft -> Sent -> Received -> Closed`) and gated behind an explicit confirmation dialog (`ConfirmActionDialog`).
+
+### 14.2 Vendor Create, Edit & Detail Workflows
+
+| View | Route | Component | Key Behaviors |
+|---|---|---|---|
+| Vendor Create | `/erp2/vendors/new` | `VendorCreatePage` | Validates required fields (`name`, `tax_number`, `email`), validates ISO currency and minimum bank detail length, submits to `POST /vendors`, and redirects to detail view. |
+| Vendor Detail | `/erp2/vendors/:id` | `VendorDetailPage` | Renders complete procurement profile, displays server-masked bank coordinates (`XXXX-XXXX-7890`), and provides quick actions for `Edit Vendor` and `+ Create PO`. |
+| Vendor Edit | `/erp2/vendors/:id/edit` | `VendorEditPage` | Fetches vendor by ID, prefills existing values, shows current masked bank details, accepts optional new bank coordinates without requiring re-entry, and submits to `PATCH /vendors/:id`. |
+
+#### Field-Level Validation Rules
+
+- **Legal Name (`name`)**: Required, trimmed string. Displays "Name is required" if omitted.
+- **Tax Number / EIN (`tax_number`)**: Required, trimmed alphanumeric string. Enforces unique vendor tax identity.
+- **Procurement Email (`email`)**: Required, validated against standard email format (`^[^\s@]+@[^\s@]+\.[^\s@]+$`).
+- **Currency (`currency`)**: Optional, defaults to `USD`. Must be a 3-letter ISO 4217 code.
+- **Bank Account Details (`bank_details`)**: Optional. On create, entering plain text values submits to server for SHA-256 masking and storage of last 4 digits. If entered, minimum length is 4 characters. On edit, existing masked details are displayed, and users may optionally provide replacement numbers.
+
+### 14.3 Purchase Order Create & Detail Workflows
+
+| View | Route | Component | Key Behaviors |
+|---|---|---|---|
+| PO Create | `/erp2/purchase-orders/new` | `PurchaseOrderCreatePage` | Supports optional `?vendor_id=` query param, dynamic line item add/remove, live decimal calculations, read-only total display, and submits to `POST /purchase-orders`. |
+| PO Detail | `/erp2/purchase-orders/:id` | `PurchaseOrderDetailPage` | Renders order header, linked vendor reference, line items table, read-only computed total, and confirmation-gated status transition buttons. |
+
+#### Live Line Totals & Read-Only Order Total
+
+- **Line Total Calculation**: Line total is calculated dynamically as `calculateLineTotal(quantity, price)`.
+- **Order Total**: Aggregated via `calculateOrderTotal()`. The order total is rendered as a prominent read-only summary card (`cs-summary-card`). The client never authoritatively submits an order total to the server; the backend calculates and commits the canonical total in PostgreSQL transactions.
+- **Dynamic Items**: Operators can add arbitrary line items via `+ Add Line` or remove lines via `✕` (bounded to minimum 1 line).
+- **Foreign Key Validation**: Requires valid RFC 4122 UUID for `vendor_id` (ERP-2) and `product_id` (ERP-1 product catalog).
+- **Numeric Invariants**: Quantity must be strictly positive (`> 0`); Unit price must be non-negative (`>= 0`).
+
+### 14.4 Irreversible Forward Status Transitions & Confirmation Gates
+
+In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions in V1 are strictly forward-only:
+
+```
+[Draft] ──(Send to Vendor)──> [Sent] ──(Mark as Received)──> [Received] ──(Close Order)──> [Closed]
+```
+
+- **Draft -> Sent**: Confirms order dispatch to the vendor.
+- **Sent -> Received**: Confirms delivery of goods without modifying ERP-1 inventory (in V1).
+- **Received -> Closed**: Terminates order lifecycle.
+- **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
+- **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.
+
+---
+
+## 15. Loading, Empty, Error, and Access-Denied States Specification (ERP2-19 / Issue #135)
+
+### 15.1 Overview & Architecture Boundaries
 
 ERP-2 Vendors & Purchasing provides production-grade operational state views in strict conformance with the ClearShift V1 Master Architecture Specification and SDS ClearShift ERP v2.0 §4.3 & §4.9. All screen state representations integrate with shared platform components and adhere to the following invariants:
 - **Zero Information Leakage**: Technical database dumps, Node.js filepaths, and raw execution stack traces are intercepted and sanitized before rendering to the DOM.
 - **Accessible State Semantics**: Screen readers receive appropriate ARIA roles (`status` with `aria-busy="true"` for loading, `alert` for errors, `region` for empty and access-denied screens).
 - **Recoverable vs Deterministic Actions**: Transient data fetch errors present a recoverable "Try Again" action; deterministic 403 authorization refusals never display a retry button.
 
-### 14.2 Animated Loading Skeleton Placeholder (AC1)
+### 15.2 Animated Loading Skeleton Placeholder (AC1)
 
 During initial data fetching and tab switches, the table displays an animated skeleton placeholder:
 - **Components**: `VendorsLoadingSkeleton`, `PurchaseOrdersLoadingSkeleton`, and `SkeletonTable` (`apps/erp/modules/erp-2/web/src/components/StateViews.tsx`).
@@ -543,7 +601,7 @@ During initial data fetching and tab switches, the table displays an animated sk
 - **Animation**: Placeholder cells utilize the `.cs-skeleton-cell` CSS class with shimmering CSS keyframe animation (`cs-shimmer 1.5s infinite`).
 - **Lifecycle**: Replaced seamlessly with the populated data table upon resolution of the asynchronous query.
 
-### 14.3 Zero-Data Condition & Action Callouts (AC2)
+### 15.3 Zero-Data Condition & Action Callouts (AC2)
 
 The system distinguishes between an empty catalog (zero-data condition) and an active filter producing zero matches:
 - **Zero-Data State (Initial Catalog Empty)**:
@@ -552,7 +610,7 @@ The system distinguishes between an empty catalog (zero-data condition) and an a
 - **Filtered Zero-Records State**:
   - When filters (e.g. search string, currency, or status) yield zero matches, displays "No matching vendors found" / "No matching purchase orders found" with a call-to-action button: `Clear all filters` or `Reset Search`.
 
-### 14.4 Error Sanitization & Recoverable Alert Banner (AC3)
+### 15.4 Error Sanitization & Recoverable Alert Banner (AC3)
 
 On API failure, the interface displays an accessible alert banner with recoverable action while hiding raw internal technical details:
 - **Error Sanitization (`sanitizeErrorMessage`)**:
@@ -565,7 +623,7 @@ On API failure, the interface displays an accessible alert banner with recoverab
   - Displays correlation reference ID (`Reference ID: <code>...</code>`) when provided by the backend error envelope.
   - Includes a `Try Again` retry action button that triggers a re-fetch without page reload.
 
-### 14.5 HTTP 403 Forbidden Access-Denied View & Role Guidance (AC4)
+### 15.5 HTTP 403 Forbidden Access-Denied View & Role Guidance (AC4)
 
 When an API endpoint responds with HTTP 403 Forbidden:
 - **Access-Denied State (`AccessDeniedState`)**:
@@ -573,4 +631,3 @@ When an API endpoint responds with HTTP 403 Forbidden:
   - Explains the missing permission: displays `Required permission: module.read (or module.write)`.
   - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
   - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
-

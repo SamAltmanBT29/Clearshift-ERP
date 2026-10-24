@@ -16,6 +16,7 @@ import { openingBalancesRoutes } from './opening-balances.js';
 import { periodsRoutes } from './periods.js';
 import { profilingRoutes } from './profiling.js';
 import { cleaningRoutes } from './cleaning.js';
+import { mappingRoutes } from './mapping.js';
 
 export interface ErpFinanceRoutesOptions {
   financeService: FinanceService;
@@ -33,6 +34,7 @@ export const erpFinanceRoutes: FastifyPluginAsync<ErpFinanceRoutesOptions> = asy
   await fastify.register(periodsRoutes, childOpts);
   await fastify.register(profilingRoutes);
   await fastify.register(cleaningRoutes);
+  await fastify.register(mappingRoutes);
 };
 
 export {
@@ -43,4 +45,5 @@ export {
   periodsRoutes,
   profilingRoutes,
   cleaningRoutes,
+  mappingRoutes,
 };

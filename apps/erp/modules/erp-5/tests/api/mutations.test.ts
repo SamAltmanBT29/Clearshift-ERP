@@ -31,6 +31,7 @@ import {
 import { buildHrApp } from '../../src/app.js';
 import { HrService } from '../../src/services/hr.service.js';
 import { InMemoryHrRepository } from '../../src/services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import {
   FIXTURE_DEPARTMENT_ENGINEERING,
   FIXTURE_DEPARTMENT_FINANCE,
@@ -62,7 +63,8 @@ describe('ERP-5 HR & Employees — Mutation API & Domain Validation (#48)', () =
 
   beforeEach(() => {
     repository = new InMemoryHrRepository(true);
-    hrService = new HrService(repository);
+    const auditService = new AuditService(new InMemoryAuditRepository());
+    hrService = new HrService(repository, auditService);
     app = buildHrApp({ repository, hrService, authRequired: true });
   });
 
@@ -621,7 +623,7 @@ describe('ERP-5 HR & Employees — Mutation API & Domain Validation (#48)', () =
     it('serves the trusted internal context when authentication is not required', async () => {
       const openApp = buildHrApp({
         repository: new InMemoryHrRepository(true),
-        hrService: new HrService(new InMemoryHrRepository(true)),
+        hrService: new HrService(new InMemoryHrRepository(true), new AuditService(new InMemoryAuditRepository())),
         authRequired: false,
       });
 
@@ -876,7 +878,7 @@ describe('ERP-5 HR & Employees — Mutation API & Domain Validation (#48)', () =
       };
       const failingApp = buildHrApp({
         repository: failingRepository,
-        hrService: new HrService(failingRepository),
+        hrService: new HrService(failingRepository, new AuditService(new InMemoryAuditRepository())),
         authRequired: true,
       });
 
