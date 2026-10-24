@@ -297,3 +297,21 @@ For each state event, the DB mutation and the outbox envelope commit together in
 
 ### 6.4 Hard Failure
 Any unrecoverable step emits `batch.failed` with `step` and `reason`. Consumers tolerate duplicate and out-of-order delivery and never claim exactly-once.
+
+---
+
+## 7. Migration Kit Operator Workflow (Screens) (KIT-14)
+
+The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides:
+
+1. Batch list (`/kit/batches`) with loading/empty/error states.
+2. Four-step new batch wizard (`/kit/batches/new`): upload/create → profile → mapping/rules → dry-run/load.
+3. Profile report (`/kit/batches/:batchId/profile`).
+4. Mapping & rules (`/kit/batches/:batchId/mapping`).
+5. Duplicate review (`/kit/batches/:batchId/duplicates`).
+6. Run result (`/kit/batches/:batchId/result`).
+7. Reconciliation (`/kit/batches/:batchId/reconciliation`).
+8. Reject list with paged, formula-safe CSV export (`/kit/batches/:batchId/rejects`).
+
+State-transition actions are disabled until prerequisites pass; load requires a current dry-run pass and operator role permission. Synthetic data only.
+
