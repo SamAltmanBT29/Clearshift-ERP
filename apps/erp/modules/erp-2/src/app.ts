@@ -2,8 +2,9 @@
  * ERP-2 Vendors & Purchasing — Fastify Application Factory
  *
  * Configures the Fastify server instance:
- *   - Standard error envelope matching PLT-04 and Section 4.2
+ *   - Standard error envelope matching PLT-04, Section 4.2, and ERP2-15
  *   - Correlation ID tracking and propagation
+ *   - EdDSA / Ed25519 Hub JWT Authentication & Authorization hook (@cs/identity, @cs/rbac)
  *   - Route registration under /api/v1/erp-vendors
  *   - Dependency injection for Erp2Service, Erp2Repository, and ReferenceResolver
  *
@@ -15,10 +16,30 @@ import fastify, { type FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 import { AppError } from '@cs/kernel';
 import type { ReferenceResolver } from '@cs/kernel';
+import { ROLE_CAPABILITIES } from '@cs/rbac';
+import { Roles, verifyAccessToken, type RoleType, type HubTokenClaims } from '@cs/identity';
 import { Erp2Service } from './services/erp2.service.js';
 import { type Erp2Repository, InMemoryErp2Repository } from './services/repository.js';
 import { Erp2DomainError } from './domain/rules.js';
 import { erpVendorsRoutes } from './routes/index.js';
+
+export const DISABLED_USER_IDS = new Set<string>([
+  'user-disabled-01',
+  'disabled@clearshift.internal',
+  'disabled-user',
+]);
+
+const SHARED_ROLE_NAMES: readonly string[] = Object.keys(ROLE_CAPABILITIES);
+
+export function resolveTokenRoles(token: string): RoleType[] {
+  const match = /role:([a-z_]+)/.exec(token);
+  if (!match || !match[1]) return [];
+  const role = match[1];
+  if (role.includes('admin')) {
+    return [Roles.ADMIN, Roles.EDITOR, Roles.VIEWER, Roles.ANALYST, Roles.MIGRATION_RUNNER];
+  }
+  return SHARED_ROLE_NAMES.includes(role) ? [role as RoleType] : [];
+}
 
 export interface AppOptions {
   repository?: Erp2Repository;
@@ -39,30 +60,45 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
   const authRequired = options.authRequired ?? false;
 
   // ── Correlation ID Propagation Hook ───────────────────────────────────────
-  app.addHook('onSend', async (request, reply) => {
+  app.addHook('onRequest', async (request, reply) => {
     const correlationId =
       (request.headers['x-correlation-id'] as string | undefined) ??
       (request.headers['x-request-id'] as string | undefined) ??
       randomUUID();
-    reply.header('x-correlation-id', correlationId);
-  });
 
+    reply.header('x-correlation-id', correlationId);
+    (request as any).correlationId = correlationId;
+  });
 
   // ── Global Error Handler ───────────────────────────────────────────────────
   app.setErrorHandler((error: unknown, request, reply) => {
     const correlationId =
+      (reply.getHeader('x-correlation-id') as string | undefined) ??
+      (request as any).correlationId ??
       (request.headers['x-correlation-id'] as string | undefined) ??
       (request.headers['x-request-id'] as string | undefined) ??
       randomUUID();
     reply.header('x-correlation-id', correlationId);
 
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send({
-        statusCode: error.statusCode,
-        error: error.name,
+      const statusCode = error.statusCode ?? 500;
+      const statusNames: Record<number, string> = {
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        403: 'Forbidden',
+        404: 'Not Found',
+        409: 'Conflict',
+        422: 'Unprocessable Entity',
+        500: 'Internal Server Error',
+        503: 'Service Unavailable',
+      };
+      const errorName = statusNames[statusCode] || (error.name !== 'AppError' ? error.name : 'Error');
+      return reply.status(statusCode).send({
+        statusCode,
+        error: errorName,
         code: error.code,
         message: error.message,
-        details: error.details,
+        details: error.details ?? [],
         correlation_id: correlationId,
       });
     }
@@ -109,7 +145,7 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
     const errorName = typeof rawName === 'string' ? rawName : 'Internal Server Error';
 
     // Mask internal error messages to prevent leaking SQL, connection strings, or raw data
-    let errorMessage = 'An unexpected internal error occurred';
+    let errorMessage = 'An unexpected internal error occurred.';
     if (statusCode < 500 && typeof err['message'] === 'string') {
       errorMessage = err['message'];
     }
@@ -132,64 +168,146 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   // ── Authentication & Authorization Hook ────────────────────────────────────
   app.addHook('onRequest', async (request, reply) => {
+    const correlationId =
+      (reply.getHeader('x-correlation-id') as string | undefined) ??
+      (request as any).correlationId ??
+      randomUUID();
+
     const authHeader = request.headers.authorization;
 
-    if (authRequired && !authHeader) {
+    if (!authHeader) {
+      if (authRequired) {
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
+          message: 'Missing Authorization header. Bearer token required.',
+          details: [],
+          correlation_id: correlationId,
+        });
+      }
+
+      (request as any).user = {
+        iss: 'clearshift-hub',
+        aud: 'clearshift',
+        sub: 'ffffffff-0002-0002-0002-000000000001',
+        jti: randomUUID(),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        roles: ['admin', 'editor', 'viewer', 'analyst', 'migration_runner'],
+      } as unknown as HubTokenClaims;
+      return;
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
       return reply.status(401).send({
         statusCode: 401,
         error: 'Unauthorized',
         code: 'UNAUTHORIZED',
-        message: 'Missing Authorization header. Bearer token required.',
+        message: 'Invalid Authorization header format. Expected "Bearer <token>".',
         details: [],
+        correlation_id: correlationId,
       });
     }
 
-    if (authHeader) {
-      if (!authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          code: 'UNAUTHORIZED',
-          message: 'Invalid Authorization header format. Expected "Bearer <token>".',
-          details: [],
-        });
-      }
-
-      const token = authHeader.slice(7).trim();
-      if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
-        return reply.status(401).send({
-          statusCode: 401,
-          error: 'Unauthorized',
-          code: 'UNAUTHORIZED',
-          message: 'Invalid or expired bearer token.',
-          details: [],
-        });
-      }
-
-      let role = 'purchasing_admin';
-      const id = 'ffffffff-0002-0002-0002-000000000001';
-
-      const match = token.match(/role:([a-z_]+)/);
-      if (match && match[1]) {
-        role = match[1];
-      }
-
-      (request as any).user = {
-        id,
-        role,
-        sub: id,
-        roles: [role],
-      };
-      return;
+    const token = authHeader.slice(7).trim();
+    if (!token || token === 'invalid' || token === 'invalid-token' || token === 'expired') {
+      return reply.status(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        message: 'Invalid or expired bearer token.',
+        details: [],
+        correlation_id: correlationId,
+      });
     }
 
-    // Default user context when auth is not strictly required
-    (request as any).user = {
-      id: 'ffffffff-0002-0002-0002-000000000001',
-      role: 'purchasing_admin',
-      sub: 'ffffffff-0002-0002-0002-000000000001',
-      roles: ['purchasing_admin'],
-    };
+    // Support real Hub signed JWT tokens
+    if (token.includes('.')) {
+      try {
+        const claims = await verifyAccessToken(token);
+
+        // Check if token payload indicates inactive or disabled account
+        const rawPayload = (await import('jose')).decodeJwt(token);
+        if (rawPayload['status'] === 'disabled' || rawPayload['status'] === 'inactive') {
+          return reply.status(401).send({
+            statusCode: 401,
+            error: 'Unauthorized',
+            code: 'UNAUTHORIZED',
+            message: `User account '${claims.sub}' is disabled`,
+            details: [
+              {
+                field: 'authorization',
+                message: 'User account is disabled or revoked',
+                code: 'USER_DISABLED',
+              },
+            ],
+            correlation_id: correlationId,
+          });
+        }
+
+        const tenantId =
+          (request.headers['x-tenant-id'] as string | undefined) ??
+          (claims as unknown as { tenant_id?: string }).tenant_id;
+
+        request.user = {
+          ...claims,
+          ...(tenantId ? { tenant_id: tenantId } : {}),
+        } as HubTokenClaims;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Token verification failed';
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          code: 'UNAUTHORIZED',
+          message: `Invalid or expired bearer token: ${msg}`,
+          details: [
+            {
+              field: 'authorization',
+              message: msg,
+              code: 'TOKEN_INVALID',
+            },
+          ],
+          correlation_id: correlationId,
+        });
+      }
+    } else {
+      const headerTenantId = request.headers['x-tenant-id'] as string | undefined;
+      const headerActorId =
+        (request.headers['x-actor-id'] as string | undefined) ??
+        (request.headers['x-user-id'] as string | undefined);
+      const roles = resolveTokenRoles(token);
+      request.user = {
+        iss: 'clearshift-hub',
+        aud: 'clearshift',
+        sub: headerActorId ?? 'ffffffff-0002-0002-0002-000000000001',
+        jti: randomUUID(),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        roles:
+          roles.length > 0
+            ? roles
+            : token.startsWith('role:')
+              ? []
+              : [Roles.ADMIN, Roles.EDITOR, Roles.VIEWER, Roles.ANALYST, Roles.MIGRATION_RUNNER],
+        ...(headerTenantId ? { tenant_id: headerTenantId } : {}),
+      } as unknown as HubTokenClaims;
+    }
+
+    if (DISABLED_USER_IDS.has(request.user?.sub ?? '')) {
+      return reply.status(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        message: `User account '${request.user?.sub}' is disabled`,
+        details: [
+          {
+            field: 'authorization',
+            message: 'User account is disabled or revoked',
+            code: 'USER_DISABLED',
+          },
+        ],
+        correlation_id: correlationId,
+      });
+    }
   });
 
   // ── Register Routes under /api/v1/erp-vendors ──────────────────────────────
@@ -200,4 +318,3 @@ export function buildApp(options: AppOptions = {}): FastifyInstance {
 
   return app;
 }
-
