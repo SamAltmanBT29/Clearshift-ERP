@@ -22,10 +22,11 @@ import {
 import type { HrService } from '../services/hr.service.js';
 import { leaveCreateGuard, leaveReadGuard, leaveUpdateGuard } from './guard.js';
 import { parseWriteBody } from './parsing.js';
-import type { HrRouteOptions } from './types.js';
+import type { HrRouteOptions, HrFastifyInstance } from './types.js';
 
 export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
   const { hrService } = opts;
+  const app = fastify as HrFastifyInstance;
 
   // GET /leave - List leave records
   fastify.get(
@@ -54,7 +55,11 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   // POST /leave - Create a leave record
   fastify.post('/leave', { preHandler: leaveCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrLeaveRequestSchema, request);
-    const result = await hrService.createLeave(body);
+    const result = await hrService.createLeave(
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(result.created ? 201 : 200).send({
       ...result.entity,
@@ -67,7 +72,12 @@ export const leaveRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, o
   fastify.patch('/leave/:id', { preHandler: leaveUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrLeaveRequestSchema.parse(request.body ?? {});
-    const record = await hrService.updateLeave(params.id, body);
+    const record = await hrService.updateLeave(
+      params.id,
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(200).send(record);
   });
