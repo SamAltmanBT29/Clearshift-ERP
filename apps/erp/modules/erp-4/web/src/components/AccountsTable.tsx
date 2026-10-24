@@ -14,10 +14,14 @@ export interface AccountsTableProps {
   pageSizeOptions?: number[] | undefined;
   sortColumn?: string | undefined;
   sortDirection?: SortDirection | undefined;
+  hasActiveFilters?: boolean | undefined;
+  emptyTitle?: string | undefined;
+  emptyMessage?: string | undefined;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
+  onClearFilters?: (() => void) | undefined;
 }
 
 /**
@@ -39,10 +43,14 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   pageSizeOptions = [10, 20, 50, 100],
   sortColumn: externalSortColumn,
   sortDirection: externalSortDirection,
+  hasActiveFilters,
+  emptyTitle,
+  emptyMessage,
   onPageChange,
   onPageSizeChange,
   onSort: externalOnSort,
   onRefresh,
+  onClearFilters,
 }) => {
   // Local sorting state if not controlled externally
   const [internalSortColumn, setInternalSortColumn] = useState<string>('code');
@@ -238,12 +246,18 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   }
 
   if (accounts.length === 0) {
+    const isFiltered = Boolean(hasActiveFilters);
     return (
       <EmptyState
-        title="No accounts found"
-        message="No accounts match your current filter selection or search query."
-        actionLabel={onRefresh ? 'Refresh Accounts' : undefined}
-        onAction={onRefresh}
+        title={emptyTitle ?? (isFiltered ? 'No matching accounts found' : 'No accounts found')}
+        message={
+          emptyMessage ??
+          (isFiltered
+            ? 'No accounts match your current search query or filter selection. Try adjusting your search term or clearing active filters.'
+            : 'No accounts have been created yet. Get started by creating your first account.')
+        }
+        actionLabel={isFiltered && onClearFilters ? 'Clear All Filters' : onRefresh ? 'Refresh Accounts' : undefined}
+        onAction={isFiltered && onClearFilters ? onClearFilters : onRefresh}
       />
     );
   }

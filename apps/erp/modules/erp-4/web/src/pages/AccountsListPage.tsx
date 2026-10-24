@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { SortDirection } from '@cs/ui';
 import type {
   Account,
+  AccountType,
   AccountsFilterQuery,
   JournalEntry,
 } from '@clearshift/contracts';
@@ -9,12 +11,13 @@ import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
-import { FilterBar } from '../components/FilterBar.js';
+import { FilterBar, type FilterUpdate } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
 import { JournalEntryFormPage } from './JournalEntryFormPage.js';
 import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
 
 export const AccountsListPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance' | 'journal-entries'>('accounts');
@@ -28,10 +31,27 @@ export const AccountsListPage: React.FC = () => {
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<AccountsFilterQuery>({
-    page: 1,
-    limit: 20,
-    search: '',
+  // Initialize filters from URL query parameters (ERP4-18)
+  const [filters, setFilters] = useState<AccountsFilterQuery>(() => {
+    const page = Number(searchParams.get('page')) || 1;
+    const limit = Number(searchParams.get('limit') || searchParams.get('pageSize')) || 20;
+    const search = searchParams.get('search') || '';
+    const type = (searchParams.get('type') as AccountType) || undefined;
+    const rawActive = searchParams.get('isActive');
+    const isActive = rawActive === 'true' ? true : rawActive === 'false' ? false : undefined;
+    const currencyCode = searchParams.get('currencyCode') || undefined;
+
+    const initial: AccountsFilterQuery = { page, limit, search };
+    if (type) initial.type = type;
+    if (isActive !== undefined) {
+      initial.isActive = isActive;
+      initial.is_active = isActive;
+    }
+    if (currencyCode) {
+      initial.currencyCode = currencyCode;
+      initial.currency_code = currencyCode;
+    }
+    return initial;
   });
 
   // Trial Balance State
@@ -116,22 +136,74 @@ export const AccountsListPage: React.FC = () => {
     }
   }, [activeTab, currentView, loadJournalEntries]);
 
+  const syncUrlParams = (updatedFilters: AccountsFilterQuery) => {
+    const params = new URLSearchParams();
+    if (updatedFilters.page && updatedFilters.page > 1) params.set('page', String(updatedFilters.page));
+    if (updatedFilters.limit && updatedFilters.limit !== 20) params.set('limit', String(updatedFilters.limit));
+    if (updatedFilters.search) params.set('search', updatedFilters.search);
+    if (updatedFilters.type) params.set('type', updatedFilters.type);
+    if (typeof updatedFilters.isActive === 'boolean') {
+      params.set('isActive', String(updatedFilters.isActive));
+    } else if (typeof updatedFilters.is_active === 'boolean') {
+      params.set('isActive', String(updatedFilters.is_active));
+    }
+    if (updatedFilters.currencyCode) params.set('currencyCode', updatedFilters.currencyCode);
+    setSearchParams(params, { replace: true });
+  };
+
   // Handle filter changes (strictly resets to page 1 as mandated by acceptance criteria)
-  const handleFilterChange = (updated: Partial<AccountsFilterQuery>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...updated,
-      page: 1, // Reset pagination to page 1 on search or filter change
-    }));
+  const handleFilterChange = (updated: FilterUpdate) => {
+    setFilters((prev) => {
+      const next: AccountsFilterQuery = { ...prev, page: 1 };
+      if ('search' in updated) {
+        if (updated.search) next.search = updated.search;
+        else delete next.search;
+      }
+      if ('type' in updated) {
+        if (updated.type) next.type = updated.type;
+        else delete next.type;
+      }
+      if ('isActive' in updated) {
+        if (updated.isActive !== undefined) {
+          next.isActive = updated.isActive;
+          next.is_active = updated.isActive;
+        } else {
+          delete next.isActive;
+          delete next.is_active;
+        }
+      }
+      if ('currencyCode' in updated) {
+        if (updated.currencyCode) {
+          next.currencyCode = updated.currencyCode;
+          next.currency_code = updated.currencyCode;
+        } else {
+          delete next.currencyCode;
+          delete next.currency_code;
+        }
+      }
+      syncUrlParams(next);
+      return next;
+    });
   };
 
   const handleResetFilters = () => {
-    setFilters({
+    const reset: AccountsFilterQuery = {
       page: 1,
       limit: 20,
       search: '',
-    });
+    };
+    setFilters(reset);
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
+
+  const hasActiveFilters = Boolean(
+    filters.search ||
+    filters.type ||
+    typeof filters.isActive === 'boolean' ||
+    typeof filters.is_active === 'boolean' ||
+    filters.currencyCode ||
+    filters.currency_code
+  );
 
   const handlePageChange = (newPage: number) => {
     setFilters((prev) => ({
@@ -293,6 +365,7 @@ export const AccountsListPage: React.FC = () => {
             onFilterChange={handleFilterChange}
             onReset={handleResetFilters}
             isLoading={isAccountsLoading}
+            totalResults={accountsTotal}
           />
 
           {accountsError ? (
@@ -312,10 +385,12 @@ export const AccountsListPage: React.FC = () => {
               pageSizeOptions={[10, 20, 50, 100]}
               sortColumn={sortColumn}
               sortDirection={sortDirection}
+              hasActiveFilters={hasActiveFilters}
               onSort={handleSort}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
+              onClearFilters={handleResetFilters}
             />
           )}
         </section>

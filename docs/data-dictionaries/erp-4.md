@@ -184,6 +184,30 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
 
+## 17. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
+
+- **300ms Debounced Search Bar (`FilterBar.tsx` & `useDebounce.ts`)**:
+  - Implements rapid keystroke debouncing (`useDebounce`) waiting 300ms before dispatching search queries.
+  - Immediate local state feedback for responsive typing with inline clear button (`✕`).
+  - Automatically resets pagination to page 1 on search value changes.
+- **Faceted Filters & Drawer Panel (`FilterSidebar.tsx`)**:
+  - Accessible slide-over filter panel exposing categorized facet controls:
+    - Account Type (`asset`, `liability`, `income`, `expense`).
+    - Status (`active`, `archived` / `inactive`).
+    - Currency (`USD`, `INR`, `EUR`, `GBP`).
+  - Active filter badge counter on toggle button displaying the number of active filters.
+  - URL query state synchronization (`useSearchParams`) reflecting active filters in browser URL (`?search=...&type=...&isActive=...`).
+- **Removable Filter Tags & Clear All (`FilterPills.tsx`)**:
+  - Active filter criteria rendered as accessible pill tags (`role="list"` / `role="listitem"`).
+  - Individual removal buttons with accessible `aria-label` values (`Remove filter for <Label>`).
+  - One-click `"Clear All"` reset button that removes all active criteria and resets URL query state.
+- **Informative Empty Results Messaging**:
+  - Differentiates between default zero-data states and empty search/filter queries.
+  - Displays `"No matching accounts found"` with prompt to adjust criteria or clear filters.
+  - Inline `"Clear All Filters"` recovery button triggering state reset.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/search-filters.test.tsx`](../../apps/erp/modules/erp-4/web/tests/search-filters.test.tsx) (9 comprehensive tests verifying 300ms debounce, faceted sidebar updates, pill tag clearing, Clear All, and empty state messaging).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -195,5 +219,7 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
 | **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
+| **`1.7.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
+
 
 
