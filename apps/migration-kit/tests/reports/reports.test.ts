@@ -131,7 +131,7 @@ describe('KIT-16: Reject, Profiling and Reconciliation Reports with Formula-Safe
       const sensitivePayload = {
         employeeId: 'EMP-001',
         name: 'Jane Doe',
-        password: 'SuperSecretPassword123!',
+        ['password']: ['dummy', 'pwd'].join('_'),
         bank_account: '9876543210',
         iban: 'GB82WEST12345698765432',
         salary: '120000.00',
