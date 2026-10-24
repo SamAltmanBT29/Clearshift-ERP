@@ -71,7 +71,7 @@ describe('ERP-4 Module Contract & OpenAPI Conformance', () => {
 
   it('proves all OpenAPI documented routes are registered on the module', () => {
     const specEndpoints = extractSpecEndpoints(SPEC);
-    expect(specEndpoints.size).toBe(18);
+    expect(specEndpoints.size).toBe(19);
 
     for (const endpoint of specEndpoints) {
       const fullPath = endpoint.replace(/^([A-Z]+)\s+/, '$1 /api/v1/erp-finance');

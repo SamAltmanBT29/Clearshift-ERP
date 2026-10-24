@@ -1,7 +1,7 @@
 # ClearShift Migration Kit V1 Operational Runbook
 
 **Document ID:** RUNBOOK-KIT-01  
-**Issue Reference:** [KIT-08] Generic target adapter, stable idempotency and import receipts (#75)  
+**Issue References:** [KIT-07] Dry-run planner with a strict no-target-mutation guarantee (#74) | [KIT-08] Generic target adapter, stable idempotency and import receipts (#75)  
 **Target Milestone:** Gate G4 (V1 Build Complete)  
 **Author / Workstream:** Team 11 — Platform & Migration Kit Lead  
 **Classification:** Operational Architecture & Failure-Safety Runbook  
@@ -14,12 +14,13 @@
 The seven-step pipeline is ClearShift’s core migration engine. A simple CRUD approach does not satisfy V1; the Kit must ingest, transform, load, validate, and reconcile repeatable datasets while guaranteeing strict auditability and mathematical row conservation.
 
 This runbook documents:
-1. The **Generic Target Adapter Contract (`MigrationTargetAdapter`)** providing the exclusive write gateway into target ERP modules.
-2. The **Stable Idempotency Key Protocol** guaranteeing that retries are completely deterministic and never derive keys from mutable payloads alone.
-3. The **Durable Import Receipt Protocol (`<module>.import_receipts`)** guaranteeing atomic business mutation + receipt commit inside a single local PostgreSQL transaction.
-4. The **Failure & Crash Recovery Semantics** ensuring identical retries replay previous target IDs, modified payloads return HTTP 409 Conflict, and receipts survive worker restarts.
-5. The **500-Row Chunked Execution & 10% Circuit Breaker** preventing long database locks and halting batches on excessive errors while enforcing exact row conservation (`source = loaded + rejected + merged + skipped; unaccounted = 0`).
-6. The **Privilege Boundary Guarantee** ensuring the Migration Kit worker possesses zero direct write privileges on module-owned target tables.
+1. The **Dry-Run Planner (`DryRunPlanner`)** guaranteeing zero target database mutations and zero import receipts during preflight simulation, computing deterministic SHA-256 tokens and enforcing the 10% policy threshold (KIT-07).
+2. The **Generic Target Adapter Contract (`MigrationTargetAdapter`)** providing the exclusive write gateway into target ERP modules (KIT-08).
+3. The **Stable Idempotency Key Protocol** guaranteeing that retries are completely deterministic and never derive keys from mutable payloads alone.
+4. The **Durable Import Receipt Protocol (`<module>.import_receipts`)** guaranteeing atomic business mutation + receipt commit inside a single local PostgreSQL transaction.
+5. The **Failure & Crash Recovery Semantics** ensuring identical retries replay previous target IDs, modified payloads return HTTP 409 Conflict, and receipts survive worker restarts.
+6. The **500-Row Chunked Execution & 10% Circuit Breaker** preventing long database locks and halting batches on excessive errors while enforcing exact row conservation (`source = loaded + rejected + merged + skipped; unaccounted = 0`).
+7. The **Privilege Boundary Guarantee** ensuring the Migration Kit worker possesses zero direct write privileges on module-owned target tables.
 
 ---
 
@@ -624,4 +625,105 @@ Run full security scan across the repository:
 ```bash
 npm run security:scan
 # Must report: Zero secrets, unapproved cloud uploaders, or PII detected.
+```
+
+---
+
+## 12. Step 5: Dry-Run Planner with Strict No-Target-Mutation Guarantee (KIT-07)
+
+### 12.1 Purpose & Architectural Role
+The **Dry-Run Planner** (`DryRunPlanner` in `apps/migration-kit/src/load/dry-run.ts`) executes Step 5 of the ClearShift Migration Kit pipeline (SDS §§3-4, §4.8, §§11.1-11.9; Project Plan v3.0 §§9, 11, 17; Decision C9; Issue #74).
+
+It simulates the entire loading procedure without altering target business tables or creating target import receipts. It classifies every mapped row into an exact terminal outcome, enforces the 10% error halt threshold policy, and produces a cryptographic dry-run plan token required as a mandatory precondition for Step 6 (Load).
+
+### 12.2 Strict No-Target-Mutation Guarantee (Non-Negotiable)
+- **Zero Target Mutations**: Dry-run executes zero `INSERT`, `UPDATE`, or `DELETE` statements on target domain tables (e.g., `erp1_products`, `erp1_accounts`, `erp2_vendors`, `erp3_orders`).
+- **Zero Permanent Receipts**: Dry-run creates zero records in target receipt tables (e.g., `erp1_import_receipts`, `erp2_import_receipts`).
+- **DB Snapshot Invariance**: Database snapshots of target tables and target receipts taken immediately before and after dry-run execution are 100% byte-for-byte and row-count identical.
+- **Runtime Target Mutation Guard**: Target adapter and repository facades are protected during dry-run with a security proxy (`createTargetMutationGuard`) that intercepts and aborts any target write attempt by throwing `DryRunTargetMutationForbiddenError`.
+
+### 12.3 Exact Row Conservation Invariant
+Every single source row is deterministically evaluated and assigned exactly one planned terminal outcome:
+$$\text{total} = \text{planned\_loaded} + \text{planned\_rejected} + \text{planned\_merged} + \text{planned\_skipped}$$
+$$\text{unaccounted} = 0$$
+
+- **`loaded`**: Valid, schema-compliant new row ready for insertion.
+- **`rejected`**: Fails target invariants, required fields, enum validation, or referential foreign keys.
+- **`merged`**: Matches an existing target golden ID / duplicate key or an intra-batch duplicate planned for non-destructive deduplication.
+- **`skipped`**: Filtered or ignored in accordance with module policy.
+
+If $\text{unaccounted} \neq 0$, `assertDryRunConservation` throws `DryRunPreconditionError('CONSERVATION_VIOLATION')`.
+
+### 12.4 Policy Evaluation & 10% Error Halt Threshold (Decision C9)
+In accordance with ClearShift Master Architecture Decision C9, migrations halt when the planned failure rate exceeds 10%:
+$$\text{failure\_rate} = \frac{\text{planned\_rejected}}{\text{total}}$$
+
+- **Clean Datasets ($\text{failure\_rate} \le 10\%$)**:
+  - `policyPassed = true`, `canProceedToLoad = true`.
+  - Batch status transitions from `mapped` to `dry_run_passed`.
+  - Checkpoint advances to `dry_run_passed`.
+- **High-Error Datasets ($\text{failure\_rate} > 10\%$, including 40%-invalid fixtures)**:
+  - `policyPassed = false`, `canProceedToLoad = false`.
+  - Batch status transitions from `mapped` to `failed` with error code `POLICY_VIOLATION_THRESHOLD_EXCEEDED`.
+  - Checkpoint remains `mapped`.
+  - Real load execution is strictly blocked; calling `assertCanExecuteLoad` throws `DryRunPolicyViolationError`.
+
+### 12.5 Deterministic Token & Load Precondition Protocol
+To prevent stale, tampered, or mismatched dry-run plans from being executed in Step 6, `DryRunPlanner` computes a deterministic SHA-256 token:
+$$\text{token} = \text{SHA256}(\text{batchId} \mid \text{mappingChecksum} \mid \text{ruleVersion} \mid \text{targetBaselineHash} \mid \text{plannedCounts} \mid \text{policyConfig})$$
+
+Before Step 6 (Load) begins, the orchestrator invokes `assertCanExecuteLoad(plan, precondition)`:
+1. **Policy Check**: Asserts `plan.policyPassed === true` and `plan.canProceedToLoad === true`.
+2. **Token Check**: Asserts `precondition.token === plan.token`.
+3. **Target Baseline Drift Check**: Recomputes SHA-256 fingerprint of target tables. If target data changed since the dry-run, throws `DryRunPreconditionError('BASELINE_DRIFT')`.
+4. **Mapping Template Drift Check**: If mapping rules or template changed, throws `DryRunPreconditionError('MAPPING_CHANGED')`.
+5. **Rule Version Drift Check**: If rule version changed, throws `DryRunPreconditionError('RULE_VERSION_CHANGED')`.
+6. **Conservation Verification**: Confirms `unaccounted === 0`.
+
+### 12.6 Operational Procedures & CLI Verification
+
+#### Running Dry-Run via API:
+```http
+POST /api/v1/migration-kit/batches/BATCH_UUID/dry-run
+Content-Type: application/json
+
+{
+  "actor": "operator_parii",
+  "policyConfig": {
+    "maxFailureRate": 0.10
+  }
+}
+```
+
+#### Sample Dry-Run Plan Report Output:
+```json
+{
+  "planId": "3b294021-97b4-4b5f-9721-a47734891b98",
+  "batchId": "6c498320-1d84-48f1-94bb-12501e7492c1",
+  "module": "erp-1",
+  "targetEntity": "products",
+  "token": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "planVersion": "1.0.0",
+  "ruleVersion": "1.0.0",
+  "policyPassed": true,
+  "failureRate": 0.02,
+  "canProceedToLoad": true,
+  "plannedCounts": {
+    "total": 100,
+    "loaded": 95,
+    "rejected": 2,
+    "merged": 3,
+    "skipped": 0,
+    "unaccounted": 0
+  },
+  "targetWriteCalls": 0,
+  "targetReceiptsCreated": 0
+}
+```
+
+#### Step Ledger Verification:
+```sql
+SELECT step_number, step_name, from_status, to_status, records_in, records_out, records_rejected, metadata->>'token' AS dry_run_token
+FROM public.kit_batch_steps
+WHERE batch_id = 'BATCH_UUID' AND step_name = 'dry_run';
 ```

@@ -51,6 +51,7 @@ const EXPECTED_ENDPOINTS = [
   'GET /periods',
   'GET /periods/{id}',
   'PATCH /periods/{id}',
+  'POST /import',
 ] as const;
 
 /** Extracts METHOD /path pairs from the paths: block */
@@ -141,12 +142,12 @@ describe('ERP-4 OpenAPI 3.1 Contract Specification', () => {
     }
   });
 
-  it('documents every required V1 endpoint (all 18 routes)', () => {
+  it('documents every required V1 endpoint (all 19 routes)', () => {
     const documented = extractDocumentedEndpoints(SPEC);
     for (const endpoint of EXPECTED_ENDPOINTS) {
       expect(documented.has(endpoint), `Missing endpoint: ${endpoint}`).toBe(true);
     }
-    expect(documented.size).toBe(18);
+    expect(documented.size).toBe(19);
   });
 
   it('documents bounded pagination (max 100) on all collection routes', () => {

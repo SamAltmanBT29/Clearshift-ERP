@@ -31,7 +31,7 @@ For the canonical, detailed version see:
 | `erp4.journal_entries` | Transaction headers | UNIQUE(entry_number), partial UNIQUE(idempotency_key) |
 | `erp4.journal_lines` | Double-entry debit/credit lines | CHECK(not both), CHECK(at least one), CHECK(non-negative) |
 | `erp4.opening_balances` | One-time balance loads | UNIQUE(account_id, currency_code) |
-| `erp4.import_receipts` | Idempotent mutation & import tracking | UNIQUE(idempotency_key) |
+| `erp4.import_receipts` | Idempotent mutation & import tracking | UNIQUE(idempotency_key), request_hash |
 
 ## API Endpoints (Issues #37 & #38)
 
@@ -57,6 +57,7 @@ All collection endpoints support bounded pagination (`page`, `pageSize <= 100`, 
 | `GET` | `/api/v1/erp-finance/periods` | List fiscal accounting periods |
 | `GET` | `/api/v1/erp-finance/periods/:id` | Get accounting period by UUID |
 | `PATCH` | `/api/v1/erp-finance/periods/:id` | Update accounting period status (`open` -> `soft_closed` -> `locked`) |
+| `POST` | `/api/v1/erp-finance/import` | Import row via KIT-08 target adapter contract with durable receipts |
 
 ## Domain Relationships & State Rules (Issue #41)
 
@@ -276,8 +277,23 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
 | **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
 | **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
-| **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
 | **`1.10.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
+| **`1.11.0`** | 2026-10-24 | Sprint 3 / Gate G4 | Group 9 / Role 2 (Issue #42 / ERP4-07) | Implemented Migration Kit target adapter (`Erp4TargetAdapter`), public `POST /api/v1/erp-finance/import` endpoint, durable import receipts schema extension with request hash, atomic local dual-write transactions, 3x idempotent replay guarantees, and batch chunking with excessive failure circuit breaker. |
 
+## 21. Migration Kit Target Adapter & Durable Import Receipts (Issue #42 / [ERP4-07])
 
-
+As part of Sprint 3 / Gate G4 requirements (Decision C4 & KIT-08):
+- **Public API Ingestion (`POST /api/v1/erp-finance/import`)**: The shared Migration Kit loads records via the public API or in-process `Erp4TargetAdapter`. Neither the Migration Kit nor sibling modules have direct database write privileges into ERP-4 private tables.
+- **Atomic Local Dual-Write**: Target domain mutation and durable import receipt (`erp4.import_receipts`) commit together in a single local PostgreSQL transaction.
+- **Deterministic Idempotency Guarantees**:
+  - SHA-256 canonical request hash comparison detects replay vs. payload mismatch.
+  - Same key + identical payload returns HTTP 200 with prior result and existing target ID.
+  - Same key + different payload returns HTTP 409 Conflict with zero data mutation.
+- **Domain Invariants**:
+  - Accounts: code is unique (`ACCOUNT_CODE_EXISTS`).
+  - Journal entries: lines balance exactly at currency precision (`BR-ERP4-01`), locked period rejects posting (`BR-ERP4-02`), header and lines commit atomically.
+  - Opening balances: loaded once per account and currency pair (`FR-ERP4-04`).
+- **Batch Processing & Limits**:
+  - Processed in 500-row chunks.
+  - Circuit breaker halts execution when failure rate exceeds 10% after 10 rows.
+  - Terminal outcome reconciliation: `total = loaded + rejected + unattempted`, `unaccounted = 0`.
