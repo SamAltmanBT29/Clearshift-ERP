@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Account, JournalEntry } from '@clearshift/contracts';
 import { JournalLinesEditor, type EditableJournalLine } from './JournalLinesEditor.js';
-import { createJournalEntry, postJournalEntry, isJournalEntryBalanced } from '../../api/erp-4.js';
+import { createJournalEntry, postJournalEntry, isJournalEntryBalanced, fetchPeriods } from '../../api/erp-4.js';
 
 interface JournalEntryFormProps {
   accounts: Account[];
@@ -24,6 +24,21 @@ export const JournalEntryForm: React.FC<JournalEntryFormProps> = ({
   // Form State
   const [postingDate, setPostingDate] = useState(today);
   const [period, setPeriod] = useState(currentPeriod);
+  const [periods, setPeriods] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    fetchPeriods().then((res) => {
+      if (res.items && res.items.length > 0) {
+        setPeriods(res.items);
+        const open = res.items.find((p: any) => p.status === 'open') || res.items[0];
+        if (open?.id) {
+          setPeriod(open.id);
+        }
+      }
+    }).catch(() => {
+      // ignore
+    });
+  }, []);
   const [description, setDescription] = useState('');
   const [currencyCode, setCurrencyCode] = useState(initialCurrency);
   const [sourceReference, setSourceReference] = useState('');
@@ -258,15 +273,32 @@ export const JournalEntryForm: React.FC<JournalEntryFormProps> = ({
           <label htmlFor="je-period" className="cs-form-label cs-form-label-required">
             Fiscal Period
           </label>
-          <input
-            id="je-period"
-            type="month"
-            className={`cs-input ${fieldErrors['period'] ? 'cs-input-error' : ''}`}
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            disabled={isSubmitting}
-            aria-describedby={fieldErrors['period'] ? 'period-err' : undefined}
-          />
+          {periods.length > 0 ? (
+            <select
+              id="je-period"
+              className={`cs-select ${fieldErrors['period'] ? 'cs-input-error' : ''}`}
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              disabled={isSubmitting}
+              aria-describedby={fieldErrors['period'] ? 'period-err' : undefined}
+            >
+              {periods.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.period_label || p.label || p.id} ({p.status})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              id="je-period"
+              type="text"
+              className={`cs-input ${fieldErrors['period'] ? 'cs-input-error' : ''}`}
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              disabled={isSubmitting}
+              aria-describedby={fieldErrors['period'] ? 'period-err' : undefined}
+            />
+          )}
           {fieldErrors['period'] && (
             <span id="period-err" className="cs-form-error">{fieldErrors['period']}</span>
           )}

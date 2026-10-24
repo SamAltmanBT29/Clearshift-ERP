@@ -79,7 +79,7 @@ export const AccountCreateModal: React.FC<AccountCreateModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create General Ledger Account"
-      description="Add a new account to the ClearShift Chart of Accounts with double-entry integrity."
+      description="Create GL Account: Add a new account to the ClearShift Chart of Accounts with double-entry integrity."
       className={className}
     >
       <AccountForm

@@ -1,11 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 5177;
+const PORT = 5176;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const IN_CI = Boolean(process.env['CI']);
 
 /**
- * ERP-4 browser journeys (ERP4-10 / Gate G4). Run from the repository root:
+ * ERP-4 browser journeys (ERP4-29). Run from the repository root:
  *   npm run erp4:e2e
  * Zero retries on purpose: a test that needs a retry is a flaky test.
  */

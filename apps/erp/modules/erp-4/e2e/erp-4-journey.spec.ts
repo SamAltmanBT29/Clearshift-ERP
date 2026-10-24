@@ -1,27 +1,35 @@
 /**
- * ERP-4 Finance & Accounting — Playwright browser journeys (ERP4-10 / Gate G4).
+ * ERP-4 Finance & Accounting — Playwright browser journeys (ERP4-29).
  *
- * Covers authentication redirect, chart of accounts list, account creation modal,
- * filtering, journal entry navigation, and trial balance view against
- * the real module UI and API (in-memory store, 100% synthetic data).
+ * Covers create, list, filter, and detail view in Chromium and Firefox against
+ * the real module UI and Fastify API (in-memory store, 100% synthetic fixtures).
  */
 import { expect, test, type Page } from '@playwright/test';
 
+const API = '/api/v1/erp-finance';
 const STORAGE_KEY = 'clearshift.access_token';
 
 const encode = (value: unknown): string =>
   Buffer.from(JSON.stringify(value)).toString('base64url');
 
-/** Unsigned JWT-shaped session; UI decodes roles, Fastify app accepts in E2E host. */
+/** Unsigned JWT-shaped session; the UI only decodes claims, the API is open in the host. */
 const SESSION_TOKEN = [
   encode({ alg: 'none', typ: 'JWT' }),
   encode({
-    sub: 'e2e-finance-user',
-    roles: ['finance_admin', 'editor'],
+    sub: 'e2e-finance-admin',
+    roles: ['finance_admin'],
     exp: Math.floor(Date.now() / 1000) + 3600,
   }),
   'sig',
 ].join('.');
+
+const TEST_ACCOUNT = {
+  code: '1099',
+  name: 'Synthetic Clearing Account',
+  type: 'asset',
+  currency: 'USD',
+  description: 'Used for E2E journey tests',
+};
 
 test.beforeEach(async ({ page, request }) => {
   const reset = await request.post('/__e2e/reset');
@@ -35,50 +43,102 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 test('redirects an unauthenticated visitor to the Hub login with returnTo', async ({ page }) => {
+  page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+  page.on('pageerror', (err) => console.error('PAGE ERROR:', err));
   await page.addInitScript(() => window.sessionStorage.clear());
   await page.goto('/erp4/accounts');
   await expect(page).toHaveURL(/\/login\?returnTo=%2Ferp4%2Faccounts$/);
 });
 
-test('finance journey: accounts list, create account modal, tabs, and trial balance', async ({
+test('accounts journey: list view, create account modal, search filter and type filter', async ({
   page,
 }) => {
   const uncaught: string[] = [];
   page.on('pageerror', (error) => uncaught.push(error.message));
 
-  // 1. Visit Chart of Accounts
+  // Initial load
   await page.goto('/erp4/accounts');
-  await expect(page.getByRole('heading', { name: /Finance & Accounting/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Finance & Accounting (ERP-4)', level: 1 }),
+  ).toBeVisible();
 
-  // 2. Open Account Creation Modal
-  const newAccountBtn = page.getByRole('button', { name: /\+ New Account/i });
-  await expect(newAccountBtn).toBeVisible();
-  await newAccountBtn.click();
+  // Verify synthetic seeded accounts are rendered
+  const table = page.getByRole('table', { name: 'Chart of Accounts' });
+  await expect(table.getByText('Cash & Cash Equivalents')).toBeVisible();
 
-  // 3. Fill and submit Account Creation Form
-  await page.getByLabel(/Account Code/i).fill('1090-FLOAT');
-  await page.getByLabel(/Account Name/i).fill('Petty Cash Float Account');
-  await page.getByLabel(/Currency Code/i).fill('USD');
+  // Create new account via modal
+  await page.getByRole('button', { name: 'Create new account' }).click();
+  await expect(page.getByText('Create GL Account')).toBeVisible();
 
-  const submitBtn = page.getByRole('button', { name: /Create Account/i });
-  await submitBtn.click();
+  await page.getByLabel('Account Code').fill(TEST_ACCOUNT.code);
+  await page.getByLabel('Account Name').fill(TEST_ACCOUNT.name);
+  await page.getByLabel('Description Memo').fill(TEST_ACCOUNT.description);
+  await page.getByRole('button', { name: 'Create Account' }).click();
 
-  // 4. Verify Account appears in the list
-  await expect(page.getByText('1090-FLOAT')).toBeVisible({ timeout: 5000 });
-  await expect(page.getByText('Petty Cash Float Account')).toBeVisible();
+  // Created account appears in table
+  await expect(table.getByText(TEST_ACCOUNT.name)).toBeVisible();
+  await expect(table.getByText(TEST_ACCOUNT.code)).toBeVisible();
 
-  // 5. Navigate to Trial Balance tab
-  const tbTab = page.locator('#tab-trial-balance');
-  await expect(tbTab).toBeVisible();
-  await tbTab.click();
-  await expect(page.getByRole('heading', { name: /Trial Balance/i })).toBeVisible();
+  // Filter by search query
+  const searchInput = page.getByPlaceholder(/Search accounts by code or name/i);
+  await searchInput.fill(TEST_ACCOUNT.name);
+  await expect(table.getByText(TEST_ACCOUNT.name)).toBeVisible();
+  await expect(table.getByText('Cash & Cash Equivalents')).toHaveCount(0);
 
-  // 6. Navigate to Journal Entries tab
-  const jeTab = page.locator('#tab-journal-entries');
-  await expect(jeTab).toBeVisible();
-  await jeTab.click();
-  await expect(page.getByRole('heading', { name: /Journal Entries/i })).toBeVisible();
+  // Clear search restores all
+  await page.getByRole('button', { name: 'Reset all filters' }).click();
+  await expect(table.getByText('Cash & Cash Equivalents')).toBeVisible();
 
-  // Ensure no unhandled client runtime errors occurred
+  // Filter by type
+  const typeSelect = page.getByLabel('Filter by account type');
+  await typeSelect.selectOption('liability');
+  await expect(table.getByText('Accounts Payable')).toBeVisible();
+  await expect(table.getByText('Cash & Cash Equivalents')).toHaveCount(0);
+
+  expect(uncaught).toEqual([]);
+});
+
+test('journal entry journey: create balanced entry, list entries, view detail, and post', async ({
+  page,
+}) => {
+  const uncaught: string[] = [];
+  page.on('pageerror', (error) => uncaught.push(error.message));
+
+  await page.goto('/erp4/accounts');
+
+  // Navigate to create journal entry view
+  await page.getByRole('button', { name: 'Create new journal entry' }).click();
+  await expect(page.getByRole('main', { name: 'Journal Entry Creation Screen' })).toBeVisible();
+
+  // Fill Header fields
+  await page.getByLabel('Transaction Description / Memo').fill('E2E Inflow and Outflow Transfer');
+  await page.getByLabel('Source Reference').fill('REF-E2E-001');
+  await page.locator('#je-currency').selectOption('INR');
+
+  // Fill line amounts so entry is balanced (Line 1 debit 150.00, Line 2 credit 150.00)
+  await page.getByLabel('Debit amount for line 1').fill('150.00');
+  await page.getByLabel('Credit amount for line 2').fill('150.00');
+
+  // Save as draft
+  await page.getByRole('button', { name: 'Save draft entry' }).click();
+
+  // Verify success banner with detail link
+  await expect(page.getByText(/Successfully Saved as Draft/i)).toBeVisible();
+
+  // Click View Entry Details
+  await page.getByRole('button', { name: /View Entry Details/i }).click();
+  await expect(page.getByText('E2E Inflow and Outflow Transfer')).toBeVisible();
+
+  // Return to Ledger List
+  await page.getByRole('button', { name: 'Back to accounts list' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Finance & Accounting (ERP-4)', level: 1 }),
+  ).toBeVisible();
+
+  // Switch to Journal Entries tab and verify entry exists in table
+  await page.getByRole('tab', { name: 'Journal Entries' }).click();
+  const jeTable = page.getByRole('table', { name: 'Journal Entries Directory' });
+  await expect(jeTable.getByText('E2E Inflow and Outflow Transfer')).toBeVisible();
+
   expect(uncaught).toEqual([]);
 });

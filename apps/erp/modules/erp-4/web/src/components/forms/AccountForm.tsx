@@ -430,6 +430,7 @@ export const AccountForm: React.FC<AccountFormProps> = ({
       >
         <textarea
           rows={3}
+          aria-label="Description Memo"
           value={formData.description || ''}
           onChange={(e) => handleFieldChange('description', e.target.value)}
           placeholder="Primary operational cash account used for payroll and AP disbursements."

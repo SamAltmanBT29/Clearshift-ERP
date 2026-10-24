@@ -1,11 +1,11 @@
 /**
- * ERP-4 browser-journey host (ERP4-10).
+ * ERP-4 browser-journey host (ERP4-29).
  *
  * A minimal Vite dev server used ONLY by the Playwright journey:
  *   - serves the real ERP-4 web routes (`erp4Routes`) from ./host
- *   - mounts the real ERP-4 Fastify app (in-memory repository, synthetic data)
+ *   - mounts the real ERP-4 Fastify app (in-memory repository, synthetic fixtures)
  *     under /api via `app.inject`, so no database or network is needed
- *   - exposes POST /__e2e/reset to start every test from an empty store
+ *   - exposes POST /__e2e/reset to start every test from fresh synthetic fixtures
  *
  * Aliases are reused from the root vitest config, so module resolution is
  * identical to the unit tests. Run from the repository root.
@@ -35,15 +35,15 @@ const CONTRACTS_INDEX = path.resolve(REPO_ROOT, 'packages/contracts/src/index.ts
 const UI_INDEX = path.resolve(REPO_ROOT, 'packages/ui/src/index.ts');
 const CORE_INDEX = path.resolve(REPO_ROOT, 'packages/core/src/index.ts');
 const KIT_INDEX = path.resolve(REPO_ROOT, 'packages/kit/src/index.ts');
-
-const BROWSER_CORE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/core-browser.ts');
 const BROWSER_CONTRACTS = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/contracts-browser.ts');
 const BROWSER_UI = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/ui-browser.ts');
+const BROWSER_CORE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/core-browser.ts');
 const BROWSER_KIT = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/e2e/host/kit-browser.ts');
-
 const APP_MODULE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/src/app.ts');
-const REPOSITORY_MODULE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/src/services/repository.ts');
-const FIXTURES_MODULE = path.resolve(REPO_ROOT, 'apps/erp/modules/erp-4/fixtures/index.ts');
+const REPOSITORY_MODULE = path.resolve(
+  REPO_ROOT,
+  'apps/erp/modules/erp-4/src/services/repository.ts',
+);
 
 interface InjectResult {
   statusCode: number;
@@ -60,6 +60,14 @@ interface Erp4TestApp {
     headers: Record<string, string>;
     payload?: Buffer;
   }): Promise<InjectResult>;
+}
+
+interface Erp4AppModule {
+  buildApp(options: { repository: unknown }): Erp4TestApp;
+}
+
+interface Erp4RepositoryModule {
+  InMemoryFinanceRepository: new (seed: boolean) => unknown;
 }
 
 async function readBody(req: IncomingMessage): Promise<Buffer | undefined> {
@@ -83,35 +91,20 @@ function erp4E2eApi(): E2ePlugin {
       return null;
     },
     configureServer(server: DevServerLike) {
-      let appModule: any;
-      let repositoryModule: any;
-      let fixturesModule: any;
+      let appModule: Erp4AppModule | undefined;
+      let repositoryModule: Erp4RepositoryModule | undefined;
       let app: Erp4TestApp | undefined;
 
       const fresh = async (): Promise<Erp4TestApp> => {
-        appModule ??= await server.ssrLoadModule(APP_MODULE);
-        repositoryModule ??= await server.ssrLoadModule(REPOSITORY_MODULE);
-        fixturesModule ??= await server.ssrLoadModule(FIXTURES_MODULE);
-
+        appModule ??= (await server.ssrLoadModule(APP_MODULE)) as unknown as Erp4AppModule;
+        repositoryModule ??= (await server.ssrLoadModule(
+          REPOSITORY_MODULE,
+        )) as unknown as Erp4RepositoryModule;
         if (app) {
           await app.close();
         }
-
-        const repo = new repositoryModule.InMemoryFinanceRepository(false);
-        // Pre-seed fiscal periods so period validation succeeds
-        if (fixturesModule.FIXTURE_PERIOD_OPEN) {
-          repo.periods.set(String(fixturesModule.FIXTURE_PERIOD_OPEN.id), fixturesModule.FIXTURE_PERIOD_OPEN);
-        }
-        if (fixturesModule.FIXTURE_PERIOD_SOFT_CLOSED) {
-          repo.periods.set(String(fixturesModule.FIXTURE_PERIOD_SOFT_CLOSED.id), fixturesModule.FIXTURE_PERIOD_SOFT_CLOSED);
-        }
-        if (fixturesModule.FIXTURE_PERIOD_LOCKED) {
-          repo.periods.set(String(fixturesModule.FIXTURE_PERIOD_LOCKED.id), fixturesModule.FIXTURE_PERIOD_LOCKED);
-        }
-
         const next = appModule.buildApp({
-          repository: repo,
-          authRequired: false,
+          repository: new repositoryModule.InMemoryFinanceRepository(true),
         });
         await next.ready();
         app = next;
@@ -136,12 +129,7 @@ function erp4E2eApi(): E2ePlugin {
           const payload = await readBody(req);
           const headers: Record<string, string> = {};
           for (const [key, value] of Object.entries(req.headers)) {
-            if (
-              typeof value === 'string' &&
-              key !== 'host' &&
-              key !== 'connection' &&
-              key !== 'authorization'
-            ) {
+            if (typeof value === 'string' && key !== 'host' && key !== 'connection') {
               headers[key] = value;
             }
           }

@@ -9,7 +9,7 @@ import { erp4Routes } from '../../web/src/routes.js';
 import '../../web/src/theme.css';
 
 const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/erp4/accounts" replace /> },
+  { path: '/', element: <Navigate to="/erp4" replace /> },
   { path: '/login', element: <p>Hub login (E2E host stub)</p> },
   ...erp4Routes,
 ]);
