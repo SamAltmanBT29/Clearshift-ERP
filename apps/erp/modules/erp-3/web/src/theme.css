@@ -409,6 +409,135 @@
   opacity: 0.9;
 }
 
+/* Forbidden / Access Denied Box (AC4) */
+.cs-forbidden-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: var(--space-4);
+}
+
+.cs-forbidden-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+  margin-bottom: var(--space-2);
+}
+
+.cs-forbidden-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+  max-width: 480px;
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+/* ERP-3 Screen States & Alert Banners */
+.cs-erp3-error-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.cs-erp3-error-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp3-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error-border);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cs-erp3-correlation-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.cs-erp3-correlation-hint code {
+  font-family: var(--font-mono, monospace);
+  background: var(--color-surface);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.cs-erp3-access-denied {
+  text-align: center;
+}
+
+.cs-erp3-access-denied-icon {
+  font-size: 36px;
+  margin-bottom: var(--space-2);
+}
+
+.cs-erp3-access-denied-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.cs-erp3-access-denied-message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 480px;
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+.cs-erp3-access-denied-role-hint {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  display: inline-block;
+  margin: var(--space-2) auto;
+}
+
+.cs-erp3-access-denied-role-hint code {
+  font-family: var(--font-mono, monospace);
+  color: var(--color-primary, #2563eb);
+}
+
+.cs-erp3-access-denied-footer {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+.cs-erp3-skeleton-container {
+  width: 100%;
+}
+
+.cs-erp3-empty-zero-data {
+  border-style: dashed;
+}
+
 /* Header actions row */
 .cs-header-actions-row {
   display: flex;
@@ -1030,4 +1159,287 @@
 .cs-pagination-info {
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+/* ── Content with Sidebar Layout ── */
+.cs-erp3-content-with-sidebar {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.cs-erp3-content-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ── Debounced Search Bar ── */
+.cs-erp3-search-container {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 240px;
+}
+
+.cs-erp3-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.cs-erp3-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-subtle);
+  pointer-events: none;
+}
+
+.cs-erp3-search-input {
+  width: 100%;
+  padding-left: 32px !important;
+  padding-right: 32px !important;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.cs-erp3-search-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.cs-erp3-search-clear-btn {
+  position: absolute;
+  right: var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.cs-erp3-search-clear-btn:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+/* ── Active Filter Pill Tags ── */
+.cs-erp3-active-pills-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.cs-erp3-active-pills-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cs-erp3-pills-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-erp3-pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-info-bg, #eff6ff);
+  border: 1px solid var(--color-info-border, #bfdbfe);
+  border-radius: 9999px;
+  padding: 2px var(--space-2);
+  font-size: 12px;
+}
+
+.cs-erp3-pill-text {
+  color: var(--color-text);
+}
+
+.cs-erp3-pill-tag {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.cs-erp3-pill-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 9999px;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.cs-erp3-pill-remove-btn:hover:not(:disabled) {
+  background: var(--color-error-bg, #fee2e2);
+  color: var(--color-error, #dc2626);
+}
+
+.cs-erp3-btn-clear-all {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 2px var(--space-2);
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.cs-erp3-btn-clear-all:hover:not(:disabled) {
+  border-color: var(--color-error, #dc2626);
+  color: var(--color-error, #dc2626);
+}
+
+/* ── Faceted Filter Sidebar ── */
+.cs-erp3-faceted-sidebar {
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.cs-erp3-faceted-sidebar.is-collapsed {
+  width: 40px;
+  overflow: hidden;
+  padding: var(--space-2);
+}
+
+.cs-erp3-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp3-sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.cs-erp3-sidebar-toggle-btn {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding: 2px 5px;
+  transition: border-color 0.15s;
+}
+
+.cs-erp3-sidebar-toggle-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.cs-erp3-sidebar-reset-container {
+  margin-bottom: var(--space-3);
+}
+
+.cs-erp3-btn-reset-filters {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: var(--space-1) var(--space-2);
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.cs-erp3-btn-reset-filters:hover:not(:disabled) {
+  border-color: var(--color-error, #dc2626);
+  color: var(--color-error, #dc2626);
+}
+
+.cs-erp3-facet-group {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cs-erp3-facet-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cs-erp3-facet-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--space-2) 0;
+}
+
+.cs-erp3-facet-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-erp3-radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  transition: color 0.1s;
+}
+
+.cs-erp3-radio-option:hover {
+  color: var(--color-primary);
+}
+
+.cs-erp3-radio-option input[type='radio'] {
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .cs-erp3-content-with-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .cs-erp3-faceted-sidebar {
+    position: static;
+    max-height: none;
+  }
 }

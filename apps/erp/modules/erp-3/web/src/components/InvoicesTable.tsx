@@ -1,6 +1,12 @@
 import React from 'react';
 import type { Invoice } from '@clearshift/contracts';
-import { StatusBadge, SkeletonTable, EmptyState } from './StateViews.js';
+import {
+  StatusBadge,
+  SkeletonTable,
+  EmptyState,
+  EmptyInvoicesView,
+  InvoicesLoadingSkeleton,
+} from './StateViews.js';
 
 export interface InvoicesTableProps {
   invoices: Invoice[];
@@ -16,6 +22,9 @@ export interface InvoicesTableProps {
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onRefresh?: (() => void) | undefined;
   onSelectInvoice?: ((invoice: Invoice) => void) | undefined;
+  hasActiveFilters?: boolean | undefined;
+  onCreateInvoice?: (() => void) | undefined;
+  onClearFilters?: (() => void) | undefined;
 }
 
 export const InvoicesTable: React.FC<InvoicesTableProps> = ({
@@ -32,18 +41,20 @@ export const InvoicesTable: React.FC<InvoicesTableProps> = ({
   onPageSizeChange,
   onRefresh,
   onSelectInvoice,
+  hasActiveFilters,
+  onCreateInvoice,
+  onClearFilters,
 }) => {
   if (isLoading) {
-    return <SkeletonTable columns={8} rows={pageSize > 10 ? 8 : pageSize} />;
+    return <InvoicesLoadingSkeleton columns={8} rows={pageSize > 10 ? 8 : pageSize} />;
   }
 
   if (invoices.length === 0) {
     return (
-      <EmptyState
-        title="No invoices found"
-        message="No invoices match your current filter selection or search query."
-        actionLabel={onRefresh ? 'Clear Filters & Reload' : undefined}
-        onAction={onRefresh}
+      <EmptyInvoicesView
+        hasActiveFilters={Boolean(hasActiveFilters)}
+        onClearFilters={onClearFilters || onRefresh || (() => {})}
+        onCreateInvoice={onCreateInvoice}
       />
     );
   }
