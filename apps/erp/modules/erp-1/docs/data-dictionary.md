@@ -33,6 +33,8 @@
 19. [Requirement-to-Test Traceability Matrix (ERP1-24)](#19-requirement-to-test-traceability-matrix-erp1-24)
 20. [Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)](#20-canonical-dirty-data-pack-plan--defect-distribution-erp1-24)
 21. [Gate G1 Review & Design Artifact Sign-Off (ERP1-24)](#21-gate-g1-review--design-artifact-sign-off-erp1-24)
+22. [QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)](#22-qa-evidence-automated-test-mapping-and-team-handoff-erp1-10)
+23. [Profiling Configuration & Expected-Result Assertions (ERP1-26)](#23-profiling-configuration--expected-result-assertions-erp1-26)
 
 ---
 
@@ -158,6 +160,37 @@ cannot create a second stock row for the same pair.
 
 ---
 
+---
+
+## 5. `erp1.import_receipts` — Durable Migration Receipts
+
+**Purpose**: Records durable import receipts for idempotent migration loads in a single transaction.
+**Architecture Reference**: Decision C4 & KIT-08
+
+| Column | PostgreSQL Type | Nullable | Default | Meaning | Constraints |
+|---|---|---|---|---|---|
+| `id` | `UUID` | NOT NULL | `gen_random_uuid()` | Primary key | PK |
+| `batch_id` | `UUID` | NOT NULL | — | Migration Kit batch UUID | B-tree index |
+| `source_row` | `INTEGER` | NOT NULL | — | 0-indexed row position in source payload | — |
+| `target_id` | `UUID` | NOT NULL | — | UUID of created/updated target record | — |
+| `target_entity` | `VARCHAR(64)` | NOT NULL | `'product'` | Entity name | — |
+| `idempotency_key` | `VARCHAR(255)` | NOT NULL | — | Deterministic unique key | UNIQUE |
+| `source_system` | `VARCHAR(64)` | NULL | — | Originating import system | — |
+| `source_id` | `VARCHAR(128)` | NULL | — | Source record identifier | — |
+| `request_hash` | `VARCHAR(64)` | NOT NULL | `''` | SHA-256 of the canonical request payload; detects key reuse with different data | — |
+| `outcome` | `VARCHAR(16)` | NOT NULL | `'loaded'` | Terminal receipt outcome | — |
+| `response_payload` | `TEXT` | NULL | — | Durable JSON result replayed on an identical retry | — |
+| `created_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | Creation timestamp | — |
+
+**Indexes**:
+- `erp1_import_receipts_idempotency_idx` — UNIQUE on `(idempotency_key)`
+- `erp1_import_receipts_batch_idx` — B-tree on `(batch_id)`
+- `erp1_import_receipts_batch_row_idx` — B-tree on `(batch_id, source_row_index)`
+
+**Migration**: additive columns and the single-default-warehouse partial unique index are applied by `packages/database/migrations/erp1_v2.sql`.
+
+---
+
 ## 6. `erp1.import_receipts` — Durable Migration Receipts
 
 **Purpose**: Durable KIT-08 receipt proving a source row was loaded into a target entity. Written in the same PostgreSQL transaction as the target mutation.
@@ -174,6 +207,11 @@ cannot create a second stock row for the same pair.
 | `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
 | `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
 | `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `source_system` | `VARCHAR(64)` | `z.string().optional()` | NULLABLE | — | Source system identifier | Audit | `'legacy_erp'` |
+| `source_id` | `VARCHAR(128)` | `z.string().optional()` | NULLABLE | — | Source record identifier | Audit | `'LEG-1001'` |
+| `request_hash` | `VARCHAR(64)` | `z.string()` | NOT NULL | `''` | SHA-256 hash of canonical request | KIT-08 | `'e3b0c442...'` |
+| `outcome` | `VARCHAR(16)` | `enum('loaded','rejected','merged','skipped')` | NOT NULL | `'loaded'` | Row outcome classification | KIT-08 | `'loaded'` |
+| `response_payload` | `TEXT` | `z.string().optional()` | NULLABLE | — | Serialized JSON response for idempotent replay | KIT-08 | `'{"id":"..."}'` |
 | `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
@@ -214,6 +252,29 @@ cannot create a second stock row for the same pair.
 6. **Exact decimal handling.** Money uses `NUMERIC(19,4)`, quantities use `NUMERIC(19,4)`; no floating-point columns.
 7. **Explicit currency.** Every product stores an uppercase ISO 4217 code; there is no implicit currency default.
 8. **Migration idempotency.** `idempotency_key` is unique and opening stock is unique per product/warehouse pair.
+
+### 8.1 Relationships, State Transitions & Read Model Consistency (ERP1-06)
+
+**Issue**: [#11](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/11) — `[ERP1-06] ERP-1 Products and Inventory: Relationships, state transitions and read-model consistency`
+**Implementation**: `apps/erp/modules/erp-1/src/domain/relationships.ts`, `apps/erp/modules/erp-1/src/domain/rules.ts`, `packages/contracts/src/erp-1.ts`, `tests/domain/relationships.test.ts`.
+
+#### Rules & Invariants:
+1. **Optional Relationship Handling (`handleOptionalRelationship`)**: When an optional relationship (e.g. `categoryId` on products) is absent, the module returns `null` along with the approved `ERP1_OPTIONAL_REFERENCE_ABSENT` warning code. It never fabricates synthetic or placeholder records.
+2. **Provenance Pair Completeness (`assertSourceIdentityIsComplete`)**: `source_system` and `source_id` must be supplied together. Supplying one without the other is rejected with `SOURCE_IDENTITY_INCOMPLETE`.
+3. **Fixed Enumeration Enforcement**:
+   - `unit_of_measure`: Strictly validated against `['pcs', 'kg', 'g', 'litre', 'metre', 'box']` (`INVALID_UNIT_OF_MEASURE`).
+   - `currency`: Validated against uppercase ISO 4217 3-letter codes (`INVALID_CURRENCY_CODE`).
+   - `stock_status`: Derived and validated against `['out_of_stock', 'low_stock', 'in_stock']` (`INVALID_STOCK_STATUS`).
+   - `product_status`: Validated against lifecycle statuses `['draft', 'active', 'discontinued', 'archived']` (`INVALID_PRODUCT_STATUS`).
+4. **State Transition Matrices**:
+   - **Stock Status Transitions**: Transitions between `out_of_stock`, `low_stock`, and `in_stock` are governed by authoritative physical stock balances. Any stock mutation resulting in negative quantities is strictly rejected with `NEGATIVE_STOCK` (BR-ERP1-02).
+   - **Product Lifecycle Transitions**: Forward transitions follow `draft -> active -> discontinued -> archived`. Identical status updates are idempotent no-ops. `archived` is a terminal status; transitions out of `archived` are rejected with `INVALID_STATUS_TRANSITION`.
+5. **Read Model Consistency**:
+   - **Products**: Persisted entity and read projection agree on `normalizedSku === normalizeSku(sku)`, non-negative price with scale <= 4, non-negative tax rate with scale <= 2, and explicit currency.
+   - **Stock Levels**: Quantity must be non-negative, and authoritative derived stock status matches `deriveStockStatus(quantity)`.
+   - **Categories**: Invariant of single-level categories enforced; nested parent relationships (`parentId`) are rejected.
+6. **Cross-Module Private Table Isolation**:
+   - Sibling private tables (`erp2.*`, `erp3.*`, `erp4.*`, `erp5.*`, `crm.*`) are strictly prohibited from being written to by ERP-1. Cross-module reads resolve through contract-safe public reference resolvers (`Erp1ReferenceResolver`).
 
 ---
 
@@ -313,9 +374,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 12. Search, Filters and Sorting Controls (ERP1-18)
+## 12. Search, Filters and Sorting Controls (ERP1-04 / ERP1-18)
 
-**Issue**: [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) — `[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#114](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/114) (`[ERP1-18] ERP-1 Products and Inventory: Search, filters and sorting controls`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/` — API client, faceted sidebar, active filter pills, sorting controls, debounced search, and products list page.
 
 ### 12.1 Query Parameters (`GET /api/v1/erp-products/products`)
@@ -343,9 +404,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 13. Loading, Empty, Error and Access-Denied States (ERP1-19)
+## 13. Loading, Empty, Error and Access-Denied States (ERP1-04 / ERP1-19)
 
-**Issue**: [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) — `[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`  
+**Issues**: [#9](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/9) (`[ERP1-04] ERP-1 Products and Inventory: List screen, search/filter and stable empty/loading/error states`), [#115](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/115) (`[ERP1-19] ERP-1 Products and Inventory: Loading, empty, error and access-denied states`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/components/StateViews.tsx`, `ProductsListPage.tsx`, `theme.css`.
 
 ### 13.1 State Specifications & Acceptance Criteria
@@ -366,9 +427,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 14. Product Creation Form with Field-Level Validation (ERP1-20)
+## 14. Product Creation Form with Field-Level Validation (ERP1-05 / ERP1-20)
 
-**Issue**: [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) — `[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#116](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/116) (`[ERP1-20] ERP-1 Products and Inventory: Create form with field-level validation`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/hooks/useProductForm.ts`, `ProductCreateModal.tsx`, `ProductsListPage.tsx`, `api/erp-1.ts`, `theme.css`.
 
 ### 14.1 Form Fields, Rules and Acceptance Criteria
@@ -394,9 +455,9 @@ Request/response bodies are defined in `packages/contracts/src/erp-1.ts` and `pa
 
 ---
 
-## 15. Detail/Edit Workflow and Linked Records (ERP1-21)
+## 15. Detail/Edit Workflow and Linked Records (ERP1-05 / ERP1-21)
 
-**Issue**: [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) — `[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`  
+**Issues**: [#10](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/10) (`[ERP1-05] ERP-1 Products and Inventory: Create/edit/detail workflow and client-side validation`), [#117](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/117) (`[ERP1-21] ERP-1 Products and Inventory: Detail/edit workflow and linked records`)
 **Implementation**: `apps/erp/modules/erp-1/web/src/pages/ProductDetailPage.tsx`, `ProductAuditPanel.tsx`, `ProductLinkedRecordsTable.tsx`, `ProductEditDrawer.tsx`, `hooks/useProductEditForm.ts`, `api/erp-1.ts`, `theme.css`.
 
 ### 15.1 Architectural Scope & Acceptance Criteria
@@ -657,21 +718,23 @@ Every functional requirement, domain rule, and platform architectural invariant 
 | **ERP1-21** | Issue #117 | Detail/edit drawer workflow, linked records, HTTP 409 conflict handling | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
 | **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
 | **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
+| **ERP1-08** | Issue #13 | Module-specific profiling, cleaning, mapping and dirty-data pack | `apps/erp/modules/erp-1/tests/migration/rules.test.ts`<br>`apps/erp/modules/erp-1/docs/data-quality-rules.md` | **Verified** |
 | **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
 
 ---
 
-## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)
+## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-08 / ERP1-24)
 
 ### 20.1 Plan Overview & Principles
 
 The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove the entire 7-step Migration Kit pipeline (**Extract, Profile, Clean, Map, Load, Validate, Reconcile**) against real-world messiness without utilizing any real customer or employee PII.
 
-- **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../sample-data/erp-1/dirty-data-v1.csv)
-- **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json)
-- **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../sample-data/erp-1/mapping-template.json)
-- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/dirty-data-plan.ts`](../src/migration/dirty-data-plan.ts)
-- **Automated Regression Suite**: [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
+- **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../../../sample-data/erp-1/dirty-data-v1.csv)
+- **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../../../sample-data/erp-1/expected-profile.json)
+- **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../../../sample-data/erp-1/mapping-template.json)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/rules.ts`](../src/migration/rules.ts)
+- **Data Quality Rules Specification**: [`apps/erp/modules/erp-1/docs/data-quality-rules.md`](data-quality-rules.md)
+- **Automated Regression Suites**: [`apps/erp/modules/erp-1/tests/migration/rules.test.ts`](../tests/migration/rules.test.ts) & [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
 
 ### 20.2 Synthetic Edge-Case Scenarios
 
@@ -781,3 +844,58 @@ In compliance with Migration Kit Gate G1 standards, [`sample-data/erp-1/expected
 - **Review Date**: 2026-10-23
 - **Gate Decision**: **PASSED (UNANIMOUS SIGN-OFF FOR GATE G1)**
 - **Audit Hash**: SHA-256 checksums verified across OpenAPI specification, contracts, and Dirty Data Pack manifests.
+
+---
+
+## 22. QA Evidence, Automated Test Mapping, and Team Handoff (ERP1-10)
+
+### 22.1 Test Evidence & Invariant Mapping
+
+| Invariant / Requirement | Contract & Enforcement | Verification Test File | Status |
+|---|---|---|:---:|
+| **BR-ERP1-01** (Unique SKU) | `erp1_products_sku_unique` index + normalized uppercase matching | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **BR-ERP1-02** (Non-negative stock) | `check_erp1_stock_quantity_non_negative` constraint | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/constraints.test.ts` | **Verified** |
+| **FR-ERP1-03** (1-level category hierarchy) | Schema has no `parent_id`, validator prohibits nested subcategories | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/e2e/demo-journey.test.ts` | **Verified** |
+| **FR-ERP1-04** (Fixed units: pcs, kg, g, litre, metre, box) | `erp1.unit_of_measure` enum & `UnitOfMeasureSchema` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **FR-ERP1-05** (Single warehouse in V1) | `erp1_warehouses_single_idx` on constant `true` | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `tests/db/schema.test.ts` | **Verified** |
+| **Explicit Currency (USD)** | Uppercase ISO-4217 code required on create | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **Decimal Price (NUMERIC 19,4)** | Decimal format preserved without float rounding | `apps/erp/modules/erp-1/tests/domain/invariants.test.ts`, `packages/contracts/tests/erp-1.test.ts` | **Verified** |
+| **OpenAPI Parity** | 100% routes mapped to `packages/contracts/openapi/erp-1.yaml` | `apps/erp/modules/erp-1/tests/contract/openapi-parity.test.ts` | **Verified** |
+| **Deterministic Seed & Reset** | Re-running produces identical IDs without duplicate writes | `apps/erp/modules/erp-1/tests/seed/seed.test.ts`, `sample-data/erp-1/seed.ts` | **Verified** |
+| **Scripted 5-Minute Demo** | In-process execution of full V1 demo workflow | `apps/erp/modules/erp-1/tests/e2e/demo-journey.test.ts`, `docs/demo-scripts/erp-1-v1.md` | **Verified** |
+| **Error Envelope Compliance** | Conforms to `{ statusCode, error, code, message, details, correlation_id }` | `apps/erp/modules/erp-1/tests/api/auth-and-envelope.test.ts` | **Verified** |
+
+### 22.2 Handoff Sign-Off
+- **Issue Reference**: Resolves [#15](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/15) ([ERP1-10])
+- **Author**: Samarth (`Samarth-ITM`)
+- **Role**: Group 6 / Role 4 — Data & QA Lead
+- **Scope**: Production-grade verification, contract parity, test harnesses, seed idempotency, demo journey, and team handoff documentation.
+
+---
+
+## 23. Profiling Configuration & Expected-Result Assertions (ERP1-26)
+
+**Issue Reference**: Resolves [#122](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/122) (ERP1-26 / KIT-03)  
+**Implementation**: `apps/erp/modules/erp-1/src/migration/profiling-config.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/migration/profiling.test.ts`  
+**Detailed Specification**: `docs/data-dictionaries/erp-1-profiling.md`  
+
+### 23.1 Shared Migration Kit Profiler Integration (KIT-03)
+ERP-1 registers domain rules for module columns (`category`, `warehouse`, `product`, `stock_level`) with `@cs/kit`'s `profileDataset`.
+- Computes `totalRows` (131), `nullCount`, `populatedCount`, `distinctCount`, `invalidFormatCount`, `invalidFormatRate`, and `topValues` (max 5).
+- Enforces V1 domain invariants: single warehouse `WH-01`, fixed UOM enum, non-negative price/tax/stock, RFC email/phone regex, and OWASP formula injection prevention.
+- All column defect counts match pre-calculated manifest numbers from `sample-data/erp-1/expected-profile.json`.
+
+### 23.2 Exact Duplicate Key Matching Policy
+Configures 3 exact duplicate matching rules:
+1. `category_code`: trimmed uppercase category code (2 candidates: `R012`, `R013` matching `R001`)
+2. `product_sku`: normalized uppercase SKU (3 candidates: `R057`, `R058` matching `R022`, `R059` matching `R023`)
+3. `stock_level_key`: composite `${sku}::${warehouse}` (2 candidates: `R112`, `R113` matching `R087`)
+
+Total duplicate candidates = 7, exactly matching manifest `review: 7`. Zero fuzzy scoring or V2 compensating rollback sagas.
+
+### 23.3 Non-Destructive Guarantee & Sensitive Data Masking
+- Source data immutability: input CSV text and parsed objects are never mutated. SHA-256 digest is verified against manifest `fixture_sha256`.
+- Sensitive fields `supplier_bank_account` and `employee_ssn` are excluded from column rules and masked before profiling; zero raw financial/personal numbers in reports or formula-safe CSV exports.
+
+

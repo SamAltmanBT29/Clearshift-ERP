@@ -20,10 +20,11 @@ import {
 import type { HrService } from '../services/hr.service.js';
 import { payrollLoadGuard, payrollReadGuard } from './guard.js';
 import { parseWriteBody } from './parsing.js';
-import type { HrRouteOptions } from './types.js';
+import type { HrRouteOptions, HrFastifyInstance } from './types.js';
 
 export const payrollTotalsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
   const { hrService } = opts;
+  const app = fastify as HrFastifyInstance;
 
   // GET /payroll-totals - List department/month aggregates
   fastify.get(
@@ -52,7 +53,11 @@ export const payrollTotalsRoutes: FastifyPluginAsync<HrRouteOptions> = async (fa
   // POST /payroll-totals - Load one department/month aggregate
   fastify.post('/payroll-totals', { preHandler: payrollLoadGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrPayrollTotalRequestSchema, request);
-    const result = await hrService.createPayrollTotal(body);
+    const result = await hrService.createPayrollTotal(
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(result.created ? 201 : 200).send({
       ...result.entity,

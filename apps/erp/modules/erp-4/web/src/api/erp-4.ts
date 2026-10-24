@@ -11,6 +11,7 @@ import type {
   CreateOpeningBalancesInput,
   OpeningBalancesResponse,
 } from '@clearshift/contracts';
+export { isJournalEntryBalanced } from '@clearshift/contracts';
 
 const API_BASE = '/api/v1/erp-finance';
 
@@ -140,6 +141,26 @@ export async function fetchAccounts(
 export async function createAccount(data: CreateAccountInput): Promise<Account> {
   return request<Account>('/accounts', {
     method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Fetch a single account by ID.
+ */
+export async function fetchAccountById(id: string): Promise<Account> {
+  return request<Account>(`/accounts/${id}`);
+}
+
+/**
+ * Update mutable account fields (Admin / Editor only).
+ */
+export async function updateAccount(
+  id: string,
+  data: Partial<CreateAccountInput> & Record<string, unknown>
+): Promise<Account> {
+  return request<Account>(`/accounts/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 }
@@ -338,4 +359,55 @@ export async function downloadCleanAuditCsv(): Promise<string> {
     throw new ApiError(response.status, 'CSV_DOWNLOAD_FAILED', 'Failed to download field clean audit CSV');
   }
   return await response.text();
+}
+
+export interface MappingTemplatesResponse {
+  success: boolean;
+  data: any[];
+}
+
+/**
+ * Fetch available named mapping templates.
+ */
+export async function fetchMappingTemplates(): Promise<any[]> {
+  const res = await request<MappingTemplatesResponse>('/migration/mapping/templates');
+  return res.data;
+}
+
+/**
+ * Fetch a specific named mapping template by ID.
+ */
+export async function fetchMappingTemplate(templateId: string): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>(`/migration/mapping/templates/${templateId}`);
+  return res.data;
+}
+
+/**
+ * Validate a field mapping configuration against an entity schema.
+ */
+export async function validateMappingConfig(
+  entity: string,
+  mapping: Record<string, string>,
+  sourceTypes?: Record<string, string>
+): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>('/migration/mapping/validate', {
+    method: 'POST',
+    body: JSON.stringify({ entity, mapping, sourceTypes }),
+  });
+  return res.data;
+}
+
+/**
+ * Transform dataset rows using field mapping and value translations.
+ */
+export async function transformDatasetRows(
+  entity: string,
+  mapping: Record<string, string>,
+  rows: Record<string, unknown>[]
+): Promise<any> {
+  const res = await request<{ success: boolean; data: any }>('/migration/mapping/transform', {
+    method: 'POST',
+    body: JSON.stringify({ entity, mapping, rows }),
+  });
+  return res.data;
 }

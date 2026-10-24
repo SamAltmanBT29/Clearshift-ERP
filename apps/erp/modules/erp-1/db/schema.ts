@@ -185,11 +185,18 @@ export const erp1ImportReceipts = erp1Schema.table(
       .default(sql`gen_random_uuid()`),
     batchId: uuid('batch_id').notNull(),
     sourceRow: integer('source_row').notNull(),
-    entity: varchar('entity', { length: 64 }).notNull(),
+    targetId: uuid('target_id').notNull(),
+    targetEntity: varchar('entity', { length: 64 })
+      .notNull()
+      .default('product'),
     schemaVersion: integer('schema_version').notNull().default(1),
     idempotencyKey: varchar('idempotency_key', { length: 128 }).notNull(),
-    targetId: uuid('target_id').notNull(),
     kind: varchar('kind', { length: 16 }).notNull().default('created'),
+    sourceSystem: varchar('source_system', { length: 64 }),
+    sourceId: varchar('source_id', { length: 128 }),
+    requestHash: varchar('request_hash', { length: 64 }).notNull().default(''),
+    outcome: varchar('outcome', { length: 16 }).notNull().default('loaded'),
+    responsePayload: text('response_payload'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

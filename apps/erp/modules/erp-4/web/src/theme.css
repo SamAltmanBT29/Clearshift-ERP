@@ -61,6 +61,137 @@
   box-sizing: border-box;
 }
 
+/* Module Layout Shell (PLT-08 & ERP4-16) */
+.cs-erp4-shell {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  padding: var(--space-6);
+  box-sizing: border-box;
+}
+
+.cs-erp4-skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 50;
+  transform: translateY(-200%);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background-color: var(--color-background);
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 120ms ease-in-out;
+}
+
+.cs-erp4-skip-link:focus {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary);
+}
+
+.cs-erp4-banner {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.cs-erp4-eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.cs-erp4-module-title {
+  margin: var(--space-1) 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.cs-erp4-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.cs-erp4-nav {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.cs-erp4-nav-group + .cs-erp4-nav-group {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cs-erp4-nav-group-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.cs-erp4-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-erp4-nav-item {
+  margin: 0;
+}
+
+.cs-erp4-nav-link {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: all 120ms ease;
+}
+
+.cs-erp4-nav-link:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.cs-erp4-nav-link.is-active,
+.cs-erp4-nav-link[aria-current='page'] {
+  background-color: #eff6ff;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.cs-erp4-content {
+  min-width: 0;
+}
+
+.cs-erp4-breadcrumb {
+  margin-bottom: var(--space-4);
+}
+
+.cs-erp4-main {
+  outline: none;
+}
+
 /* Header & Metric Cards */
 .cs-header {
   margin-bottom: var(--space-6);

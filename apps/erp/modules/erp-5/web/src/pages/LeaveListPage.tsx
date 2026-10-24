@@ -10,8 +10,10 @@
 
 import React, { useMemo, useState } from 'react';
 import { PageTitle, Pagination } from '@cs/ui';
+import { useSearchParams } from 'react-router-dom';
 import {
   HR_PAGE_SIZE_DEFAULT,
+  HR_PAGE_SIZE_MAX,
   type HrLeave,
   type HrLeaveListQuery,
 } from '@clearshift/contracts';
@@ -37,10 +39,21 @@ const STATUS_OPTIONS = [
 ] as const;
 
 export const LeaveListPage: React.FC = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
-  const [type, setType] = useState<LeaveType | undefined>(undefined);
-  const [status, setStatus] = useState<LeaveStatus | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const p = Number(searchParams.get('pageSize'));
+    return Number.isFinite(p) && p >= 1 && p <= HR_PAGE_SIZE_MAX ? p : HR_PAGE_SIZE_DEFAULT;
+  });
+  const [type, setType] = useState<LeaveType | undefined>(
+    () => (searchParams.get('type') as LeaveType | null) ?? undefined
+  );
+  const [status, setStatus] = useState<LeaveStatus | undefined>(
+    () => (searchParams.get('status') as LeaveStatus | null) ?? undefined
+  );
 
   const query = useMemo<HrLeaveListQuery>(
     () => ({
@@ -51,6 +64,15 @@ export const LeaveListPage: React.FC = () => {
     }),
     [page, pageSize, type, status]
   );
+
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (page !== 1) params.set('page', String(page));
+    if (pageSize !== HR_PAGE_SIZE_DEFAULT) params.set('pageSize', String(pageSize));
+    if (type) params.set('type', type);
+    if (status) params.set('status', status);
+    setSearchParams(params, { replace: true });
+  }, [page, pageSize, type, status, setSearchParams]);
 
   const { items, meta, isLoading, error, reload } = useHrList<HrLeave, HrLeaveListQuery>(
     (currentQuery, signal) => listLeave(currentQuery, { signal }),
@@ -103,6 +125,10 @@ export const LeaveListPage: React.FC = () => {
         onReset={handleReset}
         resetLabel="Clear filters"
         isLoading={isLoading}
+        activeFilters={[
+          ...(type ? [{ id: 'type', label: `Type: ${type}`, onRemove: () => { setType(undefined); setPage(1); } }] : []),
+          ...(status ? [{ id: 'status', label: `Status: ${status}`, onRemove: () => { setStatus(undefined); setPage(1); } }] : []),
+        ]}
       />
 
       <ListStateBoundary

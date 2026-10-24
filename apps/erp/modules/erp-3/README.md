@@ -5,6 +5,7 @@ Package `@cs/mod-erp3`. API base `/api/v1/erp-orders`. Tables `erp3.sales_orders
 - **Data dictionary (module)**: [`apps/erp/modules/erp-3/docs/data-dictionary.md`](docs/data-dictionary.md)
 - **Data dictionary (canonical)**: [`docs/data-dictionaries/erp-3.md`](../../../../docs/data-dictionaries/erp-3.md)
 - **OpenAPI 3.1 contract**: [`packages/contracts/openapi/erp-3.yaml`](../../../../packages/contracts/openapi/erp-3.yaml)
+- **Security and authorization runbook**: [`apps/erp/modules/erp-3/docs/security.md`](docs/security.md)
 - **Demo script**: [`docs/demo-scripts/erp-3-v1.md`](../../../../docs/demo-scripts/erp-3-v1.md)
 
 ---

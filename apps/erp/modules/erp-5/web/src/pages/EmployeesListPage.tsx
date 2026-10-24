@@ -12,10 +12,11 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageTitle, Pagination } from '@cs/ui';
 import {
   HR_PAGE_SIZE_DEFAULT,
+  HR_PAGE_SIZE_MAX,
   type HrEmployeeListQuery,
   type HrEmployeeView,
 } from '@clearshift/contracts';
@@ -53,15 +54,41 @@ const SORT_COLUMN: Readonly<Record<EmployeeSort, string>> = {
 };
 
 export const EmployeesListPage: React.FC = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
-  const [search, setSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState<string | undefined>(undefined);
-  const [sort, setSort] = useState<EmployeeSort>('name');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const p = Number(searchParams.get('pageSize'));
+    return Number.isFinite(p) && p >= 1 && p <= HR_PAGE_SIZE_MAX ? p : HR_PAGE_SIZE_DEFAULT;
+  });
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [departmentId, setDepartmentId] = useState<string | undefined>(
+    () => searchParams.get('department_id') ?? undefined
+  );
+  const [sort, setSort] = useState<EmployeeSort>(
+    () => (searchParams.get('sort') as EmployeeSort | null) ?? 'name'
+  );
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    () => (searchParams.get('sort_dir') === 'desc' ? 'desc' : 'asc')
+  );
 
   const debouncedSearch = useDebouncedValue(search);
   const departmentLookup = useDepartmentLookup();
+
+  // Keep the URL query string in sync with the active filters so the view is
+  // shareable and survives a reload.
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (page !== 1) params.set('page', String(page));
+    if (pageSize !== HR_PAGE_SIZE_DEFAULT) params.set('pageSize', String(pageSize));
+    if (search.trim()) params.set('search', search.trim());
+    if (sort !== 'name') params.set('sort', sort);
+    if (sortDir !== 'asc') params.set('sort_dir', sortDir);
+    if (departmentId) params.set('department_id', departmentId);
+    setSearchParams(params, { replace: true });
+  }, [page, pageSize, search, sort, sortDir, departmentId, setSearchParams]);
 
   const query = useMemo<HrEmployeeListQuery>(
     () => ({
@@ -160,6 +187,14 @@ export const EmployeesListPage: React.FC = () => {
         onReset={handleReset}
         resetLabel="Clear filters"
         isLoading={isLoading}
+        activeFilters={[
+          ...(search.trim()
+            ? [{ id: 'search', label: `Search: ${search.trim()}`, onRemove: () => { setSearch(''); setPage(1); } }]
+            : []),
+          ...(departmentId
+            ? [{ id: 'department', label: `Department: ${departmentLookup.options.find((o) => o.id === departmentId)?.name ?? departmentId}`, onRemove: () => { setDepartmentId(undefined); setPage(1); } }]
+            : []),
+        ]}
       />
 
       <ListStateBoundary

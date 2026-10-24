@@ -30,6 +30,7 @@ import {
 } from '@clearshift/contracts';
 import { HrService } from '../../src/services/hr.service.js';
 import { InMemoryHrRepository } from '../../src/services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import { HrServiceError } from '../../src/services/errors.js';
 import {
   FIXTURE_DEPARTMENT_ENGINEERING,
@@ -69,20 +70,24 @@ const VALID_PAYROLL_TOTAL: CreateHrPayrollTotalRequest = {
   headcount: 1,
 };
 
+const DEFAULT_ACTOR = { sub: 'test-actor', roles: ['editor'] };
+const DEFAULT_CORRELATION_ID = 'test-correlation-id';
+
 describe('ERP-5 HR Service — domain invariants (#48)', () => {
   let repository: InMemoryHrRepository;
   let service: HrService;
 
   beforeEach(() => {
     repository = new InMemoryHrRepository(true);
-    service = new HrService(repository);
+    const auditService = new AuditService(new InMemoryAuditRepository());
+    service = new HrService(repository, auditService);
   });
 
   // ── Employees ─────────────────────────────────────────────────────────────
 
   describe('Employee creation', () => {
     it('creates an employee and returns the masked projection (BR-ERP5-02)', async () => {
-      const result = await service.createEmployee(VALID_EMPLOYEE);
+      const result = await service.createEmployee(VALID_EMPLOYEE, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.created).toBe(true);
       expect(result.entity.employee_no).toBe('EMP-9001');
@@ -93,7 +98,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
     it('[BR-ERP5-01] rejects a join date before the birth date with 422', async () => {
       const error = await service
-        .createEmployee({ ...VALID_EMPLOYEE, join_date: '1991-01-01' })
+        .createEmployee({ ...VALID_EMPLOYEE, join_date: '1991-01-01' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -105,7 +110,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
     it('rejects a negative salary with 422', async () => {
       const error = await service
-        .createEmployee({ ...VALID_EMPLOYEE, salary: '-100.0000' })
+        .createEmployee({ ...VALID_EMPLOYEE, salary: '-100.0000' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -115,10 +120,10 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
     });
 
     it('rejects a duplicate employee number with 409', async () => {
-      await service.createEmployee(VALID_EMPLOYEE);
+      await service.createEmployee(VALID_EMPLOYEE, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .createEmployee({ ...VALID_EMPLOYEE, first_name: 'Other' })
+        .createEmployee({ ...VALID_EMPLOYEE, first_name: 'Other' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -130,7 +135,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
     it('rejects an unknown department with 404', async () => {
       const error = await service
-        .createEmployee({ ...VALID_EMPLOYEE, department_id: randomUUID() })
+        .createEmployee({ ...VALID_EMPLOYEE, department_id: randomUUID() }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -145,7 +150,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
           ...VALID_EMPLOYEE,
           source_system: 'legacy_hr_csv',
           source_id: 'row-1',
-        })
+        }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -185,7 +190,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
       const updated = await service.updateEmployee(FIXTURE_EMPLOYEE_ASHA.id, {
         job_title: 'Staff Software Engineer',
         salary: '131000.0000',
-      } as UpdateHrEmployeeRequest);
+      } as UpdateHrEmployeeRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(updated.job_title).toBe('Staff Software Engineer');
       expect(updated.salary_display).toBe(HR_SALARY_MASK);
@@ -237,7 +242,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
   describe('Department creation and update', () => {
     it('creates a department', async () => {
-      const result = await service.createDepartment(VALID_DEPARTMENT);
+      const result = await service.createDepartment(VALID_DEPARTMENT, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.created).toBe(true);
       expect(result.entity.code).toBe('QA');
@@ -245,7 +250,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
     });
 
     it('rejects a duplicate department code with 409', async () => {
-      await service.createDepartment(VALID_DEPARTMENT);
+      await service.createDepartment(VALID_DEPARTMENT, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
         .createDepartment({ name: 'Quality Assurance West', code: 'QA' })
@@ -267,10 +272,10 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
     });
 
     it('rejects a self-referential parent with 422', async () => {
-      const created = await service.createDepartment(VALID_DEPARTMENT);
+      const created = await service      .createDepartment(VALID_DEPARTMENT, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .updateDepartment(created.entity.id, { parent_id: created.entity.id })
+        .updateDepartment(created.entity.id, { parent_id: created.entity.id }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -297,7 +302,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
       const updated = await service.updateDepartment(FIXTURE_DEPARTMENT_PLATFORM.id, {
         name: 'Platform Engineering',
         parent_id: null,
-      } as UpdateHrDepartmentRequest);
+      } as UpdateHrDepartmentRequest, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(updated.name).toBe('Platform Engineering');
       expect(updated.parent_id).toBeNull();
@@ -328,7 +333,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
   describe('Leave creation', () => {
     it('creates a leave record with the default status', async () => {
-      const result = await service.createLeave(VALID_LEAVE);
+      const result = await service.createLeave(VALID_LEAVE, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.created).toBe(true);
       expect(result.entity.status).toBe('pending');
@@ -362,7 +367,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
 
   describe('Payroll aggregate creation', () => {
     it('creates one department/month aggregate', async () => {
-      const result = await service.createPayrollTotal(VALID_PAYROLL_TOTAL);
+      const result = await service.createPayrollTotal(VALID_PAYROLL_TOTAL, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.created).toBe(true);
       expect(result.entity.month).toBe('2026-05');
@@ -371,10 +376,10 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
     });
 
     it('rejects a second aggregate for the same department and month with 409', async () => {
-      await service.createPayrollTotal(VALID_PAYROLL_TOTAL);
+      await service.createPayrollTotal(VALID_PAYROLL_TOTAL, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .createPayrollTotal({ ...VALID_PAYROLL_TOTAL, total_amount: '99000.0000' })
+        .createPayrollTotal({ ...VALID_PAYROLL_TOTAL, total_amount: '99000.0000' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -420,7 +425,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         batch_id: randomUUID(),
         source_row: 42,
         idempotency_key: idempotencyKey,
-      });
+      }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(result.created).toBe(true);
       expect(result.receipt).toBeDefined();
@@ -443,8 +448,8 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      const first = await service.createEmployee(payload);
-      const second = await service.createEmployee(payload);
+      const first = await service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
+      const second = await service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(first.created).toBe(true);
       expect(second.created).toBe(false);
@@ -471,10 +476,10 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      await service.createEmployee(payload);
+      await service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       const error = await service
-        .createEmployee({ ...payload, job_title: 'A different title' })
+        .createEmployee({ ...payload, job_title: 'A different title' }, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID)
         .catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
@@ -494,8 +499,8 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
       };
 
       const [first, second] = await Promise.all([
-        service.createEmployee(payload),
-        service.createEmployee(payload),
+        service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID),
+        service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID),
       ]);
 
       expect(first.entity.id).toBe(second.entity.id);
@@ -510,7 +515,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
       failingRepository.createImportReceipt = async () => {
         throw new Error('simulated receipt failure');
       };
-      const failingService = new HrService(failingRepository);
+      const failingService = new HrService(failingRepository, new AuditService(new InMemoryAuditRepository()));
 
       await expect(
         failingService.createEmployee({
@@ -535,8 +540,8 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      const first = await service.createPayrollTotal(payload);
-      const second = await service.createPayrollTotal(payload);
+      const first = await service.createPayrollTotal(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
+      const second = await service.createPayrollTotal(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(first.created).toBe(true);
       expect(second.created).toBe(false);
@@ -553,8 +558,8 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      const first = await service.createDepartment(payload);
-      const second = await service.createDepartment(payload);
+      const first = await service.createDepartment(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
+      const second = await service.createDepartment(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(first.created).toBe(true);
       expect(second.created).toBe(false);
@@ -576,8 +581,8 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      const first = await service.createLeave(payload);
-      const second = await service.createLeave(payload);
+      const first = await service.createLeave(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
+      const second = await service.createLeave(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       expect(first.created).toBe(true);
       expect(second.created).toBe(false);
@@ -594,7 +599,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
         idempotency_key: idempotencyKey,
       };
 
-      const first = await service.createEmployee(payload);
+      const first = await service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID);
 
       // The target row disappears while the receipt stays.
       const store = repository as unknown as {
@@ -602,7 +607,7 @@ describe('ERP-5 HR Service — domain invariants (#48)', () => {
       };
       store.store.employees.delete(first.entity.id);
 
-      const error = await service.createEmployee(payload).catch((err: unknown) => err);
+      const error = await service.createEmployee(payload, DEFAULT_ACTOR, DEFAULT_CORRELATION_ID).catch((err: unknown) => err);
 
       expect(error).toBeInstanceOf(HrServiceError);
       const serviceError = error as HrServiceError;
