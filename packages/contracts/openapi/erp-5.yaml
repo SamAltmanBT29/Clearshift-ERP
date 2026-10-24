@@ -131,6 +131,94 @@ paths:
         - BearerAuth: []
 
   # ── Employees ─────────────────────────────────────────────────────────────
+
+  # ── Duplicate Review ─────────────────────────────────────────────────────────
+  /duplicates:
+    get:
+      operationId: listDuplicateCandidates
+      tags: [DuplicateReview]
+      summary: List pending duplicate candidates
+      description: Returns a bounded page of candidates requiring human review.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateCandidateListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /duplicates/{id}:
+    get:
+      operationId: getDuplicateCandidateById
+      tags: [DuplicateReview]
+      summary: Inspect a single duplicate candidate
+      description: Returns detailed information about a duplicate candidate.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateCandidate"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /duplicates/{id}/decide:
+    post:
+      operationId: resolveDuplicateCandidate
+      tags: [DuplicateReview]
+      summary: Resolve a duplicate candidate
+      description: Marks a duplicate candidate as either MERGED or REJECTED.
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateDecisionRequest"
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
   /employees:
     get:
       operationId: listEmployees
@@ -972,6 +1060,64 @@ components:
             $ref: "#/components/schemas/ApiError"
 
   schemas:
+
+    DuplicateCandidate:
+      type: object
+      required: [id, entity, candidate_a, candidate_b, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        entity:
+          type: string
+        candidate_a:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            value: { type: string }
+        candidate_b:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            value: { type: string }
+        status:
+          type: string
+          enum: [PENDING_REVIEW, MERGED, REJECTED]
+        created_at:
+          type: string
+          format: date-time
+
+    DuplicateCandidateListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicateCandidate"
+        meta:
+          $ref: "#/components/schemas/ListMeta"
+
+    DuplicateDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [MERGED, REJECTED]
+        notes:
+          type: string
+          maxLength: 512
+
+    DecisionResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
 
     ApiError:
       type: object

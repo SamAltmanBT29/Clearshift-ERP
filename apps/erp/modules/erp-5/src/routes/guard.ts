@@ -50,6 +50,8 @@ export const identityUsersReadGuard = requireHrPolicy(HrPolicies.IDENTITY_USERS_
  */
 export const erp5IngestGuard = requireHrPolicy(HrPolicies.PAYROLL_LOAD);
 
+export const duplicateReviewGuard = requireHrPolicy(HrPolicies.PAYROLL_LOAD); // Temporary: Use a broad permission until a specific HR_ADMIN policy is added to HrPolicies
+
 /**
  * Ensures the request is bound to a valid tenant.
  */

@@ -389,8 +389,40 @@ export const erp5ImportReceipts = erp5Schema.table(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// View — erp5.identity_users (READ-ONLY Hub Identity projection)
+// Table 6 — erp5_duplicate_candidates (Human Review Queue)
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Records for business-level duplicates flagged during import.
+ * These are held for human review before being merged or rejected.
+ */
+export const erp5DuplicateCandidates = erp5Schema.table(
+  'duplicate_candidates',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+
+    entity: varchar('entity', { length: 32 }).notNull(), // 'employee' | 'department'
+    match_kind: varchar('match_kind', { length: 32 }).notNull(),
+    status: varchar('status', { length: 32 }).notNull().default('PENDING_REVIEW'),
+    matching_key: varchar('matching_key', { length: 64 }).notNull(),
+    matching_value: varchar('matching_value', { length: 128 }).notNull(),
+    incoming_record: text('incoming_record').notNull(), // JSON string
+    existing_record_id: uuid('existing_record_id').notNull(),
+    confidence: numeric('confidence', { precision: 3, scale: 2 }).notNull(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    resolved_at: timestamp('resolved_at', { withTimezone: true }),
+    resolved_by: uuid('resolved_by'),
+    decision: varchar('decision', { length: 32 }), // 'MERGE' | 'REJECT'
+    rationale: text('rationale'),
+  },
+  (table) => ({
+    entityStatusIdx: index('dup_candidates_entity_status_idx').on(table.entity, table.status),
+    matchingValueIdx: index('dup_candidates_value_idx').on(table.matching_value),
+  })
+);
 /**
  * Read-only projection over Hub Identity (`platform.hub_users`).
  *

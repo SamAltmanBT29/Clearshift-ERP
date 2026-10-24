@@ -109,8 +109,32 @@ export interface NewHrImportReceipt {
   kind?: 'created' | 'linked';
 }
 
+/** Fields accepted when a duplicate candidate is recorded. */
+export interface NewHrDuplicateCandidate {
+  id?: string;
+  entity: 'employee' | 'department';
+  match_kind: string;
+  status: 'PENDING_REVIEW' | 'MERGED' | 'REJECTED';
+  matching_key: string;
+  matching_value: string;
+  incoming_record: string;
+  existing_record_id: string;
+  confidence: number;
+}
+
+/** Decisions for duplicate candidates. */
+export interface HrDuplicateDecision {
+  candidate_id: string;
+  decision: 'MERGED' | 'REJECTED';
+  decided_by: string;
+  decided_at: Date;
+  notes?: string;
+}
+
+
 /**
  * Data-access contract of the ERP-5 module.
+
  *
  * `transaction` is the atomic boundary used by the service layer: the target
  * mutation and its import receipt are written inside one call, so a failure
@@ -170,7 +194,14 @@ export interface HrRepository {
   getImportReceiptByIdempotencyKey(key: string): Promise<HrImportReceipt | null>;
   createImportReceipt(receipt: NewHrImportReceipt): Promise<HrImportReceipt>;
 
+  // ── Duplicate candidates ──────────────────────────────────────────────────
+  createDuplicateCandidate(candidate: NewHrDuplicateCandidate): Promise<void>;
+  getDuplicateCandidateById(id: string): Promise<any | null>;
+  listDuplicateCandidates(query: { status: string; limit: number; offset: number }): Promise<HrPage<any>>;
+  resolveDuplicateCandidate(decision: HrDuplicateDecision): Promise<void>;
+
   // ── Transaction boundary ──────────────────────────────────────────────────
+
   /**
    * Runs `fn` inside one atomic boundary. A thrown error rolls every write
    * performed by `fn` back.

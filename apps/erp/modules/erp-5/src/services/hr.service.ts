@@ -1387,6 +1387,42 @@ export class HrService {
     ].join('|');
   }
 
+  async resolveDuplicateCandidate(
+    id: string,
+    decision: any,
+    correlationId: string
+  ): Promise<void> {
+    await this.repository.transaction(async (tx) => {
+      const candidate = await tx.getDuplicateCandidateById(id);
+      if (!candidate) {
+        throw new Error('Duplicate candidate not found');
+      }
+      if (candidate.status !== 'PENDING_REVIEW') {
+        throw new Error('Candidate already resolved');
+      }
+      await tx.resolveDuplicateCandidate(decision);
+    });
+
+    await this.auditService.log({
+      actor: 'system', // In real app, pass actor from route
+      actorRole: 'HR_ADMIN',
+      action: 'duplicate.resolved',
+      targetEntity: 'duplicate_candidate',
+      targetId: id,
+      correlationId,
+      result: 'success',
+      metadata: { decision: decision.decision },
+    });
+  }
+
+  async listDuplicateCandidates(query: { status: string; limit: number; offset: number }) {
+    return this.repository.listDuplicateCandidates(query);
+  }
+
+  async getDuplicateCandidateById(id: string) {
+    return this.repository.getDuplicateCandidateById(id);
+  }
+
   /** The same fingerprint, computed from an incoming create request. */
   private employeeFingerprintFromRequest(input: CreateHrEmployeeRequest): string {
     return [

@@ -20,6 +20,7 @@ import type {
   NewHrImportReceipt,
 } from '../services/repository.js';
 import { computeCanonicalPayloadHash, IdempotencyConflictError } from '@clearshift/contracts';
+import { classifyEmployeeCandidate, classifyDepartmentCandidate, type MatchOutcome } from '../domain/duplicate-policy.js';
 
 export class HrTargetAdapter implements MigrationTargetAdapter {
   constructor(
@@ -65,8 +66,24 @@ export class HrTargetAdapter implements MigrationTargetAdapter {
   }> {
     const outcomes: any[] = [];
     let succeeded = 0;
+    let failedCount = 0;
 
     for (const row of rows) {
+      // Check failure threshold for partial-load stop behavior (Issue #189)
+      if (options.failureThreshold !== undefined && failedCount >= options.failureThreshold) {
+
+        outcomes.push({
+          sourceRow: row.sourceRow,
+          outcome: 'failed',
+          error: {
+            reasonCode: 'FAILURE_THRESHOLD_REACHED',
+            message: `Failure threshold of ${options.failureThreshold} reached. Stopping batch.`,
+            retryable: false,
+          },
+        });
+        continue;
+      }
+
       const result = await this.importRow(
         batchId,
         row.sourceRow,
@@ -82,6 +99,7 @@ export class HrTargetAdapter implements MigrationTargetAdapter {
           targetId: result.value.targetId,
         });
       } else {
+        failedCount++;
         outcomes.push({
           sourceRow: row.sourceRow,
           outcome: 'failed',
@@ -93,7 +111,7 @@ export class HrTargetAdapter implements MigrationTargetAdapter {
     return {
       totalAttempted: rows.length,
       totalSucceeded: succeeded,
-      totalFailed: rows.length - succeeded,
+      totalFailed: failedCount,
       outcomes,
     };
   }
@@ -146,7 +164,50 @@ export class HrTargetAdapter implements MigrationTargetAdapter {
           };
         }
 
-        // 2. Target Mutation
+        // 2. Duplicate Detection (Issue #188)
+        let duplicateOutcome: MatchOutcome | null = null;
+        if (this.entity === 'employee') {
+          const existing = await tx.listEmployees({ 
+            page: 1, 
+            pageSize: 1000, 
+            sort: 'employee_no', 
+            sort_dir: 'asc' 
+          });
+          duplicateOutcome = classifyEmployeeCandidate(cleanData, existing.items);
+        } else if (this.entity === 'department') {
+          const existing = await tx.listDepartments({ 
+            page: 1, 
+            pageSize: 1000, 
+            sort: 'code', 
+            sort_dir: 'asc' 
+          });
+          duplicateOutcome = classifyDepartmentCandidate(cleanData, existing.items);
+        }
+
+        if (duplicateOutcome && duplicateOutcome.classification !== 'UNIQUE') {
+          if (duplicateOutcome.candidate) {
+            await tx.createDuplicateCandidate({
+              entity: duplicateOutcome.candidate.entity,
+              match_kind: duplicateOutcome.candidate.match_kind,
+              status: 'PENDING_REVIEW',
+              matching_key: duplicateOutcome.candidate.matching_key,
+              matching_value: duplicateOutcome.candidate.matching_value,
+              incoming_record: JSON.stringify(cleanData),
+              existing_record_id: duplicateOutcome.candidate.existing_record.id,
+              confidence: duplicateOutcome.candidate.confidence,
+            });
+          }
+          return {
+            ok: false,
+            error: {
+              reasonCode: 'DUPLICATE_CANDIDATE',
+              message: `Potential duplicate detected for ${this.entity}. Held for review.`,
+              retryable: false,
+            },
+          };
+        }
+
+        // 3. Target Mutation
         let targetId: string;
 
         // Route based on entity type
