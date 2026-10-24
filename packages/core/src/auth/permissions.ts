@@ -8,6 +8,9 @@ export { Roles, RoleType, Actions, ActionType, Resources, ResourceType };
  */
 export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, ActionType[]>>> = {
   [Roles.VIEWER]: {
+    [Resources.ERP3_SALES_ORDERS]: [Actions.READ],
+    [Resources.ERP3_INVOICES]: [Actions.READ],
+    [Resources.ERP3_PAYMENTS]: [Actions.READ],
     [Resources.ACCOUNTS]: [Actions.READ, Actions.EXPORT],
     [Resources.JOURNAL_ENTRIES]: [Actions.READ, Actions.EXPORT],
     [Resources.TRIAL_BALANCE]: [Actions.READ, Actions.EXPORT],
@@ -22,6 +25,9 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
   },
 
   [Roles.EDITOR]: {
+    [Resources.ERP3_SALES_ORDERS]: [Actions.READ, Actions.CREATE, Actions.UPDATE],
+    [Resources.ERP3_INVOICES]: [Actions.READ, Actions.CREATE],
+    [Resources.ERP3_PAYMENTS]: [Actions.READ, Actions.CREATE],
     [Resources.ACCOUNTS]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.EXPORT],
     [Resources.JOURNAL_ENTRIES]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.EXPORT],
     [Resources.TRIAL_BALANCE]: [Actions.READ, Actions.EXPORT],
@@ -36,6 +42,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
   },
 
   [Roles.MIGRATION_RUNNER]: {
+    [Resources.ERP3_SALES_ORDERS]: [Actions.CREATE],
+    [Resources.ERP3_INVOICES]: [Actions.CREATE],
+    [Resources.ERP3_PAYMENTS]: [Actions.CREATE],
+    [Resources.ERP3_IMPORTS]: [Actions.EXECUTE_BULK],
     // Migration Runner executes bulk loads but CANNOT approve its own merge/skip decisions
     [Resources.MIGRATION_BATCHES]: [Actions.READ, Actions.CREATE, Actions.EXECUTE_BULK],
     [Resources.MIGRATION_RUNS]: [Actions.READ, Actions.EXECUTE_BULK],
@@ -63,6 +73,10 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
   },
 
   [Roles.ADMIN]: {
+    [Resources.ERP3_SALES_ORDERS]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.DELETE, Actions.EXPORT],
+    [Resources.ERP3_INVOICES]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.DELETE, Actions.EXPORT],
+    [Resources.ERP3_PAYMENTS]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.DELETE, Actions.EXPORT],
+    [Resources.ERP3_IMPORTS]: [Actions.EXECUTE_BULK],
     [Resources.ACCOUNTS]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.DELETE, Actions.EXPORT],
     [Resources.JOURNAL_ENTRIES]: [Actions.READ, Actions.CREATE, Actions.UPDATE, Actions.DELETE, Actions.EXPORT],
     [Resources.TRIAL_BALANCE]: [Actions.READ, Actions.EXPORT],

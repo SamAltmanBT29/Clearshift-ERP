@@ -1,0 +1,174 @@
+row_id,record_type,case_tags,source_id,vendor_code,vendor_name,tax_number,email,currency,payment_terms_days,bank_account,po_number,po_vendor_code,po_status,status_path,po_date,expected_date,po_total,line_no,product_sku,quantity,unit_price,line_total,source_system,expect_outcome,expect_reasons
+R001,vendor,vendor.record:valid,VND-001,VEN-001,Brightwater Fasteners Ltd,TAX-100001,accounts1@example.com,EUR,45,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R002,vendor,vendor.record:valid,VND-002,VEN-002,Kestrel Packaging Co,TAX-100002,accounts2@example.com,GBP,60,CH93-0000-0000-0000-1002-2,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R003,vendor,vendor.record:valid,VND-003,VEN-003,Orion Precision Tools,TAX-100003,,INR,15,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R004,vendor,vendor.record:valid,VND-004,VEN-004,Maple Ridge Chemicals,TAX-100004,accounts4@example.com,USD,90,CH93-0000-0000-0000-1004-4,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R005,vendor,vendor.record:valid,VND-005,VEN-005,Zenith Cable Systems,TAX-100005,accounts5@example.com,EUR,,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R006,vendor,vendor.record:valid,VND-006,VEN-006,Alder Logistics,TAX-100006,,GBP,120,CH93-0000-0000-0000-1006-6,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R007,vendor,vendor.record:valid,VND-007,VEN-007,Quartz Electronics,,accounts7@example.com,INR,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R008,vendor,vendor.record:valid,VND-008,VEN-008,Harbor Steel Traders,TAX-100008,accounts8@example.com,USD,45,CH93-0000-0000-0000-1008-8,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R009,vendor,vendor.record:valid,VND-009,VEN-009,Lumen Sensors,TAX-100009,,EUR,60,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R010,vendor,vendor.record:valid,VND-010,VEN-010,Tundra Lubricants,TAX-100010,accounts10@example.com,GBP,,CH93-0000-0000-0000-1010-0,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R011,vendor,vendor.record:valid,VND-011,VEN-011,Cobalt Safety Gear,TAX-100011,accounts11@example.com,INR,90,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R012,vendor,vendor.record:valid,VND-012,VEN-012,Meridian Abrasives,TAX-100012,,USD,7,CH93-0000-0000-0000-1012-2,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R013,vendor,vendor.record:valid,VND-013,VEN-013,Sable Pallets,TAX-100013,accounts13@example.com,EUR,120,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R014,vendor,vendor.record:valid,VND-014,VEN-014,Juniper Adhesives,,accounts14@example.com,GBP,30,CH93-0000-0000-0000-1014-4,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R015,vendor,vendor.record:valid,VND-015,VEN-015,Falcon Hydraulics,TAX-100015,,INR,,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R016,vendor,vendor.record:valid,VND-016,VEN-016,Granite Fixings,TAX-100016,accounts16@example.com,USD,60,CH93-0000-0000-0000-1016-6,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R017,vendor,vendor.record:valid,VND-017,VEN-017,Pinnacle Valves,TAX-100017,accounts17@example.com,EUR,15,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R018,vendor,vendor.record:valid,VND-018,VEN-018,Saffron Textiles,TAX-100018,,GBP,90,CH93-0000-0000-0000-1018-8,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R019,vendor,vendor.record:valid,VND-019,VEN-019,Delta Gaskets,TAX-100019,accounts19@example.com,INR,7,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R020,vendor,vendor.record:valid,VND-020,VEN-020,Willow Pumps,TAX-100020,accounts20@example.com,USD,,CH93-0000-0000-0000-1020-0,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R021,vendor,vendor.name:utf8,VND-021,VEN-021,Müller & Söhne Präzisionswerkzeuge GmbH,TAX-100021,einkauf@example.com,EUR,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R022,vendor,vendor.name:utf8,VND-022,VEN-022,株式会社サクラ部品 (Sakura Parts KK),TAX-100022,sales@example.org,USD,45,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R023,vendor,vendor.name:utf8,VND-023,VEN-023,Société Générale des Joints — Étanchéité,TAX-100023,contact@example.net,EUR,60,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R024,vendor,vendor.code:whitespace|vendor.name:whitespace|vendor.tax_number:whitespace,VND-024,  VEN-024  ,  Padded Name Trading Co  , tax-100024 ,padded@example.com,GBP,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R025,vendor,vendor.payment_terms_days:boundary_min,VND-025,VEN-025,Zero Terms Cash Supplier,TAX-100025,,INR,0,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R026,vendor,vendor.payment_terms_days:boundary_max,VND-026,VEN-026,Long Terms Heavy Industries,TAX-100026,,USD,365,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R027,vendor,vendor.code:null,VND-027,,Missing Code Supplies,TAX-100027,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_CODE_REQUIRED
+R028,vendor,vendor.name:null,VND-028,VEN-028,,TAX-100028,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_NAME_REQUIRED
+R029,vendor,vendor.code:too_long,VND-029,VEN-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX,Overlong Code Vendor,TAX-100029,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_CODE_TOO_LONG
+R030,vendor,vendor.currency:null,VND-030,VEN-030,No Currency Vendor,TAX-100030,,,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,CURRENCY_REQUIRED
+R031,vendor,vendor.currency:invalid,VND-031,VEN-031,Yen Only Vendor,TAX-100031,,JPY,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_CURRENCY
+R032,vendor,vendor.email:malformed,VND-032,VEN-032,Bad Email Vendor,TAX-100032,not-an-email,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_EMAIL
+R033,vendor,vendor.tax_number:malformed,VND-033,VEN-033,Bad Tax Vendor,??,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_TAX_NUMBER
+R034,vendor,vendor.payment_terms_days:malformed,VND-034,VEN-034,Words For Terms Vendor,TAX-100034,,USD,thirty,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_PAYMENT_TERMS
+R035,vendor,vendor.payment_terms_days:boundary_below_min,VND-035,VEN-035,Negative Terms Vendor,TAX-100035,,USD,-1,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PAYMENT_TERMS_OUT_OF_RANGE
+R036,vendor,vendor.payment_terms_days:boundary_above_max,VND-036,VEN-036,Excess Terms Vendor,TAX-100036,,USD,366,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PAYMENT_TERMS_OUT_OF_RANGE
+R037,vendor,vendor.bank_account:malformed,VND-037,VEN-037,Bad Bank Vendor,TAX-100037,,USD,30,1234567890,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_BANK_DETAILS
+R038,vendor,vendor.name:formula_injection,VND-038,VEN-038,"=HYPERLINK(""http://example.com"",""Click"")",TAX-100038,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R039,vendor,vendor.code:formula_injection,VND-039,@SUM(A1:A9),Injected Code Vendor,TAX-100039,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R040,vendor,vendor.name:formula_injection_tab,VND-040,VEN-040,	=1+1,TAX-100040,,USD,30,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R041,vendor,vendor.multi_defect,VND-041,VEN-041,Two Defects Vendor,TAX-100041,,XXX,400,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_CURRENCY|PAYMENT_TERMS_OUT_OF_RANGE
+R042,vendor,vendor.record:exact_duplicate,VND-042,VEN-001,Brightwater Fasteners Ltd,TAX-100001,accounts1@example.com,EUR,45,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_VENDOR_CODE_REVIEW|DUPLICATE_TAX_NUMBER_REVIEW
+R043,vendor,vendor.code:duplicate_whitespace_case,VND-043,  ven-002 ,Kestrel Packaging Co,TAX-200002,accounts2@example.com,GBP,60,CH93-0000-0000-0000-1002-2,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_VENDOR_CODE_REVIEW
+R044,vendor,vendor.tax_number:duplicate,VND-044,VEN-044,Tax Twin Of Vendor Three,TAX-100003,,INR,15,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_TAX_NUMBER_REVIEW
+R045,vendor,vendor.tax_number:duplicate_formatting_variant,VND-045,VEN-045,Tax Twin Of Vendor Four,tax 100004,,USD,90,CH93-0000-0000-0000-1004-4,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_TAX_NUMBER_REVIEW
+R046,vendor,vendor.code:duplicate,VND-046,VEN-005,Code Twin Of Vendor Five,TAX-300005,,EUR,,,,,,,,,,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_VENDOR_CODE_REVIEW
+R047,purchase_order,purchase_order.record:valid,POS-001,,,,,EUR,,,PO-2026-0001,VEN-001,Sent,Draft>Sent,2026-02-02,2026-02-28,12255.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R048,purchase_order,purchase_order.record:valid,POS-002,,,,,GBP,,,PO-2026-0002,VEN-002,Received,Draft>Sent>Received,2026-03-03,2026-03-28,10240.50,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R049,purchase_order,purchase_order.record:valid,POS-003,,,,,INR,,,PO-2026-0003,VEN-003,Closed,Draft>Sent>Received>Closed,2026-04-04,2026-04-28,10.02,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R050,purchase_order,purchase_order.record:valid,POS-004,,,,,USD,,,PO-2026-0004,VEN-004,Draft,,2026-05-05,2026-05-28,557.38,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R051,purchase_order,purchase_order.record:valid,POS-005,,,,,EUR,,,PO-2026-0005,VEN-005,Sent,Draft>Sent,2026-06-06,,1045.73,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R052,purchase_order,purchase_order.po_status:whitespace_case,POS-006,,,,,GBP,,,PO-2026-0006,VEN-006,  received ,Draft>Sent>Received,2026-07-07,2026-07-28,491.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R053,purchase_order,purchase_order.record:valid,POS-007,,,,,INR,,,PO-2026-0007,VEN-007,Closed,Draft>Sent>Received>Closed,2026-08-08,2026-08-28,300.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R054,purchase_order,purchase_order.record:valid,POS-008,,,,,USD,,,PO-2026-0008,VEN-008,Draft,,2026-09-09,2026-09-28,6.53,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R055,purchase_order,purchase_order.record:valid,POS-009,,,,,EUR,,,PO-2026-0009,VEN-009,Sent,Draft>Sent,2026-10-10,2026-10-28,16.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R056,purchase_order,purchase_order.po_number:whitespace_case,POS-010,,,,,GBP,,,  po-2026-0010 ,VEN-010,Received,Draft>Sent>Received,2026-11-11,,634.38,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R057,purchase_order,purchase_order.po_vendor_code:whitespace_case,POS-011,,,,,INR,,,PO-2026-0011, ven-011 ,Closed,Draft>Sent>Received>Closed,2026-12-12,2026-12-28,25078.33,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R058,purchase_order,purchase_order.po_status:whitespace_case,POS-012,,,,,USD,,,PO-2026-0012,VEN-012,  draft ,,2026-01-13,2026-01-28,3002.33,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R059,purchase_order,purchase_order.record:valid,POS-013,,,,,EUR,,,PO-2026-0013,VEN-013,Sent,Draft>Sent,2026-02-14,2026-02-28,12255.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R060,purchase_order,purchase_order.record:valid,POS-014,,,,,GBP,,,PO-2026-0014,VEN-014,Received,Draft>Sent>Received,2026-03-15,2026-03-28,10240.50,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R061,purchase_order,purchase_order.record:valid,POS-015,,,,,INR,,,PO-2026-0015,VEN-015,Closed,Draft>Sent>Received>Closed,2026-04-16,,10.02,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R062,purchase_order,purchase_order.record:valid,POS-016,,,,,USD,,,PO-2026-0016,VEN-016,Draft,,2026-05-17,2026-05-28,557.38,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R063,purchase_order,purchase_order.record:valid,POS-017,,,,,EUR,,,PO-2026-0017,VEN-017,Sent,Draft>Sent,2026-06-18,2026-06-28,1045.73,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R064,purchase_order,purchase_order.po_status:whitespace_case,POS-018,,,,,GBP,,,PO-2026-0018,VEN-018,  received ,Draft>Sent>Received,2026-07-19,2026-07-28,1.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R065,purchase_order,purchase_order.record:valid,POS-019,,,,,INR,,,PO-2026-0019,VEN-019,Closed,Draft>Sent>Received>Closed,2026-08-20,2026-08-28,305.01,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R066,purchase_order,purchase_order.record:valid,POS-020,,,,,USD,,,PO-2026-0020,VEN-020,Draft,,2026-09-21,,1.01,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R067,purchase_order,purchase_order.po_date:leap_day,POS-021,,,,,EUR,,,PO-2026-0021,VEN-021,Sent,Draft>Sent,2028-02-29,2028-03-15,1.00,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R068,purchase_order,purchase_order.expected_date:boundary_equal,POS-022,,,,,USD,,,PO-2026-0022,VEN-022,Received,Draft>Sent>Received,2026-12-31,2026-12-31,8.50,,,,,,SYNTH-ERP2-DIRTY-V1,accepted,
+R069,purchase_order,purchase_order.po_number:null,POS-023,,,,,EUR,,,,VEN-001,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_NUMBER_REQUIRED
+R070,purchase_order,purchase_order.po_vendor_code:null,POS-024,,,,,GBP,,,PO-2026-0024,,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_VENDOR_REQUIRED
+R071,purchase_order,purchase_order.po_vendor_code:foreign_key_missing,POS-025,,,,,USD,,,PO-2026-0025,VEN-999,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_NOT_FOUND
+R072,purchase_order,purchase_order.po_vendor_code:foreign_key_rejected_vendor,POS-026,,,,,USD,,,PO-2026-0026,VEN-030,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_NOT_FOUND
+R073,purchase_order,purchase_order.po_status:null,POS-027,,,,,INR,,,PO-2026-0027,VEN-003,,,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_STATUS_REQUIRED
+R074,purchase_order,purchase_order.po_status:invalid,POS-028,,,,,USD,,,PO-2026-0028,VEN-004,Cancelled,,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_PO_STATUS
+R075,purchase_order,purchase_order.status_path:skipped_transition,POS-029,,,,,EUR,,,PO-2026-0029,VEN-005,Received,Draft>Received,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_STATUS_TRANSITION
+R076,purchase_order,purchase_order.po_date:null,POS-030,,,,,GBP,,,PO-2026-0030,VEN-006,Sent,Draft>Sent,,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_DATE_REQUIRED
+R077,purchase_order,purchase_order.po_date:impossible,POS-031,,,,,INR,,,PO-2026-0031,VEN-007,Sent,Draft>Sent,2026-02-30,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_DATE
+R078,purchase_order,purchase_order.expected_date:before_order_date,POS-032,,,,,USD,,,PO-2026-0032,VEN-008,Sent,Draft>Sent,2026-06-15,2026-06-01,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,EXPECTED_DATE_BEFORE_ORDER_DATE
+R079,purchase_order,purchase_order.currency:null,POS-033,,,,,,,,PO-2026-0033,VEN-009,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,CURRENCY_REQUIRED
+R080,purchase_order,purchase_order.currency:invalid,POS-034,,,,,JPY,,,PO-2026-0034,VEN-010,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_CURRENCY
+R081,purchase_order,purchase_order.currency:vendor_mismatch,POS-035,,,,,USD,,,PO-2026-0035,VEN-001,Sent,Draft>Sent,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,CURRENCY_MISMATCH
+R082,purchase_order,purchase_order.po_total:null,POS-036,,,,,USD,,,PO-2026-0036,VEN-012,Sent,Draft>Sent,2026-05-10,2026-05-20,,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_TOTAL_REQUIRED
+R083,purchase_order,purchase_order.po_total:excess_decimals,POS-037,,,,,EUR,,,PO-2026-0037,VEN-013,Sent,Draft>Sent,2026-05-10,2026-05-20,12.345,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_PO_TOTAL
+R084,purchase_order,purchase_order.po_total:mismatch,POS-038,,,,,GBP,,,PO-2026-0038,VEN-014,Sent,Draft>Sent,2026-05-10,2026-05-20,21.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,PO_TOTAL_MISMATCH
+R085,purchase_order,purchase_order.lines:none,POS-039,,,,,INR,,,PO-2026-0039,VEN-015,Sent,Draft>Sent,2026-05-10,2026-05-20,100.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,EMPTY_ORDER_LINES
+R086,purchase_order,purchase_order.multi_defect,POS-040,,,,,USD,,,PO-2026-0040,VEN-999,Cancelled,,2026-05-10,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,rejected,VENDOR_NOT_FOUND|INVALID_PO_STATUS
+R087,purchase_order,purchase_order.po_date:ambiguous_slash,POS-041,,,,,EUR,,,PO-2026-0041,VEN-017,Sent,Draft>Sent,03/04/2026,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,review,AMBIGUOUS_DATE_FORMAT_REVIEW
+R088,purchase_order,purchase_order.po_date:ambiguous_dot,POS-042,,,,,GBP,,,PO-2026-0042,VEN-018,Sent,Draft>Sent,15.07.2026,2026-05-20,20.00,,,,,,SYNTH-ERP2-DIRTY-V1,review,AMBIGUOUS_DATE_FORMAT_REVIEW
+R089,purchase_order,purchase_order.record:exact_duplicate,POS-043,,,,,INR,,,PO-2026-0003,VEN-003,Closed,Draft>Sent>Received>Closed,2026-04-04,2026-04-28,10.02,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_PO_NUMBER_REVIEW
+R090,purchase_order,purchase_order.po_number:duplicate_whitespace_case,POS-044,,,,,EUR,,, po-2026-0005,VEN-005,Sent,Draft>Sent,2026-06-06,,1045.73,,,,,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_PO_NUMBER_REVIEW
+R091,po_line,po_line.record:valid,POL-001,,,,,,,,PO-2026-0001,,,,,,,1,SKU-ELEC-0001,0.5,9.99,5.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R092,po_line,po_line.record:valid,POL-002,,,,,,,,PO-2026-0001,,,,,,,2,SKU-ELEC-0002,12.25,999.9999,,SYNTH-ERP2-DIRTY-V1,accepted,
+R093,po_line,po_line.record:valid,POL-003,,,,,,,,PO-2026-0002,,,,,,,1,SKU-ELEC-0002,100,2.505,,SYNTH-ERP2-DIRTY-V1,accepted,
+R094,po_line,po_line.record:valid,POL-004,,,,,,,,PO-2026-0002,,,,,,,2,SKU-CHEM-0001,1000,9.99,9990.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R095,po_line,po_line.record:valid,POL-005,,,,,,,,PO-2026-0003,,,,,,,1,SKU-CHEM-0001,7,0,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R096,po_line,po_line.record:valid,POL-006,,,,,,,,PO-2026-0003,,,,,,,2,SKU-RAW-0001,4,2.505,10.02,SYNTH-ERP2-DIRTY-V1,accepted,
+R097,po_line,po_line.record:valid,POL-007,,,,,,,,PO-2026-0004,,,,,,,1,SKU-RAW-0001,12.25,45.5,557.38,SYNTH-ERP2-DIRTY-V1,accepted,
+R098,po_line,po_line.record:valid,POL-008,,,,,,,,PO-2026-0004,,,,,,,2,SKU-RAW-0002,0.001,0,,SYNTH-ERP2-DIRTY-V1,accepted,
+R099,po_line,po_line.record:valid,POL-009,,,,,,,,PO-2026-0005,,,,,,,1,SKU-RAW-0002,1000,1,,SYNTH-ERP2-DIRTY-V1,accepted,
+R100,po_line,po_line.record:valid,POL-010,,,,,,,,PO-2026-0005,,,,,,,2,SKU-PKG-0001,1.005,45.5,45.73,SYNTH-ERP2-DIRTY-V1,accepted,
+R101,po_line,po_line.record:valid,POL-011,,,,,,,,PO-2026-0006,,,,,,,1,SKU-PKG-0001,4,120.00,480.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R102,po_line,po_line.record:valid,POL-012,,,,,,,,PO-2026-0006,,,,,,,2,SKU-PKG-0002,1,1,1.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R103,po_line,po_line.record:whitespace_case,POL-013,,,,,,,,PO-2026-0006,,,,,,,3, sku-pkg-0001 , 4 , 2.50 ,,SYNTH-ERP2-DIRTY-V1,accepted,
+R104,po_line,po_line.record:valid,POL-014,,,,,,,,PO-2026-0007,,,,,,,1,SKU-PKG-0002,0.001,0.0001,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R105,po_line,po_line.record:valid,POL-015,,,,,,,,PO-2026-0007,,,,,,,2,SKU-TOOLS-0001,2.5,120.00,,SYNTH-ERP2-DIRTY-V1,accepted,
+R106,po_line,po_line.record:valid,POL-016,,,,,,,,PO-2026-0008,,,,,,,1,SKU-TOOLS-0001,1.005,0.3333,,SYNTH-ERP2-DIRTY-V1,accepted,
+R107,po_line,po_line.record:valid,POL-017,,,,,,,,PO-2026-0008,,,,,,,2,SKU-TOOLS-0002,10,0.0001,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R108,po_line,po_line.record:whitespace_case,POL-018,,,,,,,, po-2026-0008 ,,,,,,,3,SKU-RAW-0001,2,3.10,6.20,SYNTH-ERP2-DIRTY-V1,accepted,
+R109,po_line,po_line.record:valid,POL-019,,,,,,,,PO-2026-0009,,,,,,,1,SKU-TOOLS-0002,1,15,15.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R110,po_line,po_line.record:valid,POL-020,,,,,,,,PO-2026-0009,,,,,,,2,SKU-GEN-0003,3,0.3333,1.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R111,po_line,po_line.record:valid,POL-021,,,,,,,,PO-2026-0010,,,,,,,1,SKU-GEN-0003,2.5,250.75,626.88,SYNTH-ERP2-DIRTY-V1,accepted,
+R112,po_line,po_line.record:valid,POL-022,,,,,,,,PO-2026-0010,,,,,,,2,SKU-GEN-0001,0.5,15,,SYNTH-ERP2-DIRTY-V1,accepted,
+R113,po_line,po_line.record:valid,POL-023,,,,,,,,PO-2026-0011,,,,,,,1,SKU-GEN-0001,10,0.3333,,SYNTH-ERP2-DIRTY-V1,accepted,
+R114,po_line,po_line.record:valid,POL-024,,,,,,,,PO-2026-0011,,,,,,,2,SKU-GEN-0002,100,250.75,25075.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R115,po_line,po_line.record:valid,POL-025,,,,,,,,PO-2026-0012,,,,,,,1,SKU-GEN-0002,3,999.9999,3000.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R116,po_line,po_line.record:valid,POL-026,,,,,,,,PO-2026-0012,,,,,,,2,SKU-ELEC-0001,7,0.3333,2.33,SYNTH-ERP2-DIRTY-V1,accepted,
+R117,po_line,po_line.record:valid,POL-027,,,,,,,,PO-2026-0013,,,,,,,1,SKU-ELEC-0001,0.5,9.99,5.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R118,po_line,po_line.record:valid,POL-028,,,,,,,,PO-2026-0013,,,,,,,2,SKU-ELEC-0002,12.25,999.9999,,SYNTH-ERP2-DIRTY-V1,accepted,
+R119,po_line,po_line.record:valid,POL-029,,,,,,,,PO-2026-0014,,,,,,,1,SKU-ELEC-0002,100,2.505,,SYNTH-ERP2-DIRTY-V1,accepted,
+R120,po_line,po_line.record:valid,POL-030,,,,,,,,PO-2026-0014,,,,,,,2,SKU-CHEM-0001,1000,9.99,9990.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R121,po_line,po_line.record:valid,POL-031,,,,,,,,PO-2026-0015,,,,,,,1,SKU-CHEM-0001,7,0,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R122,po_line,po_line.record:valid,POL-032,,,,,,,,PO-2026-0015,,,,,,,2,SKU-RAW-0001,4,2.505,10.02,SYNTH-ERP2-DIRTY-V1,accepted,
+R123,po_line,po_line.record:valid,POL-033,,,,,,,,PO-2026-0016,,,,,,,1,SKU-RAW-0001,12.25,45.5,557.38,SYNTH-ERP2-DIRTY-V1,accepted,
+R124,po_line,po_line.record:valid,POL-034,,,,,,,,PO-2026-0016,,,,,,,2,SKU-RAW-0002,0.001,0,,SYNTH-ERP2-DIRTY-V1,accepted,
+R125,po_line,po_line.record:valid,POL-035,,,,,,,,PO-2026-0017,,,,,,,1,SKU-RAW-0002,1000,1,,SYNTH-ERP2-DIRTY-V1,accepted,
+R126,po_line,po_line.record:valid,POL-036,,,,,,,,PO-2026-0017,,,,,,,2,SKU-PKG-0001,1.005,45.5,45.73,SYNTH-ERP2-DIRTY-V1,accepted,
+R127,po_line,po_line.record:valid,POL-037,,,,,,,,PO-2026-0018,,,,,,,1,SKU-PKG-0001,5,0,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R128,po_line,po_line.record:valid,POL-038,,,,,,,,PO-2026-0018,,,,,,,2,SKU-PKG-0002,1,1,1.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R129,po_line,po_line.record:valid,POL-039,,,,,,,,PO-2026-0019,,,,,,,1,SKU-PKG-0002,2,2.505,5.01,SYNTH-ERP2-DIRTY-V1,accepted,
+R130,po_line,po_line.record:valid,POL-040,,,,,,,,PO-2026-0019,,,,,,,2,SKU-TOOLS-0001,2.5,120.00,,SYNTH-ERP2-DIRTY-V1,accepted,
+R131,po_line,po_line.record:valid,POL-041,,,,,,,,PO-2026-0020,,,,,,,1,SKU-TOOLS-0001,1.005,1,,SYNTH-ERP2-DIRTY-V1,accepted,
+R132,po_line,po_line.record:valid,POL-042,,,,,,,,PO-2026-0020,,,,,,,2,SKU-TOOLS-0002,10,0.0001,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R133,po_line,po_line.record:valid,POL-043,,,,,,,,PO-2026-0021,,,,,,,1,SKU-TOOLS-0002,0.001,0.0001,0.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R134,po_line,po_line.record:valid,POL-044,,,,,,,,PO-2026-0021,,,,,,,2,SKU-GEN-0003,3,0.3333,1.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R135,po_line,po_line.record:valid,POL-045,,,,,,,,PO-2026-0022,,,,,,,1,SKU-GEN-0003,3,0.3333,1.00,SYNTH-ERP2-DIRTY-V1,accepted,
+R136,po_line,po_line.record:valid,POL-046,,,,,,,,PO-2026-0022,,,,,,,2,SKU-GEN-0001,0.5,15,,SYNTH-ERP2-DIRTY-V1,accepted,
+R137,po_line,po_line.po_number:parent_not_loadable,POL-047,,,,,,,,PO-2026-0024,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R138,po_line,po_line.po_number:parent_not_loadable,POL-048,,,,,,,,PO-2026-0025,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R139,po_line,po_line.po_number:parent_not_loadable,POL-049,,,,,,,,PO-2026-0026,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R140,po_line,po_line.po_number:parent_not_loadable,POL-050,,,,,,,,PO-2026-0027,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R141,po_line,po_line.po_number:parent_not_loadable,POL-051,,,,,,,,PO-2026-0028,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R142,po_line,po_line.po_number:parent_not_loadable,POL-052,,,,,,,,PO-2026-0029,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R143,po_line,po_line.po_number:parent_not_loadable,POL-053,,,,,,,,PO-2026-0030,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R144,po_line,po_line.po_number:parent_not_loadable,POL-054,,,,,,,,PO-2026-0031,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R145,po_line,po_line.po_number:parent_not_loadable,POL-055,,,,,,,,PO-2026-0032,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R146,po_line,po_line.po_number:parent_not_loadable,POL-056,,,,,,,,PO-2026-0033,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R147,po_line,po_line.po_number:parent_not_loadable,POL-057,,,,,,,,PO-2026-0034,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R148,po_line,po_line.po_number:parent_not_loadable,POL-058,,,,,,,,PO-2026-0035,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R149,po_line,po_line.po_number:parent_not_loadable,POL-059,,,,,,,,PO-2026-0036,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R150,po_line,po_line.po_number:parent_not_loadable,POL-060,,,,,,,,PO-2026-0037,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R151,po_line,po_line.po_number:parent_not_loadable,POL-061,,,,,,,,PO-2026-0038,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R152,po_line,po_line.po_number:parent_not_loadable,POL-062,,,,,,,,PO-2026-0040,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R153,po_line,po_line.po_number:parent_not_loadable,POL-063,,,,,,,,PO-2026-0041,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R154,po_line,po_line.po_number:parent_not_loadable,POL-064,,,,,,,,PO-2026-0042,,,,,,,1,SKU-GEN-0001,2,10.00,20.00,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R155,po_line,po_line.po_number:null,POL-065,,,,,,,,,,,,,,,1,SKU-GEN-0002,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,PO_NUMBER_REQUIRED
+R156,po_line,po_line.po_number:foreign_key_missing,POL-066,,,,,,,,PO-2026-9999,,,,,,,1,SKU-GEN-0002,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,PO_NOT_FOUND
+R157,po_line,po_line.line_no:zero,POL-067,,,,,,,,PO-2026-0001,,,,,,,0,SKU-GEN-0002,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_LINE_NUMBER
+R158,po_line,po_line.line_no:malformed,POL-068,,,,,,,,PO-2026-0001,,,,,,,abc,SKU-GEN-0002,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_LINE_NUMBER
+R159,po_line,po_line.product_sku:null,POL-069,,,,,,,,PO-2026-0004,,,,,,,3,,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,SKU_REQUIRED
+R160,po_line,po_line.product_sku:foreign_key_missing,POL-070,,,,,,,,PO-2026-0005,,,,,,,3,SKU-UNKNOWN-9999,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,UNKNOWN_PRODUCT
+R161,po_line,po_line.product_sku:formula_injection,POL-071,,,,,,,,PO-2026-0010,,,,,,,3,=cmd|calc,2,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,FORMULA_INJECTION_DETECTED
+R162,po_line,po_line.quantity:null,POL-072,,,,,,,,PO-2026-0009,,,,,,,3,SKU-GEN-0002,,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,QUANTITY_REQUIRED
+R163,po_line,po_line.quantity:boundary_zero,POL-073,,,,,,,,PO-2026-0011,,,,,,,3,SKU-GEN-0002,0,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,QUANTITY_MUST_BE_POSITIVE
+R164,po_line,po_line.quantity:negative,POL-074,,,,,,,,PO-2026-0012,,,,,,,3,SKU-GEN-0002,-5,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,QUANTITY_MUST_BE_POSITIVE
+R165,po_line,po_line.quantity:malformed,POL-075,,,,,,,,PO-2026-0013,,,,,,,3,SKU-GEN-0002,five,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_QUANTITY
+R166,po_line,po_line.quantity:excess_decimals,POL-076,,,,,,,,PO-2026-0014,,,,,,,3,SKU-GEN-0002,1.2345,10.00,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_QUANTITY
+R167,po_line,po_line.unit_price:null,POL-077,,,,,,,,PO-2026-0015,,,,,,,3,SKU-GEN-0002,2,,,SYNTH-ERP2-DIRTY-V1,rejected,PRICE_REQUIRED
+R168,po_line,po_line.unit_price:negative,POL-078,,,,,,,,PO-2026-0016,,,,,,,3,SKU-GEN-0002,2,-1.00,,SYNTH-ERP2-DIRTY-V1,rejected,PRICE_MUST_BE_NON_NEGATIVE
+R169,po_line,po_line.unit_price:malformed,POL-079,,,,,,,,PO-2026-0017,,,,,,,3,SKU-GEN-0002,2,abc,,SYNTH-ERP2-DIRTY-V1,rejected,INVALID_PRICE
+R170,po_line,po_line.line_total:mismatch,POL-080,,,,,,,,PO-2026-0018,,,,,,,3,SKU-GEN-0002,2,10.00,25.00,SYNTH-ERP2-DIRTY-V1,rejected,LINE_TOTAL_MISMATCH
+R171,po_line,po_line.record:exact_duplicate,POL-081,,,,,,,,PO-2026-0002,,,,,,,1,SKU-ELEC-0002,100,2.505,,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_LINE_REVIEW
+R172,po_line,po_line.key:duplicate_whitespace_case,POL-082,,,,,,,, po-2026-0003 ,,,,,,,2,SKU-RAW-0001,4,2.505,10.02,SYNTH-ERP2-DIRTY-V1,review,DUPLICATE_LINE_REVIEW
+R173,po_line,po_line.multi_defect,POL-083,,,,,,,,PO-2026-0019,,,,,,,3,SKU-GEN-0002,0,-2,,SYNTH-ERP2-DIRTY-V1,rejected,QUANTITY_MUST_BE_POSITIVE|PRICE_MUST_BE_NON_NEGATIVE

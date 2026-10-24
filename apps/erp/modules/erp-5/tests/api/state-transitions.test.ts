@@ -22,6 +22,7 @@ import { ErrorEnvelopeSchema, HR_DOMAIN_RULES } from '@clearshift/contracts';
 import { buildHrApp } from '../../src/app.js';
 import { HrService } from '../../src/services/hr.service.js';
 import { InMemoryHrRepository } from '../../src/services/in-memory.repository.js';
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import { createErp5Resolver } from '../../src/public.js';
 import {
   FIXTURE_DEPARTMENT_ENGINEERING,
@@ -41,7 +42,8 @@ describe('ERP-5 HR & Employees — relationships, state transitions and read mod
 
   beforeEach(() => {
     repository = new InMemoryHrRepository(true);
-    hrService = new HrService(repository);
+    const auditService = new AuditService(new InMemoryAuditRepository());
+    hrService = new HrService(repository, auditService);
     app = buildHrApp({ repository, hrService, authRequired: true });
   });
 

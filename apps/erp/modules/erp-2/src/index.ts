@@ -13,6 +13,7 @@ export * from './public.js';
 export * from './services/erp2.service.js';
 export * from './services/repository.js';
 export * from './migration/target-adapter.js';
+export * from './kit/field-registry.js';
 export * from './routes/index.js';
 
 export const moduleDefinition = {

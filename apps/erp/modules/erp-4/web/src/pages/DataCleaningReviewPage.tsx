@@ -372,15 +372,15 @@ export const DataCleaningReviewPage: React.FC<DataCleaningReviewPageProps> = ({
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-xs text-slate-600 capitalize">
-                          {row.cleanedData.record_type || '—'}
+                          {String(row.cleanedData['record_type'] || '—')}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-slate-600 font-mono">
                           {row.audits.length > 0 ? `${row.audits.length} change(s)` : '0'}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-slate-800">
-                          {row.cleanedData.code || row.cleanedData.entry_number || '—'}{' '}
-                          {row.cleanedData.name ? `(${row.cleanedData.name})` : ''}{' '}
-                          {row.cleanedData.balance_amount ? `[Amt: ${row.cleanedData.balance_amount}]` : ''}
+                          {String(row.cleanedData['code'] || row.cleanedData['entry_number'] || '—')}{' '}
+                          {row.cleanedData['name'] ? `(${String(row.cleanedData['name'])})` : ''}{' '}
+                          {row.cleanedData['balance_amount'] ? `[Amt: ${String(row.cleanedData['balance_amount'])}]` : ''}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-amber-700">
                           {row.rejections.length > 0 ? (

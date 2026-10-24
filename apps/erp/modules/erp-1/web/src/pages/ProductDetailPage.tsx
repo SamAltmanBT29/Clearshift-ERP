@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import type {
   Product,
   Category,
@@ -34,7 +35,7 @@ import {
 import { ProductsLoadingSkeleton, ErrorProductsView, AccessDeniedProductsView } from '../components/StateViews.js';
 
 export interface ProductDetailPageProps {
-  productId: string;
+  productId?: string | undefined;
   initialProduct?: Product | null;
   categories?: readonly Category[];
   userPermissions?: readonly string[];
@@ -61,7 +62,7 @@ export function resolveStockStatus(quantityStr?: string): {
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
-  productId,
+  productId: propProductId,
   initialProduct = null,
   categories: initialCategories = [],
   userPermissions = ['inventory:read', 'inventory:write'],
@@ -69,6 +70,8 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onNavigateModule,
   onProductUpdated,
 }) => {
+  const params = useParams<{ productId?: string }>();
+  const productId = propProductId ?? params.productId ?? '';
   const [product, setProduct] = useState<Product | null>(initialProduct);
   const [categories, setCategories] = useState<Category[]>(() =>
     initialCategories.length > 0 ? [...initialCategories] : []
