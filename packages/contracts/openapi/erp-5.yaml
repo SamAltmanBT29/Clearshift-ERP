@@ -1024,38 +1024,44 @@ components:
     ImportRowRequest:
       type: object
       additionalProperties: false
-      required: [batch_id, source_row, idempotency_key, record]
+      required: [batch_id, source_row, idempotency_key, entity, record]
       properties:
         batch_id:
           $ref: "#/components/schemas/BatchId"
         source_row:
           $ref: "#/components/schemas/SourceRow"
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
         idempotency_key:
           $ref: "#/components/schemas/IdempotencyKeyValue"
+        correlation_id:
+          type: string
+          maxLength: 128
+          nullable: true
         entity:
           type: string
           minLength: 1
           maxLength: 64
-        source_system:
-          type: string
-          maxLength: 64
-        source_id:
-          type: string
-          maxLength: 128
         record:
           type: object
           additionalProperties: true
 
     ImportRowResponse:
       type: object
-      required: [targetId, receipt, isExisting]
+      required: [entity, receipt, prior_result]
       properties:
-        targetId:
+        entity:
           type: string
-          format: uuid
+          description: Target record identifier returned by the ERP-5 import service.
         receipt:
           type: object
-          required: [batchId, sourceRow, entity, schemaVersion, idempotencyKey, requestHash, targetId, kind, createdAt]
+          required: [batchId, sourceRow, entity, schemaVersion, idempotencyKey, payloadHash, targetId, kind, createdAt]
           properties:
             batchId:
               type: string
@@ -1070,7 +1076,7 @@ components:
               minimum: 1
             idempotencyKey:
               type: string
-            requestHash:
+            payloadHash:
               type: string
               minLength: 1
               maxLength: 64
@@ -1083,7 +1089,7 @@ components:
             createdAt:
               type: string
               format: date-time
-        isExisting:
+        prior_result:
           type: boolean
 
     ImportBatchRequest:
@@ -1161,7 +1167,32 @@ components:
                 format: uuid
               error:
                 type: object
+                properties:
+                  reasonCode:
+                    type: string
+                  message:
+                    type: string
+                  field:
+                    type: string
+                  retryable:
+                    type: boolean
                 additionalProperties: true
+
+    IdempotencyConflictResponse:
+      type: object
+      required: [statusCode, error, code, message]
+      properties:
+        statusCode:
+          type: integer
+          enum: [409]
+        error:
+          type: string
+          enum: [Conflict]
+        code:
+          type: string
+          enum: [IDEMPOTENCY_CONFLICT]
+        message:
+          type: string
 
     ImportReceipt:
       type: object
