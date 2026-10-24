@@ -14,15 +14,21 @@ import {
   CreatePaymentRequestSchema,
   PaymentListQuerySchema,
 } from "@clearshift/contracts";
+import { requireErp3Policy } from "../policies/authorization.js";
+import { auditRequest, type Erp3AuditService } from "../services/audit.js";
 import type { Erp3Service } from "../services/erp3.service.js";
 
 export const paymentRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
+  auditService: Erp3AuditService;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+  const auditService = opts.auditService;
 
   // GET /payments
-  fastify.get("/payments", async (request, reply) => {
+  fastify.get("/payments", {
+    preHandler: [requireErp3Policy("PAYMENTS_READ", auditService)],
+  }, async (request, reply) => {
     const parsedQuery = PaymentListQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
       const correlationId =
@@ -48,7 +54,9 @@ export const paymentRoutes: FastifyPluginAsync<{
   });
 
   // POST /payments
-  fastify.post("/payments", async (request, reply) => {
+  fastify.post("/payments", {
+    preHandler: [requireErp3Policy("PAYMENTS_CREATE", auditService)],
+  }, async (request, reply) => {
     const idempotencyHeader = request.headers["idempotency-key"] as
       | string
       | undefined;
@@ -96,12 +104,42 @@ export const paymentRoutes: FastifyPluginAsync<{
         entity: "payment",
         record: parsed.data as unknown as Record<string, unknown>,
       });
+      if (!importRes.prior_result) {
+        await auditRequest(auditService, request, {
+          action: "load.requested",
+          targetEntity: "payment",
+          targetId: importRes.target_id,
+          batchId: parsed.data.batch_id,
+          result: "success",
+          metadata: { module: "erp-3", rowCount: 1 },
+        });
+        await auditRequest(auditService, request, {
+          action: "erp.invoice.status_changed",
+          targetEntity: "invoice",
+          targetId: parsed.data.invoice_id,
+          result: "success",
+          metadata: { status: "Paid", source: "migration_import" },
+        });
+      }
       return reply
         .status(importRes.prior_result ? 200 : 201)
         .send(importRes.receipt.response_payload);
     }
 
     const created = await service.createPayment(parsed.data);
+    await auditRequest(auditService, request, {
+      action: "erp.payment.created",
+      targetEntity: "payment",
+      targetId: created.id,
+      result: "success",
+    });
+    await auditRequest(auditService, request, {
+      action: "erp.invoice.status_changed",
+      targetEntity: "invoice",
+      targetId: created.invoice_id,
+      result: "success",
+      metadata: { status: "Paid" },
+    });
     return reply.status(201).send(created);
   });
 };
