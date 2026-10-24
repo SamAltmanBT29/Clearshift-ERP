@@ -26,11 +26,14 @@ import { SalesOrderFilterSidebar, InvoiceFilterSidebar } from '../components/Fil
 import { FilterPillTags } from '../components/FilterPillTags.js';
 import type { Erp3ActiveFilters, Erp3FilterKey } from '../components/FilterPillTags.js';
 import { ErrorState, AccessDeniedState, sanitizeErrorMessage } from '../components/StateViews.js';
+import { Alert } from '@cs/ui';
 import { OrderCreatePage } from './OrderCreatePage.js';
 import { OrderDetailPage } from './OrderDetailPage.js';
 import { InvoiceCreatePage } from './InvoiceCreatePage.js';
 import { InvoiceDetailPage } from './InvoiceDetailPage.js';
 import { OrdersImportPage } from './OrdersImportPage.js';
+import { OrderCreateModal } from '../components/forms/OrderCreateModal.js';
+import { OrdersRejectionReviewPage } from './OrdersRejectionReviewPage.js';
 
 export type OrdersViewMode =
   | 'list'
@@ -38,7 +41,8 @@ export type OrdersViewMode =
   | 'order-detail'
   | 'create-invoice'
   | 'invoice-detail'
-  | 'import';
+  | 'import'
+  | 'rejections';
 
 export interface PageErrorState {
   message: string;
@@ -48,8 +52,12 @@ export interface PageErrorState {
 
 export interface OrdersListPageProps {
   initialTab?: 'orders' | 'invoices';
+  initialCreateModalOpen?: boolean;
+  createMode?: 'modal' | 'page';
   initialView?: OrdersViewMode;
+  onOrderCreated?: (order: SalesOrder) => void;
   onNavigateImport?: () => void;
+  onNavigateRejections?: () => void;
 }
 
 // ─── URL Query State Helpers ──────────────────────────────────────────────────
@@ -118,13 +126,19 @@ function updateUrl(params: Record<string, string | number | undefined>) {
 
 export const OrdersListPage: React.FC<OrdersListPageProps> = ({
   initialTab = 'orders',
+  initialCreateModalOpen = false,
+  createMode = 'page',
   initialView = 'list',
+  onOrderCreated,
   onNavigateImport,
+  onNavigateRejections,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'invoices'>(() =>
     parseInitialTabFromUrl(initialTab)
   );
   const [viewMode, setViewMode] = useState<OrdersViewMode>(initialView);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(initialCreateModalOpen);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -456,6 +470,17 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
     );
   }
 
+  if (viewMode === 'rejections') {
+    return (
+      <OrdersRejectionReviewPage
+        onNavigateBack={() => {
+          setViewMode('list');
+          loadOrders(orderFilters);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="cs-module-root">
       {/* Page Header with Action Buttons */}
@@ -484,11 +509,38 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
             </button>
             <button
               type="button"
+              className="cs-btn-secondary"
+              data-testid="btn-view-rejections"
+              onClick={() => {
+                onNavigateRejections?.();
+                setViewMode('rejections');
+              }}
+              aria-label="View migration rejections"
+            >
+              Migration Rejections
+            </button>
+            <button
+              type="button"
               className="cs-btn-primary"
-              onClick={() => setViewMode('create-order')}
+              onClick={() => {
+                if (createMode === 'modal') {
+                  setIsCreateModalOpen(true);
+                } else {
+                  setViewMode('create-order');
+                }
+              }}
               aria-label="Create new sales order"
             >
               + New Sales Order
+            </button>
+            <button
+              type="button"
+              className="cs-btn-secondary"
+              onClick={() => setIsCreateModalOpen(true)}
+              aria-label="Open sales order creation modal"
+              data-testid="open-order-create-modal"
+            >
+              + Order Modal
             </button>
             <button
               type="button"
@@ -504,6 +556,19 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Confirmation Toast (AC4) */}
+      {toastMessage && (
+        <div className="cs-erp3-toast-container" role="status" aria-live="polite">
+          <Alert
+            variant="success"
+            title="Success"
+            onDismiss={() => setToastMessage(null)}
+          >
+            {toastMessage}
+          </Alert>
+        </div>
+      )}
 
       {/* Tabs navigation */}
       <nav className="cs-tabs-container" aria-label="Order and invoice views">
@@ -608,7 +673,13 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
                     orderFilters.currency ||
                     orderFilters.customer_golden_id
                 )}
-                onCreateOrder={() => setViewMode('create-order')}
+                onCreateOrder={() => {
+                  if (createMode === 'modal') {
+                    setIsCreateModalOpen(true);
+                  } else {
+                    setViewMode('create-order');
+                  }
+                }}
                 onClearFilters={handleClearAllOrderFilters}
               />
             )}
@@ -704,6 +775,22 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({
           </div>
         </div>
       )}
+      {/* Sales Order Creation Modal (Issue #156 / ERP3-20) */}
+      <OrderCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onOrderCreated={(created) => {
+          setOrders((prev) => [created, ...prev]);
+          setOrdersTotal((prev) => prev + 1);
+          setToastMessage(
+            `Sales order ${created.order_number || created.id} created successfully.`
+          );
+          if (onOrderCreated) {
+            onOrderCreated(created);
+          }
+          setIsCreateModalOpen(false);
+        }}
+      />
     </div>
   );
 };

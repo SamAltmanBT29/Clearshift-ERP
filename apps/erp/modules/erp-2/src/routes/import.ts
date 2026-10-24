@@ -14,6 +14,9 @@
  *     Returns 200 with per-row outcomes and aggregate totals.
  *     A data-validation failure on one row does NOT abort subsequent rows.
  *
+ * Security:
+ *   - Protected by erp2IngestGuard (requires 'module.write' or 'kit.run')
+ *
  * @module erp2/routes/import
  */
 
@@ -22,6 +25,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ImportRowRequestSchema } from '@clearshift/contracts';
 import type { Erp2Service } from '../services/erp2.service.js';
 import { Erp2TargetAdapter } from '../migration/target-adapter.js';
+import { erp2IngestGuard, assertTenantAccess } from './guard.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Batch request schema (ERP2-11)
@@ -62,38 +66,47 @@ export const importRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> = as
    * POST /import
    * Single-row import endpoint (KIT-08 / Decision C4).
    */
-  fastify.post('/import', async (request, reply) => {
-    const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
+  fastify.post(
+    '/import',
+    { preHandler: erp2IngestGuard },
+    async (request, reply) => {
+      const idempotencyHeader = request.headers['idempotency-key'] as string | undefined;
 
-    const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
-    const bodyToValidate = {
-      ...rawBody,
-      idempotency_key: idempotencyHeader || rawBody['idempotency_key'],
-    };
+      const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+      assertTenantAccess(
+        request.user,
+        { tenant_id: rawBody['tenant_id'] as string | undefined },
+        request.headers['x-tenant-id'] as string | undefined
+      );
+      const bodyToValidate = {
+        ...rawBody,
+        idempotency_key: idempotencyHeader || rawBody['idempotency_key'],
+      };
 
-    const parsed = ImportRowRequestSchema.safeParse(bodyToValidate);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        statusCode: 400,
-        error: 'Bad Request',
-        code: 'VALIDATION_ERROR',
-        message: parsed.error.issues[0]?.message ?? 'Invalid import row request',
-        details: parsed.error.issues.map((i) => ({
-          field: i.path.join('.'),
-          message: i.message,
-          code: i.code,
-        })),
-      });
+      const parsed = ImportRowRequestSchema.safeParse(bodyToValidate);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.issues[0]?.message ?? 'Invalid import row request',
+          details: parsed.error.issues.map((i) => ({
+            field: i.path.join('.'),
+            message: i.message,
+            code: i.code,
+          })),
+        });
+      }
+
+      // Propagate upsert flag if present in the body
+      const upsert = typeof rawBody['upsert'] === 'boolean' ? rawBody['upsert'] : false;
+      const result = await service.importRow({ ...parsed.data, upsert } as any);
+
+      // If idempotent replay of identical key & payload: HTTP 200; if fresh: HTTP 201
+      const statusCode = result.prior_result ? 200 : 201;
+      return reply.status(statusCode).send(result);
     }
-
-    // Propagate upsert flag if present in the body
-    const upsert = typeof rawBody['upsert'] === 'boolean' ? rawBody['upsert'] : false;
-    const result = await service.importRow({ ...parsed.data, upsert } as any);
-
-    // If idempotent replay of identical key & payload: HTTP 200; if fresh: HTTP 201
-    const statusCode = result.prior_result ? 200 : 201;
-    return reply.status(statusCode).send(result);
-  });
+  );
 
   /**
    * POST /import/batch
@@ -103,53 +116,62 @@ export const importRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> = as
    * Each row's outcome is independent: data-validation failures are collected
    * per-row without aborting the batch. Infrastructure failures propagate.
    */
-  fastify.post('/import/batch', async (request, reply) => {
-    const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+  fastify.post(
+    '/import/batch',
+    { preHandler: erp2IngestGuard },
+    async (request, reply) => {
+      const rawBody = (request.body && typeof request.body === 'object' ? request.body : {}) as Record<string, unknown>;
+      assertTenantAccess(
+        request.user,
+        { tenant_id: rawBody['tenant_id'] as string | undefined },
+        request.headers['x-tenant-id'] as string | undefined
+      );
 
-    const parsed = ImportBatchRequestSchema.safeParse(rawBody);
-    if (!parsed.success) {
-      return reply.status(400).send({
-        statusCode: 400,
-        error: 'Bad Request',
-        code: 'VALIDATION_ERROR',
-        message: parsed.error.issues[0]?.message ?? 'Invalid batch import request',
-        details: parsed.error.issues.map((i) => ({
-          field: i.path.join('.'),
-          message: i.message,
-          code: i.code,
-        })),
+      const parsed = ImportBatchRequestSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.issues[0]?.message ?? 'Invalid batch import request',
+          details: parsed.error.issues.map((i) => ({
+            field: i.path.join('.'),
+            message: i.message,
+            code: i.code,
+          })),
+        });
+      }
+
+      const {
+        batch_id,
+        entity,
+        upsert,
+        chunk_size,
+        failure_threshold,
+        min_attempted_rows,
+        rows,
+      } = parsed.data;
+
+      // Instantiate in-process target adapter scoped to the declared entity
+      const adapter = new Erp2TargetAdapter(service, entity);
+
+      // Map request rows to BatchRowInput
+      const batchRows = rows.map((r) => ({
+        sourceRow: r.source_row,
+        idempotencyKey: r.idempotency_key,
+        sourceSystem: r.source_system ?? undefined,
+        sourceId: r.source_id ?? undefined,
+        data: r.record,
+      }));
+
+      const result = await adapter.loadBatch(batch_id, batchRows, {
+        upsert,
+        chunkSize: chunk_size,
+        failureThreshold: failure_threshold,
+        minAttemptedRows: min_attempted_rows,
       });
+
+      return reply.status(200).send(result);
     }
-
-    const {
-      batch_id,
-      entity,
-      upsert,
-      chunk_size,
-      failure_threshold,
-      min_attempted_rows,
-      rows,
-    } = parsed.data;
-
-    // Instantiate in-process target adapter scoped to the declared entity
-    const adapter = new Erp2TargetAdapter(service, entity);
-
-    // Map request rows to BatchRowInput
-    const batchRows = rows.map((r) => ({
-      sourceRow: r.source_row,
-      idempotencyKey: r.idempotency_key,
-      sourceSystem: r.source_system ?? undefined,
-      sourceId: r.source_id ?? undefined,
-      data: r.record,
-    }));
-
-    const result = await adapter.loadBatch(batch_id, batchRows, {
-      upsert,
-      chunkSize: chunk_size,
-      failureThreshold: failure_threshold,
-      minAttemptedRows: min_attempted_rows,
-    });
-
-    return reply.status(200).send(result);
-  });
+  );
 };

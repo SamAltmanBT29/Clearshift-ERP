@@ -17,6 +17,11 @@ import {
 } from "./services/repository.js";
 import { erpOrdersRoutes } from "./routes/index.js";
 import * as domainRules from "./domain/index.js";
+export * from "./migration/mapping-config.js";
+export * from "./migration/profiling-config.js";
+export * from "./migration/cleaning-config.js";
+export { hasFormulaPrefix } from "./migration/cleaning-config.js";
+export * from "./kit/rejection-context.js";
 
 export {
   erp3Resolver,
@@ -49,5 +54,6 @@ export const moduleDefinition = {
 export const erp3Descriptor = moduleDefinition;
 
 export * from "./kit/field-registry.js";
+export { erp3KitMetadata } from "./kit/field-registry.js";
 
 export default moduleDefinition;

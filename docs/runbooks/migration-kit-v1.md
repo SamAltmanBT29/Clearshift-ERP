@@ -111,3 +111,207 @@ Migration Kit operates under strict privilege separation (ADR-004 / Decision C4)
 - **No Direct Table Privileges:** The Migration Kit worker role possesses ZERO insert, update, or delete privileges on module-owned domain schemas (`erp1.*`, `erp2.*`, `erp3.*`, `erp4.*`, `erp5.*`).
 - **Adapter In-Process Port:** All loads are mediated via the owning module's `MigrationTargetAdapter`, ensuring that module business rules, events, and transactional boundaries are strictly respected.
 - **Durable Import Receipts:** Every module maintains an `import_receipts` table with a unique constraint on `idempotency_key` (`<module>_import_receipts_idempotency_key_unique`), guaranteeing that no race condition or retry can ever produce a duplicate target record.
+
+---
+
+## 4. Step 7: Terminal Outcome Ledger & Mathematically Exact Reconciliation (KIT-09)
+
+**Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; Issue #76 `[KIT-09]`.
+
+### 4.1 Overview & Pipeline Stage Responsibilities
+
+Step 7 (**Reconcile**) provides mathematical accounting for every parsed source row in a migration batch. In ClearShift V1, a migration run is NEVER considered complete or eligible for client/operator signoff based on target table count heuristics. Reconciliation is mathematically exact and derived exclusively from the append-only `platform.kit_row_outcomes` ledger.
+
+```
+                  ┌─────────────────────────────────────────────────────────┐
+                  │ Append-Only Outcome Ledger (platform.kit_row_outcomes)  │
+                  │ - UNIQUE (batch_id, source_row)                         │
+                  │ - Database triggers strictly prohibit UPDATE & DELETE   │
+                  └────────────┬───────────────────────────────┬────────────┘
+                               │                               │
+                Loaded Rows    │                               │ Skipped Rows (Pre-Load)
+                               ▼                               ▼
+                     [ Target Adapter Port ]          [ SkipManager ]
+                     - Atomically commits             - Editor/Admin RBAC
+                       target row + receipt           - Runner self-approval blocked
+                     - Writes LOADED outcome          - Min 10 non-whitespace reason
+                               │                      - operator_approved_skip code
+                               │                      - Post-dry-run token invalidator
+                               ▼                               │
+                  ┌────────────────────────────────────────────▼────────────┐
+                  │ ReconciliationEngine                                    │
+                  │                                                         │
+                  │   source = loaded + rejected + merged + skipped         │
+                  │   unaccounted = 0                                       │
+                  │                                                         │
+                  │   ├── If holds: status = OK, signoffAllowed = true      │
+                  │   └── If discrepancy: status = reconciliation_failed,   │
+                  │       signoff strictly disabled                         │
+                  └─────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Append-Only Ledger Invariants (`kit_row_outcomes`)
+
+1. **Unique Terminal Outcome:** Every parsed source row has exactly one terminal outcome:
+   - `loaded`: Row successfully committed to the target module and import receipt issued.
+   - `rejected`: Row failed validation, formatting, or circuit breaker threshold.
+   - `merged`: Exact duplicate matched to existing golden master row and merged.
+   - `skipped`: Operator explicitly excluded row before real load following authorized skip policy.
+2. **Database-Level Uniqueness:** A database unique constraint on `(batch_id, source_row)` strictly blocks any second terminal outcome. Attempting to assign multiple outcomes throws `SecondTerminalOutcomeError` (`HTTP 409`).
+3. **Immutability (Append-Only):** Database trigger `trg_kit_row_outcomes_append_only` intercepts and blocks any `UPDATE` or `DELETE` statement, ensuring that outcome entries cannot be tampered with.
+4. **Ledger Authority:** Counts are derived directly by aggregating the outcome ledger (`countOutcomesByBatch`), never from target business table totals (`SELECT count(*) FROM target`). This guarantees immunity to external mutations or multi-tenant database writes.
+
+### 4.3 Operator Skip Authorization & Lifecycle Rules
+
+A `skipped` outcome is permitted ONLY under strict operational controls:
+- **Pre-Load Window Only:** Skips are strictly permitted before real load (i.e. during `created`, `extracted`, `profiled`, `cleaned`, `mapped`, or `dry_run_ok` states). Any skip requested during or after `loading` throws `SkipApprovalForbiddenError` (`HTTP 403`).
+- **Role-Based Access Control:** An **Editor** or **Admin** must confirm the Skip row action. Viewers, Analysts, or unprivileged roles cannot approve skips.
+- **Separation of Duties:** A **Migration Runner cannot approve its own skip**. If `actor === batchRunner`, the request is rejected immediately with `SkipApprovalForbiddenError`.
+- **Reason Requirement:** The operator must supply an explanatory reason of at least **10 non-whitespace characters**. Reasons failing this threshold throw `InvalidSkipReasonError` (`HTTP 400`).
+- **Audit Policy Stamp:** The Kit automatically records actor, timestamp, and policy code `operator_approved_skip` alongside the reason text in the ledger.
+- **Ignored Columns Policy:** Setting columns to "ignore" in field mapping NEVER marks a row as skipped. Ignored columns simply omit fields; row terminal outcomes remain governed by load/validation.
+
+### 4.4 Dry-Run Token Invalidation Protocol
+
+To guarantee that preflight predictions match actual load inputs:
+1. Completing a dry-run issues a cryptographic `DryRunToken` recorded in `DryRunTokenManager`.
+2. Any skip approved after dry-run **invalidates the dry-run token** immediately.
+3. The real load gateway (`TargetBatchLoader`) asserts token validity prior to dispatching chunks. If the token is invalidated or missing, load halts with `DryRunTokenInvalidatedError` (`HTTP 412`), requiring a new dry-run before real load is unlocked.
+
+### 4.5 Exact Conservation Equation & Signoff State
+
+The reconciliation engine verifies the mathematical conservation equation:
+
+$$\text{sourceRows} = \text{loaded} + \text{rejected} + \text{merged} + \text{skipped}$$
+$$\text{unaccountedRows} = \text{sourceRows} - (\text{loaded} + \text{rejected} + \text{merged} + \text{skipped}) = 0$$
+
+- **Verification Verdict:**
+  - **Verdict `OK`:** Formula holds and `unaccountedRows === 0`. The batch status transitions to `reconciled` and operator signoff is enabled.
+  - **Verdict `reconciliation_failed`:** If `unaccountedRows !== 0`, counts do not match, or double-count duplicates exist, the batch status remains `reconciliation_failed` and signoff is strictly disabled (`signoffAllowed: false`).
+- **Formula-Safe Export Defense:** All reconciliation summary and outcome CSV exports sanitize dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) by prepending a single quote (`'`), neutralizing CSV injection attacks per OWASP guidelines.
+
+---
+
+## 5. Step 5b: Resumable Compensating-Saga Rollback with Conflict Preflight (KIT-12)
+
+**Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; Issue #79 `[KIT-12]`.
+
+### 5.1 Non-Distributed ACID & Saga Principles
+
+In multi-module ERP systems, rollback is **not distributed ACID**. A load cannot simply execute a global SQL transaction rollback once external systems or multi-entity transactions commit. Instead, ClearShift Migration Kit implements a **resumable compensating saga** with **conflict preflight** and **append-only journaling**:
+
+```
+                       [ Operator Rollback Request ]
+                                    │
+                                    ▼
+                     ┌─────────────────────────────┐
+                     │  Conflict Preflight Check   │
+                     │  - Durable receipt check    │
+                     │  - Target version match     │
+                     │  - Child reference guard    │
+                     └──────────────┬──────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+             Conflict Detected                 Clean / Passed
+                    │                               │
+                    ▼                               ▼
+       ┌────────────────────────┐      ┌─────────────────────────┐
+       │ Status:                │      │ Status:                 │
+       │ rollback_blocked       │      │ in_progress             │
+       │ - Zero mutations       │      │ - Stop new writes       │
+       │ - Blocked items logged │      │ - Reverse order (LIFO)  │
+       └────────────────────────┘      └────────────┬────────────┘
+                                                    │
+                                                    ▼
+                                       ┌─────────────────────────┐
+                                       │ Compensating Actions    │
+                                       │ - remove_created        │
+                                       │ - restore_updated       │
+                                       │ - Log to journal        │
+                                       └────────────┬────────────┘
+                                                    │
+                                                    ▼
+                                       ┌─────────────────────────┐
+                                       │ Status: rolled_back     │
+                                       │ (100% actions confirmed)│
+                                       └─────────────────────────┘
+```
+
+### 5.2 Conflict Preflight Invariants
+
+Before any target table mutation occurs, the `RollbackPreflightChecker` inspects all records associated with the batch:
+1. **Receipt Completeness:** Asserts that every loaded row has a durable import receipt recorded in `<module>.import_receipts`.
+2. **Child Reference Guard (`CHILD_REFERENCES_EXIST`):** Created records can be removed **only when no downstream child references exist** (e.g., invoice lines referencing orders, inventory moves referencing products).
+3. **Version & Later Edits Guard (`TARGET_VERSION_MISMATCH`):** Updated records can be restored **only when current target version still matches post-load version**. If an external user or service edited the target row after migration, rollback is strictly blocked.
+4. **Blocking Semantics (`rollback_blocked`):** If any conflict is detected:
+   - Rollback immediately halts without mutating target business tables.
+   - Batch status transitions to `rollback_blocked`.
+   - All conflicts are durably recorded in `platform.kit_rollback_journal` as `blocked` with explicit diagnostic error reasons.
+
+### 5.3 Reverse Dependency Order Execution (LIFO)
+
+When preflight succeeds, compensations execute in strict reverse dependency order (descending `sourceRow` / reverse load position):
+- **LIFO Compensation:** Dependent child entities loaded in later rows are compensated before parent entities loaded in earlier rows.
+- **Created Records (`remove_created`):** The target business record is deleted from the module domain table.
+- **Updated Records (`restore_updated`):** The target record is restored to its exact `beforeState` payload.
+
+### 5.4 Append-Only Rollback Journal (`platform.kit_rollback_journal`)
+
+Every compensation decision is audited durably in PostgreSQL:
+- **Columns:** `id`, `batch_id`, `module`, `entity`, `target_id`, `source_row`, `action`, `target_version`, `before_state`, `after_state`, `actor`, `status`, `idempotency_key`, `error_reason`, `position`, `executed_at`, `created_at`.
+- **Status Lifecycle:** `pending` -> `compensated` | `blocked` | `failed`.
+- **Idempotency Guarantee:** Unique constraint on `(batch_id, idempotency_key, action)` prevents duplicate journal actions.
+
+### 5.5 Idempotency & Resumable Recovery Workflows
+
+1. **Repeated Requests (Idempotent):** If an operator or automated retry triggers rollback on an already-rolled-back batch (`status === 'rolled_back'`), the engine returns the existing completed summary immediately with `isExisting: true`. Zero duplicate database mutations are performed.
+2. **Worker Interruption & Partial Recovery (Resumable):**
+   - If worker crashes or network fails mid-saga, the batch status remains `failed` or `in_progress`.
+   - Completed compensation actions remain stamped `compensated` in the append-only journal.
+   - Upon restart/re-execution, the saga resumes from the first uncompensated action, skipping all confirmed actions.
+   - The batch transitions to `rolled_back` **only when 100% of actions are confirmed**.
+
+---
+
+## 6. Transactional Event Envelope, Outbox Producer and CRM-5 Projections (KIT-13)
+
+**Traceability:** Issue #80 `[KIT-13]`; SDS ClearShift Migration Kit v2.0 §4.13; Project Plan v3.0 §§9, 11, 17.
+
+### 6.1 Event Types
+Batch state events published via the PostgreSQL outbox:
+- `batch.extracted` — payload: `batch_id`, `module`, `rows_read`
+- `batch.profiled` — payload: `batch_id`, `module`, `empty_count`, `invalid_count`, `duplicate_count`
+- `batch.cleaned` — payload: `batch_id`, `cleaned`, `rejected`
+- `batch.mapped` — payload: `batch_id`, `mapped`, `missing_required`
+- `batch.loaded` — payload: `batch_id`, `loaded`, `rejected`, `merged`
+- `batch.validated` — payload: `batch_id`, `validation_failures`
+- `batch.failed` — payload: `batch_id`, `step`, `reason`
+- `contact.merged` — where relevant
+
+### 6.2 Transactional Commit
+For each state event, the DB mutation and the outbox envelope commit together in the same PostgreSQL transaction. The Migration Kit uses `OutboxEventProducer` (`apps/migration-kit/src/events/producer.ts`) which delegates to `IOutboxRepository.writeEvent(envelope, tx)`.
+
+### 6.3 CRM-5 Projections
+`InMemoryCrm5ProjectionStore` (`apps/migration-kit/src/events/projection.ts`) derives batch counts/status from event envelopes. Duplicate deliveries are deduplicated by `event_id`; out-of-order deliveries are ignored when their `occurred_at` is older than the last applied event, preventing projection regression.
+
+### 6.4 Hard Failure
+Any unrecoverable step emits `batch.failed` with `step` and `reason`. Consumers tolerate duplicate and out-of-order delivery and never claim exactly-once.
+
+---
+
+## 7. Migration Kit Operator Workflow (Screens) (KIT-14)
+
+The shared Migration Kit web app lives at `apps/migration-kit/web/` and provides:
+
+1. Batch list (`/kit/batches`) with loading/empty/error states.
+2. Four-step new batch wizard (`/kit/batches/new`): upload/create → profile → mapping/rules → dry-run/load.
+3. Profile report (`/kit/batches/:batchId/profile`).
+4. Mapping & rules (`/kit/batches/:batchId/mapping`).
+5. Duplicate review (`/kit/batches/:batchId/duplicates`).
+6. Run result (`/kit/batches/:batchId/result`).
+7. Reconciliation (`/kit/batches/:batchId/reconciliation`).
+8. Reject list with paged, formula-safe CSV export (`/kit/batches/:batchId/rejects`).
+
+State-transition actions are disabled until prerequisites pass; load requires a current dry-run pass and operator role permission. Synthetic data only.
+

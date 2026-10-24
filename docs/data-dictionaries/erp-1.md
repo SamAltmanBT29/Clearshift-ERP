@@ -39,6 +39,7 @@
 25. [Module Authorization and Policy Integration (ERP1-15)](#27-module-authorization-and-policy-integration-erp1-15)
 26. [Module Route and Page Registration in Shared Shell (ERP1-16)](#28-module-route-and-page-registration-in-shared-shell-erp1-16)
 27. [Main Paginated Data Table (ERP1-17)](#29-main-paginated-data-table-erp1-17)
+28. [Profiling Configuration & Expected-Result Assertions (ERP1-26)](#28-profiling-configuration--expected-result-assertions-erp1-26)
 
 ---
 
@@ -211,6 +212,11 @@ cannot create a second stock row for the same pair.
 | `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
 | `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
 | `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `source_system` | `VARCHAR(64)` | `z.string().optional()` | NULLABLE | — | Source system identifier | Audit | `'legacy_erp'` |
+| `source_id` | `VARCHAR(128)` | `z.string().optional()` | NULLABLE | — | Source record identifier | Audit | `'LEG-1001'` |
+| `request_hash` | `VARCHAR(64)` | `z.string()` | NOT NULL | `''` | SHA-256 hash of canonical request | KIT-08 | `'e3b0c442...'` |
+| `outcome` | `VARCHAR(16)` | `enum('loaded','rejected','merged','skipped')` | NOT NULL | `'loaded'` | Row outcome classification | KIT-08 | `'loaded'` |
+| `response_payload` | `TEXT` | `z.string().optional()` | NULLABLE | — | Serialized JSON response for idempotent replay | KIT-08 | `'{"id":"..."}'` |
 | `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
@@ -717,11 +723,12 @@ Every functional requirement, domain rule, and platform architectural invariant 
 | **ERP1-21** | Issue #117 | Detail/edit drawer workflow, linked records, HTTP 409 conflict handling | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
 | **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
 | **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
+| **ERP1-08** | Issue #13 | Module-specific profiling, cleaning, mapping and dirty-data pack | `apps/erp/modules/erp-1/tests/migration/rules.test.ts`<br>`apps/erp/modules/erp-1/docs/data-quality-rules.md` | **Verified** |
 | **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
 
 ---
 
-## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)
+## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-08 / ERP1-24)
 
 ### 20.1 Plan Overview & Principles
 
@@ -730,8 +737,9 @@ The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove
 - **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../sample-data/erp-1/dirty-data-v1.csv)
 - **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json)
 - **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../sample-data/erp-1/mapping-template.json)
-- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/dirty-data-plan.ts`](../src/migration/dirty-data-plan.ts)
-- **Automated Regression Suite**: [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/rules.ts`](../../apps/erp/modules/erp-1/src/migration/rules.ts)
+- **Data Quality Rules Specification**: [`apps/erp/modules/erp-1/docs/data-quality-rules.md`](../../apps/erp/modules/erp-1/docs/data-quality-rules.md)
+- **Automated Regression Suites**: [`apps/erp/modules/erp-1/tests/migration/rules.test.ts`](../../apps/erp/modules/erp-1/tests/migration/rules.test.ts) & [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../../apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts)
 
 ### 20.2 Synthetic Edge-Case Scenarios
 
@@ -1163,3 +1171,37 @@ The primary collection table screen renders entity rows with stable columns dire
    - Headers declare `aria-sort="ascending"`, `aria-sort="descending"`, or `aria-sort="none"`.
    - Accessible descriptions announce the current sort state and next action (`aria-label`).
    - Supports keyboard activation via `Enter` and `Space` (`tabIndex={0}`).
+
+---
+
+## 28. Profiling Configuration & Expected-Result Assertions (ERP1-26)
+
+**Issue Reference**: Resolves [#122](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/122) (ERP1-26 / KIT-03)  
+**Implementation**: `apps/erp/modules/erp-1/src/migration/profiling-config.ts`  
+**Test Suite**: `apps/erp/modules/erp-1/tests/migration/profiling.test.ts`  
+**Detailed Specification**: `docs/data-dictionaries/erp-1-profiling.md`  
+
+### 28.1 Shared Profiler Engine Integration (AC1 & AC4)
+ERP-1 integrates directly with the `@cs/kit` shared column profiler (`profileDataset`) and CSV report exporter (`exportProfileReportToCsv`) without duplicating platform infrastructure:
+- Accurately computes total rows (131), null counts, populated counts, distinct values, invalid format counts, and rates for all 4 owned entities (`category`, `warehouse`, `product`, `stock_level`).
+- Validates strict domain invariants:
+  - SKU uniqueness after documented normalization (`normalizeSku`).
+  - Unit of measure from fixed V1 list (`pcs`, `kg`, `g`, `litre`, `metre`, `box` per FR-ERP1-04).
+  - Price and tax rates use non-negative decimal types (FR-ERP1-02).
+  - Stock quantity may not become negative (BR-ERP1-01 / BR-ERP1-02).
+  - Single operating warehouse in V1 (`WH-01` per FR-ERP1-05).
+  - OWASP formula injection protection (`=`, `+`, `-`, `@`, `\t`, `\r`).
+- Validates all column invalid format counts match pre-calculated manifest numbers from `sample-data/erp-1/expected-profile.json`.
+
+### 28.2 Exact Duplicate Candidate Rules (AC2)
+Deterministic exact-key matching rules are configured for human review:
+- `category_code`: Trimmed uppercase category code (2 duplicate candidates: `R012`, `R013` matching `R001`).
+- `product_sku`: Normalized uppercase SKU (3 duplicate candidates: `R057`, `R058` matching `R022`, `R059` matching `R023`).
+- `stock_level_key`: Composite key `${sku}::${warehouse_code}` for valid stock lines (2 duplicate candidates: `R112`, `R113` matching `R087`).
+
+Total duplicate candidate count: 7 (100% parity with manifest `reconciliation.review = 7`). Zero fuzzy scoring rules; V2 auto-merge rollback sagas are strictly out of scope.
+
+### 28.3 Non-Destructive Guarantees & PII Masking (AC3)
+- Non-destructive operation: source CSV text, file bytes, and SHA-256 (`25040ea5a6c9ec820f21798f0f4014edb116844392fea024048e96537c39ee91`) remain completely untouched.
+- Sensitive fields `supplier_bank_account` and `employee_ssn` are never profiled and are masked before profiling, ensuring zero PII or financial number leakage in profile reports or formula-safe CSV exports.
+

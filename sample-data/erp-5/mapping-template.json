@@ -1,0 +1,292 @@
+{
+  "mapping_schema_version": 1,
+  "rules_version": "1.0.0",
+  "module": "erp5",
+  "source_system": "SYNTH-ERP5-DIRTY-V1",
+  "fixture": "sample-data/erp-5/dirty-data-v1.csv",
+  "policy": {
+    "fuzzy_matching": false,
+    "automatic_merge": false,
+    "raw_input_mutation": false,
+    "duplicate_handling": "Exact candidate keys only; later duplicates get outcome review and are never loaded or merged until a human decides.",
+    "salary_handling": "Salary numeric(20,4) masked as salary_display = 'XX,XXX' on serialization (BR-ERP5-02, DR-5).",
+    "temporal_handling": "Join date must not precede birth date (BR-ERP5-01). Leave date_to must not precede date_from.",
+    "payroll_handling": "Department/month aggregates only; employee-level rows are strictly forbidden (FR-ERP5-06).",
+    "idempotency_key": "SYNTH-ERP5-DIRTY-V1:{entity}:{source_id}"
+  },
+  "load_order": [
+    "department",
+    "employee",
+    "leave",
+    "payroll_total"
+  ],
+  "reference_fixtures": {
+    "accepted_departments": [
+      "EXEC",
+      "OPS",
+      "ENG",
+      "HR",
+      "FIN",
+      "SALES",
+      "MKT",
+      "RND"
+    ],
+    "accepted_currencies": [
+      "INR",
+      "USD",
+      "EUR"
+    ],
+    "leave_types": [
+      "annual",
+      "sick",
+      "unpaid"
+    ],
+    "leave_statuses": [
+      "pending",
+      "approved",
+      "rejected"
+    ]
+  },
+  "entities": {
+    "department": {
+      "record_type": "department",
+      "adapter_entity": "department",
+      "target_table": "erp5.departments",
+      "api": "POST /api/v1/erp-hr/departments",
+      "candidate_key": [
+        "code"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "department_code",
+          "target": "code",
+          "type": "string",
+          "required": true,
+          "transform": "uppercase_trim"
+        },
+        {
+          "source": "department_name",
+          "target": "name",
+          "type": "string",
+          "required": true,
+          "transform": "trim"
+        },
+        {
+          "source": "parent_code",
+          "target": "parent_id",
+          "type": "uuid",
+          "required": false,
+          "resolve_from": "department.code"
+        }
+      ]
+    },
+    "employee": {
+      "record_type": "employee",
+      "adapter_entity": "employee",
+      "target_table": "erp5.employees",
+      "api": "POST /api/v1/erp-hr/employees",
+      "candidate_key": [
+        "employee_no"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "employee_no",
+          "target": "employee_no",
+          "type": "string",
+          "required": true,
+          "transform": "uppercase_trim"
+        },
+        {
+          "source": "first_name",
+          "target": "first_name",
+          "type": "string",
+          "required": true,
+          "transform": "trim"
+        },
+        {
+          "source": "last_name",
+          "target": "last_name",
+          "type": "string",
+          "required": true,
+          "transform": "trim"
+        },
+        {
+          "source": "birth_date",
+          "target": "birth_date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "source": "join_date",
+          "target": "join_date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "source": "department_code",
+          "target": "department_id",
+          "type": "uuid",
+          "required": true,
+          "resolve_from": "department.code"
+        },
+        {
+          "source": "job_title",
+          "target": "job_title",
+          "type": "string",
+          "required": true,
+          "transform": "trim"
+        },
+        {
+          "source": "salary",
+          "target": "salary",
+          "type": "decimal",
+          "required": true,
+          "transform": "decimal_scale_4"
+        },
+        {
+          "source": "currency_code",
+          "target": "currency_code",
+          "type": "string",
+          "required": true,
+          "transform": "uppercase"
+        }
+      ]
+    },
+    "leave": {
+      "record_type": "leave",
+      "adapter_entity": "leave",
+      "target_table": "erp5.leave",
+      "api": "POST /api/v1/erp-hr/leave",
+      "candidate_key": [
+        "employee_id",
+        "date_from"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "employee_no",
+          "target": "employee_id",
+          "type": "uuid",
+          "required": true,
+          "resolve_from": "employee.employee_no"
+        },
+        {
+          "source": "leave_type",
+          "target": "leave_type",
+          "type": "enum",
+          "required": true,
+          "allowed_values": [
+            "annual",
+            "sick",
+            "unpaid"
+          ]
+        },
+        {
+          "source": "date_from",
+          "target": "date_from",
+          "type": "date",
+          "required": true
+        },
+        {
+          "source": "date_to",
+          "target": "date_to",
+          "type": "date",
+          "required": true
+        },
+        {
+          "source": "leave_reason",
+          "target": "reason",
+          "type": "string",
+          "required": false,
+          "transform": "trim"
+        },
+        {
+          "source": "leave_status",
+          "target": "status",
+          "type": "enum",
+          "required": true,
+          "allowed_values": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        }
+      ]
+    },
+    "payroll_total": {
+      "record_type": "payroll_total",
+      "adapter_entity": "payroll_total",
+      "target_table": "erp5.payroll_totals",
+      "api": "POST /api/v1/erp-hr/payroll-totals",
+      "candidate_key": [
+        "department_id",
+        "month"
+      ],
+      "fields": [
+        {
+          "source": "source_id",
+          "target": "source_id",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "department_code",
+          "target": "department_id",
+          "type": "uuid",
+          "required": true,
+          "resolve_from": "department.code"
+        },
+        {
+          "source": "month",
+          "target": "month",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "gross_total",
+          "target": "gross_total",
+          "type": "decimal",
+          "required": true,
+          "transform": "decimal_scale_4"
+        },
+        {
+          "source": "net_total",
+          "target": "net_total",
+          "type": "decimal",
+          "required": true,
+          "transform": "decimal_scale_4"
+        },
+        {
+          "source": "employee_count",
+          "target": "employee_count",
+          "type": "number",
+          "required": true
+        },
+        {
+          "source": "currency_code",
+          "target": "currency_code",
+          "type": "string",
+          "required": true,
+          "transform": "uppercase"
+        }
+      ]
+    }
+  }
+}
