@@ -423,11 +423,16 @@ export const ImportReceiptSchema = z.object({
   id: UuidSchema,
   batch_id: UuidSchema,
   source_row: z.number().int().nonnegative(),
+  source_system: z.string().max(64).optional().nullable(),
+  source_id: z.string().max(128).optional().nullable(),
   entity: z.string().min(1).max(64),
   schema_version: z.number().int().positive().default(1),
   idempotency_key: z.string().min(1).max(128),
+  request_hash: z.string().max(64).optional().nullable(),
   target_id: UuidSchema,
   kind: z.enum(['created', 'linked']).default('created'),
+  outcome: z.enum(['loaded', 'rejected', 'merged', 'skipped']).default('loaded'),
+  response_payload: z.unknown().optional().nullable(),
   created_at: z.string().datetime(),
 });
 export type ImportReceipt = z.infer<typeof ImportReceiptSchema>;
