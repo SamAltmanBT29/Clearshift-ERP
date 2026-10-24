@@ -742,3 +742,82 @@ To prevent lost updates in distributed operational environments:
 - **Actionable Refresh (`handleRefreshRecord`)**:
   - The banner renders an explicit action button: `🔄 Refresh Record and Re-apply Changes` (`data-testid="conflict-refresh-btn"`).
   - Clicking refresh calls `fetchVendorById(id)` to synchronize the latest canonical record from the server, clears the conflict error state, and displays a confirmation toast notifying the operator that current server state has been restored.
+
+---
+
+## 18. Shared Migration Kit Wizard Integration & Module Metadata Specification (ERP2-22 / Issue #138)
+
+### 18.1 Overview & Architecture Boundaries
+
+In strict compliance with Gate G4 requirements and the "Zero duplicate wizards" architecture rule (H2), ERP-2 Vendors and Purchasing supplies its target schema metadata directly to the shared Migration Kit wizard (`MigrationKitWizard` from `@cs/ui`) via the central `migrationKitRegistry` (`@cs/kit`).
+No custom import mapping wizard or duplicate UI components are created; the module defines rich schema definitions, human-readable labels, enum options, and required constraints that dynamically drive the wizard.
+
+### 18.2 Registered Target Entities & Field Definitions (AC1, AC2)
+
+The module registers target schema metadata across all 3 owned domain entities (`vendors`, `purchase_orders`, `po_lines`):
+
+#### 1. Vendors (`erp2_vendors`)
+- **Target Table**: `erp2_vendors`
+- **Primary Key**: `id` (UUID)
+- **Natural Key**: `tax_number`
+- **Fields**:
+  - `name`: string, required, label: "Vendor Name", rules: `FR-ERP2-01`, `RL-01`.
+  - `tax_number`: string, required, label: "Tax Identification Number", rules: `FR-ERP2-01`, `BR-ERP2-01`, `RL-03`.
+  - `email`: string, required, label: "Contact Email", rules: `FR-ERP2-01`, `RL-02`.
+  - `phone`: string, optional, label: "Phone Number".
+  - `address_line`: string, optional, label: "Address Line".
+  - `city`: string, optional, label: "City".
+  - `country`: string, optional, label: "Country".
+  - `currency`: string, required, label: "Default Currency (ISO-4217)", default `USD`.
+  - `bank_masked`: string, optional, label: "Masked Bank Details", rules: `FR-ERP2-02`, `BR-ERP2-02`. Example: `XXXX-XXXX-7890`. Server-side masked per PCI/GDPR.
+  - `source_system`: string, optional, label: "Source System".
+  - `source_id`: string, optional, label: "Source Record ID".
+- **Mapping Defaults**: Maps legacy columns (`vendor_name` -> `name`, `tax_id` -> `tax_number`, `email` -> `email`, `currency` -> `currency`, `bank_account` -> `bank_masked`).
+
+#### 2. Purchase Orders (`erp2_purchase_orders`)
+- **Target Table**: `erp2_purchase_orders`
+- **Primary Key**: `id` (UUID)
+- **Natural Key**: `po_number`
+- **Fields**:
+  - `po_number`: string, required, label: "PO Number", rules: `FR-ERP2-03`, `BR-ERP2-01`.
+  - `vendor_id`: uuid, required, label: "Vendor UUID", rules: `FR-ERP2-03`.
+  - `order_date`: date, required, label: "Order Date (ISO-8601)", rules: `FR-ERP2-03`.
+  - `status`: enum, required, label: "Lifecycle Status", rules: `FR-ERP2-04`. Enum options: `[Draft, Sent, Received, Closed]`.
+  - `currency`: string, required, label: "Currency (ISO-4217)".
+  - `total`: decimal, required, label: "Order Total", rules: `FR-ERP2-03`, `BR-ERP2-03`.
+  - `notes`: string, optional, label: "Order Notes".
+  - `source_system`: string, optional, label: "Source System".
+  - `source_id`: string, optional, label: "Source Record ID".
+
+#### 3. Purchase Order Lines (`erp2_po_lines`)
+- **Target Table**: `erp2_po_lines`
+- **Primary Key**: `id` (UUID)
+- **Natural Key**: `po_id,line_number`
+- **Fields**:
+  - `po_id`: uuid, required, label: "Purchase Order UUID".
+  - `product_id`: uuid, required, label: "Product UUID (ERP-1 Catalog)", rules: `FR-ERP2-03`, `Decision C7`.
+  - `line_number`: number, required, label: "Line Number".
+  - `quantity`: decimal, required, label: "Quantity", rules: `FR-ERP2-03`, `BR-ERP2-03`.
+  - `price`: decimal, required, label: "Unit Price", rules: `FR-ERP2-03`, `BR-ERP2-03`.
+  - `line_total`: decimal, required, label: "Line Total", rules: `FR-ERP2-03`, `BR-ERP2-03`.
+
+### 18.3 Incompatible Source Type Detection & Warning Alerts (AC3)
+
+The shared Migration Kit wizard integrates `checkTypeCompatibility` to analyze incoming source columns against target field types:
+- **Type Incompatibilities**: Mapping non-coercible source types (such as `date` to numeric `decimal` total/price, or `boolean` to `enum` status) immediately triggers an operator warning banner (`[data-testid="type-incompatibility-warning"]`) and field-row warning callout.
+- **Coercion Notices**: Mapping raw text columns to numeric or date fields renders informational notes explaining standard decimal parsing or ISO-8601 expectations.
+- **Preset Staging**: Pre-configured synthetic datasets (`standard_vendors_csv`, `standard_purchase_orders_csv`, `incompatible_types_csv`, `incomplete_vendors_csv`) facilitate testing and operator validation.
+
+### 18.4 Guard Blocking Unmapped Required Fields (AC4)
+
+To guarantee that incomplete mappings never proceed to destructive operations or invalid runs:
+- The wizard validates all required target fields across the active entity (`name`, `tax_number`, `email`, `currency` for vendors; `po_number`, `vendor_id`, `order_date`, `status`, `currency`, `total` for POs; `po_id`, `product_id`, `line_number`, `quantity`, `price`, `line_total` for PO lines).
+- Whenever any required target field remains unmapped:
+  - An unmapped required alert (`[data-testid="unmapped-required-alert"]`) displays the full list of missing fields.
+  - "Proceed to Dry-Run" and "Start Migration Load" action buttons are strictly disabled (`disabled` and `aria-disabled="true"`).
+- Once all required fields are mapped, the proceed actions become active and dispatch the validated mapping payload.
+
+### 18.5 Host Page Integration (`VendorImportPage` & `VendorsListPage`)
+
+- **Component**: `VendorImportPage` (`apps/erp/modules/erp-2/web/src/pages/VendorImportPage.tsx`) wraps `MigrationKitWizard` with module metadata, synthetic presets, and back navigation.
+- **Navigation**: `VendorsListPage` exposes an "Import Data" button (`data-testid="btn-import-data"`) in the header actions bar that seamlessly switches to `VendorImportPage`.
