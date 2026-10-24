@@ -1689,7 +1689,7 @@ export function evaluateDataset(
     // notes & formula injection
     const rawNotes = r.notes;
     if (rawNotes) {
-      if (/^[=+\-@\t\r]/.test(rawNotes.trim())) {
+      if (/^[=+\-@\t\r]/.test(rawNotes) || /^[=+\-@]/.test(rawNotes.trim())) {
         reasons.push('FORMULA_INJECTION_DETECTED');
         applied.push('SO-050');
         incRule('SO-050');
@@ -2084,7 +2084,7 @@ export function evaluateDataset(
     // notes & formula injection
     const rawNotes = r.notes;
     if (rawNotes) {
-      if (/^[=+\-@\t\r]/.test(rawNotes.trim())) {
+      if (/^[=+\-@\t\r]/.test(rawNotes) || /^[=+\-@]/.test(rawNotes.trim())) {
         reasons.push('FORMULA_INJECTION_DETECTED');
         applied.push('INV-050');
         incRule('INV-050');
@@ -2386,7 +2386,10 @@ export function evaluateDataset(
     }
 
     // formula injection in reference
-    if (r.payment_reference && /^[=+\-@\t\r]/.test(r.payment_reference.trim())) {
+    if (
+      r.payment_reference &&
+      (/^[=+\-@\t\r]/.test(r.payment_reference) || /^[=+\-@]/.test(r.payment_reference.trim()))
+    ) {
       reasons.push('FORMULA_INJECTION_DETECTED');
       applied.push('PAY-050');
       incRule('PAY-050');

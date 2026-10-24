@@ -256,3 +256,37 @@ Cleaning normalizes raw text without mutating source rows:
   - `GET /api/v1/erp-finance/migration/clean/audit/export`: Downloads formula-safe CSV field-level change audit log
   - `POST /api/v1/erp-finance/migration/clean`: In-memory cleaning with rule toggles on uploaded CSV
 - UI screen: [`apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx`](../web/src/pages/DataCleaningReviewPage.tsx)
+
+---
+
+## 10. Mapping & Value Translation Configuration (Issue #184 / ERP4-28 / KIT-05)
+
+### 10.1 Shared Migration Kit Mapping Integration
+- Implements Step 4 of the Migration Kit pipeline complying with Migration Kit SDS §4.5 (FR-MP-01 to FR-MP-05).
+- Features:
+  - Source-to-target field projection rules with strict type coercion:
+    - String-encoded decimals to `NUMERIC(20,4)` precision (e.g., ` $ 150,000.50 ` -> `150000.5000`).
+    - Standardized date coercion to ISO 8601 (`YYYY-MM-DD`).
+    - Boolean normalization (`true`/`1`/`yes` -> `true`).
+    - Code trimming and uppercase normalization.
+  - Enum translation tables:
+    - Account classification allowlist: `asset`, `liability`, `income`, `expense`.
+    - Currency code allowlist: `INR`, `USD`, `EUR`.
+    - Accounting period status: `open`, `soft_closed`, `locked`.
+  - Required target field enforcement guards:
+    - Evaluates field mapping completeness prior to execution (`validateErp4Mapping`).
+    - Blocks dry-run and real load operations if mandatory target attributes are missing.
+  - Named, versioned, reproducible templates:
+    - `erp4-canonical-v1` (Version 1.0.0, Schema Version 1) mapping accounts, opening balances, journal entries, and lines.
+
+### 10.2 Configured Module Mapping Artifacts
+- Module Mapping Engine: [`apps/erp/modules/erp-4/src/migration/mapping-config.ts`](../src/migration/mapping-config.ts)
+- Web Metadata Bridge: [`apps/erp/modules/erp-4/web/src/kit-metadata.ts`](../web/src/kit-metadata.ts)
+- Endpoints:
+  - `GET /api/v1/erp-finance/migration/mapping/templates`: List named versioned templates
+  - `GET /api/v1/erp-finance/migration/mapping/templates/:id`: Retrieve specific named template
+  - `GET /api/v1/erp-finance/migration/mapping/schema`: Inspect ERP-4 target entity definitions
+  - `POST /api/v1/erp-finance/migration/mapping/validate`: Validate mapping config and missing required target fields
+  - `POST /api/v1/erp-finance/migration/mapping/transform`: In-memory projection, enum translation, and type coercion
+- UI Screen: [`apps/erp/modules/erp-4/web/src/pages/DataMappingConfigPage.tsx`](../web/src/pages/DataMappingConfigPage.tsx)
+- Test Suite: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../tests/migration/mapping.test.ts) (26 automated tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../web/tests/DataMappingConfigPage.test.tsx) (3 automated tests)
