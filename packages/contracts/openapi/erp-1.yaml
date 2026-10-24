@@ -1160,18 +1160,6 @@ components:
         message:
           type: string
 
-    ImportReceipt:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        batch_id: { type: string, format: uuid }
-        source_row: { type: integer, minimum: 0 }
-        target_id: { type: string, format: uuid }
-        target_entity: { type: string }
-        idempotency_key: { type: string }
-        outcome: { type: string }
-        created_at: { type: string, format: date-time }
-
     OpeningStockResponse:
       allOf:
         - $ref: '#/components/schemas/StockLevel'
