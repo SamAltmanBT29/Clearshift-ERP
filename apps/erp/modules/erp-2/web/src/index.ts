@@ -22,3 +22,4 @@ export * from './pages/PurchaseOrderDetailPage.js';
 export * from './pages/ImportReceiptsListPage.js';
 export * from './pages/DuplicateCandidatesPage.js';
 export * from './pages/ModuleNotFoundPage.js';
+export * from './components/forms/index.js';

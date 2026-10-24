@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import type { SortDirection } from '@cs/ui';
 import type {
   Account,
   AccountsFilterQuery,
-  TrialBalanceResponse,
   JournalEntry,
 } from '@clearshift/contracts';
+import type { NormalizedTrialBalanceResponse } from '../api/erp-4.js';
 import { fetchAccounts, fetchTrialBalance, fetchJournalEntries } from '../api/erp-4.js';
 import { AccountsTable } from '../components/AccountsTable.js';
 import { TrialBalanceTable } from '../components/TrialBalanceTable.js';
@@ -22,15 +23,15 @@ export const AccountsListPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsTotal, setAccountsTotal] = useState(0);
   const [accountsTotalPages, setAccountsTotalPages] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string>('code');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [isAccountsLoading, setIsAccountsLoading] = useState(false);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsError, setAccountsError] = useState<unknown | null>(null);
 
   const [filters, setFilters] = useState<AccountsFilterQuery>({
     page: 1,
     limit: 20,
     search: '',
-    type: undefined,
-    isActive: undefined,
   });
 
   // Trial Balance State
@@ -39,14 +40,14 @@ export const AccountsListPage: React.FC = () => {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
-  const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
+  const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isTbLoading, setIsTbLoading] = useState(false);
-  const [tbError, setTbError] = useState<string | null>(null);
+  const [tbError, setTbError] = useState<unknown | null>(null);
 
   // Journal Entries State
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [isEntriesLoading, setIsEntriesLoading] = useState(false);
-  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<unknown | null>(null);
   const [entriesTotal, setEntriesTotal] = useState(0);
 
   // Fetch Accounts from real API
@@ -58,8 +59,8 @@ export const AccountsListPage: React.FC = () => {
       setAccounts(response.items);
       setAccountsTotal(response.total);
       setAccountsTotalPages(response.totalPages);
-    } catch (err: any) {
-      setAccountsError(err?.message || 'Failed to fetch chart of accounts');
+    } catch (err: unknown) {
+      setAccountsError(err);
     } finally {
       setIsAccountsLoading(false);
     }
@@ -72,8 +73,8 @@ export const AccountsListPage: React.FC = () => {
     try {
       const response = await fetchTrialBalance(currentPeriod);
       setTrialBalanceData(response);
-    } catch (err: any) {
-      setTbError(err?.message || 'Failed to fetch trial balance report');
+    } catch (err: unknown) {
+      setTbError(err);
     } finally {
       setIsTbLoading(false);
     }
@@ -87,8 +88,8 @@ export const AccountsListPage: React.FC = () => {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
       setJournalEntries(response.items);
       setEntriesTotal(response.total);
-    } catch (err: any) {
-      setEntriesError(err?.message || 'Failed to fetch journal entries');
+    } catch (err: unknown) {
+      setEntriesError(err);
     } finally {
       setIsEntriesLoading(false);
     }
@@ -129,8 +130,6 @@ export const AccountsListPage: React.FC = () => {
       page: 1,
       limit: 20,
       search: '',
-      type: undefined,
-      isActive: undefined,
     });
   };
 
@@ -139,6 +138,23 @@ export const AccountsListPage: React.FC = () => {
       ...prev,
       page: newPage,
     }));
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setFilters((prev) => ({
+      ...prev,
+      limit: Math.min(100, Math.max(1, newPageSize)),
+      page: 1,
+    }));
+  };
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection('asc');
+    }
   };
 
   // Switch to detail view for a specific journal entry
@@ -281,8 +297,7 @@ export const AccountsListPage: React.FC = () => {
 
           {accountsError ? (
             <ErrorState
-              title="Unable to load Chart of Accounts"
-              message={accountsError}
+              error={accountsError}
               onRetry={() => loadAccounts(filters)}
             />
           ) : (
@@ -292,8 +307,15 @@ export const AccountsListPage: React.FC = () => {
               total={accountsTotal}
               page={filters.page || 1}
               totalPages={accountsTotalPages}
+              pageSize={filters.limit || 20}
+              pageSizeOptions={[10, 20, 50, 100]}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              onSort={handleSort}
               onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
               onRefresh={() => loadAccounts(filters)}
+              onCreateAccount={() => setCurrentView('create-journal')}
             />
           )}
         </section>
@@ -303,8 +325,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-trial-balance" role="tabpanel" aria-labelledby="tab-trial-balance">
           {tbError ? (
             <ErrorState
-              title="Unable to generate Trial Balance"
-              message={tbError}
+              error={tbError}
               onRetry={() => loadTrialBalance(period)}
             />
           ) : (
@@ -323,8 +344,7 @@ export const AccountsListPage: React.FC = () => {
         <section id="panel-journal-entries" role="tabpanel" aria-labelledby="tab-journal-entries">
           {entriesError ? (
             <ErrorState
-              title="Unable to load journal entries"
-              message={entriesError}
+              error={entriesError}
               onRetry={loadJournalEntries}
             />
           ) : isEntriesLoading ? (

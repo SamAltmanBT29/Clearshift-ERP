@@ -10,8 +10,10 @@
 
 import React, { useMemo, useState } from 'react';
 import { PageTitle, Pagination } from '@cs/ui';
+import { useSearchParams } from 'react-router-dom';
 import {
   HR_PAGE_SIZE_DEFAULT,
+  HR_PAGE_SIZE_MAX,
   type HrPayrollTotal,
   type HrPayrollTotalListQuery,
 } from '@clearshift/contracts';
@@ -23,10 +25,21 @@ import { useDepartmentLookup } from '../hooks/useDepartmentLookup.js';
 import { useHrList } from '../hooks/useHrList.js';
 
 export const PayrollTotalsListPage: React.FC = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
-  const [month, setMonth] = useState<string | undefined>(undefined);
-  const [departmentId, setDepartmentId] = useState<string | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const p = Number(searchParams.get('pageSize'));
+    return Number.isFinite(p) && p >= 1 && p <= HR_PAGE_SIZE_MAX ? p : HR_PAGE_SIZE_DEFAULT;
+  });
+  const [month, setMonth] = useState<string | undefined>(
+    () => searchParams.get('month') ?? undefined
+  );
+  const [departmentId, setDepartmentId] = useState<string | undefined>(
+    () => searchParams.get('department_id') ?? undefined
+  );
 
   const departmentLookup = useDepartmentLookup();
 
@@ -39,6 +52,15 @@ export const PayrollTotalsListPage: React.FC = () => {
     }),
     [page, pageSize, month, departmentId]
   );
+
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (page !== 1) params.set('page', String(page));
+    if (pageSize !== HR_PAGE_SIZE_DEFAULT) params.set('pageSize', String(pageSize));
+    if (month) params.set('month', month);
+    if (departmentId) params.set('department_id', departmentId);
+    setSearchParams(params, { replace: true });
+  }, [page, pageSize, month, departmentId, setSearchParams]);
 
   const { items, meta, isLoading, error, reload } = useHrList<
     HrPayrollTotal,
@@ -96,6 +118,10 @@ export const PayrollTotalsListPage: React.FC = () => {
         onReset={handleReset}
         resetLabel="Clear filters"
         isLoading={isLoading}
+        activeFilters={[
+          ...(month ? [{ id: 'month', label: `Month: ${month}`, onRemove: () => { setMonth(undefined); setPage(1); } }] : []),
+          ...(departmentId ? [{ id: 'department', label: `Department: ${departmentLookup.options.find((o) => o.id === departmentId)?.name ?? departmentId}`, onRemove: () => { setDepartmentId(undefined); setPage(1); } }] : []),
+        ]}
       />
 
       <ListStateBoundary
