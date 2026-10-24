@@ -14,8 +14,10 @@
 
 import React, { useMemo, useState } from 'react';
 import { PageTitle, Pagination } from '@cs/ui';
+import { useSearchParams } from 'react-router-dom';
 import {
   HR_PAGE_SIZE_DEFAULT,
+  HR_PAGE_SIZE_MAX,
   type HrIdentityUser,
   type HrIdentityUserListQuery,
 } from '@clearshift/contracts';
@@ -27,9 +29,16 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue.js';
 import { useHrList } from '../hooks/useHrList.js';
 
 export const IdentityUsersListPage: React.FC = () => {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(HR_PAGE_SIZE_DEFAULT);
-  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p >= 1 ? p : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const p = Number(searchParams.get('pageSize'));
+    return Number.isFinite(p) && p >= 1 && p <= HR_PAGE_SIZE_MAX ? p : HR_PAGE_SIZE_DEFAULT;
+  });
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -41,6 +50,14 @@ export const IdentityUsersListPage: React.FC = () => {
     }),
     [page, pageSize, debouncedSearch]
   );
+
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (page !== 1) params.set('page', String(page));
+    if (pageSize !== HR_PAGE_SIZE_DEFAULT) params.set('pageSize', String(pageSize));
+    if (search.trim()) params.set('search', search.trim());
+    setSearchParams(params, { replace: true });
+  }, [page, pageSize, search, setSearchParams]);
 
   const { items, meta, isLoading, error, reload } = useHrList<
     HrIdentityUser,
@@ -74,6 +91,11 @@ export const IdentityUsersListPage: React.FC = () => {
         onReset={handleReset}
         resetLabel="Clear filters"
         isLoading={isLoading}
+        activeFilters={
+          search.trim()
+            ? [{ id: 'search', label: `Search: ${search.trim()}`, onRemove: () => { setSearch(''); setPage(1); } }]
+            : []
+        }
       />
 
       <ListStateBoundary

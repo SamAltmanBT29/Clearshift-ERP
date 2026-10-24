@@ -4,15 +4,17 @@
  * @module erp5/web/pages/DepartmentDetailPage
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { HrDepartment } from '@clearshift/contracts';
-import { getDepartment } from '../api/erp-5.js';
+import type { HrDepartment, HrEmployeeView, HrEmployeeListQuery } from '@clearshift/contracts';
+import { getDepartment, listEmployees } from '../api/erp-5.js';
+import { EmployeesTable } from '../components/EmployeesTable.js';
 import { FormPageLayout } from '../components/FormPageLayout.js';
 import { RecordDetail } from '../components/RecordDetail.js';
 import { RecordStateBoundary } from '../components/RecordStateBoundary.js';
 import { departmentLabel } from '../hooks/useDepartmentLookup.js';
 import { useDepartmentLookup } from '../hooks/useDepartmentLookup.js';
+import { useHrList } from '../hooks/useHrList.js';
 import { useHrRecord } from '../hooks/useHrRecord.js';
 
 export const DepartmentDetailPage: React.FC = () => {
@@ -30,6 +32,19 @@ export const DepartmentDetailPage: React.FC = () => {
   );
 
   const { record, isLoading, error, reload } = useHrRecord<HrDepartment>(fetchDepartment);
+
+  const employeeQuery = useMemo<HrEmployeeListQuery>(
+    () => ({ page: 1, pageSize: 25, sort: 'name', sort_dir: 'asc', ...(departmentId ? { department_id: departmentId } : {}) }),
+    [departmentId]
+  );
+  const {
+    items: employees,
+    isLoading: employeesLoading,
+    error: employeesError,
+  } = useHrList<HrEmployeeView, HrEmployeeListQuery>(
+    (query, signal) => listEmployees(query, { signal }),
+    employeeQuery
+  );
 
   return (
     <FormPageLayout
@@ -71,6 +86,23 @@ export const DepartmentDetailPage: React.FC = () => {
                 { label: 'Updated', value: record.updated_at },
               ]}
             />
+
+            <section className="cs-erp5-linked-records" aria-labelledby="erp5-department-employees-heading">
+              <h2 id="erp5-department-employees-heading" className="cs-erp5-detail-section-title">
+                Employees
+              </h2>
+              {employeesError ? (
+                <p className="cs-erp5-detail-hint">
+                  Employees could not be loaded: {employeesError.message}
+                </p>
+              ) : (
+                <EmployeesTable
+                  employees={employees}
+                  departmentLookup={departmentLookup}
+                  isLoading={employeesLoading}
+                />
+              )}
+            </section>
           </>
         ) : null}
       </RecordStateBoundary>

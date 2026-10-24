@@ -18,6 +18,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { ReferenceResolver } from "@cs/kernel";
+import { Roles, signAccessToken } from "@cs/identity";
 import { buildApp } from "../../src/app.js";
 import { InMemoryErp3Repository } from "../../src/services/repository.js";
 import { Erp3Service } from "../../src/services/erp3.service.js";
@@ -736,9 +737,11 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
         throw new Error("Simulated receipt write failure");
       };
 
-      const res = await app.inject({
+      const migrationRunnerToken = await signAccessToken("migration-runner-user", [Roles.MIGRATION_RUNNER]);
+      const res = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/import",
+        headers: { authorization: `Bearer ${migrationRunnerToken}` },
         payload: {
           batch_id: BATCH_ID,
           source_row: 99,
@@ -770,9 +773,12 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
     });
 
     it("rejects malformed sales_order, invoice, and payment records submitted directly to POST /api/v1/erp-orders/import with 400 VALIDATION_ERROR", async () => {
-      const badOrderImport = await app.inject({
+      const migrationRunnerToken = await signAccessToken("migration-runner-user", [Roles.MIGRATION_RUNNER]);
+      const headers = { authorization: `Bearer ${migrationRunnerToken}` };
+      const badOrderImport = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/import",
+        headers,
         payload: {
           batch_id: BATCH_ID,
           source_row: 101,
@@ -796,9 +802,10 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
         ]),
       );
 
-      const badInvoiceImport = await app.inject({
+      const badInvoiceImport = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/import",
+        headers,
         payload: {
           batch_id: BATCH_ID,
           source_row: 102,
@@ -821,9 +828,10 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
         ]),
       );
 
-      const badPaymentImport = await app.inject({
+      const badPaymentImport = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/import",
+        headers,
         payload: {
           batch_id: BATCH_ID,
           source_row: 103,
@@ -865,10 +873,19 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
       expect(noTokenRes.statusCode).toBe(401);
       expect(JSON.parse(noTokenRes.payload).code).toBe("UNAUTHORIZED");
 
+      const invalidTokenRes = await authApp.inject({
+        method: "POST",
+        url: "/api/v1/erp-orders/sales-orders",
+        headers: { authorization: "Bearer invalid-token" },
+        payload: {},
+      });
+      expect(invalidTokenRes.statusCode).toBe(401);
+
+      const viewerToken = await signAccessToken("viewer-user", [Roles.VIEWER]);
       const viewerRes = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/sales-orders",
-        headers: { authorization: "Bearer role:viewer" },
+        headers: { authorization: `Bearer ${viewerToken}` },
         payload: {
           customer_golden_id: CUSTOMER_1,
           order_date: "2026-04-10",
@@ -886,10 +903,11 @@ describe("ERP-3 Mutation API & Domain Validation (Issue #28 / ERP3-03)", () => {
       expect(viewerRes.statusCode).toBe(403);
       expect(JSON.parse(viewerRes.payload).code).toBe("FORBIDDEN");
 
+      const editorToken = await signAccessToken("editor-user", [Roles.EDITOR]);
       const editorRes = await authApp.inject({
         method: "POST",
         url: "/api/v1/erp-orders/sales-orders",
-        headers: { authorization: "Bearer role:editor" },
+        headers: { authorization: `Bearer ${editorToken}` },
         payload: {
           customer_golden_id: CUSTOMER_1,
           order_date: "2026-04-10",
