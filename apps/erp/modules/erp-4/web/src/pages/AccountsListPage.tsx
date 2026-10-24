@@ -12,6 +12,7 @@ import { FilterBar } from '../components/FilterBar.js';
 import { ErrorState, EmptyState, SkeletonTable, StatusBadge } from '../components/StateViews.js';
 import { JournalEntryFormPage } from './JournalEntryFormPage.js';
 import { JournalEntryDetailPage } from './JournalEntryDetailPage.js';
+import { AccountCreateModal } from '../components/forms/AccountCreateModal.js';
 
 export const AccountsListPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<'list' | 'create-journal' | 'detail-journal'>('list');
@@ -85,8 +86,8 @@ export const AccountsListPage: React.FC = () => {
     setEntriesError(null);
     try {
       const response = await fetchJournalEntries({ page: 1, limit: 20 });
-      setJournalEntries(response.items);
-      setEntriesTotal(response.total);
+      setJournalEntries(response.items || (response as any).data || []);
+      setEntriesTotal(response.total || 0);
     } catch (err: any) {
       setEntriesError(err?.message || 'Failed to fetch journal entries');
     } finally {
@@ -147,6 +148,8 @@ export const AccountsListPage: React.FC = () => {
     setCurrentView('detail-journal');
   };
 
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+
   // Derive high-level stats
   const assetCount = accounts.filter((a) => a.type === 'asset').length;
   const liabilityCount = accounts.filter((a) => a.type === 'liability').length;
@@ -191,6 +194,14 @@ export const AccountsListPage: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="cs-btn cs-btn-secondary"
+            onClick={() => setIsAccountModalOpen(true)}
+            aria-label="Create new account"
+          >
+            + New Account
+          </button>
           <button
             type="button"
             className="cs-btn cs-btn-primary"
@@ -395,6 +406,16 @@ export const AccountsListPage: React.FC = () => {
           )}
         </section>
       )}
+      {/* Quick Account Creation Modal */}
+      <AccountCreateModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        onSuccess={(newAcc) => {
+          setIsAccountModalOpen(false);
+          setAccounts((prev) => [newAcc, ...prev]);
+          setAccountsTotal((prev) => prev + 1);
+        }}
+      />
     </div>
   );
 };
