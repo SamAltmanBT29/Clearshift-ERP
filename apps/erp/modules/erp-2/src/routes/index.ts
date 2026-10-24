@@ -25,3 +25,4 @@ export const erpVendorsRoutes: FastifyPluginAsync<{ erp2Service: Erp2Service }> 
 };
 
 export { vendorRoutes, purchaseOrderRoutes, importRoutes, duplicateRoutes };
+export * from './guard.js';

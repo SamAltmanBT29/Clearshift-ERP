@@ -476,3 +476,45 @@
   color: var(--cs-text-muted);
   font-size: 0.9375rem;
 }
+
+/* Toast notification (ERP5-20) */
+.cs-erp5-toast {
+  position: fixed;
+  right: var(--cs-s-6);
+  bottom: var(--cs-s-6);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--cs-s-3);
+  padding: var(--cs-s-3) var(--cs-s-4);
+  border-radius: var(--cs-r-md);
+  border: 1px solid var(--cs-border);
+  background-color: var(--cs-bg);
+  color: var(--cs-text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.875rem;
+  max-width: 360px;
+}
+
+.cs-erp5-toast--success {
+  border-color: var(--cs-accent);
+}
+
+.cs-erp5-toast--error {
+  border-color: var(--cs-err);
+  background-color: var(--cs-err-bg);
+}
+
+.cs-erp5-toast-message {
+  flex: 1;
+}
+
+.cs-erp5-toast-dismiss {
+  background: none;
+  border: none;
+  color: var(--cs-text-muted);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0;
+}
