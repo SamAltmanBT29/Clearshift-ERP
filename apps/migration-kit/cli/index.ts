@@ -33,6 +33,8 @@ function usage(): string {
     '  cs-kit batch create --module <module> --file <path> [--name <name>] [--entity <entity>] [--date-format <fmt>] [--phone-country <code>]',
     '  cs-kit run --batch <id> --steps <comma-list>',
     '  cs-kit report reconcile --batch <id> --out <path>',
+    '  cs-kit report profile --batch <id> --out <path>',
+    '  cs-kit report reject --batch <id> --out <path>',
     '',
     'Valid modules: ' + KNOWN_MODULES.join(', '),
     'Valid steps: ' + PIPELINE_STEPS.join(', '),
@@ -239,6 +241,154 @@ async function handleReportReconcile(args: string[], io: CliIO): Promise<number>
   return 0;
 }
 
+async function handleReportProfile(args: string[], io: CliIO): Promise<number> {
+  let values: Record<string, unknown>;
+  try {
+    const parsed = parseArgs({
+      args,
+      options: {
+        batch: { type: 'string' },
+        out: { type: 'string' },
+        help: { type: 'boolean', short: 'h' },
+      },
+      allowPositionals: false,
+      strict: true,
+    });
+    values = parsed.values as Record<string, unknown>;
+  } catch (err) {
+    return failValidation(io, (err as Error).message);
+  }
+
+  if (values['help']) {
+    io.stdout(usage());
+    return 0;
+  }
+
+  const batchId = values['batch'] as string | undefined;
+  const outPath = values['out'] as string | undefined;
+  if (!batchId) return failValidation(io, '--batch is required');
+  if (!outPath) return failValidation(io, '--out is required');
+
+  const store = new BatchStore(getDataDir());
+  const batch = store.get(batchId);
+  if (!batch) return failValidation(io, `Batch not found: ${batchId}`);
+
+  const { exportProfileReportCsv } = await import('../src/reports/index.js');
+  const columns = batch.profile?.emptyCounts
+    ? Object.entries(batch.profile.emptyCounts).map(([colName, emptyCount]) => ({
+        columnName: colName,
+        inferredType: 'string',
+        emptyCount: Number(emptyCount),
+        totalRows: batch.sourceRowCount,
+      }))
+    : [];
+
+  const csv = exportProfileReportCsv({
+    batchId: batch.id,
+    module: batch.module,
+    entity: batch.entity,
+    totalRows: batch.sourceRowCount,
+    duplicateCount: batch.profile?.duplicateCount ?? 0,
+    columns,
+    counts: {
+      sourceCount: batch.sourceRowCount,
+      loadedCount: batch.loadedCount,
+      rejectedCount: batch.rejectedCount,
+      mergedCount: batch.mergedCount,
+      skippedCount: batch.skippedCount,
+      unaccountedCount: batch.unaccountedCount,
+      formulaHolds: batch.reconciliation?.ok ?? false,
+    },
+  });
+
+  try {
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const { dirname } = await import('node:path');
+    mkdirSync(dirname(path.resolve(outPath)), { recursive: true });
+    writeFileSync(path.resolve(outPath), csv, 'utf8');
+  } catch (err) {
+    return failSystem(io, (err as Error).message);
+  }
+
+  io.stdout(`Profiling report written: ${path.resolve(outPath)}`);
+  return 0;
+}
+
+async function handleReportReject(args: string[], io: CliIO): Promise<number> {
+  let values: Record<string, unknown>;
+  try {
+    const parsed = parseArgs({
+      args,
+      options: {
+        batch: { type: 'string' },
+        out: { type: 'string' },
+        help: { type: 'boolean', short: 'h' },
+      },
+      allowPositionals: false,
+      strict: true,
+    });
+    values = parsed.values as Record<string, unknown>;
+  } catch (err) {
+    return failValidation(io, (err as Error).message);
+  }
+
+  if (values['help']) {
+    io.stdout(usage());
+    return 0;
+  }
+
+  const batchId = values['batch'] as string | undefined;
+  const outPath = values['out'] as string | undefined;
+  if (!batchId) return failValidation(io, '--batch is required');
+  if (!outPath) return failValidation(io, '--out is required');
+
+  const store = new BatchStore(getDataDir());
+  const batch = store.get(batchId);
+  if (!batch) return failValidation(io, `Batch not found: ${batchId}`);
+
+  const { exportRejectReportCsv } = await import('../src/reports/index.js');
+  const rows = [];
+  if (batch.rejectedCount > 0) {
+    for (let i = 1; i <= batch.rejectedCount; i++) {
+      rows.push({
+        sourceRow: i,
+        entity: batch.entity,
+        reasonCode: 'RULE_REJECTION',
+        safeMessage: 'Validation rule rejection',
+        module: batch.module,
+      });
+    }
+  }
+
+  const csv = exportRejectReportCsv({
+    batchId: batch.id,
+    module: batch.module,
+    entity: batch.entity,
+    rows,
+    counts: {
+      sourceCount: batch.sourceRowCount,
+      loadedCount: batch.loadedCount,
+      rejectedCount: batch.rejectedCount,
+      mergedCount: batch.mergedCount,
+      skippedCount: batch.skippedCount,
+      unaccountedCount: batch.unaccountedCount,
+      formulaHolds: batch.reconciliation?.ok ?? false,
+    },
+  });
+
+  try {
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    const { dirname } = await import('node:path');
+    mkdirSync(dirname(path.resolve(outPath)), { recursive: true });
+    writeFileSync(path.resolve(outPath), csv, 'utf8');
+  } catch (err) {
+    return failSystem(io, (err as Error).message);
+  }
+
+  io.stdout(`Rejection report written: ${path.resolve(outPath)}`);
+  return 0;
+}
+
 export async function main(argv: string[] = process.argv.slice(2), io: CliIO = defaultIO): Promise<number> {
   if (argv.length === 0) {
     io.stdout(usage());
@@ -259,6 +409,18 @@ export async function main(argv: string[] = process.argv.slice(2), io: CliIO = d
   }
   if (argv[0] === "report-reconcile") {
     return handleReportReconcile(argv.slice(1), io);
+  }
+  if (argv[0] === "report" && argv[1] === "profile") {
+    return handleReportProfile(argv.slice(2), io);
+  }
+  if (argv[0] === "report-profile") {
+    return handleReportProfile(argv.slice(1), io);
+  }
+  if (argv[0] === "report" && argv[1] === "reject") {
+    return handleReportReject(argv.slice(2), io);
+  }
+  if (argv[0] === "report-reject") {
+    return handleReportReject(argv.slice(1), io);
   }
 
   if (argv.includes("--help") || argv.includes("-h")) {
