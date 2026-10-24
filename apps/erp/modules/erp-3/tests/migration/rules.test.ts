@@ -97,7 +97,8 @@ describe('ERP-3 Sales Orders & Invoices — V1 Data Quality Rules & Dirty Pack (
     it('verifies row counts and record types in committed manifest', () => {
       const rows = readRawRows(CSV_TEXT);
       expect(rows.length).toBe(EXPECTED_PROFILE.fixture.row_count);
-      expect(rows.length).toBe(60);
+      expect(rows.length).toBeGreaterThanOrEqual(100);
+      expect(rows.length).toBe(135);
 
       const byType: Record<string, number> = {
         sales_order: rows.filter((r) => r.record_type === 'sales_order').length,
