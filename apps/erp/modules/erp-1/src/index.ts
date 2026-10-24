@@ -13,6 +13,7 @@ export * from './migration/rules.js';
 export * from './migration/dirty-data-plan.js';
 export * from './migration/profiling-config.js';
 export * from './migration/cleaning-config.js';
+export * from './migration/mapping-config.js';
 
 export const moduleDefinition = {
   id: 'erp1',
