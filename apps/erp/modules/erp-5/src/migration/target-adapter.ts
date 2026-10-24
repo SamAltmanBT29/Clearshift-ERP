@@ -67,6 +67,20 @@ export class HrTargetAdapter implements MigrationTargetAdapter {
     let succeeded = 0;
 
     for (const row of rows) {
+      // Check failure threshold for partial-load stop behavior (Issue #189)
+      if (rows.length - succeeded >= (options.failureThreshold || Infinity)) {
+        outcomes.push({
+          sourceRow: row.sourceRow,
+          outcome: 'failed',
+          error: {
+            reasonCode: 'FAILURE_THRESHOLD_REACHED',
+            message: `Failure threshold of ${options.failureThreshold} reached. Stopping batch.`,
+            retryable: false,
+          },
+        });
+        continue;
+      }
+
       const result = await this.importRow(
         batchId,
         row.sourceRow,
