@@ -113,5 +113,168 @@
         "line_total": "line_total (verified, recomputed)"
       }
     }
-  }
+  },
+  "pack": "erp2-dirty-data-v1",
+  "templates": [
+    {
+      "name": "erp2-vendors-import",
+      "version": "1.0.0",
+      "entity": "vendors",
+      "fields": [
+        {
+          "source": "Vendor Code",
+          "target": "vendor_code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "Vendor Name",
+          "target": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "Contact Email",
+          "target": "contact_email",
+          "type": "string",
+          "required": false
+        },
+        {
+          "source": "Status",
+          "target": "status",
+          "type": "enum",
+          "required": true,
+          "enumTable": "vendor_status"
+        },
+        {
+          "source": "Payment Terms Days",
+          "target": "payment_terms_days",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "source": "Bank IBAN",
+          "target": "bank_iban",
+          "type": "string",
+          "required": false,
+          "sensitive": true
+        }
+      ],
+      "enumTranslations": {
+        "vendor_status": {
+          "allowed": [
+            "active",
+            "inactive"
+          ],
+          "map": {
+            "Active": "active",
+            "A": "active",
+            "Y": "active",
+            "Inactive": "inactive",
+            "Disabled": "inactive",
+            "N": "inactive"
+          }
+        }
+      }
+    },
+    {
+      "name": "erp2-purchase-orders-import",
+      "version": "1.0.0",
+      "entity": "purchase_orders",
+      "fields": [
+        {
+          "source": "PO Number",
+          "target": "po_number",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "Vendor Code",
+          "target": "vendor_code",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "PO Status",
+          "target": "status",
+          "type": "enum",
+          "required": true,
+          "enumTable": "po_status"
+        },
+        {
+          "source": "Order Date",
+          "target": "order_date",
+          "type": "date",
+          "required": true,
+          "dateFormat": "dmy"
+        },
+        {
+          "source": "Currency",
+          "target": "currency",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "enumTranslations": {
+        "po_status": {
+          "allowed": [
+            "draft",
+            "sent",
+            "received",
+            "closed"
+          ],
+          "map": {
+            "Draft": "draft",
+            "New": "draft",
+            "Sent": "sent",
+            "Issued": "sent",
+            "Received": "received",
+            "Delivered": "received",
+            "Closed": "closed",
+            "Complete": "closed"
+          }
+        }
+      }
+    },
+    {
+      "name": "erp2-po-lines-import",
+      "version": "1.0.0",
+      "entity": "po_lines",
+      "fields": [
+        {
+          "source": "PO Number",
+          "target": "po_number",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "Line No",
+          "target": "line_no",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "source": "Product SKU",
+          "target": "product_sku",
+          "type": "string",
+          "required": true
+        },
+        {
+          "source": "Qty",
+          "target": "quantity",
+          "type": "decimal",
+          "required": true,
+          "decimalScale": 3
+        },
+        {
+          "source": "Unit Price",
+          "target": "unit_price",
+          "type": "decimal",
+          "required": true,
+          "decimalScale": 2
+        }
+      ],
+      "enumTranslations": {}
+    }
+  ]
 }
