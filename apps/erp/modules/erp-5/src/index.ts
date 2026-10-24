@@ -9,16 +9,20 @@
  */
 
 import { erp5Resolver } from './public.js';
+import { erp5KitMetadata } from './kit/field-registry.js';
 
 export const moduleDefinition = {
   id: 'erp5',
   schema: 'erp5',
   routePrefix: '/api/v1/erp-hr',
   referenceResolvers: erp5Resolver,
+  migrationMetadata: erp5KitMetadata,
 };
 
 export default moduleDefinition;
 
+export * from './kit/field-registry.js';
+export * from './kit/rejection-context.js';
 export * from './public.js';
 export * from './app.js';
 export * from './auth/authenticate.js';
