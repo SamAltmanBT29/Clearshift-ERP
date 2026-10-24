@@ -272,7 +272,8 @@ export async function createHrMockServer(fastify: FastifyInstance) {
         reply.code(HttpStatusCodes.NOT_FOUND);
         return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Employee not found');
       }
-      state.employees[idx] = { ...state.employees[idx], ...body, updated_at: new Date().toISOString() };
+      const existingEmployee = state.employees[idx];
+      state.employees[idx] = Object.assign({}, existingEmployee, body, { updated_at: new Date().toISOString() });
       return maskSalary(state.employees[idx]);
     } catch (e: any) {
       if (reply.statusCode === HttpStatusCodes.NOT_FOUND) return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Employee not found');
@@ -340,7 +341,8 @@ export async function createHrMockServer(fastify: FastifyInstance) {
         reply.code(HttpStatusCodes.NOT_FOUND);
         return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Department not found');
       }
-      state.departments[idx] = { ...state.departments[idx], ...body, updated_at: new Date().toISOString() };
+      const existingDept = state.departments[idx];
+      state.departments[idx] = Object.assign({}, existingDept, body, { updated_at: new Date().toISOString() });
       return state.departments[idx];
     } catch (e: any) {
       if (reply.statusCode === HttpStatusCodes.NOT_FOUND) return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Department not found');
@@ -413,7 +415,8 @@ export async function createHrMockServer(fastify: FastifyInstance) {
         reply.code(HttpStatusCodes.NOT_FOUND);
         return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Leave record not found');
       }
-      state.leave[idx] = { ...state.leave[idx], ...body, updated_at: new Date().toISOString() };
+      const existingLeave = state.leave[idx];
+      state.leave[idx] = Object.assign({}, existingLeave, body, { updated_at: new Date().toISOString() });
       return state.leave[idx];
     } catch (e: any) {
       if (reply.statusCode === HttpStatusCodes.NOT_FOUND) return createErrorEnvelope(StandardErrorCodes.NOT_FOUND, 'Leave record not found');
