@@ -46,6 +46,8 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     search: '',
     status: undefined,
   });
+  const [orderSortField, setOrderSortField] = useState<string | undefined>(undefined);
+  const [orderSortDirection, setOrderSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Invoices state
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -60,6 +62,42 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
     search: '',
     status: undefined,
   });
+  const [invoiceSortField, setInvoiceSortField] = useState<string | undefined>(undefined);
+  const [invoiceSortDirection, setInvoiceSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleOrderSortChange = (field: string) => {
+    if (orderSortField === field) {
+      setOrderSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setOrderSortField(field);
+      setOrderSortDirection('asc');
+    }
+  };
+
+  const handleOrderPageSizeChange = (newPageSize: number) => {
+    setOrderFilters((prev) => ({
+      ...prev,
+      pageSize: newPageSize,
+      page: 1,
+    }));
+  };
+
+  const handleInvoiceSortChange = (field: string) => {
+    if (invoiceSortField === field) {
+      setInvoiceSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setInvoiceSortField(field);
+      setInvoiceSortDirection('asc');
+    }
+  };
+
+  const handleInvoicePageSizeChange = (newPageSize: number) => {
+    setInvoiceFilters((prev) => ({
+      ...prev,
+      pageSize: newPageSize,
+      page: 1,
+    }));
+  };
 
   // Load Sales Orders
   const loadOrders = useCallback(async (filters: Partial<SalesOrdersFilterQuery>) => {
@@ -254,7 +292,11 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
               page={orderFilters.page || 1}
               pageSize={orderFilters.pageSize || 20}
               totalPages={ordersTotalPages}
+              sortField={orderSortField}
+              sortDirection={orderSortDirection}
+              onSortChange={handleOrderSortChange}
               onPageChange={(newPage) => setOrderFilters((prev) => ({ ...prev, page: newPage }))}
+              onPageSizeChange={handleOrderPageSizeChange}
               onRefresh={() => setOrderFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
               onSelectOrder={(ord) => {
                 setSelectedOrderId(ord.id);
@@ -287,7 +329,11 @@ export const OrdersListPage: React.FC<OrdersListPageProps> = ({ initialTab = 'or
               page={invoiceFilters.page || 1}
               pageSize={invoiceFilters.pageSize || 20}
               totalPages={invoicesTotalPages}
+              sortField={invoiceSortField}
+              sortDirection={invoiceSortDirection}
+              onSortChange={handleInvoiceSortChange}
               onPageChange={(newPage) => setInvoiceFilters((prev) => ({ ...prev, page: newPage }))}
+              onPageSizeChange={handleInvoicePageSizeChange}
               onRefresh={() => setInvoiceFilters({ page: 1, pageSize: 20, search: '', status: undefined })}
               onSelectInvoice={(inv) => {
                 setSelectedInvoiceId(inv.id);
