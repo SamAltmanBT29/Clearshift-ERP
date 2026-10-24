@@ -10,14 +10,20 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyPluginAsync } from "fastify";
 import { ImportRowRequestSchema } from "@clearshift/contracts";
+import { requireErp3Policy } from "../policies/authorization.js";
+import { auditRequest, type Erp3AuditService } from "../services/audit.js";
 import type { Erp3Service } from "../services/erp3.service.js";
 
 export const importRoutes: FastifyPluginAsync<{
   erp3Service: Erp3Service;
+  auditService: Erp3AuditService;
 }> = async (fastify, opts) => {
   const service = opts.erp3Service;
+  const auditService = opts.auditService;
 
-  fastify.post("/import", async (request, reply) => {
+  fastify.post("/import", {
+    preHandler: [requireErp3Policy("IMPORT_EXECUTE", auditService)],
+  }, async (request, reply) => {
     const idempotencyHeader = request.headers["idempotency-key"] as
       | string
       | undefined;
@@ -56,6 +62,16 @@ export const importRoutes: FastifyPluginAsync<{
     }
 
     const result = await service.importRow(parsed.data);
+    if (!result.prior_result) {
+      await auditRequest(auditService, request, {
+        action: "load.requested",
+        targetEntity: parsed.data.entity,
+        targetId: result.target_id,
+        batchId: parsed.data.batch_id,
+        result: "success",
+        metadata: { module: "erp-3", rowCount: 1 },
+      });
+    }
     return reply.status(result.prior_result ? 200 : 201).send(result);
   });
 };

@@ -11,6 +11,7 @@ export * from './kit/field-registry.js';
 export * from './kit/rejection-context.js';
 export * from './migration/rules.js';
 export * from './migration/dirty-data-plan.js';
+export * from './migration/profiling-config.js';
 
 export const moduleDefinition = {
   id: 'erp1',

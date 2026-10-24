@@ -5,10 +5,11 @@
  */
 
 // Regex patterns for detecting sensitive tokens and formatted secrets
-const JWT_REGEX = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/;
+const JWT_REGEX = /^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/;
 const BEARER_AUTH_REGEX = /Bearer\s+[A-Za-z0-9-_.]+/gi;
 const SSN_REGEX = /\b\d{3}-\d{2}-\d{4}\b/g;
 const CREDIT_CARD_REGEX = /\b(?:\d{4}[ -]?){3}\d{4}\b/g;
+const UUID_REGEX = /\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b/i;
 const INLINE_SECRET_REGEX = /(password|secret|token|api_key|credential|private_key)[=:\s]+([^\s,;]+)/gi;
 
 // Key patterns (lowercased) that indicate sensitive attributes
@@ -66,6 +67,16 @@ const SENSITIVE_KEY_SUBSTRINGS = [
   "identity_num",
 ];
 
+function redactCardNumbers(value: string): string {
+  const uuid = UUID_REGEX.exec(value);
+  return value.replace(CREDIT_CARD_REGEX, (match, offset: number) => {
+    if (uuid && offset >= uuid.index && offset + match.length <= uuid.index + uuid[0].length) {
+      return match;
+    }
+    return "[REDACTED_CARD]";
+  });
+}
+
 function isSensitiveKey(key: string): boolean {
   const normalized = key.toLowerCase().replace(/[-_]/g, "");
   if (SENSITIVE_KEY_EXACT.has(normalized)) return true;
@@ -103,7 +114,7 @@ export function redactSensitiveData<T>(obj: T, visited: WeakSet<object> = new We
     // Redact SSN patterns
     sanitized = sanitized.replace(SSN_REGEX, "[REDACTED_SSN]");
     // Redact Card patterns
-    sanitized = sanitized.replace(CREDIT_CARD_REGEX, "[REDACTED_CARD]");
+    sanitized = redactCardNumbers(sanitized);
     // Redact inline secrets
     sanitized = sanitized.replace(INLINE_SECRET_REGEX, "$1=[REDACTED_SECRET]");
     return sanitized as unknown as T;

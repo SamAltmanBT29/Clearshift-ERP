@@ -9,10 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import { FormPageLayout } from '../components/FormPageLayout.js';
 import { DepartmentForm } from '../components/forms/DepartmentForm.js';
 import { useDepartmentLookup } from '../hooks/useDepartmentLookup.js';
+import { useToast } from '../hooks/useToast.js';
 
 export const DepartmentCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const departmentLookup = useDepartmentLookup();
+  const { showToast } = useToast();
 
   return (
     <FormPageLayout
@@ -25,6 +27,7 @@ export const DepartmentCreatePage: React.FC = () => {
         mode="create"
         departments={departmentLookup.options}
         onSaved={(department) => {
+          showToast('Department created.');
           navigate(`/erp5/departments/${department.id}`);
         }}
         onCancel={() => {
