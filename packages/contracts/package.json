@@ -20,6 +20,8 @@
     "./erp-4-mock": "./src/erp-4-mock.ts",
     "./erp-4-events": "./src/erp-4-events.ts",
     "./erp-5": "./src/erp-5.ts",
+    "./erp-5-mock": "./src/erp-5-mock.ts",
+    "./erp-5-events": "./src/erp-5-events.ts",
     "./roles": "./src/roles.ts",
     "./golden-id": "./src/golden-id.ts",
     "./import-target": "./src/import-target.ts",
