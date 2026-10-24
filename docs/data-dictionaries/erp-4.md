@@ -184,7 +184,31 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
 
-## 17. Loading, Empty, Error, and Access-Denied States (Issue #175 / ERP4-19)
+## 17. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
+
+- **300ms Debounced Search Bar (`FilterBar.tsx` & `useDebounce.ts`)**:
+  - Implements rapid keystroke debouncing (`useDebounce`) waiting 300ms before dispatching search queries.
+  - Immediate local state feedback for responsive typing with inline clear button (`✕`).
+  - Automatically resets pagination to page 1 on search value changes.
+- **Faceted Filters & Drawer Panel (`FilterSidebar.tsx`)**:
+  - Accessible slide-over filter panel exposing categorized facet controls:
+    - Account Type (`asset`, `liability`, `income`, `expense`).
+    - Status (`active`, `archived` / `inactive`).
+    - Currency (`USD`, `INR`, `EUR`, `GBP`).
+  - Active filter badge counter on toggle button displaying the number of active filters.
+  - URL query state synchronization (`useSearchParams`) reflecting active filters in browser URL (`?search=...&type=...&isActive=...`).
+- **Removable Filter Tags & Clear All (`FilterPills.tsx`)**:
+  - Active filter criteria rendered as accessible pill tags (`role="list"` / `role="listitem"`).
+  - Individual removal buttons with accessible `aria-label` values (`Remove filter for <Label>`).
+  - One-click `"Clear All"` reset button that removes all active criteria and resets URL query state.
+- **Informative Empty Results Messaging**:
+  - Differentiates between default zero-data states and empty search/filter queries.
+  - Displays `"No matching accounts found"` with prompt to adjust criteria or clear filters.
+  - Inline `"Clear All Filters"` recovery button triggering state reset.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/search-filters.test.tsx`](../../apps/erp/modules/erp-4/web/tests/search-filters.test.tsx) (9 comprehensive tests verifying 300ms debounce, faceted sidebar updates, pill tag clearing, Clear All, and empty state messaging).
+
+## 18. Loading, Empty, Error, and Access-Denied States (Issue #175 / ERP4-19)
 
 - **Loading State**:
   - [`SkeletonTable.tsx`](../../apps/erp/modules/erp-4/web/src/components/StateViews.tsx): Accessible animated skeleton table placeholder (`role="status"`, `aria-busy="true"`, `.animate-pulse`) displaying column header and row pulse blocks matching target dimensions during initial data fetching.
@@ -198,7 +222,7 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/state-views.test.tsx`](../../apps/erp/modules/erp-4/web/tests/state-views.test.tsx) (15 tests covering skeleton placeholders, zero-data CTA actions, error sanitization & retry alerts, and 403 access-denied role explanations).
 
-## 18. Create Form with Field-Level Validation (Issue #176 / ERP4-20)
+## 19. Create Form with Field-Level Validation (Issue #176 / ERP4-20)
 
 - **Account Creation Form (`AccountForm.tsx`)**:
   - Bound to shared `@cs/ui` `FormField`, `Input`, `Select`, `Button`, and `Card` components.
@@ -213,7 +237,7 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx`](../../apps/erp/modules/erp-4/web/tests/AccountCreateModal.test.tsx) (9 comprehensive tests verifying field validation, decimal boundaries, double-submit guards, server error mapping, modal lifecycle, and table cache updates).
 
-## 19. Detail/Edit Workflow and Linked Records (Issue #177 / ERP4-21)
+## 20. Detail/Edit Workflow and Linked Records (Issue #177 / ERP4-21)
 
 - **Primary Attribute & System Metadata Display (`AccountDetailPage.tsx` & `AccountAuditPanel.tsx`)**:
   - Displays all primary domain attributes: Account Code (`code`), Account Name (`name`), Classification Type (`type`), Operating Currency (`currency_code`), Current Balance (`balance`), Active Status (`is_active`), Description, and Parent Account ID.
@@ -250,9 +274,10 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
 | **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
 | **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
-| **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
-| **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
-| **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
+| **`1.7.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
+| **`1.8.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
+| **`1.9.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
+| **`1.10.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
 
 
 

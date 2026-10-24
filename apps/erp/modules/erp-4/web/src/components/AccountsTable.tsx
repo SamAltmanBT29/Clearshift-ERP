@@ -14,11 +14,15 @@ export interface AccountsTableProps {
   pageSizeOptions?: number[] | undefined;
   sortColumn?: string | undefined;
   sortDirection?: SortDirection | undefined;
+  hasActiveFilters?: boolean | undefined;
+  emptyTitle?: string | undefined;
+  emptyMessage?: string | undefined;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: ((newPageSize: number) => void) | undefined;
   onSort?: ((columnKey: string) => void) | undefined;
   onRefresh?: (() => void) | undefined;
   onCreateAccount?: (() => void) | undefined;
+  onClearFilters?: (() => void) | undefined;
   emptyActionLabel?: string | undefined;
   emptyOnAction?: (() => void) | undefined;
 }
@@ -42,11 +46,15 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   pageSizeOptions = [10, 20, 50, 100],
   sortColumn: externalSortColumn,
   sortDirection: externalSortDirection,
+  hasActiveFilters,
+  emptyTitle,
+  emptyMessage,
   onPageChange,
   onPageSizeChange,
   onSort: externalOnSort,
   onRefresh,
   onCreateAccount,
+  onClearFilters,
   emptyActionLabel,
   emptyOnAction,
 }) => {
@@ -244,15 +252,34 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({
   }
 
   if (accounts.length === 0) {
-    const actionLabel = emptyActionLabel || (onCreateAccount ? '+ New Account' : (onRefresh ? 'Refresh Accounts' : undefined));
-    const onAction = emptyOnAction || onCreateAccount || onRefresh;
+    const isFiltered = Boolean(hasActiveFilters);
+    const actionLabel =
+      emptyActionLabel ||
+      (isFiltered && onClearFilters
+        ? 'Clear All Filters'
+        : onCreateAccount
+        ? '+ New Account'
+        : onRefresh
+        ? 'Refresh Accounts'
+        : undefined);
+    const onAction =
+      emptyOnAction ||
+      (isFiltered && onClearFilters
+        ? onClearFilters
+        : onCreateAccount || onRefresh);
+
     return (
       <EmptyState
         icon="📂"
-        title="No accounts found"
-        message="No accounts match your current filter selection or search query. Create your first general ledger account to begin."
+        title={emptyTitle ?? (isFiltered ? 'No matching accounts found' : 'No accounts found')}
+        message={
+          emptyMessage ??
+          (isFiltered
+            ? 'No accounts match your current search query or filter selection. Try adjusting your search term or clearing active filters.'
+            : 'No accounts have been created yet. Get started by creating your first account.')
+        }
         {...(actionLabel && onAction ? { actionLabel, onAction } : {})}
-        {...(onCreateAccount && onRefresh ? { secondaryActionLabel: 'Refresh Accounts', onSecondaryAction: onRefresh } : {})}
+        {...(!isFiltered && onCreateAccount && onRefresh ? { secondaryActionLabel: 'Refresh Accounts', onSecondaryAction: onRefresh } : {})}
       />
     );
   }

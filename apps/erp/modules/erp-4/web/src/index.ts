@@ -17,6 +17,8 @@ export * from './components/AccountsTable.js';
 export * from './components/JournalEntriesTable.js';
 export * from './components/TrialBalanceTable.js';
 export * from './components/FilterBar.js';
+export * from './components/FilterPills.js';
+export * from './components/FilterSidebar.js';
 export * from './components/StateViews.js';
 export * from './components/Toast.js';
 export * from './components/forms/AccountForm.js';
