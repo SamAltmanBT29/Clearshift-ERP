@@ -1,11 +1,15 @@
 import React from 'react';
 import type { SalesOrderStatus, SalesOrdersFilterQuery } from '@clearshift/contracts';
+import { SearchBar } from './SearchBar.js';
 
 interface FilterBarProps {
   filters: Partial<SalesOrdersFilterQuery>;
   onFilterChange: (updated: Partial<SalesOrdersFilterQuery>) => void;
   onReset: () => void;
   isLoading?: boolean;
+  debounceMs?: number;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -13,22 +17,35 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onFilterChange,
   onReset,
   isLoading = false,
+  debounceMs = 300,
+  onToggleSidebar,
+  isSidebarOpen,
 }) => {
+  const hasActiveFilters = Boolean(filters.search?.trim()) || Boolean(filters.status);
+
   return (
     <div className="cs-filter-bar" role="search" aria-label="Filter sales orders">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          className="cs-btn-secondary cs-sidebar-toggle-btn"
+          onClick={onToggleSidebar}
+          aria-expanded={isSidebarOpen}
+          aria-label={isSidebarOpen ? 'Hide filter sidebar' : 'Show filter sidebar'}
+        >
+          {isSidebarOpen ? 'Hide Filters' : 'Filters'}
+        </button>
+      )}
+
       <div className="cs-search-input-wrapper">
-        <label htmlFor="order-search-input" className="sr-only">
-          Search orders
-        </label>
-        <input
-          id="order-search-input"
-          type="text"
-          className="cs-input"
-          placeholder="Search by order # or customer Golden ID (UUID)..."
+        <SearchBar
           value={filters.search || ''}
-          onChange={(e) => onFilterChange({ search: e.target.value, page: 1 })}
+          onChange={(val) => onFilterChange({ search: val, page: 1 })}
+          placeholder="Search by order # or customer Golden ID (UUID)..."
           disabled={isLoading}
-          aria-label="Search orders by order number or customer Golden ID"
+          debounceMs={debounceMs}
+          inputId="order-search-input"
+          ariaLabel="Search orders by order number or customer Golden ID"
         />
       </div>
 
@@ -58,7 +75,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         type="button"
         className="cs-btn-secondary"
         onClick={onReset}
-        disabled={isLoading}
+        disabled={isLoading || !hasActiveFilters}
         aria-label="Reset filters"
       >
         Reset Filters
