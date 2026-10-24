@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS erp5.import_receipts (
     entity              VARCHAR(64)    NOT NULL,
     schema_version      INTEGER        NOT NULL DEFAULT 1,
     idempotency_key     VARCHAR(128)   NOT NULL,
+    request_hash        VARCHAR(64)    NOT NULL DEFAULT '',
     target_id           UUID           NOT NULL,
     kind                VARCHAR(16)    NOT NULL DEFAULT 'created',
     created_at          TIMESTAMPTZ    NOT NULL DEFAULT now(),
