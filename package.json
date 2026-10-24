@@ -26,6 +26,7 @@
     "security:scan": "node --experimental-strip-types infra/security/scan-secrets.ts",
     "erp1:test": "vitest run apps/erp/modules/erp-1",
     "erp1:seed": "node sample-data/erp-1/seed.ts",
+    "erp1:e2e": "playwright test -c apps/erp/modules/erp-1/e2e/playwright.config.ts",
     "erp2:test": "vitest run apps/erp/modules/erp-2",
     "erp2:seed": "node sample-data/erp-2/seed.ts",
     "erp2:e2e": "playwright test -c apps/erp/modules/erp-2/e2e/playwright.config.ts",
