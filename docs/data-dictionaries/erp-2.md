@@ -524,3 +524,53 @@ All new CSS classes use the `cs-erp2-*` prefix to avoid collision with other mod
 - `cs-erp2-faceted-sidebar`, `cs-erp2-sidebar-*`, `cs-erp2-facet-*` — Sidebar tokens
 - `cs-erp2-content-with-sidebar`, `cs-erp2-content-main` — Layout tokens
 
+---
+
+## 14. Loading, Empty, Error, and Access-Denied States Specification (ERP2-19 / Issue #135)
+
+### 14.1 Overview & Architecture Boundaries
+
+ERP-2 Vendors & Purchasing provides production-grade operational state views in strict conformance with the ClearShift V1 Master Architecture Specification and SDS ClearShift ERP v2.0 §4.3 & §4.9. All screen state representations integrate with shared platform components and adhere to the following invariants:
+- **Zero Information Leakage**: Technical database dumps, Node.js filepaths, and raw execution stack traces are intercepted and sanitized before rendering to the DOM.
+- **Accessible State Semantics**: Screen readers receive appropriate ARIA roles (`status` with `aria-busy="true"` for loading, `alert` for errors, `region` for empty and access-denied screens).
+- **Recoverable vs Deterministic Actions**: Transient data fetch errors present a recoverable "Try Again" action; deterministic 403 authorization refusals never display a retry button.
+
+### 14.2 Animated Loading Skeleton Placeholder (AC1)
+
+During initial data fetching and tab switches, the table displays an animated skeleton placeholder:
+- **Components**: `VendorsLoadingSkeleton`, `PurchaseOrdersLoadingSkeleton`, and `SkeletonTable` (`apps/erp/modules/erp-2/web/src/components/StateViews.tsx`).
+- **Semantics**: Rendered with `role="status"`, `aria-busy="true"`, and accessible label (`Loading vendors table` / `Loading purchase orders table`).
+- **Animation**: Placeholder cells utilize the `.cs-skeleton-cell` CSS class with shimmering CSS keyframe animation (`cs-shimmer 1.5s infinite`).
+- **Lifecycle**: Replaced seamlessly with the populated data table upon resolution of the asynchronous query.
+
+### 14.3 Zero-Data Condition & Action Callouts (AC2)
+
+The system distinguishes between an empty catalog (zero-data condition) and an active filter producing zero matches:
+- **Zero-Data State (Initial Catalog Empty)**:
+  - Vendors: Renders "No vendors in supplier master" with guidance: "No vendor profiles have been recorded in the supplier master yet. Add your first vendor to establish supplier coordinates." Includes a prominent call-to-action button: `Add Vendor` (navigating to `/erp2/vendors/new`).
+  - Purchase Orders: Renders "No purchase orders in ledger" with guidance: "No purchase orders have been recorded in the procurement ledger yet. Create your first purchase order to begin tracking supplier orders." Includes a call-to-action button: `New Purchase Order` (navigating to `/erp2/purchase-orders/new`).
+- **Filtered Zero-Records State**:
+  - When filters (e.g. search string, currency, or status) yield zero matches, displays "No matching vendors found" / "No matching purchase orders found" with a call-to-action button: `Clear all filters` or `Reset Search`.
+
+### 14.4 Error Sanitization & Recoverable Alert Banner (AC3)
+
+On API failure, the interface displays an accessible alert banner with recoverable action while hiding raw internal technical details:
+- **Error Sanitization (`sanitizeErrorMessage`)**:
+  - Strips multiline JavaScript stack frames (`at ...`), Node.js internal paths, and module paths (`node_modules`).
+  - Masks internal SQL and ORM syntax error dumps (`syntax error`, `relation`, `drizzle-orm`, `postgres`, `pg-protocol`) and network socket failures (`ECONNREFUSED`, `ENOTFOUND`).
+  - Converts low-level errors into safe operator-facing diagnostics (`A database connection error occurred while communicating with the server. Please try again or contact support.`).
+  - Preserves user-facing domain validation messages and API envelope messages.
+- **Alert Banner**:
+  - Renders with `role="alert"` and accessible label.
+  - Displays correlation reference ID (`Reference ID: <code>...</code>`) when provided by the backend error envelope.
+  - Includes a `Try Again` retry action button that triggers a re-fetch without page reload.
+
+### 14.5 HTTP 403 Forbidden Access-Denied View & Role Guidance (AC4)
+
+When an API endpoint responds with HTTP 403 Forbidden:
+- **Access-Denied State (`AccessDeniedState`)**:
+  - Rendered with `role="region"` (or `role="alert"`), `aria-label="Access denied state"`, and title "Access Denied".
+  - Explains the missing permission: displays `Required permission: module.read (or module.write)`.
+  - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
+  - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+

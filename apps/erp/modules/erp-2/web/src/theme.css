@@ -595,6 +595,88 @@
   line-height: 1.5;
 }
 
+/* ERP-2 Screen States & Alert Banners */
+.cs-erp2-error-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.cs-erp2-error-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-erp2-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error-border);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cs-erp2-correlation-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.cs-erp2-correlation-hint code {
+  font-family: var(--font-mono, monospace);
+  background: var(--color-surface);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.cs-erp2-access-denied {
+  text-align: center;
+}
+
+.cs-erp2-access-denied-icon {
+  font-size: 36px;
+  margin-bottom: var(--space-2);
+}
+
+.cs-erp2-access-denied-role-hint {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  display: inline-block;
+  margin: var(--space-2) auto;
+}
+
+.cs-erp2-access-denied-role-hint code {
+  font-family: var(--font-mono, monospace);
+  color: var(--color-primary, #2563eb);
+}
+
+.cs-erp2-access-denied-footer {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+.cs-erp2-skeleton-container {
+  width: 100%;
+}
+
+
 /* Pagination */
 .cs-pagination-bar {
   display: flex;

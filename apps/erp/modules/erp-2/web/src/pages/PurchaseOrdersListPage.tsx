@@ -17,7 +17,18 @@ import type { PurchaseOrder, PurchaseOrderListQuery, PurchaseOrderStatus } from 
 import { fetchPurchaseOrders, ApiError } from '../api/erp-2.js';
 import { PurchaseOrdersTable } from '../components/PurchaseOrdersTable.js';
 import { PurchaseOrderFilterBar } from '../components/FilterBar.js';
-import { ErrorState, AccessDeniedState } from '../components/StateViews.js';
+import {
+  ErrorState,
+  AccessDeniedState,
+  PurchaseOrdersLoadingSkeleton,
+  sanitizeErrorMessage,
+} from '../components/StateViews.js';
+
+interface PageErrorInfo {
+  message: string;
+  isForbidden: boolean;
+  correlationId?: string | undefined;
+}
 
 export const PurchaseOrdersListPage: React.FC = () => {
   // Read initial parameters from window.location if present
@@ -45,8 +56,8 @@ export const PurchaseOrdersListPage: React.FC = () => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
-  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
-  const [ordersError, setOrdersError] = useState<{ message: string; isForbidden: boolean } | null>(null);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState<PageErrorInfo | null>(null);
 
   const [orderFilters, setOrderFilters] = useState<PurchaseOrderListQuery>({
     page: initial.page || 1,
@@ -83,11 +94,13 @@ export const PurchaseOrdersListPage: React.FC = () => {
       setOrders(response.items || []);
       setOrdersTotal(response.total || 0);
       setOrdersTotalPages(response.totalPages || 1);
-    } catch (err: any) {
-      const isForbidden = err instanceof ApiError ? err.status === 403 : err?.status === 403;
+    } catch (err: unknown) {
+      const isForbidden = err instanceof ApiError ? err.status === 403 : (err as { status?: number })?.status === 403;
+      const correlationId = (err as { correlationId?: string })?.correlationId;
       setOrdersError({
-        message: err?.message || 'Failed to fetch purchase orders from server.',
+        message: sanitizeErrorMessage(err),
         isForbidden,
+        correlationId,
       });
     } finally {
       setIsOrdersLoading(false);
@@ -145,14 +158,18 @@ export const PurchaseOrdersListPage: React.FC = () => {
           <AccessDeniedState
             title="Access Denied"
             message="You do not have permission to view purchase orders. Please check your role assignments."
+            requiredCapability="module.read"
           />
         ) : (
           <ErrorState
             title="Failed to Load Purchase Orders"
             message={ordersError.message}
+            correlationId={ordersError.correlationId}
             onRetry={() => loadOrders(orderFilters)}
           />
         )
+      ) : isOrdersLoading ? (
+        <PurchaseOrdersLoadingSkeleton />
       ) : (
         <PurchaseOrdersTable
           purchaseOrders={orders}
@@ -163,6 +180,7 @@ export const PurchaseOrdersListPage: React.FC = () => {
           totalPages={ordersTotalPages}
           sortField={orderSort.field}
           sortDirection={orderSort.direction}
+          hasActiveFilters={Boolean(orderFilters.status || orderFilters.vendor_id)}
           onSortChange={handleOrderSortChange}
           onPageChange={(newPage) =>
             setOrderFilters((prev) => ({
