@@ -212,6 +212,11 @@ cannot create a second stock row for the same pair.
 | `idempotency_key` | `VARCHAR(128)` | `z.string().min(1)` | NOT NULL | — | UNIQUE `erp1_import_receipts_idempotency_key_unique` | KIT-08 | `'sha256-hash-key-001'` |
 | `target_id` | `UUID` | `z.string().uuid()` | NOT NULL | — | Target entity row UUID | KIT-08 | `'f47ac10b-58cc-4372-a567-0e02b2c3d479'` |
 | `kind` | `VARCHAR(16)` | `enum('created', 'linked')` | NOT NULL | `'created'` | CHECK `kind IN ('created', 'linked')` | KIT-08 | `'created'` |
+| `source_system` | `VARCHAR(64)` | `z.string().optional()` | NULLABLE | — | Source system identifier | Audit | `'legacy_erp'` |
+| `source_id` | `VARCHAR(128)` | `z.string().optional()` | NULLABLE | — | Source record identifier | Audit | `'LEG-1001'` |
+| `request_hash` | `VARCHAR(64)` | `z.string()` | NOT NULL | `''` | SHA-256 hash of canonical request | KIT-08 | `'e3b0c442...'` |
+| `outcome` | `VARCHAR(16)` | `enum('loaded','rejected','merged','skipped')` | NOT NULL | `'loaded'` | Row outcome classification | KIT-08 | `'loaded'` |
+| `response_payload` | `TEXT` | `z.string().optional()` | NULLABLE | — | Serialized JSON response for idempotent replay | KIT-08 | `'{"id":"..."}'` |
 | `created_at` | `TIMESTAMPTZ` | `z.string().datetime()` | NOT NULL | `now()` | Immutable receipt timestamp | Audit | `'2026-04-01T08:00:00.000Z'` |
 
 **Indexes & constraints**:
@@ -718,11 +723,12 @@ Every functional requirement, domain rule, and platform architectural invariant 
 | **ERP1-21** | Issue #117 | Detail/edit drawer workflow, linked records, HTTP 409 conflict handling | `apps/erp/modules/erp-1/web/tests/ProductDetailPage.test.tsx` | **Verified** |
 | **ERP1-22** | Issue #118 | Migration Kit field registry & type compatibility checks | `apps/erp/modules/erp-1/tests/kit/field-registry.test.ts`<br>`apps/erp/modules/erp-1/web/tests/MigrationKitWizard.test.tsx` | **Verified** |
 | **ERP1-23** | Issue #119 | Rejection review context, sensitive masking, formula-safe CSV export | `apps/erp/modules/erp-1/tests/kit/rejection-context.test.ts`<br>`apps/erp/modules/erp-1/web/tests/RejectionReviewScreen.test.tsx` | **Verified** |
+| **ERP1-08** | Issue #13 | Module-specific profiling, cleaning, mapping and dirty-data pack | `apps/erp/modules/erp-1/tests/migration/rules.test.ts`<br>`apps/erp/modules/erp-1/docs/data-quality-rules.md` | **Verified** |
 | **ERP1-24** | Issue #120 | Data dictionary, ERD, traceability & canonical Dirty Data Pack plan | `apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`<br>`packages/contracts/tests/erp-1.test.ts` | **Verified** |
 
 ---
 
-## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-24)
+## 20. Canonical Dirty Data Pack Plan & Defect Distribution (ERP1-08 / ERP1-24)
 
 ### 20.1 Plan Overview & Principles
 
@@ -731,8 +737,9 @@ The ERP-1 Dirty Data Pack is a deterministic synthetic dataset designed to prove
 - **Committed Fixture**: [`sample-data/erp-1/dirty-data-v1.csv`](../../sample-data/erp-1/dirty-data-v1.csv)
 - **Expected Profile Report**: [`sample-data/erp-1/expected-profile.json`](../../sample-data/erp-1/expected-profile.json)
 - **Mapping Template**: [`sample-data/erp-1/mapping-template.json`](../../sample-data/erp-1/mapping-template.json)
-- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/dirty-data-plan.ts`](../src/migration/dirty-data-plan.ts)
-- **Automated Regression Suite**: [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../tests/migration/dirty-data-plan.test.ts)
+- **Rules Engine & Profile Evaluator**: [`apps/erp/modules/erp-1/src/migration/rules.ts`](../../apps/erp/modules/erp-1/src/migration/rules.ts)
+- **Data Quality Rules Specification**: [`apps/erp/modules/erp-1/docs/data-quality-rules.md`](../../apps/erp/modules/erp-1/docs/data-quality-rules.md)
+- **Automated Regression Suites**: [`apps/erp/modules/erp-1/tests/migration/rules.test.ts`](../../apps/erp/modules/erp-1/tests/migration/rules.test.ts) & [`apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts`](../../apps/erp/modules/erp-1/tests/migration/dirty-data-plan.test.ts)
 
 ### 20.2 Synthetic Edge-Case Scenarios
 

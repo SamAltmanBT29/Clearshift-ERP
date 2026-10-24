@@ -21,7 +21,7 @@ export const TrialBalancePage: React.FC = () => {
   });
   const [trialBalanceData, setTrialBalanceData] = useState<NormalizedTrialBalanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
 
   const loadTrialBalance = useCallback(async () => {
     setIsLoading(true);
@@ -29,8 +29,8 @@ export const TrialBalancePage: React.FC = () => {
     try {
       const response = await fetchTrialBalance(period);
       setTrialBalanceData(response);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load trial balance report');
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setIsLoading(false);
     }
@@ -59,8 +59,7 @@ export const TrialBalancePage: React.FC = () => {
 
       {error ? (
         <ErrorState
-          title="Failed to Load Trial Balance"
-          message={error}
+          error={error}
           onRetry={loadTrialBalance}
         />
       ) : (

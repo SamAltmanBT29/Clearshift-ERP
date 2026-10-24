@@ -18,6 +18,8 @@ export * from './components/JournalEntriesTable.js';
 export * from './components/TrialBalanceTable.js';
 export * from './components/FilterBar.js';
 export * from './components/StateViews.js';
+export * from './components/AccessDeniedView.js';
+export * from './utils/error-sanitizer.js';
 export * from './pages/AccountsListPage.js';
 export * from './pages/AccountCreatePage.js';
 export * from './pages/AccountDetailPage.js';
