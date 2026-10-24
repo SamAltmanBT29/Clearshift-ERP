@@ -535,3 +535,59 @@ When an API endpoint responds with HTTP 403 Forbidden:
   - Explains the missing permission: displays `Required permission: orders:read (or orders:manage)`.
   - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
   - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+
+---
+
+## 13. Create Form and Field-Level Validation Specification (ERP3-20 / Issue #156)
+
+### 13.1 Overview & Architecture
+
+ERP-3 Sales Orders & Invoices implements production-grade creation workflows with client-side field validation, double-submission guards, and server validation error mapping in conformance with ClearShift V1 Master Architecture Specification and SDS §4.4 & §4.9.
+
+- **Hook**: `apps/erp/modules/erp-3/web/src/hooks/useOrderForm.ts`
+- **Modal Component**: `apps/erp/modules/erp-3/web/src/components/forms/OrderCreateModal.tsx`
+- **List Page Integration**: `apps/erp/modules/erp-3/web/src/pages/OrdersListPage.tsx`
+- **Test Suite**: `apps/erp/modules/erp-3/web/tests/OrderCreateModal.test.tsx` (13 tests, 100% synthetic fixtures)
+
+### 13.2 Field-Level Client Validation (AC1)
+
+Client-side synchronous validation (`validateOrderForm`) executes prior to network dispatch:
+- **Required Primary Identifiers**:
+  - `Customer Golden ID`: Mandatory UUID v4 per ADR-003 and BR-ERP3-03; validated against `CustomerGoldenIdSchema` (`UuidSchema`). Legacy/raw strings (e.g. `gid-*`) are rejected.
+  - `Order Date`: Mandatory string in ISO `YYYY-MM-DD` format.
+  - `Currency`: Mandatory 3-letter ISO 4217 uppercase currency code (`/^[A-Z]{3}$/`, e.g. `USD`, `EUR`, `GBP`, `INR`).
+- **Contact & Communication Formats**:
+  - `Customer Email`: Optional; when provided, strictly validated against standard email pattern (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`). Rejects invalid syntax with inline error guidance.
+  - `Contact Phone`: Optional; when provided, validated against E.164-compatible pattern (`/^\+?[0-9\s\-()]{7,20}$/`).
+- **Line Items & Decimal Ranges**:
+  - Minimum 1 line item required (`lines.length >= 1`).
+  - `Product ID`: Mandatory catalog item UUID v4 (`OrdersUuid`).
+  - `Quantity`: Decimal string with up to 4 decimal places (`/^\d+(\.\d{1,4})?$/`). Strictly enforces `Number(quantity) > 0` (zero and negative quantities rejected).
+  - `Unit Price`: Decimal string with up to 4 decimal places (`/^\d+(\.\d{1,4})?$/`). Enforces `Number(price) >= 0` (negative prices rejected).
+  - `Tax Rate`: Decimal percentage string (`/^\d+(\.\d{1,4})?$/`). Enforces range `0.00%` to `100.00%`.
+- **Live Calculations**:
+  - Line items compute live subtotal, tax amount, and line total using the canonical `@clearshift/contracts` helper `calculateLineAmounts(qty, price, taxRate)`.
+  - Order totals card computes aggregate subtotal, total tax, and total order amount in real time.
+
+### 13.3 Double-Submit Prevention & Inflight States (AC2)
+
+To prevent duplicate database mutations and race conditions:
+- **Inflight State**: `useOrderForm` tracks the `isSubmitting` flag during promise execution.
+- **Form Submission Guard**: Any submission attempt while `isSubmitting === true` is immediately rejected at the hook level.
+- **Button Semantics**: The submit button (`Create Sales Order`) is disabled during request flight, receives `aria-busy="true"`, and changes its label to `"Creating..."`.
+
+### 13.4 Server Error Mapping (AC3)
+
+When backend validation fails with HTTP 400 Bad Request:
+- **Detail Extraction**: Extracts error details from `ApiError.details` or `details.errors` array.
+- **Input Mapping**: Maps error messages directly to the corresponding input fields (`customerGoldenId`, `orderDate`, `currency`, `customerEmail`, `customerPhone`).
+- **Line Items Mapping**: Nested line item error paths (e.g. `lines.0.quantity`, `lines[0].price`, `lines.0.product_id`) are mapped to the exact line item index and field (`errors.lines[index]`), rendering inline `aria-invalid="true"` and `<p role="alert">` indicators.
+- **Alert Banner**: Renders an error alert banner with correlation reference ID (`Reference ID: <code>...</code>`).
+- **Conflict Handling (HTTP 409)**: Detects duplicate entity conflicts and renders appropriate guidance.
+
+### 13.5 Modal Closure, Table Cache Update & Toast Confirmation (AC4)
+
+Upon successful creation:
+- **Modal Closure**: Invokes `onClose()` and resets form state.
+- **Cache Update**: Prepends the newly created `SalesOrder` directly into the list page's local `orders` array and increments `totalOrders` by 1 without requiring a full page refresh.
+- **Confirmation Toast**: Renders an accessible confirmation toast notification (`.cs-erp3-toast-container`, `role="status"`, `aria-live="polite"`, `Alert variant="success"`) with message: `Sales order {order_number} created successfully.`.
