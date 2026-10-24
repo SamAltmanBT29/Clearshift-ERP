@@ -9,10 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import { FormPageLayout } from '../components/FormPageLayout.js';
 import { LeaveForm } from '../components/forms/LeaveForm.js';
 import { useEmployeeLookup } from '../hooks/useEmployeeLookup.js';
+import { useToast } from '../hooks/useToast.js';
 
 export const LeaveCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const employeeLookup = useEmployeeLookup();
+  const { showToast } = useToast();
 
   return (
     <FormPageLayout
@@ -25,6 +27,7 @@ export const LeaveCreatePage: React.FC = () => {
         mode="create"
         employees={employeeLookup.options}
         onSaved={(leaveRecord) => {
+          showToast('Leave record created.');
           navigate(`/erp5/leave/${leaveRecord.id}`);
         }}
         onCancel={() => {
