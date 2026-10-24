@@ -49,6 +49,87 @@ tags:
 # ────────────────────────────────────────────────────────────────────────────
 paths:
 
+  # ── Migration Import ─────────────────────────────────────────────────────────
+  /import:
+    post:
+      operationId: importRow
+      tags: [Migration]
+      summary: Import a single row
+      description: |
+        Import a single row from the Migration Kit (KIT-08 / Decision C4).
+
+        Returns 201 on fresh load, 200 on idempotent replay.
+        Returns 409 if the same idempotency key is used with a different payload.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRowRequest"
+      responses:
+        "201":
+          description: Row created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdempotencyConflictResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /import/batch:
+    post:
+      operationId: importBatch
+      tags: [Migration]
+      summary: Import a batch of rows
+      description: |
+        Processes a batch of rows sequentially. Data-validation failures
+        on one row do not abort subsequent rows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportBatchRequest"
+      responses:
+        "200":
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportBatchResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
   # ── Employees ─────────────────────────────────────────────────────────────
   /employees:
     get:
