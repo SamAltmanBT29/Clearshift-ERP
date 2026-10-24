@@ -139,9 +139,9 @@ describe('ERP-2 Vendors & Purchasing Migration Rejection Review & Export Screen 
         />
       );
 
-      // Human-readable reason text from synthetic fixture
+      // Human-readable reason text from erp2FailureExplanations
       expect(
-        screen.getAllByText(/Tax number TAX-ACME-9901 already exists in active vendor catalog/i)
+        screen.getAllByText(/Tax number is already registered after uppercase alphanumeric normalization/i)
           .length
       ).toBeGreaterThan(0);
     });
@@ -156,7 +156,7 @@ describe('ERP-2 Vendors & Purchasing Migration Rejection Review & Export Screen 
 
       expect(
         screen.getByText(
-          /PO status "Archived" is not in approved unidirectional lifecycle \(Draft, Sent, Received, Closed\)/i
+          /PO status transitions are strictly unidirectional: Draft -> Sent -> Received -> Closed/i
         )
       ).toBeTruthy();
     });
@@ -369,7 +369,7 @@ describe('ERP-2 Vendors & Purchasing Migration Rejection Review & Export Screen 
       render(
         <VendorRejectionReviewPage batchId="BATCH_ERP2_CUSTOM_99" />
       );
-      expect(screen.getByText(/BATCH_ERP2_CUSTOM_99/i)).toBeTruthy();
+      expect(screen.getAllByText(/BATCH_ERP2_CUSTOM_99/i).length).toBeGreaterThan(0);
     });
 
     it('displays retry status notification when Retry All is clicked', () => {

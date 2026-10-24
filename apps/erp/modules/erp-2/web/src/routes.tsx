@@ -39,7 +39,6 @@ import { PurchaseOrderCreatePage } from './pages/PurchaseOrderCreatePage.js';
 import { PurchaseOrderDetailPage } from './pages/PurchaseOrderDetailPage.js';
 import { ImportReceiptsListPage } from './pages/ImportReceiptsListPage.js';
 import { DuplicateCandidatesPage } from './pages/DuplicateCandidatesPage.js';
-import { VendorRejectionReviewPage } from './pages/VendorRejectionReviewPage.js';
 import { ModuleNotFoundPage } from './pages/ModuleNotFoundPage.js';
 import { ERP2_BASE_PATH } from './route-manifest.js';
 
@@ -102,11 +101,6 @@ export const erp2Routes: RouteObject[] = [
             id: 'erp2-duplicates',
             path: 'duplicates',
             element: <DuplicateCandidatesPage />,
-          },
-          {
-            id: 'erp2-rejection-review',
-            path: 'rejection-review',
-            element: <VendorRejectionReviewPage />,
           },
           {
             id: 'erp2-not-found',
