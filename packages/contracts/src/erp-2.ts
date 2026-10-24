@@ -24,8 +24,16 @@ import {
   TargetAdapterErrorSchema,
 } from './import-target.js';
 
+// Re-export import target schemas for convenience
+export {
+  ImportReceiptRecordSchema,
+  ImportRowRequestSchema,
+  ImportRowResponseSchema,
+  TargetAdapterErrorSchema,
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared Primitives
+// Shared Primitives & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Monetary amount: string-encoded decimal with up to 2 decimal places. */
@@ -37,6 +45,14 @@ export const MoneyAmount2Dp = z
 export const IsoDateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be a date in YYYY-MM-DD format');
+
+/** Bank details masking pattern (FR-ERP2-06): XXXX-XXXX-7890 */
+export const MaskedBankSchema = z
+  .string()
+  .regex(/^XXXX-XXXX-\d{4}$/, 'Masked bank format must match XXXX-XXXX-7890');
+
+export const PageSchema = z.coerce.number().int().min(1, 'page must be >= 1').default(1);
+export const PageSizeSchema = z.coerce.number().int().min(1, 'pageSize must be >= 1').max(100, 'pageSize <= 100').default(20);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Enum Schemas
@@ -269,6 +285,10 @@ export const PaginatedVendorsResponseSchema = z.object({
 });
 export type PaginatedVendorsResponse = z.infer<typeof PaginatedVendorsResponseSchema>;
 
+// Contract naming aliases for compatibility
+export const VendorListResponseSchema = PaginatedVendorsResponseSchema;
+export type VendorListResponse = PaginatedVendorsResponse;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Purchase Order Line Schemas
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,6 +394,10 @@ export const PaginatedPurchaseOrdersResponseSchema = z.object({
   totalPages: z.number().int().nonnegative(),
 });
 export type PaginatedPurchaseOrdersResponse = z.infer<typeof PaginatedPurchaseOrdersResponseSchema>;
+
+// Contract naming aliases for compatibility
+export const PurchaseOrderListResponseSchema = PaginatedPurchaseOrdersResponseSchema;
+export type PurchaseOrderListResponse = PaginatedPurchaseOrdersResponse;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exact Duplicate Key Policy & Human Review (KIT-10 / ERP2-12 / Issue #128)

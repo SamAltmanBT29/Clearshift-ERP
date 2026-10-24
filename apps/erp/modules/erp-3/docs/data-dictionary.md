@@ -666,12 +666,90 @@ To prevent lost updates in multi-operator environments, order updates enforce op
 
 ---
 
-## 15. Migration Rejection, Review, and Export Context (ERP3-23)
+## 15. Module Metadata Integration with Shared Migration Kit Wizard Specification (ERP3-22 / Issue #158)
+
+**Issue**: [#158](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/158) — `[ERP3-22] ERP-3 Sales Orders and Invoices: Module metadata integration with shared Migration Kit wizard`<br>
+**Implementation**: `packages/kit/src/domain/metadata.ts`, `packages/ui/src/components/MigrationKitWizard.tsx`, `apps/erp/modules/erp-3/src/kit/field-registry.ts`, `apps/erp/modules/erp-3/web/src/kit-metadata.ts`, `apps/erp/modules/erp-3/web/src/pages/OrdersImportPage.tsx`.
+
+### 15.1 Architectural Scope & Acceptance Criteria
+
+| Requirement | Implementation Component | Technical Specification | Gate Acceptance |
+|---|---|---|:---:|
+| **AC 1: Module Metadata Registration** | `field-registry.ts`, `kit-metadata.ts`, `MigrationKitRegistry` | Registers ERP-3 target schema metadata across all 4 domain entities (`sales_orders`, `so_lines`, `invoices`, `invoice_lines`) into central `migrationKitRegistry` without duplicating wizard infrastructure (H2). | **Pass** |
+| **AC 2: Dynamic Rendering of Target Fields, Types & Badges** | `MigrationKitWizard.tsx`, `kit-metadata.ts` | Dynamically renders all target fields with human-readable labels, data type badges (`string`, `decimal`, `uuid`, `enum`, `date`), allowable enum options (`[Open, Invoiced, Closed]` for status), required badges, and governing rule IDs (`FR-ERP3-01`, `BR-ERP3-01`, `BR-ERP3-03`, `KIT-08`). | **Pass** |
+| **AC 3: Incompatible Source Type Operator Warnings** | `MigrationKitWizard.tsx`, `checkTypeCompatibility()` | Evaluates source column data types against target field definitions. Flags type mismatches (e.g. mapping `date` or `boolean` to `decimal` total or `enum` status) with an accessible operator warning banner and row-level alert. | **Pass** |
+| **AC 4: Guard Blocking Unmapped Required Fields** | `MigrationKitWizard.tsx`, `validateFieldMapping()` | Enforces that all required target fields (`order_number`, `customer_golden_id`, `order_date`, `currency`, `status`) must be mapped before progressing. Renders a missing required fields banner and disables "Proceed to Dry-Run" and "Proceed to Load" actions. | **Pass** |
+
+### 15.2 Entity Target Field Definitions
+
+1. **Sales Orders (`erp3_sales_orders`)**:
+   - `order_number`: string, required (FR-ERP3-01, RL-01). Natural key, unique human-readable sales order identifier (e.g. `SO-2026-0001`).
+   - `customer_golden_id`: uuid, required (BR-ERP3-03, ADR-003). Mandatory UUID v4 referencing the canonical Hub / CRM-1 customer identity.
+   - `order_date`: date, required (FR-ERP3-01, RL-01). Booking calendar date in ISO-8601 format (YYYY-MM-DD).
+   - `currency`: string(3), required (FR-ERP3-01, RL-01). ISO-4217 uppercase currency code (e.g. USD, EUR, GBP).
+   - `status`: enum, required (FR-ERP3-05). Forward-only lifecycle status: `Open`, `Invoiced`, `Closed`.
+   - `subtotal`: decimal(19,4), optional (BR-ERP3-01). Server-computed pre-tax sum of line items.
+   - `tax_total`: decimal(19,4), optional (BR-ERP3-02). Server-computed total tax across line items.
+   - `total`: decimal(19,4), optional (BR-ERP3-01). Server-computed grand total.
+   - `customer_email`: string, optional (RL-02). Optional operational customer contact email.
+   - `customer_phone`: string, optional (RL-02). Optional customer contact phone number.
+   - `notes`: string, optional (RL-02). Optional customer or fulfillment instructions.
+   - `source_system`: string, optional (KIT-08). Original legacy system name preserved immutably.
+   - `source_id`: string, optional (KIT-08). Original primary key in the source system for idempotency.
+
+2. **Sales Order Lines (`erp3_so_lines`)**:
+   - `order_id`: uuid, required (FR-ERP3-01). Foreign key linking to parent sales order.
+   - `line_number`: number, required (FR-ERP3-01). 1-based sequential line item position.
+   - `product_id`: uuid, required (FR-ERP3-01, Decision C7). Reference to ERP-1 catalog product.
+   - `quantity`: decimal(12,4), required (BR-ERP3-01). Strictly positive ordered quantity (> 0).
+   - `unit_price`: decimal(19,4), required (BR-ERP3-01). Non-negative unit selling price (>= 0).
+   - `tax_rate`: decimal(6,4), optional (BR-ERP3-02). Percentage tax rate (0.00% to 100.00%).
+   - `tax_amount`: decimal(19,4), optional (BR-ERP3-02). Computed line tax amount.
+   - `line_total`: decimal(19,4), optional (BR-ERP3-01). Computed line total ((qty * unit_price) + tax_amount).
+
+3. **Invoices (`erp3_invoices`)**:
+   - `invoice_number`: string, required (FR-ERP3-02, RL-01). Natural key, unique human-readable invoice identifier.
+   - `order_id`: uuid, required (FR-ERP3-02). 1:1 foreign key reference to parent sales order in V1.
+   - `customer_golden_id`: uuid, required (BR-ERP3-03, ADR-003). Reference to canonical customer identity.
+   - `invoice_date`: date, required (FR-ERP3-02, RL-01). Issue calendar date (YYYY-MM-DD).
+   - `due_date`: date, required (DR-2, FR-ERP3-02). Payment due date satisfying `due_date >= invoice_date`.
+   - `currency`: string(3), required (FR-ERP3-02). ISO-4217 uppercase currency code.
+   - `status`: enum, required (FR-ERP3-02, FR-ERP3-04). Lifecycle status: `Open`, `Paid`, `Overdue`.
+   - `subtotal`: decimal(19,4), optional (BR-ERP3-01). Server-computed pre-tax sum.
+   - `tax_total`: decimal(19,4), optional (BR-ERP3-02). Server-computed total tax.
+   - `total`: decimal(19,4), optional (BR-ERP3-01). Server-computed grand invoice total.
+   - `source_system`: string, optional (KIT-08). Original provenance system.
+   - `source_id`: string, optional (KIT-08). Original legacy invoice record ID.
+
+4. **Invoice Lines (`erp3_invoice_lines`)**:
+   - `invoice_id`: uuid, required (FR-ERP3-02). Foreign key linking to parent invoice.
+   - `line_number`: number, required (FR-ERP3-02). 1-based sequential line item position.
+   - `product_id`: uuid, required (FR-ERP3-02, Decision C7). Reference to ERP-1 catalog product.
+   - `quantity`: decimal(12,4), required (BR-ERP3-01). Invoiced quantity (> 0).
+   - `unit_price`: decimal(19,4), required (BR-ERP3-01). Non-negative unit price (>= 0).
+   - `tax_rate`: decimal(6,4), optional (BR-ERP3-02). Line tax rate percentage.
+   - `tax_amount`: decimal(19,4), optional (BR-ERP3-02). Server-computed line tax amount.
+   - `line_total`: decimal(19,4), optional (BR-ERP3-01). Computed line total ((qty * unit_price) + tax_amount).
+
+### 15.3 Source-to-Target Type Compatibility Rules
+
+| Target Type | Supported Source Types | Warning Scenarios | Incompatible / Error Scenarios |
+|---|---|---|---|
+| `string` | Any source type | Coerced to string | None |
+| `decimal` / `number` | `number`, `integer`, `float`, `decimal` | `string` / `text` (parsed dynamically) | `date`, `boolean`, `uuid` |
+| `boolean` | `boolean`, `bool` | `string`, `number` (coerced 1/0, true/false) | `date`, `uuid` |
+| `date` | `date`, `datetime`, `timestamp` | `string` (must match ISO-8601 YYYY-MM-DD) | `number`, `boolean`, `uuid` |
+| `enum` | `string`, `text` (exact match) | `string` (warns allowed enum options) | `number`, `date`, `boolean`, `uuid` |
+| `uuid` | `uuid` | `string` (must match RFC-4122 format) | `number`, `date`, `boolean` |
+
+---
+
+## 16. Migration Rejection, Review, and Export Context (ERP3-23)
 
 **Issue**: [#159](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/159) — `[ERP3-23] ERP-3 Sales Orders and Invoices: Module context in shared rejection/review/export screens`<br>
 **Implementation**: `packages/kit/src/domain/rejection.ts`, `packages/ui/src/components/RejectionReviewScreen.tsx`, `apps/erp/modules/erp-3/src/kit/rejection-context.ts`, `apps/erp/modules/erp-3/web/src/pages/OrdersRejectionReviewPage.tsx`.
 
-### 15.1 Module Identifier Columns (AC1)
+### 16.1 Module Identifier Columns (AC1)
 
 The shared Migration Kit rejection review interface dynamically displays ERP-3's primary identifier and business columns:
 
@@ -687,7 +765,7 @@ The shared Migration Kit rejection review interface dynamically displays ERP-3's
 | **Order Status** | `status` | Secondary Context | Forward-only status (`Open`, `Invoiced`, `Closed`) |
 | **Total Amount** | `total` | Financial Context | Server-computed order grand total |
 
-### 15.2 Standardized Error Codes & Failure Explanations (AC2)
+### 16.2 Standardized Error Codes & Failure Explanations (AC2)
 
 | Error Code | Title | Failure Explanation | Doc Ref | Remediation Guidance |
 |---|---|---|---|---|
@@ -704,7 +782,7 @@ The shared Migration Kit rejection review interface dynamically displays ERP-3's
 | `TOTAL_MISMATCH` | Line Item Total Mismatch | Order total is server-computed: line_total = (qty * price) + tax, total = sum(line_total) (BR-ERP3-01). Source total did not reconcile. | BR-ERP3-01 | Allow server-side computed totals or reconcile source line arithmetic. |
 | `MISSING_REQUIRED_FIELD` | Missing Mandatory Field | A mandatory field (order_number, customer_golden_id, order_date, currency, status) is missing or blank (FR-ERP3-01). | FR-ERP3-01 | Populate all required fields in source data prior to importing. |
 
-### 15.3 Sensitive Field Masking (AC3)
+### 16.3 Sensitive Field Masking (AC3)
 
 All sensitive financial, bank, or employee fields are automatically masked or excluded from review tables, payload inspector modals, and CSV downloads:
 - **Credentials & Passwords**: `[REDACTED]`
@@ -712,17 +790,16 @@ All sensitive financial, bank, or employee fields are automatically masked or ex
 - **Government Tax IDs & SSNs**: `***-**-XXXX` (last 4 characters preserved)
 - **Employee Salaries & Compensation**: `[CONFIDENTIAL SALARY]`
 
-### 15.4 Formula-Safe CSV Export (AC4)
+### 16.4 Formula-Safe CSV Export (AC4)
 
 Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines (PLT-12 / KIT-16):
-- Any cell value starting with `=`, `+`, `-`, `@`, `\t`, or `\r` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
+- Any cell value starting with `=`, `+`, `-`, `@`, `	`, or `` (after leading whitespace) is neutralized with a single-quote prefix (`'`).
 - Export includes all standardized headers: `"Source Row"`, `"Error Code"`, `"Error Title"`, `"Reason"`, `"Doc Reference"`, `"Resolution"`, `"Order Number"`, `"Customer Golden ID"`, `"Source ID"`, `"Currency Code"`.
 - Filtering is preserved: exporting with active filters downloads only the matching subset of rejected rows.
 
-
 ---
 
-## 15. Relationships, State Transitions & Read-Model Consistency (`ERP3-06` / Issue #31)
+## 17. Relationships, State Transitions & Read-Model Consistency (`ERP3-06` / Issue #31)
 
 - **Relationship Catalog (`src/domain/relationships.ts`)**:
   - `ORDER_CUSTOMER`, `ORDER_LINES`, `ORDER_LINE_PRODUCT`, `INVOICE_CUSTOMER`, `INVOICE_ORDER`, `INVOICE_LINES`, `INVOICE_LINE_PRODUCT`, `PAYMENT_INVOICE`.
@@ -734,3 +811,26 @@ Rejection exports conform strictly to OWASP CSV Injection mitigation guidelines 
   - Invoices (`assertInvoiceStatusTransition`): `Open -> Paid | Overdue`, `Overdue -> Paid`, `Paid` is terminal (`422 INVALID_INVOICE_STATUS_TRANSITION`).
 - **Read-Model Consistency (`assertSalesOrderReadConsistency`, `assertInvoiceReadConsistency`, `assertPaymentReadConsistency`)**:
   - Asserted immediately on every write and read in `Erp3Service` so persisted records and HTTP projections agree on status, links, derived line taxes/totals, and aggregate totals (`422 READ_MODEL_INCONSISTENT`).
+
+---
+
+## 18. Invariants Enforced at Schema & DB Level (ERP3-01 / Issue #26)
+
+1. **UUID Primary Keys**: Every table uses a `UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
+2. **Deterministic Uniqueness**:
+   - `sales_orders.order_number` is unique.
+   - `invoices.invoice_number` is unique.
+   - `invoices.order_id` is unique (enforcing at most one V1 invoice per sales order).
+   - `(order_id, line_number)` is unique on `so_lines`.
+   - `(invoice_id, line_number)` is unique on `invoice_lines`.
+   - `import_receipts.idempotency_key` is unique.
+3. **Check Constraints**:
+   - Quantities are strictly positive (`> 0`).
+   - Prices, tax amounts, line totals, and document totals are non-negative (`>= 0`).
+   - Tax rates are bounded percentages (`>= 0 AND <= 100`).
+   - Payment amounts are strictly positive (`> 0`).
+   - Invoice `due_date >= invoice_date`.
+4. **Referential Integrity & Cascades**:
+   - Order lines cascade delete when the parent sales order is deleted (`ON DELETE CASCADE`).
+   - Invoice lines cascade delete when the parent invoice is deleted (`ON DELETE CASCADE`).
+   - Cross-module relationships use logical UUID columns without DB-level foreign keys.

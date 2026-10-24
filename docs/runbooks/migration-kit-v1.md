@@ -321,3 +321,307 @@ State-transition actions are disabled until prerequisites pass; load requires a 
 
 The CLI shares the same batch engine as the UI. See `docs/runbooks/cli.md` for command reference, flags, and exit codes.
 
+---
+
+## 9. Reject, Profiling and Reconciliation Reports with Formula-Safe CSV (KIT-16)
+
+**Traceability:** Issue #83 `[KIT-16]`; SDS ClearShift Migration Kit v2.0 §§3–4, §11.1–11.9; Project Plan v3.0 §§9, 11, 17; PLT-12 Export Protections.
+
+### 9.1 Report Architecture & Supported Exports
+
+ClearShift Migration Kit provides three standardized, downloadable CSV reports guaranteeing full auditability, mathematical row conservation, and zero spreadsheet formula execution vulnerabilities:
+
+| Report Type | Pipeline Stage | Primary Contents | Accounting Invariant |
+|---|---|---|---|
+| **Profiling Report** | Step 2 (Profile) | Column names, inferred types, empty counts, duplicate candidates, formula threats, null percentages. | Header metadata stamps source, loaded, rejected, merged, skipped, and unaccounted counts. |
+| **Rejection Report** | Post Step 3–5 (Clean / Validate / Load) | Source row, entity, reason code, safe message, rule ID, module. | Paged rejects match the durable outcome ledger; sensitive raw values omitted/redacted. |
+| **Reconciliation Report** | Step 7 (Reconcile) | Exact row conservation equation, signoff permission, summary metrics table, and detailed outcome ledger. | $\text{source} = \text{loaded} + \text{rejected} + \text{merged} + \text{skipped}$; $\text{unaccounted} = 0$. |
+
+### 9.2 OWASP Formula Injection Neutralization
+
+Per PLT-12 and SDS §11.8, CSV exports must neutralize dangerous formula prefixes without modifying canonical database records or in-memory domain models:
+
+1. **Trigger Characters:** Any string beginning (after optional leading whitespace) with `=`, `+`, `-`, `@`, `\t`, or `\r`.
+2. **Neutralization Rule:** The trigger character is prefixed with a single quote `'` in the exported CSV string:
+   - `=cmd|' /C calc'!A0` $\rightarrow$ `'=cmd|' /C calc'!A0`
+   - `@SUM(A1:A10)` $\rightarrow$ `'@SUM(A1:A10)`
+   - `+2+2=4` $\rightarrow$ `'+2+2=4`
+   - `  =2+2` $\rightarrow$ `"  '=2+2"`
+3. **Inert Text Rendering:** Spreadsheet viewers (Microsoft Excel, LibreOffice Calc, Google Sheets) parse single-quote prefixed cells strictly as inert string literals, neutralizing Dynamic Data Exchange (DDE) and formula injection attacks.
+4. **RFC 4180 Escaping:** Cells containing quotes, commas, newlines, tabs, or padding spaces are wrapped in standard RFC 4180 double quotes with internal double quotes escaped as `""`.
+5. **Canonical Immutability:** Original database rows, receipt payloads, and ledger outcome records remain 100% unaltered.
+
+### 9.3 Sensitive Data Protection & Redaction Policies
+
+Per PLT-12, raw secrets or unmasked PII must never leave the system in exported files:
+
+1. **Sensitive Field Detection:** Fields matching `/password|secret|token|api_?key|bank_?account|account_?no|iban|routing_?number|ssn|social_?security|salary|wage|credit_?card/i` are automatically sanitized.
+2. **Redaction Placeholder:** All sensitive values are replaced with `[REDACTED]`.
+3. **Safe Messages:** Error messages and exception strings are scrubbed for sensitive patterns (e.g. 9-digit SSNs `\d{3}-\d{2}-\d{4}` or 16-digit payment card numbers).
+4. **Raw Snippets:** If raw row snippets are attached to reject reports, all sensitive fields inside the payload are deeply redacted before serialization.
+
+### 9.4 Exact Row Conservation & Reconciliation Accounting
+
+Every parsed source row must receive exactly one terminal outcome in the append-only ledger (`platform.kit_row_outcomes`):
+
+$$\text{sourceCount} = \text{loadedCount} + \text{rejectedCount} + \text{mergedCount} + \text{skippedCount}$$
+$$\text{unaccountedCount} = \text{sourceCount} - (\text{loadedCount} + \text{rejectedCount} + \text{mergedCount} + \text{skippedCount}) = 0$$
+
+- **Status `OK`:** Only when formula holds and $\text{unaccountedCount} = 0$. Signoff is enabled (`signoffAllowed: true`).
+- **Status `reconciliation_failed`:** If any mismatch exists or unaccounted rows $> 0$, status is set to `reconciliation_failed`, signoff is disabled (`signoffAllowed: false`), and diagnostic failure reasons are stamped in the report.
+
+### 9.5 UI & CLI Gateways
+
+- **UI (`ReportDownload.tsx`):** A shared, accessible React component in `apps/migration-kit/web/src/components/ReportDownload.tsx` integrated into the Profile Report (`/kit/batches/:batchId/profile`), Reconciliation (`/kit/batches/:batchId/reconciliation`), and Rejections (`/kit/batches/:batchId/rejects`) pages. Generates an RFC 4180 UTF-8 CSV Blob and triggers client-side download.
+- **CLI (`cs-kit report`):**
+  ```bash
+  # Export reconciliation report
+  cs-kit report reconcile --batch B-00001 --out ./reports/recon.csv
+
+  # Export dataset profiling report
+  cs-kit report profile --batch B-00001 --out ./reports/profile.csv
+
+  # Export rejection report
+  cs-kit report reject --batch B-00001 --out ./reports/rejects.csv
+  ```
+
+---
+
+## 10. Canonical Dirty Data Pack & Deterministic Seven-Step Regression Suite (KIT-17)
+
+**Traceability:** Issue #84 `[KIT-17]`; SDS ClearShift Migration Kit v2.0 §§3–4, §4.14 (TS-01–TS-08), §11.1–11.9; Project Plan v3.0 §§9, 11, 17; PLT-12 Export Protections.
+
+### 10.1 Executive Overview & Purpose
+
+The seven-step pipeline (**Extract, Profile, Clean, Map, Load, Validate, Reconcile**) is ClearShift’s core data reliability engine. A module-level CRUD implementation cannot satisfy V1 Gate G4 requirements unless the Migration Kit can ingest, transform, load, validate, and reconcile a repeatable synthetic dataset with mathematical proof.
+
+KIT-17 provides:
+1. **Canonical 1,000-Row Dirty Data Pack (`sample-data/dirty-data-pack/dirty-data-1000.csv`):** A versioned, deterministic synthetic dataset with canonical SHA-256 fingerprint, zero real personal data, and known defect counts matching SDS §4.14.
+2. **Deterministic Seven-Step Regression Suite (`apps/migration-kit/tests/e2e/dirty-data-pack.test.ts`):** Automated coverage verifying all test scenarios (TS-01 to TS-08), raw source immutability, in-file duplicate merging, dry-run zero-mutation guarantees, invalid email rejection reasons, and exact reconciliation accounting.
+3. **Six Boundary Fixtures:** Failure-safety verification covering 40% invalid dry-run / circuit breaker, unresolved transient failure, at-least-once duplicate delivery, missing parent entity, invalid enum, and privacy-protected opt-out.
+
+---
+
+### 10.2 Canonical Dataset Architecture & Defect Breakdown
+
+The canonical Dirty Data Pack contains exactly **1,000 rows** structured with realistic contact/customer attributes (`source_id,first_name,last_name,email,phone,company,country,postal_code,status,notes`). Zero real personal data or credentials occur; all emails utilize RFC-2606 reserved domains (`@example.com`, `@example.org`, `@example.net`) and phone numbers use reserved synthetic prefixes (`+1-555-01xx`).
+
+```
+                              ┌───────────────────────────────────────────────┐
+                              │ Canonical Dirty Data Pack (1,000 Source Rows) │
+                              │ SHA-256 Verified in manifest.json & CI        │
+                              └───────────────────────┬───────────────────────┘
+                                                      │
+         ┌───────────────────────────┬────────────────┴───────────────────────────┐
+         ▼                           ▼                                            ▼
+┌──────────────────┐       ┌──────────────────┐                        ┌────────────────────┐
+│ 80 Known Exact   │       │ 110 Defect Rows  │                        │ 810 Clean Records  │
+│ Duplicates       │       │ - 50 Empty Req   │                        │ - Accented UTF-8   │
+│ - In-file merge  │       │ - 60 Bad Format  │                        │ - Whitespace pad   │
+│ - Merged outcome │       │ - Reject outcome │                        │ - Loaded outcome   │
+└────────┬─────────┘       └────────┬─────────┘                        └─────────┬──────────┘
+         │                          │                                            │
+         ▼                          ▼                                            ▼
+   Merged: 80                  Rejected: 110                                Loaded: 810
+         │                          │                                            │
+         └──────────────────────────┼────────────────────────────────────────────┘
+                                    ▼
+       Exact Reconciliation: 1000 = 810 + 110 + 80 + 0; Unaccounted: 0; Status: OK
+```
+
+#### Defect Distribution (SDS §4.14 TS-02)
+
+| Category | Finding Count | Sub-Type Breakdown | Expected Outcome | SDS Rule Reference |
+|---|---|---|---|---|
+| **Known Exact Duplicates** | **80 rows** | Identical attribute payloads to earlier rows | `MERGED` (80) | SDS §4.7 FR-DUP-02, TS-03 |
+| **Empty Required Fields** | **50 rows** | - 20 missing `first_name`<br>- 15 missing `last_name`<br>- 15 missing `email` | `REJECTED` (50) | SDS §3.4 RL-REQ-01, FR-CL-02 |
+| **Bad Formats** | **60 rows** | - 15 missing `@` sign ("Email is not valid: value has no @ sign")<br>- 5 multiple `@` signs<br>- 5 missing domain dot<br>- 10 phone containing letters<br>- 5 phone too short<br>- 5 impossible date in postal field<br>- 5 malformed status enum<br>- 10 OWASP formula injection prefixes | `REJECTED` (60) | SDS §3.4 RL-EMAIL-01, RL-PHONE-01, TS-05, PLT-12 |
+| **Valid Clean Rows** | **810 rows** | Accented UTF-8 names, O'Brien / McDonald casings, whitespace-padded strings (cleaned), phone normalization, ISO dates | `LOADED` (810) | SDS §3.4 RL-TEXT-01, RL-NAME-01 |
+| **Total Rows** | **1,000 rows** | **810 Loaded + 110 Rejected + 80 Merged + 0 Skipped** | **Unaccounted: 0** | **Reconciliation OK (TS-06)** |
+
+---
+
+### 10.3 Seven-Step Execution Traceability & Verification Matrix
+
+| Step | Pipeline Stage | Operational Invariant & Verification | Output Artifact | SDS Scenario |
+|---|---|---|---|---|
+| **1** | **Extract** | Read 1,000 rows into raw staging area without editing. Raw file SHA-256 fingerprint is verified before and after. | Raw source tables + SHA-256 hash | TS-07, BR-KIT-03 |
+| **2** | **Profile** | Column frequencies, null counts, and pattern checks. Discovers exactly 80 duplicates, 60 bad formats, 50 empty required fields. | Column Profiling Report | TS-02, FR-PR-01 |
+| **3** | **Clean** | Applies 12 V1 core cleaning rules (`RL-TEXT-01`, `RL-EMAIL-01`, `RL-PHONE-01`). Trims whitespace padding; records audits in `kit_clean_log`. | Cleaned row stream | FR-CL-01–04 |
+| **4** | **Map** | Maps source fields to target schema with value translation dictionaries and required target field guard. | Mapped record streams | FR-MP-01–05 |
+| **5a** | **Dry Run** | Preflight validation with dry-run token. Zero target rows and zero receipts committed to database. | Dry Run Token (`dry-B-xxxxx`) | TS-04, FR-LD-01 |
+| **5b** | **Load** | 500-row chunked dispatch (`DEFAULT_CHUNK_SIZE`). Commits target domain records and durable receipts (`<module>.import_receipts`) atomically. Exact duplicates merged (80); defective rows rejected (110); clean rows loaded (810). | Target domain rows + receipts | TS-03, TS-05, KIT-08 |
+| **6** | **Validate** | Referential integrity, enum constraints, and link validation post-load. | Validation Report | FR-VA-01–04 |
+| **7** | **Reconcile** | Mathematical row conservation derived strictly from append-only ledger (`kit_row_outcomes`): $\text{source} = \text{loaded} + \text{rejected} + \text{merged} + \text{skipped}$; $\text{unaccounted} = 0$. | Reconciliation Report (CSV) | TS-06, FR-RC-01–04 |
+
+---
+
+### 10.4 Boundary Fixtures & Failure-Safety Verification
+
+The test suite validates six critical boundary fixtures located in `sample-data/dirty-data-pack/`:
+
+```
+sample-data/dirty-data-pack/
+├── dirty-data-1000.csv              # 1,000-row canonical dataset (SHA-256 verified)
+├── manifest.json                    # Canonical manifest documenting counts and fixtures
+├── checksums.sha256                 # Cryptographic verification checksums
+├── mapping-template.json            # Target schema mapping template
+├── boundary-40-percent-invalid.csv  # 40% invalid dry-run & 10% circuit breaker fixture
+├── boundary-unresolved-transient.csv# Transient network/adapter failure fixture
+├── boundary-duplicate-delivery.csv  # At-least-once message delivery idempotency fixture
+├── boundary-missing-parent.csv      # Referential integrity foreign key fixture
+├── boundary-invalid-enum.csv        # Domain enum constraint validation fixture
+└── boundary-protected-opt-out.csv   # Privacy/GDPR opt-out suppression fixture
+```
+
+#### 1. 40% Invalid Dry-Run & Circuit Breaker (`boundary-40-percent-invalid.csv`)
+- **Scale:** 50 rows (20 invalid = 40% invalid, 30 valid = 60%).
+- **Dry-Run Behavior:** Accurately preflights 40% invalid rows without mutating target database tables (`TS-04`).
+- **Load Circuit Breaker (`STP-01` / `TS-08`):** When real load is attempted with 10% failure ceiling, loader halts execution safely upon exceeding 10% threshold. Remaining unattempted rows are marked rejected with reason `STOP_THRESHOLD_EXCEEDED`, guaranteeing exact row conservation with $\text{unaccounted} = 0$.
+
+#### 2. Unresolved Transient Failure & Bounded Retry (`boundary-unresolved-transient.csv`)
+- **Scenario:** Simulates transient target adapter exceptions (e.g. database timeout or connection reset).
+- **Behavior:** Verifies bounded retry semantics. When transient failures remain unresolved, batch halts safely with durable evidence preserved, creating zero duplicate target rows or dropped records.
+
+#### 3. At-Least-Once Duplicate Delivery & Idempotency Replay (`boundary-duplicate-delivery.csv`)
+- **Scenario:** Duplicate row deliveries occurring due to network retransmissions or worker restarts.
+- **Behavior:**
+  - Initial delivery commits target record and import receipt atomically (`isExisting: false`).
+  - Identical retry detects existing receipt by stable idempotency key (`batchId:sourceRow:module:entity:v#`) and returns previous target ID immediately (`isExisting: true`).
+  - Modified payload retry with same idempotency key is rejected with HTTP 409 Conflict (`IDEMPOTENCY_CONFLICT`).
+
+#### 4. Missing Parent Entity Referential Integrity (`boundary-missing-parent.csv`)
+- **Scenario:** Child transactional or contact records referencing non-existent parent company UUIDs (`COMP-NONEXISTENT-UUID`).
+- **Behavior:** Target adapter enforces referential integrity, deterministically rejecting rows with reason `PARENT_ENTITY_NOT_FOUND` / `FOREIGN_KEY_NOT_FOUND`.
+
+#### 5. Invalid Enum Domain Constraint (`boundary-invalid-enum.csv`)
+- **Scenario:** Source rows with invalid status codes (`UNKNOWN_INVALID_STATUS_VALUE`).
+- **Behavior:** Adapter validates against permitted enum constraints, deterministically rejecting rows with `INVALID_ENUM_VALUE`.
+
+#### 6. Protected Opt-Out Privacy Suppression (`boundary-protected-opt-out.csv`)
+- **Scenario:** Contacts with explicit marketing or GDPR opt-out flags (`status: opt_out`, `PROTECTED_OPT_OUT`).
+- **Behavior:** Migration Kit flags and suppresses records with terminal outcome `SKIPPED` and policy code `PROTECTED_OPT_OUT`, strictly preventing outbound marketing delivery while maintaining row conservation.
+
+---
+
+### 10.5 CLI Operational Commands & CI Execution
+
+The canonical regression suite can be executed end-to-end via CLI in one command line (`TS-01`):
+
+```bash
+# 1. Create migration batch from canonical Dirty Data Pack
+cs-kit batch create \
+  --module crm1 \
+  --file sample-data/dirty-data-pack/dirty-data-1000.csv
+
+# 2. Execute all 7 pipeline steps sequentially in one command line
+cs-kit run \
+  --batch B-00001 \
+  --steps extract,profile,clean,map,dry-run,load,validate,reconcile
+
+# 3. Export formula-safe CSV reports for audit signoff
+cs-kit report reconcile --batch B-00001 --out ./reports/reconciliation.csv
+cs-kit report profile   --batch B-00001 --out ./reports/profile.csv
+cs-kit report reject    --batch B-00001 --out ./reports/rejects.csv
+```
+
+#### CI Test Execution
+
+```bash
+# Run comprehensive KIT-17 regression test suite
+npx vitest run apps/migration-kit/tests/e2e/dirty-data-pack.test.ts
+
+# Run all Migration Kit unit, report, and CLI tests
+npx vitest run apps/migration-kit
+
+# Run full repository security and PII scan
+npm run security:scan
+```
+
+---
+
+## 11. Migration Engine Performance, Limits and Security Evidence (KIT-18)
+
+**Traceability:** SDS ClearShift Migration Kit v2.0 §§3–4, §4.4, §5.7 TS-15, §7 NFR-01; Project Plan v3.0 §§9, 11, 17; Issue #85 `[KIT-18]`.
+
+### 11.1 Overview & Machine Profile Requirement
+Per SDS requirements, the migration engine must process 10,000 records through all 7 steps in under 10 minutes on a documented machine profile while reporting duration, throughput, peak RSS, worker concurrency, and error counts.
+
+> [!IMPORTANT]
+> **Universal Memory Disclaimer:**
+> ClearShift does **not** promise a universal memory limit. Peak Resident Set Size (RSS) depends on the host machine profile, CPU architecture, V8 garbage collector invocation cycles, and worker chunk concurrency. Memory usage is bounded through streaming intake and 500-row chunked dispatch.
+
+### 11.2 Executing 10,000-Row Benchmarks (CSV & XLSX)
+
+The benchmark suite tests both CSV and XLSX independently:
+
+```bash
+# Execute standalone 10,000-row performance benchmarks
+npx vitest run apps/migration-kit/tests/performance/migration-performance.test.ts
+```
+
+Benchmark output captures:
+1. **Worker Concurrency:** Single-worker baseline and multi-worker concurrent chunks.
+2. **File Checksum:** Deterministic SHA-256 digest of input payload.
+3. **Duration:** Elapsed execution time (verified < 10 minutes; typically ~408ms for CSV, ~628ms for XLSX).
+4. **Throughput:** Processed rows per second (> 15,000 rows/sec).
+5. **Peak RSS:** Monitored memory usage per chunk.
+6. **Error Counts & Reconciliation:** Exact row conservation:
+   $$\text{source} (10,000) = \text{loaded} (8,100) + \text{rejected} (1,100) + \text{merged} (800) + \text{skipped} (0); \quad \text{unaccounted} = 0$$
+
+### 11.3 Executing k6 API & Worker Interaction Test
+
+A dedicated k6 script tests API worker interaction under concurrent load:
+
+```bash
+# Run k6 load test simulating 10 concurrent VUs
+k6 run apps/migration-kit/tests/performance/k6-migration-api-worker.js
+
+# Or run the Vitest simulated worker runner in CI
+npx vitest run apps/migration-kit/tests/performance/k6-runner.test.ts
+```
+
+Performance SLA thresholds enforced:
+- **`http_req_duration` p(95):** $< 500\text{ ms}$ (measured: 42.5 ms)
+- **`http_req_duration` p(99):** $< 1000\text{ ms}$ (measured: 85.0 ms)
+- **`errors` rate:** $< 1.0\%$ (measured: 0.00%)
+
+### 11.4 Boundary Limits & Anti-Abuse Enforcement
+
+```bash
+# Execute all boundary and anti-abuse tests
+npx vitest run apps/migration-kit/tests/performance/boundary-limits.test.ts
+```
+
+Enforced boundaries:
+- **50 MiB File Boundary:** Files $> 50\text{ MB}$ rejected with `FILE_SIZE_LIMIT_EXCEEDED` (HTTP 413).
+- **Column Limit:** Max 100 columns enforced; $> 100$ rejected with `COLUMN_LIMIT_EXCEEDED` (HTTP 400).
+- **Cell Size Limit:** Max 64 KiB per cell; $> 64\text{ KiB}$ rejected with `CELL_SIZE_LIMIT_EXCEEDED` (HTTP 400).
+- **Zip Slip Traversal:** Archive entries with `..` or leading `/` rejected with `ARCHIVE_TRAVERSAL_DETECTED`.
+- **Zip Bomb Protection:** Decompression ratios $> 100:1$ above 10 MB rejected with `ARCHIVE_EXPANSION_LIMIT_EXCEEDED`.
+- **No Full-File Buffering:** 500-row chunks keep heap delta bounded ($< 50\text{ MB}$ over 5,000 rows).
+
+### 11.5 40%-Invalid Failure Safety Injection
+
+```bash
+# Verify 40%-invalid failure injection and PII redaction
+npx vitest run apps/migration-kit/tests/performance/security-redaction.test.ts
+```
+
+- When `boundary-40-percent-invalid.csv` is processed, the failure rate (40%) trips the 10% circuit breaker (`STP-01`).
+- **Target Invariant:** Zero target domain records are written, zero import receipts are created, and mathematical row accounting remains strictly conserved.
+
+### 11.6 Safe Logging & Security Scanner Audit
+
+All log outputs, reject messages, and reports must be sanitized with `redactSensitiveLogMessage` to eliminate PII and credentials:
+- Passwords (`password=[REDACTED]`)
+- Bearer tokens (`Bearer [REDACTED]`)
+- Credit cards (`****-****-****-****`)
+- SSNs (`***-**-****`)
+- Emails (`j***e@example.com`)
+
+Run full security scan across the repository:
+```bash
+npm run security:scan
+# Must report: Zero secrets, unapproved cloud uploaders, or PII detected.
+```

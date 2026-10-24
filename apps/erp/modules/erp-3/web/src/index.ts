@@ -19,6 +19,8 @@ export * from './pages/OrderCreatePage.js';
 export * from './pages/OrderDetailPage.js';
 export * from './pages/InvoiceCreatePage.js';
 export * from './pages/InvoiceDetailPage.js';
+export * from './pages/OrdersImportPage.js';
+export * from './kit-metadata.js';
 export * from './rejection-context.js';
 export * from './pages/OrdersRejectionReviewPage.js';
 

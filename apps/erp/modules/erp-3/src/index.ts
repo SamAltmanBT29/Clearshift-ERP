@@ -28,6 +28,8 @@ export * from "./migration/profiling-config.js";
 export * from "./migration/cleaning-config.js";
 export { hasFormulaPrefix } from "./migration/cleaning-config.js";
 export * from "./kit/rejection-context.js";
+export * from "./migration/target-adapter.js";
+export * from "./migration/batch-runner.js";
 
 export * from "./domain/index.js";
 
@@ -63,5 +65,8 @@ export const moduleDefinition = {
 };
 
 export const erp3Descriptor = moduleDefinition;
+
+export * from "./kit/field-registry.js";
+export { erp3KitMetadata } from "./kit/field-registry.js";
 
 export default moduleDefinition;
