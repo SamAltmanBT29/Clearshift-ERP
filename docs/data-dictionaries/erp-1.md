@@ -38,6 +38,7 @@
 24. [Idempotent Retry and Partial-Load Stop Behavior (ERP1-13)](#24-idempotent-retry-and-partial-load-stop-behavior-erp1-13)
 25. [Module Authorization and Policy Integration (ERP1-15)](#27-module-authorization-and-policy-integration-erp1-15)
 26. [Module Route and Page Registration in Shared Shell (ERP1-16)](#28-module-route-and-page-registration-in-shared-shell-erp1-16)
+27. [Main Paginated Data Table (ERP1-17)](#29-main-paginated-data-table-erp1-17)
 
 ---
 
@@ -1119,3 +1120,46 @@ Route protection via `RequireAuth` wrapper:
 - Intercepts unauthenticated sessions and redirects to Hub login with return URL parameter (`/login?redirect=...`).
 - Checks user role against route permission requirements (e.g. restricts product creation/editing to `editor` / `admin`).
 - Emits standard access-denied state if the user lacks the required role.
+
+---
+
+## 29. Main Paginated Data Table (ERP1-17)
+
+**Issue Reference**: [#113](https://github.com/SamAltmanBT29/Clearshift-ERP/issues/113)<br />
+**Traceability**: ClearShift Project Plan v3.0, SDS ClearShift ERP v2.0 §4.2, §4.7; PLT-04 Bounded Pagination, PLT-08 Shared Web Shell<br />
+**Implementation**: `apps/erp/modules/erp-1/web/src/components/ProductsTable.tsx`, `apps/erp/modules/erp-1/web/src/pages/ProductsListPage.tsx`
+
+### 29.1 Stable Columns Matching Data Dictionary (AC1)
+
+The primary collection table screen renders entity rows with stable columns directly mapping to `erp1.products` master data and `erp1.stock_levels`:
+
+| Column Header | Field Name | Data Type / Representation | Sortable | Accessibility & Formatting Notes |
+|---|---|---|---|---|
+| **Product Name** | `name` | `VARCHAR(255)` / string | Yes (`name`) | Primary entity identifier; interactive button for detail/edit drawer; optional source system metadata |
+| **SKU** | `sku` | `VARCHAR(64)` / string | Yes (`sku`) | Monospace `code` pill; normalized uppercase alphanumeric key |
+| **Category** | `categoryId` | UUID FK -> `erp1.categories` | No | Rendered as category name badge from cached category map; fallback `—` |
+| **Unit** | `unitOfMeasure` | `erp1.unit_of_measure` enum | No | Restricted to fixed V1 unit list: `pcs`, `kg`, `g`, `litre`, `metre`, `box` |
+| **Price** | `price` | `NUMERIC(14,4)` decimal string | Yes (`price`) | Formatted 2-4 decimal places with ISO currency code (e.g. `185.50 USD`) |
+| **Tax Rate** | `taxRate` | `NUMERIC(5,2)` decimal string | No | Right-aligned percentage string (e.g. `5.00%`) |
+| **Stock Status** | `stockQuantity` | `NUMERIC(14,4)` from stock levels | Yes (`quantity`) | `StatusBadge`: `In Stock` (>10), `Low` (<=10), `Out of Stock` (<=0), or `Unknown` |
+
+### 29.2 Server-Side Pagination & Bounded Paging (AC2 & AC4)
+
+1. **Query Parameter Binding**:
+   - `page`: 1-based integer index sent to `/api/v1/erp-products/products?page=...`
+   - `pageSize`: Bound to standard bounded options `[10, 25, 50, 100]`.
+   - Modifying `pageSize` immediately resets `page` to `1` and updates URL search parameters via `replaceState`.
+2. **DOM Performance & Bounded Limits**:
+   - Strictly conforms to platform constraint: `pageSize <= 100`.
+   - DOM node creation is capped at <= 100 rows per rendered page window, preventing browser DOM thrashing and layout thrash.
+   - Previous and Next buttons enforce disabled states at page boundaries (`currentPage <= 1` and `currentPage >= totalPages`).
+
+### 29.3 Predictable Column Header Sorting (AC3)
+
+1. **Sort Direction Toggle**:
+   - Clicking an active sorted column toggles between `asc` and `desc`.
+   - Clicking an inactive column switches `sortBy` to that field with initial direction `asc`.
+2. **WAI-ARIA & Keyboard Accessibility**:
+   - Headers declare `aria-sort="ascending"`, `aria-sort="descending"`, or `aria-sort="none"`.
+   - Accessible descriptions announce the current sort state and next action (`aria-label`).
+   - Supports keyboard activation via `Enter` and `Space` (`tabIndex={0}`).
