@@ -239,6 +239,30 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Automated Verification**:
   - [`apps/erp/modules/erp-4/web/tests/detail-edit-workflow.test.tsx`](../../apps/erp/modules/erp-4/web/tests/detail-edit-workflow.test.tsx) (13 tests verifying primary attribute display, timestamps, Golden ID resolution, inline and drawer editing with allowlist and permission checking, tabbed linked entity sub-tables, and HTTP 409 concurrent conflict prompts with refresh handling).
 
+## 20. Search, Filters and Sorting Controls (Issue #174 / ERP4-18)
+
+- **300ms Debounced Search Bar (`FilterBar.tsx` & `useDebounce.ts`)**:
+  - Implements rapid keystroke debouncing (`useDebounce`) waiting 300ms before dispatching search queries.
+  - Immediate local state feedback for responsive typing with inline clear button (`✕`).
+  - Automatically resets pagination to page 1 on search value changes.
+- **Faceted Filters & Drawer Panel (`FilterSidebar.tsx`)**:
+  - Accessible slide-over filter panel exposing categorized facet controls:
+    - Account Type (`asset`, `liability`, `income`, `expense`).
+    - Status (`active`, `archived` / `inactive`).
+    - Currency (`USD`, `INR`, `EUR`, `GBP`).
+  - Active filter badge counter on toggle button displaying the number of active filters.
+  - URL query state synchronization (`useSearchParams`) reflecting active filters in browser URL (`?search=...&type=...&isActive=...`).
+- **Removable Filter Tags & Clear All (`FilterPills.tsx`)**:
+  - Active filter criteria rendered as accessible pill tags (`role="list"` / `role="listitem"`).
+  - Individual removal buttons with accessible `aria-label` values (`Remove filter for <Label>`).
+  - One-click `"Clear All"` reset button that removes all active criteria and resets URL query state.
+- **Informative Empty Results Messaging**:
+  - Differentiates between default zero-data states and empty search/filter queries.
+  - Displays `"No matching accounts found"` with prompt to adjust criteria or clear filters.
+  - Inline `"Clear All Filters"` recovery button triggering state reset.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/search-filters.test.tsx`](../../apps/erp/modules/erp-4/web/tests/search-filters.test.tsx) (9 comprehensive tests verifying 300ms debounce, faceted sidebar updates, pill tag clearing, Clear All, and empty state messaging).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -253,6 +277,7 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.7.0`** | 2026-10-24 | Sprint 2 / Screen States & Error Sanitization | Group 9 / Role 3 (Issue #175 / ERP4-19) | Implemented animated skeleton table placeholders during data fetching, zero-data empty states with actionable primary CTAs, sanitized error alert banners with retry actions (suppressing raw stack traces and DB queries), and accessible 403 Forbidden access-denied views explaining required RBAC roles. Added 15 automated web tests. |
 | **`1.8.0`** | 2026-10-24 | Sprint 2 / Create Form & Field Validation | Group 9 / Role 3 (Issue #176 / ERP4-20) | Implemented create modal and form with real-time field validation, decimal range enforcement, double-submission prevention, server 400 validation error mapping, table cache synchronization, and accessible confirmation toast. |
 | **`1.9.0`** | 2026-10-24 | Sprint 2 / Detail-Edit Workflow & Linked Records | Group 9 / Role 3 (Issue #177 / ERP4-21) | Implemented detail and edit workflow with primary attributes, timestamps, Golden ID badge, inline and drawer editing with allowlisted fields and RBAC permission guards, cross-module linked records sub-tables with count badges, and HTTP 409 concurrent modification handling with refresh prompt. Added 13 automated web tests. |
+| **`1.10.0`** | 2026-10-24 | Sprint 2 / Search & Filters | Group 9 / Role 3 (Issue #174 / ERP4-18) | Implemented 300ms debounced search bar, faceted filter sidebar drawer, active filter pill tags with individual and Clear All actions, URL query state synchronization, and informative empty results messaging. |
 
 
 

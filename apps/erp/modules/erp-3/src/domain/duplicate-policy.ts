@@ -84,8 +84,9 @@ export function extractInvoiceKeys(
 export function extractPaymentKeys(
   record: Partial<Payment> | Record<string, unknown>
 ): NormalizedPaymentKeys {
-  const rawReference = typeof record['reference'] === 'string' ? record['reference'] : '';
-  const invoiceId = typeof record['invoice_id'] === 'string' ? record['invoice_id'] : '';
+  const rec = record as Record<string, unknown>;
+  const rawReference = typeof rec['reference'] === 'string' ? rec['reference'] : '';
+  const invoiceId = typeof rec['invoice_id'] === 'string' ? rec['invoice_id'] : '';
   return {
     normalizedReference: normalizePaymentReference(rawReference),
     rawReference,
@@ -248,8 +249,9 @@ export function classifyPaymentCandidate(
   }
 
   const matches = existingPayments.filter((pmt) => {
-    const rawRef = typeof pmt['reference'] === 'string' ? pmt['reference'] : '';
-    const invId = typeof pmt['invoice_id'] === 'string' ? pmt['invoice_id'] : '';
+    const pmtRec = pmt as Record<string, unknown>;
+    const rawRef = typeof pmtRec['reference'] === 'string' ? pmtRec['reference'] : '';
+    const invId = typeof pmtRec['invoice_id'] === 'string' ? pmtRec['invoice_id'] : '';
     return (
       invId === incomingKeys.invoiceId &&
       normalizePaymentReference(rawRef) === incomingKeys.normalizedReference
