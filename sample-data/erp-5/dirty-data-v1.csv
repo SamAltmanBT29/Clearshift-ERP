@@ -1,0 +1,131 @@
+row_id,record_type,case_tags,source_id,department_code,department_name,parent_code,employee_no,first_name,last_name,birth_date,join_date,job_title,salary,currency_code,leave_type,date_from,date_to,leave_reason,leave_status,month,gross_total,net_total,employee_count,source_system,expect_outcome,expect_reasons
+R001,department,dept.valid,DEP-SRC-001,EXEC,Executive Management,,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R002,department,dept.valid,DEP-SRC-002,OPS,Operations Division,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R003,department,dept.valid|whitespace,DEP-SRC-003,  ENG , Engineering & Development ,OPS,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R004,department,dept.valid,DEP-SRC-004,HR,Human Resources,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R005,department,dept.valid,DEP-SRC-005,FIN,Finance & Accounts,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R006,department,dept.valid,DEP-SRC-006,SALES,Global Sales,OPS,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R007,department,dept.valid,DEP-SRC-007,MKT,Product Marketing,SALES,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R008,department,dept.valid|utf8,DEP-SRC-008,RND,Recherche & Développement,ENG,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R009,department,dept.missing_code,DEP-SRC-009,,No Code Department,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_CODE_REQUIRED
+R010,department,dept.missing_name,DEP-SRC-010,LEGAL,,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NAME_REQUIRED
+R011,department,dept.self_parent,DEP-SRC-011,SEC,Security Team,SEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_SELF_PARENT
+R012,department,dept.cycle_a,DEP-SRC-012,CYCA,Cycle Dept A,CYCB,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_CYCLE_DETECTED
+R013,department,dept.cycle_b,DEP-SRC-013,CYCB,Cycle Dept B,CYCA,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_CYCLE_DETECTED
+R014,department,dept.parent_not_found,DEP-SRC-014,ORPH,Orphan Subdepartment,NONEXISTENT,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,PARENT_DEPARTMENT_NOT_FOUND
+R015,department,dept.formula_inj_name,DEP-SRC-015,PAYR,=cmd|' /C calc'!A0,FIN,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R016,department,dept.formula_inj_code,DEP-SRC-016,@SUM,Formula Injected Code,FIN,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R017,department,dept.invalid_code_format,DEP-SRC-017,bad_code!,Invalid Code Dept,OPS,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_CODE_REQUIRED
+R018,department,dept.name_too_long,DEP-SRC-018,LONG,XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX,OPS,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NAME_REQUIRED
+R019,department,dept.dup_review,DEP-SRC-019,ENG,Engineering Duplicate 1,OPS,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_DEPARTMENT_CODE_REVIEW
+R020,department,dept.dup_review,DEP-SRC-020,HR,Human Resources Duplicate,EXEC,,,,,,,,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_DEPARTMENT_CODE_REVIEW
+R021,employee,emp.valid,EMP-SRC-1001,EXEC,,,EMP-1001,Aarav,Sharma,1980-001-15,2010-001-01,Staff Role 1,80000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R022,employee,emp.valid|utf8,EMP-SRC-1002,OPS,,,EMP-1002,Élodie,Dubois,1981-002-15,2011-002-01,Staff Role 2,85000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R023,employee,emp.valid|utf8,EMP-SRC-1003,ENG,,,EMP-1003,Müller,Schmidt,1982-003-15,2012-003-01,Staff Role 3,90000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R024,employee,emp.valid|utf8,EMP-SRC-1004,HR,,,EMP-1004,François,Lefebvre,1983-004-15,2013-004-01,Staff Role 4,95000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R025,employee,emp.valid|whitespace,EMP-SRC-1005,FIN,,,EMP-1005,  Vikram  ,Patel,1984-005-15,2014-005-01,Staff Role 5,100000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R026,employee,emp.valid|whitespace,EMP-SRC-1006,SALES,,,EMP-1006,  Priya  ,Deshmukh,1985-006-15,2015-006-01,Staff Role 6,105000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R027,employee,emp.valid,EMP-SRC-1007,MKT,,,EMP-1007,Aditya,Verma,1986-007-15,2016-007-01,Staff Role 7,110000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R028,employee,emp.valid,EMP-SRC-1008,RND,,,EMP-1008,Rohan,Mehta,1987-008-15,2017-008-01,Staff Role 8,115000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R029,employee,emp.valid,EMP-SRC-1009,EXEC,,,EMP-1009,Sneha,Kulkarni,1988-009-15,2018-009-01,Staff Role 9,120000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R030,employee,emp.valid,EMP-SRC-1010,OPS,,,EMP-1010,Neha,Joshi,1989-001-15,2019-001-01,Staff Role 10,125000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R031,employee,emp.valid,EMP-SRC-1011,ENG,,,EMP-1011,Kabir,Singhania,1980-002-15,2010-002-01,Staff Role 11,130000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R032,employee,emp.valid,EMP-SRC-1012,HR,,,EMP-1012,Ananya,Kapoor,1981-003-15,2011-003-01,Staff Role 12,135000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R033,employee,emp.valid,EMP-SRC-1013,FIN,,,EMP-1013,Zara,Khan,1982-004-15,2012-004-01,Staff Role 13,140000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R034,employee,emp.valid,EMP-SRC-1014,SALES,,,EMP-1014,David,Smith,1983-005-15,2013-005-01,Staff Role 14,145000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R035,employee,emp.valid,EMP-SRC-1015,MKT,,,EMP-1015,Sarah,Johnson,1984-006-15,2014-006-01,Staff Role 15,150000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R036,employee,emp.valid,EMP-SRC-1016,RND,,,EMP-1016,Kavita,Rao,1985-007-15,2015-007-01,Staff Role 16,155000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R037,employee,emp.valid,EMP-SRC-1017,EXEC,,,EMP-1017,Arjun,Reddy,1986-008-15,2016-008-01,Staff Role 17,160000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R038,employee,emp.valid,EMP-SRC-1018,OPS,,,EMP-1018,Meera,Nair,1987-009-15,2017-009-01,Staff Role 18,165000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R039,employee,emp.missing_no,EMP-SRC-R039,ENG,,,,John,Doe,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NO_REQUIRED
+R040,employee,emp.missing_fname,EMP-SRC-R040,ENG,,,EMP-9002,,Doe,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NAME_REQUIRED
+R041,employee,emp.missing_lname,EMP-SRC-R041,ENG,,,EMP-9003,John,,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NAME_REQUIRED
+R042,employee,emp.missing_bdate,EMP-SRC-R042,ENG,,,EMP-9004,John,Doe,,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,BIRTH_DATE_REQUIRED
+R043,employee,emp.missing_jdate,EMP-SRC-R043,ENG,,,EMP-9005,John,Doe,1990-01-01,,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_REQUIRED
+R044,employee,emp.missing_dept,EMP-SRC-R044,,,,EMP-9006,John,Doe,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R045,employee,emp.join_before_birth,EMP-SRC-R045,ENG,,,EMP-9007,Time,Traveler,2000-01-01,1990-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_BEFORE_BIRTH_DATE
+R046,employee,emp.join_before_birth,EMP-SRC-R046,HR,,,EMP-9008,Early,Starter,1995-05-20,1995-05-19,Admin,75000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_BEFORE_BIRTH_DATE
+R047,employee,emp.join_before_birth,EMP-SRC-R047,FIN,,,EMP-9009,Child,Prodigy,2005-12-31,2000-01-01,Analyst,85000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_BEFORE_BIRTH_DATE
+R048,employee,emp.join_before_birth,EMP-SRC-R048,OPS,,,EMP-9010,Paradox,Worker,2010-06-15,2008-01-01,Specialist,90000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_BEFORE_BIRTH_DATE
+R049,employee,emp.negative_salary,EMP-SRC-R049,ENG,,,EMP-9011,Minus,Pay,1985-01-01,2010-01-01,Dev,-5000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R050,employee,emp.negative_salary,EMP-SRC-R050,HR,,,EMP-9012,Deficit,Earner,1988-03-12,2012-07-01,Recruiter,-0.0100,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R051,employee,emp.negative_salary,EMP-SRC-R051,FIN,,,EMP-9013,Negative,Comp,1992-11-05,2016-04-10,Accountant,-120000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R052,employee,emp.invalid_salary,EMP-SRC-R052,SALES,,,EMP-9014,Text,Salary,1989-08-22,2013-09-01,Rep,NOT_A_NUMBER,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R053,employee,emp.invalid_salary,EMP-SRC-R053,MKT,,,EMP-9015,Empty,Salary,1991-04-17,2015-02-15,Designer,,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R054,employee,emp.invalid_salary,EMP-SRC-R054,RND,,,EMP-9016,Hex,Salary,1987-10-30,2011-12-01,Scientist,0xDEAD,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_SALARY
+R055,employee,emp.invalid_currency,EMP-SRC-R055,ENG,,,EMP-9017,Crypto,Lover,1993-02-14,2017-06-01,Dev,100000.0000,BTC,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_CURRENCY
+R056,employee,emp.invalid_currency,EMP-SRC-R056,FIN,,,EMP-9018,Gold,Standard,1984-07-09,2009-03-15,Analyst,95000.0000,XAU,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_CURRENCY
+R057,employee,emp.invalid_currency,EMP-SRC-R057,OPS,,,EMP-9019,Numeric,Cur,1990-12-01,2014-08-20,Lead,110000.0000,123,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_CURRENCY
+R058,employee,emp.invalid_currency,EMP-SRC-R058,HR,,,EMP-9020,Blank,Cur,1986-05-18,2011-11-11,Generalist,80000.0000,,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_CURRENCY
+R059,employee,emp.dept_not_found,EMP-SRC-R059,NONEXISTENT,,,EMP-9021,Lost,Worker,1992-03-25,2016-01-10,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R060,employee,emp.dept_not_found,EMP-SRC-R060,DEPT_404,,,EMP-9022,Missing,Dept,1988-09-14,2013-05-01,Analyst,85000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R061,employee,emp.dept_not_found,EMP-SRC-R061,VOID,,,EMP-9023,Ghost,Employee,1994-06-30,2018-09-15,Support,70000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R062,employee,emp.dept_rejected_ref,EMP-SRC-R062,LEGAL,,,EMP-9024,Child,OfRejected,1991-01-20,2015-07-01,Counsel,130000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R063,employee,emp.dept_rejected_ref,EMP-SRC-R063,SEC,,,EMP-9025,Security,Guard,1987-11-11,2012-03-01,Guard,65000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R064,employee,emp.dept_rejected_ref,EMP-SRC-R064,CYCA,,,EMP-9026,Cycle,Member,1995-04-05,2019-10-01,Member,78000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R065,employee,emp.invalid_date,EMP-SRC-R065,ENG,,,EMP-9027,Bad,Birth,1990-02-31,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,BIRTH_DATE_REQUIRED
+R066,employee,emp.invalid_date,EMP-SRC-R066,ENG,,,EMP-9028,Bad,Join,1990-01-01,2015-13-45,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_REQUIRED
+R067,employee,emp.invalid_date,EMP-SRC-R067,HR,,,EMP-9029,Text,Date,NOT-A-DATE,2015-01-01,Rep,80000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,BIRTH_DATE_REQUIRED
+R068,employee,emp.invalid_date,EMP-SRC-R068,FIN,,,EMP-9030,Slash,Date,1990-01-01,INVALID,Clerk,75000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,JOIN_DATE_REQUIRED
+R069,employee,emp.invalid_date,EMP-SRC-R069,OPS,,,EMP-9031,Zero,Month,1990-00-15,2015-01-01,Coord,82000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,BIRTH_DATE_REQUIRED
+R070,employee,emp.invalid_date,EMP-SRC-R070,SALES,,,EMP-9032,Zero,Day,1990-05-00,2015-01-01,Rep,90000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,BIRTH_DATE_REQUIRED
+R071,employee,emp.formula_inj_fname,EMP-SRC-R071,ENG,,,EMP-9033,=cmd|' /C calc'!A0,Smith,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R072,employee,emp.formula_inj_lname,EMP-SRC-R072,ENG,,,EMP-9034,John,+FormulaInj,1990-01-01,2015-01-01,Dev,100000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R073,employee,emp.formula_inj_job,EMP-SRC-R073,HR,,,EMP-9035,Alice,Brown,1990-01-01,2015-01-01,@SUM(A1:A10),80000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R074,employee,emp.formula_inj_no,EMP-SRC-R074,FIN,,,-EMP-INJ,Bob,White,1990-01-01,2015-01-01,Analyst,85000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R075,employee,emp.formula_inj_tab,EMP-SRC-R075,OPS,,,EMP-9037,	TabLeading,Black,1990-01-01,2015-01-01,Lead,95000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R076,employee,emp.formula_inj_cr,EMP-SRC-R076,SALES,,,EMP-9038,Carriage,"ReturnInj",1990-01-01,2015-01-01,VP,150000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R077,employee,emp.dup_review,EMP-SRC-077,EXEC,,,EMP-1001,Aarav,Sharma,1980-01-15,2010-01-01,Executive Duplicate,80000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_EMPLOYEE_NO_REVIEW
+R078,employee,emp.dup_review,EMP-SRC-078,OPS,,,EMP-1002,Élodie,Dubois,1981-02-15,2011-02-01,Ops Duplicate,85000.0000,USD,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_EMPLOYEE_NO_REVIEW
+R079,employee,emp.dup_review,EMP-SRC-079,ENG,,,EMP-1003,Müller,Schmidt,1982-03-15,2012-03-01,Eng Duplicate,90000.0000,EUR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_EMPLOYEE_NO_REVIEW
+R080,employee,emp.dup_review,EMP-SRC-080,HR,,,EMP-1004,François,Lefebvre,1983-04-15,2013-04-01,HR Duplicate,95000.0000,INR,,,,,,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_EMPLOYEE_NO_REVIEW
+R081,leave,leave.valid,LEV-SRC-101,,,,EMP-1001,,,,,,,,annual,2026-11-01,2026-11-02,Approved Planned Leave 1,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R082,leave,leave.valid,LEV-SRC-102,,,,EMP-1002,,,,,,,,sick,2026-11-03,2026-11-04,Approved Planned Leave 2,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R083,leave,leave.valid,LEV-SRC-103,,,,EMP-1003,,,,,,,,unpaid,2026-11-05,2026-11-06,Approved Planned Leave 3,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R084,leave,leave.valid,LEV-SRC-104,,,,EMP-1004,,,,,,,,annual,2026-11-07,2026-11-08,Approved Planned Leave 4,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R085,leave,leave.valid,LEV-SRC-105,,,,EMP-1005,,,,,,,,sick,2026-11-09,2026-11-10,Approved Planned Leave 5,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R086,leave,leave.valid,LEV-SRC-106,,,,EMP-1006,,,,,,,,unpaid,2026-11-11,2026-11-12,Approved Planned Leave 6,pending,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R087,leave,leave.valid,LEV-SRC-107,,,,EMP-1007,,,,,,,,annual,2026-11-13,2026-11-14,Approved Planned Leave 7,approved,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R088,leave,leave.valid,LEV-SRC-108,,,,EMP-1008,,,,,,,,sick,2026-11-15,2026-11-16,Approved Planned Leave 8,approved,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R089,leave,leave.valid,LEV-SRC-109,,,,EMP-1009,,,,,,,,unpaid,2026-11-17,2026-11-18,Approved Planned Leave 9,approved,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R090,leave,leave.valid,LEV-SRC-110,,,,EMP-1010,,,,,,,,annual,2026-11-19,2026-11-20,Approved Planned Leave 10,approved,,,,,SYNTH-ERP5-DIRTY-V1,accepted,
+R091,leave,leave.missing_emp,LEV-SRC-R091,,,,,,,,,,,,annual,2026-11-01,2026-11-05,Vacation,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NOT_FOUND
+R092,leave,leave.emp_not_found,LEV-SRC-R092,,,,EMP-4040,,,,,,,,sick,2026-11-01,2026-11-02,Fever,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NOT_FOUND
+R093,leave,leave.emp_rejected_ref,LEV-SRC-R093,,,,EMP-9007,,,,,,,,unpaid,2026-11-01,2026-11-03,Personal,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NOT_FOUND
+R094,leave,leave.emp_rejected_ref,LEV-SRC-R094,,,,EMP-9011,,,,,,,,annual,2026-11-01,2026-11-05,Holiday,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_NOT_FOUND
+R095,leave,leave.missing_type,LEV-SRC-R095,,,,EMP-1001,,,,,,,,,2026-11-10,2026-11-12,Missing type,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,LEAVE_TYPE_REQUIRED
+R096,leave,leave.missing_from,LEV-SRC-R096,,,,EMP-1002,,,,,,,,annual,,2026-11-12,Missing from,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DATE_FROM_REQUIRED
+R097,leave,leave.missing_to,LEV-SRC-R097,,,,EMP-1003,,,,,,,,sick,2026-11-10,,Missing to,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,DATE_TO_REQUIRED
+R098,leave,leave.invalid_type,LEV-SRC-R098,,,,EMP-1004,,,,,,,,sabbatical,2026-11-10,2026-11-12,Sabbatical not in V1,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_TYPE
+R099,leave,leave.date_inversion,LEV-SRC-R099,,,,EMP-1005,,,,,,,,annual,2026-11-15,2026-11-10,Backwards dates,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_DATES
+R100,leave,leave.date_inversion,LEV-SRC-R100,,,,EMP-1006,,,,,,,,sick,2026-12-05,2026-12-01,End before start,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_DATES
+R101,leave,leave.date_inversion,LEV-SRC-R101,,,,EMP-1007,,,,,,,,unpaid,2027-01-10,2026-12-31,Year jump backwards,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_DATES
+R102,leave,leave.date_inversion,LEV-SRC-R102,,,,EMP-1008,,,,,,,,annual,2026-11-02,2026-11-01,One day inverted,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_DATES
+R103,leave,leave.invalid_status,LEV-SRC-R103,,,,EMP-1009,,,,,,,,annual,2026-11-20,2026-11-22,Cancelled not valid,cancelled,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_STATUS
+R104,leave,leave.invalid_status,LEV-SRC-R104,,,,EMP-1010,,,,,,,,sick,2026-11-20,2026-11-22,Draft not valid,draft,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_STATUS
+R105,leave,leave.invalid_transition,LEV-SRC-R105,,,,EMP-1001,,,,,,,,unpaid,2026-11-20,2026-11-22,Backward mutation,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_STATUS_TRANSITION
+R106,leave,leave.invalid_transition,LEV-SRC-R106,,,,EMP-1002,,,,,,,,annual,2026-11-20,2026-11-22,Terminal to terminal,rejected,,,,,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_LEAVE_STATUS_TRANSITION
+R107,leave,leave.formula_inj_reason,LEV-SRC-R107,,,,EMP-1003,,,,,,,,annual,2026-11-25,2026-11-27,=cmd|' /C calc'!A0,pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R108,leave,leave.formula_inj_reason,LEV-SRC-R108,,,,EMP-1004,,,,,,,,sick,2026-11-25,2026-11-27,"+SUM(1,2)",pending,,,,,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R109,leave,leave.dup_review,LEV-SRC-109,,,,EMP-1001,,,,,,,,annual,2026-11-01,2026-11-02,Duplicate Leave Request,pending,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_LEAVE_REQUEST_REVIEW
+R110,leave,leave.dup_review,LEV-SRC-110,,,,EMP-1002,,,,,,,,sick,2026-11-03,2026-11-04,Duplicate Sick Leave,pending,,,,,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_LEAVE_REQUEST_REVIEW
+R111,payroll_total,pay.valid,PAY-SRC-201,EXEC,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,accepted,
+R112,payroll_total,pay.valid,PAY-SRC-202,OPS,,,,,,,,,,INR,,,,,,2026-11,550000.0000,440000.0000,12,SYNTH-ERP5-DIRTY-V1,accepted,
+R113,payroll_total,pay.valid,PAY-SRC-203,ENG,,,,,,,,,,INR,,,,,,2026-12,600000.0000,480000.0000,14,SYNTH-ERP5-DIRTY-V1,accepted,
+R114,payroll_total,pay.valid,PAY-SRC-204,HR,,,,,,,,,,INR,,,,,,2026-10,650000.0000,520000.0000,16,SYNTH-ERP5-DIRTY-V1,accepted,
+R115,payroll_total,pay.valid,PAY-SRC-205,FIN,,,,,,,,,,INR,,,,,,2026-11,700000.0000,560000.0000,18,SYNTH-ERP5-DIRTY-V1,accepted,
+R116,payroll_total,pay.valid,PAY-SRC-206,SALES,,,,,,,,,,INR,,,,,,2026-12,750000.0000,600000.0000,20,SYNTH-ERP5-DIRTY-V1,accepted,
+R117,payroll_total,pay.missing_dept,PAY-SRC-R117,,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R118,payroll_total,pay.dept_not_found,PAY-SRC-R118,DEP-404,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,DEPARTMENT_NOT_FOUND
+R119,payroll_total,pay.missing_month,PAY-SRC-R119,ENG,,,,,,,,,,INR,,,,,,,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,MONTH_REQUIRED
+R120,payroll_total,pay.invalid_month,PAY-SRC-R120,ENG,,,,,,,,,,INR,,,,,,2026/10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_MONTH_FORMAT
+R121,payroll_total,pay.negative_gross,PAY-SRC-R121,HR,,,,,,,,,,INR,,,,,,2026-10,-500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_GROSS_TOTAL
+R122,payroll_total,pay.net_exceeds_gross,PAY-SRC-R122,FIN,,,,,,,,,,INR,,,,,,2026-10,400000.0000,500000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,NET_EXCEEDS_GROSS
+R123,payroll_total,pay.negative_count,PAY-SRC-R123,OPS,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,-5,SYNTH-ERP5-DIRTY-V1,rejected,NEGATIVE_EMPLOYEE_COUNT
+R124,payroll_total,pay.invalid_currency,PAY-SRC-R124,SALES,,,,,,,,,,INVALID,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,INVALID_CURRENCY
+R125,payroll_total,pay.employee_lines_forbidden,PAY-SRC-R125,ENG,,,EMP-9999,,,,,,,INR,,,,,,2026-11,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_LINES_FORBIDDEN
+R126,payroll_total,pay.employee_lines_forbidden,PAY-SRC-R126,HR,,,EMP-9999,,,,,,,INR,,,,,,2026-11,450000.0000,350000.0000,8,SYNTH-ERP5-DIRTY-V1,rejected,EMPLOYEE_LINES_FORBIDDEN
+R127,payroll_total,pay.formula_inj_dept,PAY-SRC-R127,=cmd|calc,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R128,payroll_total,pay.formula_inj_month,PAY-SRC-R128,FIN,,,,,,,,,,INR,,,,,,"@SUM(1,1)",500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,rejected,FORMULA_INJECTION_REJECTED
+R129,payroll_total,pay.dup_review,PAY-SRC-129,EXEC,,,,,,,,,,INR,,,,,,2026-10,500000.0000,400000.0000,10,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_PAYROLL_TOTAL_REVIEW
+R130,payroll_total,pay.dup_review,PAY-SRC-130,OPS,,,,,,,,,,INR,,,,,,2026-11,550000.0000,440000.0000,12,SYNTH-ERP5-DIRTY-V1,review,DUPLICATE_PAYROLL_TOTAL_REVIEW
