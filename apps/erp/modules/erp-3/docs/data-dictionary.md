@@ -733,4 +733,30 @@ ERP-3 Sales Orders & Invoices implements robust batch processing, transient faul
    - All rows committed prior to circuit-breaker tripping remain permanent and durable along with their corresponding import receipts.
    - Replaying the batch is fully idempotent: previously committed rows return `outcome: loaded` and `priorResult: true` with zero duplicate entities.
 
+---
+
+## 19. Module Authorization Policy Integration & Object-Level Guards (ERP3-15 / PLT-05 / PLT-06 / Issue #151)
+
+ERP-3 Sales Orders & Invoices integrates unified authentication, 5-role RBAC, and object-level authorization guards conforming to ClearShift SDS §4.2, §4.9, and Gate G2 requirements:
+
+1. **Hub JWT Signature & Expiration Validation (PLT-05)**:
+   - Every route validates incoming Hub JWT EdDSA (Ed25519) signatures, issuer (`clearshift-hub`), audience (`clearshift`), and expiration timestamps (`verifyAccessToken`).
+   - Unauthenticated requests, forged signatures, expired tokens, or malformed claims return `401 Unauthorized` (`UNAUTHORIZED`).
+   - Disabled accounts are actively rejected with `401 Unauthorized` and record an immutable audit event with `reason: "account_disabled"`.
+2. **5-Role Capability Matrix Enforcement (PLT-06)**:
+   - **Viewer**: Read-only access to sales orders, invoices, and payments (`SALES_ORDERS_READ`, `INVOICES_READ`, `PAYMENTS_READ`). Mutations return `403 Forbidden`.
+   - **Editor**: Can create and update sales orders, invoices, and register payments (`SALES_ORDERS_CREATE`, `SALES_ORDERS_UPDATE`, `INVOICES_CREATE`, `PAYMENTS_CREATE`). Cannot execute batch migration loads or system exports.
+   - **Migration Runner**: Granted dedicated execution privileges for migration imports (`IMPORT_EXECUTE`, `SALES_ORDERS_CREATE`, `INVOICES_CREATE`, `PAYMENTS_CREATE`). Forbidden from manual single-order status mutation.
+   - **Analyst**: Dedicated reporting role; blocked from modifying sales orders or creating business entities.
+   - **Admin**: Full administrative supervisor access across all endpoints and actions.
+   - Insufficient permissions return `403 Forbidden` (`FORBIDDEN`).
+3. **Object-Level Multi-Tenant & Cross-User Authorization Guards**:
+   - **Multi-Tenant Boundary Isolation (`assertTenantAccess`)**: Compares caller tenant context (`user.tenant_id` or `x-tenant-id` header) against entity tenant bindings (`erp3EntityTenantRegistry`). Cross-tenant access is rejected with `403 OBJECT_ACCESS_DENIED`.
+   - **Cross-User Mutation Safety (`assertObjectMutationAccess`)**: Prevents non-admin callers from modifying records created by another user (`erp3EntityCreatorRegistry`). Unauthorized modifications return `403 CROSS_USER_MUTATION_FORBIDDEN`.
+   - Administrators are permitted to supervise and mutate records across users within their tenant boundary.
+4. **Sensitive Field Masking & Safe Logging**:
+   - Outbound JSON responses recursively mask sensitive bank accounts (`XXXX-XXXX-XXXX`), salaries, and tokens before serialization.
+   - Application audit trails capture `actor`, `action`, `correlationId`, `result`, and target entity metadata without logging raw tokens or credentials.
+
+
 
