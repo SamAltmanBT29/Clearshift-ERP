@@ -11,6 +11,7 @@ import type {
   CreateOpeningBalancesInput,
   OpeningBalancesResponse,
 } from '@clearshift/contracts';
+export { isJournalEntryBalanced } from '@clearshift/contracts';
 
 const API_BASE = '/api/v1/erp-finance';
 
@@ -140,6 +141,26 @@ export async function fetchAccounts(
 export async function createAccount(data: CreateAccountInput): Promise<Account> {
   return request<Account>('/accounts', {
     method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Fetch a single account by ID.
+ */
+export async function fetchAccountById(id: string): Promise<Account> {
+  return request<Account>(`/accounts/${id}`);
+}
+
+/**
+ * Update mutable account fields (Admin / Editor only).
+ */
+export async function updateAccount(
+  id: string,
+  data: Partial<CreateAccountInput> & Record<string, unknown>
+): Promise<Account> {
+  return request<Account>(`/accounts/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 }

@@ -73,6 +73,7 @@ paths:
       operationId: listSalesOrders
       tags: [Sales Orders]
       summary: List sales orders (paged)
+      x-required-roles: [viewer, editor, admin]
       description: |
         Returns a paginated list of sales orders.
         Supports filtering by status, customer_golden_id, currency, and date range.
@@ -141,6 +142,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -150,6 +153,7 @@ paths:
       operationId: createSalesOrder
       tags: [Sales Orders]
       summary: Create a new sales order
+      x-required-roles: [editor, migration_runner, admin]
       description: |
         Creates a sales order with one or more lines.
 
@@ -216,6 +220,7 @@ paths:
       operationId: getSalesOrder
       tags: [Sales Orders]
       summary: Get a single sales order by ID
+      x-required-roles: [viewer, editor, admin]
       description: |
         Returns a sales order with all embedded lines.
 
@@ -235,6 +240,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           description: Sales order not found
           content:
@@ -254,6 +261,7 @@ paths:
       operationId: updateSalesOrderStatus
       tags: [Sales Orders]
       summary: Update sales order status
+      x-required-roles: [editor, admin]
       description: |
         Updates the lifecycle status of a sales order. Allowed forward transitions only:
         Open -> Invoiced, Invoiced -> Closed, Open -> Closed.
@@ -276,6 +284,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           description: Sales order not found
           content:
@@ -309,6 +319,7 @@ paths:
       operationId: listInvoices
       tags: [Invoices]
       summary: List invoices (paged)
+      x-required-roles: [viewer, editor, admin]
       description: |
         Returns a paginated list of invoices.
         Supports filtering by status, customer_golden_id, order_id, currency, and date range.
@@ -383,6 +394,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -392,6 +405,7 @@ paths:
       operationId: createInvoice
       tags: [Invoices]
       summary: Create a new invoice
+      x-required-roles: [editor, migration_runner, admin]
       description: |
         Creates an invoice with one or more lines.
 
@@ -454,6 +468,7 @@ paths:
       operationId: getInvoice
       tags: [Invoices]
       summary: Get a single invoice by ID
+      x-required-roles: [viewer, editor, admin]
       description: |
         Returns an invoice with all embedded lines.
 
@@ -473,6 +488,8 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           description: Invoice not found
           content:
@@ -495,6 +512,7 @@ paths:
       operationId: createPayment
       tags: [Payments]
       summary: Record a payment against an invoice
+      x-required-roles: [editor, migration_runner, admin]
       description: |
         Records a payment for an invoice.
 
@@ -566,6 +584,7 @@ paths:
       operationId: listPayments
       tags: [Payments]
       summary: List payments (paged)
+      x-required-roles: [viewer, editor, admin]
       description: |
         Retrieves a paginated list of recorded payments with optional invoice filtering.
       parameters:
@@ -601,6 +620,53 @@ paths:
           $ref: "#/components/responses/ValidationError"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+      security:
+        - BearerAuth: []
+
+  /import:
+    post:
+      operationId: importErp3Row
+      tags: [Sales Orders, Invoices, Payments]
+      summary: Load one validated migration row
+      x-required-roles: [migration_runner, admin]
+      description: |
+        Writes one sales order, invoice, or payment through the module-owned
+        adapter and stores its idempotency receipt in the same transaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRowRequest"
+      responses:
+        "201":
+          description: Row loaded and receipt created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "200":
+          description: Idempotent replay returned the prior result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportRowResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Idempotency key reused with a different request payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "500":
           $ref: "#/components/responses/InternalError"
       security:
@@ -629,6 +695,56 @@ components:
 
   # ── Schemas ──────────────────────────────────────────────────────────────────
   schemas:
+    ImportRowRequest:
+      type: object
+      required: [batch_id, source_row, idempotency_key, entity, record]
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        source_row:
+          type: integer
+          minimum: 0
+        source_system:
+          type: [string, "null"]
+          maxLength: 64
+        source_id:
+          type: [string, "null"]
+          maxLength: 128
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+        correlation_id:
+          type: [string, "null"]
+          maxLength: 128
+        entity:
+          type: string
+          minLength: 1
+          maxLength: 64
+          enum: [sales_order, invoice, payment]
+        record:
+          type: object
+          additionalProperties: true
+    ImportRowResponse:
+      type: object
+      required: [target_id, target_version, outcome, receipt, prior_result]
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        target_version:
+          oneOf:
+            - type: number
+            - type: string
+        outcome:
+          type: string
+          enum: [loaded, rejected, merged, skipped]
+        receipt:
+          type: object
+          additionalProperties: true
+        prior_result:
+          type: boolean
     # Enums
     SalesOrderStatus:
       type: string
