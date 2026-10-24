@@ -167,6 +167,23 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
   - [`apps/erp/modules/erp-4/web/tests/module-shell.test.tsx`](../../apps/erp/modules/erp-4/web/tests/module-shell.test.tsx) (11 tests).
   - [`apps/erp/modules/erp-4/web/tests/routes.test.tsx`](../../apps/erp/modules/erp-4/web/tests/routes.test.tsx) (8 tests).
 
+## 16. Main Paginated Data Table & Sortable Collection Screens (Issue #173 / ERP4-17)
+
+- **Chart of Accounts Collection Table (`AccountsTable.tsx`)**:
+  - Bound to shared `@cs/ui` `Table` and `Pagination` components using design tokens.
+  - Stable columns matching data dictionary: Account Code (`code`), Account Name (`name`), Account Type (`type`), Currency (`currency_code`), Balance (`balance`), Status (`is_active`), and Actions (`View`, `Edit`).
+  - Predictable multi-column sorting (`code`, `name`, `type`, `currency_code`, `balance`, `is_active`) with visual directional indicators (`▲`, `▼`, `⇅`) and accessible `aria-sort` attributes (`ascending`, `descending`, `none`).
+  - Deterministic secondary tie-breaker (`code ASC, id ASC`) guaranteeing stable row positioning.
+  - Bounded pagination controls bound to API `page` and `pageSize` parameters (clamped to `<= 100` rows per page).
+  - Virtualization DOM guard (`virtualize={accounts.length > 50}`) protecting the browser from rendering degradation.
+- **Journal Entries Collection Table (`JournalEntriesTable.tsx`)**:
+  - Reusable collection component integrated into `JournalEntriesListPage.tsx`.
+  - Stable columns matching data dictionary: Entry Number (`entry_number`), Posting Date (`posting_date`), Fiscal Period (`period_id`), Description (`description`), Currency (`currency_code`), Status (`status`), and Actions.
+  - Predictable sorting on entry number, posting date, period, description, and status.
+  - Full server-side pagination with windowed page numbers, total counts, and page size selector.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -177,4 +194,6 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.3.0`** | 2026-10-23 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #183 / ERP4-27) | Implemented canonical 12 V1 cleaning rules (`@cs/kit`), field-level change audit ledger (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints, React review screen (`DataCleaningReviewPage`), and 20 automated tests. |
 | **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
 | **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
+| **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
+
 
