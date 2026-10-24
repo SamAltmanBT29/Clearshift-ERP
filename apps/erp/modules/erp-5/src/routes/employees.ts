@@ -26,10 +26,11 @@ import {
   employeeUpdateGuard,
 } from './guard.js';
 import { parseWriteBody } from './parsing.js';
-import type { HrRouteOptions } from './types.js';
+import type { HrRouteOptions, HrFastifyInstance } from './types.js';
 
 export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastify, opts) => {
   const { hrService } = opts;
+  const app = fastify as HrFastifyInstance;
 
   // GET /employees - List employees with bounded paging and search
   fastify.get(
@@ -37,7 +38,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
     { preHandler: employeeReadGuard },
     async (request, reply) => {
       const query = HrEmployeeListQuerySchema.parse(request.query);
-      const response = await hrService.listEmployees(query);
+      const response = await hrService.listEmployees(query, request.user!.roles);
 
       return reply.status(200).send(response);
     }
@@ -49,7 +50,7 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
     { preHandler: employeeReadGuard },
     async (request, reply) => {
       const params = HrIdParamSchema.parse(request.params);
-      const employee = await hrService.getEmployeeById(params.id);
+      const employee = await hrService.getEmployeeById(params.id, request.user!.roles);
 
       return reply.status(200).send(employee);
     }
@@ -58,7 +59,11 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   // POST /employees - Create an employee
   fastify.post('/employees', { preHandler: employeeCreateGuard }, async (request, reply) => {
     const body = parseWriteBody(CreateHrEmployeeRequestSchema, request);
-    const result = await hrService.createEmployee(body);
+    const result = await hrService.createEmployee(
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(result.created ? 201 : 200).send({
       ...result.entity,
@@ -71,7 +76,12 @@ export const employeesRoutes: FastifyPluginAsync<HrRouteOptions> = async (fastif
   fastify.patch('/employees/:id', { preHandler: employeeUpdateGuard }, async (request, reply) => {
     const params = HrIdParamSchema.parse(request.params);
     const body = UpdateHrEmployeeRequestSchema.parse(request.body ?? {});
-    const employee = await hrService.updateEmployee(params.id, body);
+    const employee = await hrService.updateEmployee(
+      params.id,
+      body,
+      request.user!,
+      app.resolveCorrelationId(request)
+    );
 
     return reply.status(200).send(employee);
   });

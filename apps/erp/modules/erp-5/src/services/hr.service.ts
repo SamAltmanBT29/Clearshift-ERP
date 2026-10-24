@@ -49,6 +49,8 @@ import {
   type UpdateHrEmployeeRequest,
   type UpdateHrLeaveRequest,
 } from '@clearshift/contracts';
+
+import { AuditService, InMemoryAuditRepository } from '@cs/core';
 import {
   HrDomainError,
   assertDepartmentHierarchyAcyclic,
@@ -221,7 +223,12 @@ function assertPayloadHasNoCredentials(payload: Readonly<Record<string, unknown>
 }
 
 /** Builds the masked public projection of an employee (BR-ERP5-02). */
-export function toHrEmployeeView(employee: HrEmployee): HrEmployeeView {
+export function toHrEmployeeView(
+  employee: HrEmployee,
+  roles: readonly string[]
+): HrEmployeeView {
+  // Salary masking is strictly enforced for all callers (BR-ERP5-02 / DR-5).
+  // The raw value never leaves the module, regardless of role.
   return {
     id: employee.id,
     employee_no: employee.employee_no,
@@ -276,21 +283,25 @@ function guard(rule: () => void): void {
 
 export class HrService {
   private readonly repository: HrRepository;
+  private readonly auditService: AuditService;
 
-  constructor(repository: HrRepository) {
+  constructor(repository: HrRepository, auditService: AuditService) {
     this.repository = repository;
+    this.auditService = auditService;
   }
 
   // ── Departments (FR-ERP5-03) ─────────────────────────────────────────────
 
   async createDepartment(
-    input: CreateHrDepartmentRequest
+    input: CreateHrDepartmentRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
   ): Promise<HrMutationResult<HrDepartment>> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       if (provenance !== null) {
         const replay = await this.replayDepartment(tx, provenance, input);
         if (replay) {
@@ -363,15 +374,30 @@ export class HrService {
         ...(parent.warning !== undefined && { warnings: [parent.warning] }),
       };
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'department.created',
+      targetEntity: 'department',
+      targetId: result.entity.id,
+      correlationId,
+      result: 'success',
+      metadata: { department_code: result.entity.code },
+    });
+
+    return result;
   }
 
   async updateDepartment(
     id: string,
-    input: UpdateHrDepartmentRequest
+    input: UpdateHrDepartmentRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
   ): Promise<HrDepartment> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       const existing = await tx.getDepartmentById(id);
       if (!existing) {
         throw new HrNotFoundError('Department', id);
@@ -455,11 +481,28 @@ export class HrService {
         'department'
       );
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'department.updated',
+      targetEntity: 'department',
+      targetId: id,
+      correlationId,
+      result: 'success',
+      metadata: { department_code: result.code },
+    });
+
+    return result;
   }
 
   // ── Employees (FR-ERP5-01/02, BR-ERP5-01/02) ─────────────────────────────
 
-  async createEmployee(input: CreateHrEmployeeRequest): Promise<HrMutationResult<HrEmployeeView>> {
+  async createEmployee(
+    input: CreateHrEmployeeRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
+  ): Promise<HrMutationResult<HrEmployeeView>> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
@@ -469,7 +512,7 @@ export class HrService {
     // The source identity is a pair — half of it is not a valid state.
     guard(() => assertSourceIdentityIsComplete(input.source_system, input.source_id));
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       if (provenance !== null) {
         const replay = await this.replayEmployee(tx, provenance, input);
         if (replay) {
@@ -553,17 +596,35 @@ export class HrService {
       );
 
       return {
-        entity: toHrEmployeeView(employee),
+        entity: toHrEmployeeView(employee, actor.roles),
         created: true,
         ...(receipt !== null && { receipt }),
       };
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'employee.created',
+      targetEntity: 'employee',
+      targetId: result.entity.id,
+      correlationId,
+      result: 'success',
+      metadata: { employee_no: result.entity.employee_no },
+    });
+
+    return result;
   }
 
-  async updateEmployee(id: string, input: UpdateHrEmployeeRequest): Promise<HrEmployeeView> {
+  async updateEmployee(
+    id: string,
+    input: UpdateHrEmployeeRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
+  ): Promise<HrEmployeeView> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       const existing = await tx.getEmployeeById(id);
       if (!existing) {
         throw new HrNotFoundError('Employee', id);
@@ -650,13 +711,30 @@ export class HrService {
         assertHrEmployeeReadConsistency,
         'employee'
       );
-      return toHrEmployeeView(persisted);
+      return toHrEmployeeView(persisted, actor.roles);
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'employee.updated',
+      targetEntity: 'employee',
+      targetId: id,
+      correlationId,
+      result: 'success',
+      metadata: { employee_no: result.employee_no },
+    });
+
+    return result;
   }
 
   // ── Leave (FR-ERP5-04) ───────────────────────────────────────────────────
 
-  async createLeave(input: CreateHrLeaveRequest): Promise<HrMutationResult<HrLeave>> {
+  async createLeave(
+    input: CreateHrLeaveRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
+  ): Promise<HrMutationResult<HrLeave>> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
     const provenance = resolveImportProvenance(input);
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
@@ -669,7 +747,7 @@ export class HrService {
       guard(() => assertValidLeaveStatus(leaveStatus));
     }
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       if (provenance !== null) {
         const replay = await this.replayLeave(tx, provenance, input);
         if (replay) {
@@ -711,6 +789,19 @@ export class HrService {
         ...(receipt !== null && { receipt }),
       };
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'leave.created',
+      targetEntity: 'leave',
+      targetId: result.entity.id,
+      correlationId,
+      result: 'success',
+      metadata: { employee_id: result.entity.employee_id },
+    });
+
+    return result;
   }
 
   /**
@@ -720,10 +811,15 @@ export class HrService {
    * state matrix. The recorded subject (`employee_id`) is immutable — a leave
    * is a fact about one employee and is never re-parented.
    */
-  async updateLeave(id: string, input: UpdateHrLeaveRequest): Promise<HrLeave> {
+  async updateLeave(
+    id: string,
+    input: UpdateHrLeaveRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
+  ): Promise<HrLeave> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
 
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       const existing = await tx.getLeaveById(id);
       if (!existing) {
         throw new HrNotFoundError('Leave record', id);
@@ -774,12 +870,27 @@ export class HrService {
         'leave'
       );
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'leave.updated',
+      targetEntity: 'leave',
+      targetId: id,
+      correlationId,
+      result: 'success',
+      metadata: { employee_id: result.employee_id },
+    });
+
+    return result;
   }
 
   // ── Payroll totals (FR-ERP5-06) ───────────────────────────────────────────
 
   async createPayrollTotal(
-    input: CreateHrPayrollTotalRequest
+    input: CreateHrPayrollTotalRequest,
+    actor: { sub: string; roles: string[] },
+    correlationId: string
   ): Promise<HrMutationResult<HrPayrollTotal>> {
     assertPayloadHasNoCredentials(input as unknown as Record<string, unknown>);
     try {
@@ -805,7 +916,7 @@ export class HrService {
     assertImportOnlyFieldsAllowed(input as unknown as Record<string, unknown>, provenance);
 
     guard(() => assertPayrollAmountNotNegative(input.total_amount));
-    return this.repository.transaction(async (tx) => {
+    const result = await this.repository.transaction(async (tx) => {
       if (provenance !== null) {
         const replay = await this.replayPayrollTotal(tx, provenance, input);
         if (replay) {
@@ -870,6 +981,19 @@ export class HrService {
         ...(receipt !== null && { receipt }),
       };
     });
+
+    await this.auditService.log({
+      actor: actor.sub,
+      actorRole: actor.roles[0],
+      action: 'payroll_total.loaded',
+      targetEntity: 'payroll_total',
+      targetId: result.entity.id,
+      correlationId,
+      result: 'success',
+      metadata: { department_id: result.entity.department_id, month: result.entity.month },
+    });
+
+    return result;
   }
 
   // ── Query layer (ERP5-02) ────────────────────────────────────────────────
@@ -896,14 +1020,15 @@ export class HrService {
    * leaves the module (BR-ERP5-02).
    */
   async listEmployees(
-    query: HrEmployeeListQuery
+    query: HrEmployeeListQuery,
+    roles: readonly string[]
   ): Promise<{ data: HrEmployeeView[]; meta: HrListMeta }> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? HR_PAGE_SIZE_DEFAULT;
     const result = await this.repository.listEmployees({ ...query, page, pageSize });
 
     return {
-      data: result.items.map(toHrEmployeeView),
+      data: result.items.map((emp) => toHrEmployeeView(emp, roles)),
       meta: HrService.toListMeta(page, pageSize, result.total),
     };
   }
@@ -965,12 +1090,15 @@ export class HrService {
     };
   }
 
-  async getEmployeeById(id: string): Promise<HrEmployeeView> {
+  async getEmployeeById(
+    id: string,
+    roles: readonly string[]
+  ): Promise<HrEmployeeView> {
     const employee = await this.repository.getEmployeeById(id);
     if (!employee) {
       throw new HrNotFoundError('Employee', id);
     }
-    return toHrEmployeeView(employee);
+    return toHrEmployeeView(employee, roles);
   }
 
   async getDepartmentById(id: string): Promise<HrDepartment> {
@@ -1124,7 +1252,7 @@ export class HrService {
     }
 
     return {
-      entity: toHrEmployeeView(result.entity),
+      entity: toHrEmployeeView(result.entity, []), // Force masked projection for replays per BR-ERP5-02
       created: false,
       ...(result.receipt !== undefined && { receipt: result.receipt }),
     };
