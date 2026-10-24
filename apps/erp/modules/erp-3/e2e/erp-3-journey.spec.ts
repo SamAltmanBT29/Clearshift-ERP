@@ -81,13 +81,13 @@ test('sales order journey: empty list, create, detail view, list, and search fil
   // 2. Create first sales order & verify detail view
   await createOrderThroughForm(page, CUSTOMER_A, PRODUCT_A, '2', '50.0000', '10.0000');
   await expect(page.locator('h1.cs-page-title')).toContainText('Sales Order');
-  await expect(page.locator('.cs-badge')).toHaveText('Open');
-  await expect(page.getByText(CUSTOMER_A)).toBeVisible();
+  await expect(page.locator('.cs-badge').first()).toHaveText('Open');
+  await expect(page.getByText(CUSTOMER_A).first()).toBeVisible();
   await expect(page.getByText('$110.00 USD').first()).toBeVisible();
 
   // 3. Create second sales order for different customer
   await createOrderThroughForm(page, CUSTOMER_B, PRODUCT_B, '1', '200.0000', '0.0000');
-  await expect(page.getByText(CUSTOMER_B)).toBeVisible();
+  await expect(page.getByText(CUSTOMER_B).first()).toBeVisible();
   await expect(page.getByText('$200.00 USD').first()).toBeVisible();
 
   // 4. List view shows both orders
@@ -157,10 +157,10 @@ test('order status transition and status filter journey', async ({ page, request
 
   // Transition Order A: Open -> Invoiced in the UI
   await page.goto(`/erp3/sales-orders/${createdA.id}`);
-  await expect(page.locator('.cs-badge')).toHaveText('Open');
+  await expect(page.locator('.cs-badge').first()).toHaveText('Open');
   await page.getByRole('button', { name: /mark order as invoiced|mark invoiced/i }).click();
   await page.getByRole('button', { name: 'Yes, Update Status' }).click();
-  await expect(page.locator('.cs-badge')).toHaveText('Invoiced');
+  await expect(page.locator('.cs-badge').first()).toHaveText('Invoiced');
 
   // Navigate to list and filter by Invoiced status
   await page.goto('/erp3/sales-orders');
