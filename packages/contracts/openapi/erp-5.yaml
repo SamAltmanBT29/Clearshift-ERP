@@ -1021,6 +1021,179 @@ components:
           type: string
           description: Correlation id for log tracing
 
+    ImportRowRequest:
+      type: object
+      additionalProperties: false
+      required: [batch_id, source_row, idempotency_key, entity, record]
+      properties:
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        source_row:
+          $ref: "#/components/schemas/SourceRow"
+        source_system:
+          type: string
+          maxLength: 64
+          nullable: true
+        source_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        idempotency_key:
+          $ref: "#/components/schemas/IdempotencyKeyValue"
+        correlation_id:
+          type: string
+          maxLength: 128
+          nullable: true
+        entity:
+          type: string
+          minLength: 1
+          maxLength: 64
+        record:
+          type: object
+          additionalProperties: true
+
+    ImportRowResponse:
+      type: object
+      required: [entity, receipt, prior_result]
+      properties:
+        entity:
+          type: string
+          description: Target record identifier returned by the ERP-5 import service.
+        receipt:
+          type: object
+          required: [batchId, sourceRow, entity, schemaVersion, idempotencyKey, payloadHash, targetId, kind, createdAt]
+          properties:
+            batchId:
+              type: string
+              format: uuid
+            sourceRow:
+              type: integer
+              minimum: 0
+            entity:
+              type: string
+            schemaVersion:
+              type: integer
+              minimum: 1
+            idempotencyKey:
+              type: string
+            payloadHash:
+              type: string
+              minLength: 1
+              maxLength: 64
+            targetId:
+              type: string
+              format: uuid
+            kind:
+              type: string
+              enum: [created, linked]
+            createdAt:
+              type: string
+              format: date-time
+        prior_result:
+          type: boolean
+
+    ImportBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [batch_id, entity, rows]
+      properties:
+        batch_id:
+          $ref: "#/components/schemas/BatchId"
+        entity:
+          type: string
+          minLength: 1
+          maxLength: 64
+        upsert:
+          type: boolean
+          default: false
+        chunk_size:
+          type: integer
+          minimum: 1
+          maximum: 500
+        failure_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+        min_attempted_rows:
+          type: integer
+          minimum: 0
+        rows:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [source_row, idempotency_key, record]
+            properties:
+              source_row:
+                $ref: "#/components/schemas/SourceRow"
+              idempotency_key:
+                $ref: "#/components/schemas/IdempotencyKeyValue"
+              source_system:
+                type: string
+                maxLength: 64
+                nullable: true
+              source_id:
+                type: string
+                maxLength: 128
+                nullable: true
+              record:
+                type: object
+                additionalProperties: true
+
+    ImportBatchResponse:
+      type: object
+      required: [totalAttempted, totalSucceeded, totalFailed, outcomes]
+      properties:
+        totalAttempted:
+          type: integer
+        totalSucceeded:
+          type: integer
+        totalFailed:
+          type: integer
+        outcomes:
+          type: array
+          items:
+            type: object
+            required: [sourceRow, outcome]
+            properties:
+              sourceRow:
+                type: integer
+              outcome:
+                type: string
+                enum: [created, replayed, failed]
+              targetId:
+                type: string
+                format: uuid
+              error:
+                type: object
+                properties:
+                  reasonCode:
+                    type: string
+                  message:
+                    type: string
+                  field:
+                    type: string
+                  retryable:
+                    type: boolean
+                additionalProperties: true
+
+    IdempotencyConflictResponse:
+      type: object
+      required: [statusCode, error, code, message]
+      properties:
+        statusCode:
+          type: integer
+          enum: [409]
+        error:
+          type: string
+          enum: [Conflict]
+        code:
+          type: string
+          enum: [IDEMPOTENCY_CONFLICT]
+        message:
+          type: string
+
     ImportReceipt:
       type: object
       description: |
@@ -1030,7 +1203,7 @@ components:
         receipt.
       required:
         [id, batch_id, source_row, entity, schema_version, idempotency_key,
-         target_id, kind, created_at]
+         request_hash, target_id, kind, created_at]
       properties:
         id:
           type: string
@@ -1053,6 +1226,10 @@ components:
         idempotency_key:
           type: string
           maxLength: 128
+        request_hash:
+          type: string
+          minLength: 1
+          maxLength: 64
         target_id:
           type: string
           format: uuid
