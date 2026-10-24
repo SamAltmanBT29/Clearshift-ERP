@@ -52,6 +52,15 @@ export interface ListFilterDefinition {
   readonly onChange: (value: string | undefined) => void;
 }
 
+export interface ListFilterTag {
+  /** Stable identifier of the tag. */
+  readonly id: string;
+  /** Human-readable label, e.g. "Department: Engineering". */
+  readonly label: string;
+  /** Called when the tag's remove button is activated. */
+  readonly onRemove: () => void;
+}
+
 export interface ListFilterBarProps {
   /** The accessible name of the search landmark. */
   readonly landmarkLabel: string;
@@ -79,6 +88,8 @@ export interface ListFilterBarProps {
   readonly onReset?: (() => void) | undefined;
   readonly resetLabel?: string | undefined;
   readonly isLoading?: boolean | undefined;
+  /** Removable tags describing the currently active filters. */
+  readonly activeFilters?: readonly ListFilterTag[] | undefined;
 }
 
 export const ListFilterBar: React.FC<ListFilterBarProps> = ({
@@ -97,6 +108,7 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
   onReset,
   resetLabel,
   isLoading = false,
+  activeFilters,
 }) => (
   <form
     className="cs-erp5-filter-bar"
@@ -172,6 +184,29 @@ export const ListFilterBar: React.FC<ListFilterBarProps> = ({
             ))}
           </select>
         </FormField>
+      ) : null}
+
+      {activeFilters && activeFilters.length > 0 ? (
+        <div className="cs-erp5-filter-tags" role="list" aria-label="Active filters">
+          {activeFilters.map((tag) => (
+            <span
+              key={tag.id}
+              className="cs-erp5-filter-tag"
+              role="listitem"
+            >
+              <span>{tag.label}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${tag.label}`}
+                disabled={isLoading}
+                onClick={tag.onRemove}
+                className="cs-erp5-filter-tag-remove"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
       ) : null}
 
       {onReset ? (

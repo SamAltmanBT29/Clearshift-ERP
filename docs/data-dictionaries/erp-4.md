@@ -140,6 +140,50 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 - **Frontend Screen**: Accessible UI component [`DataCleaningReviewPage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataCleaningReviewPage.tsx).
 - **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/cleaning.test.ts`](../../apps/erp/modules/erp-4/tests/migration/cleaning.test.ts) (20 tests).
 
+## 14. Mapping & Value Translation Configuration (Issue #184 / ERP4-28 / KIT-05)
+
+- **Module Mapping Configuration**: [`apps/erp/modules/erp-4/src/migration/mapping-config.ts`](../../apps/erp/modules/erp-4/src/migration/mapping-config.ts) defines source-to-target field mapping templates, strict type coercion routines (ISO-8601 dates, decimal strings, booleans), enum translation dictionaries (`account_type`, `currency_code`, `status`), and required target column enforcement guards.
+- **Web Metadata Bridge**: [`apps/erp/modules/erp-4/web/src/kit-metadata.ts`](../../apps/erp/modules/erp-4/web/src/kit-metadata.ts) registering ERP-4 metadata with `@cs/kit` `MigrationKitRegistry`.
+- **REST Endpoints**: Fastify 5 routes in [`apps/erp/modules/erp-4/src/routes/mapping.ts`](../../apps/erp/modules/erp-4/src/routes/mapping.ts) (`/api/v1/erp-finance/migration/mapping/*`).
+- **Frontend Screen**: Accessible UI component [`DataMappingConfigPage.tsx`](../../apps/erp/modules/erp-4/web/src/pages/DataMappingConfigPage.tsx) consuming shared `MigrationKitWizard`.
+- **Automated Verification**: [`apps/erp/modules/erp-4/tests/migration/mapping.test.ts`](../../apps/erp/modules/erp-4/tests/migration/mapping.test.ts) (26 tests) and [`apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx`](../../apps/erp/modules/erp-4/web/tests/DataMappingConfigPage.test.tsx) (3 tests).
+
+## 15. Module Route and Page Registration Using Shared Shell (Issue #172 / ERP4-16)
+
+- **Route Manifest (`/erp4/*`)**: Defined in [`apps/erp/modules/erp-4/web/src/route-manifest.ts`](../../apps/erp/modules/erp-4/web/src/route-manifest.ts) registering all primary, secondary, and migration screens under prefix `/erp4`:
+  - General Ledger: Accounts List (`/erp4/accounts`), Account Create (`/erp4/accounts/new`), Account Detail (`/erp4/accounts/:id`), Account Edit (`/erp4/accounts/:id/edit`), Journal Entries List (`/erp4/journal-entries`), Journal Entry New (`/erp4/journal-entries/new`), Journal Entry Detail (`/erp4/journal-entries/:id`), Journal Entry Edit (`/erp4/journal-entries/:id/edit`).
+  - Reports: Trial Balance (`/erp4/trial-balance`).
+  - Migration & Data Health: Health Profile (`/erp4/migration/profile`), Data Cleaning Review (`/erp4/migration/clean`), Mapping Config (`/erp4/migration/mapping`).
+  - Catch-all: NotFound 404 (`/erp4/*`).
+- **Module Shell & Landmark Layout**: Implemented in [`ModuleShell.tsx`](../../apps/erp/modules/erp-4/web/src/components/ModuleShell.tsx):
+  - Accessible skip link (`#erp4-main`) with visible focus state.
+  - Semantic landmark regions: `role="banner"` module header, `role="navigation"` (`<nav aria-label="Finance and Accounting">`), and `<main id="erp4-main" tabIndex={-1}>`.
+  - Dynamic `document.title` synchronization formatted as `<Page Title> · ClearShift ERP4`.
+  - Grouped navigation with `aria-current="page"` and active state highlighting (`.is-active`).
+  - Hierarchical breadcrumb navigation (`ModuleBreadcrumbs.tsx`) derived dynamically from route descriptors.
+- **Route Authorization Guard**: [`RequireAuth.tsx`](../../apps/erp/modules/erp-4/web/src/auth/RequireAuth.tsx) and [`session.ts`](../../apps/erp/modules/erp-4/web/src/auth/session.ts) protecting all module routes with JWT expiration check, role verification, and redirect to `/login?returnTo=...` preserving destination.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/route-manifest.test.ts`](../../apps/erp/modules/erp-4/web/tests/route-manifest.test.ts) (15 tests).
+  - [`apps/erp/modules/erp-4/web/tests/module-shell.test.tsx`](../../apps/erp/modules/erp-4/web/tests/module-shell.test.tsx) (11 tests).
+  - [`apps/erp/modules/erp-4/web/tests/routes.test.tsx`](../../apps/erp/modules/erp-4/web/tests/routes.test.tsx) (8 tests).
+
+## 16. Main Paginated Data Table & Sortable Collection Screens (Issue #173 / ERP4-17)
+
+- **Chart of Accounts Collection Table (`AccountsTable.tsx`)**:
+  - Bound to shared `@cs/ui` `Table` and `Pagination` components using design tokens.
+  - Stable columns matching data dictionary: Account Code (`code`), Account Name (`name`), Account Type (`type`), Currency (`currency_code`), Balance (`balance`), Status (`is_active`), and Actions (`View`, `Edit`).
+  - Predictable multi-column sorting (`code`, `name`, `type`, `currency_code`, `balance`, `is_active`) with visual directional indicators (`▲`, `▼`, `⇅`) and accessible `aria-sort` attributes (`ascending`, `descending`, `none`).
+  - Deterministic secondary tie-breaker (`code ASC, id ASC`) guaranteeing stable row positioning.
+  - Bounded pagination controls bound to API `page` and `pageSize` parameters (clamped to `<= 100` rows per page).
+  - Virtualization DOM guard (`virtualize={accounts.length > 50}`) protecting the browser from rendering degradation.
+- **Journal Entries Collection Table (`JournalEntriesTable.tsx`)**:
+  - Reusable collection component integrated into `JournalEntriesListPage.tsx`.
+  - Stable columns matching data dictionary: Entry Number (`entry_number`), Posting Date (`posting_date`), Fiscal Period (`period_id`), Description (`description`), Currency (`currency_code`), Status (`status`), and Actions.
+  - Predictable sorting on entry number, posting date, period, description, and status.
+  - Full server-side pagination with windowed page numbers, total counts, and page size selector.
+- **Automated Verification**:
+  - [`apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx`](../../apps/erp/modules/erp-4/web/tests/paginated-data-table.test.tsx) (11 tests verifying column contracts, pagination binding, sorting predictability, and virtualization guards).
+
 ## Versioned Contract Change Control Log
 
 | Version | Date | Gate / Milestone | Author / Team | Description of Changes |
@@ -148,3 +192,8 @@ As part of Sprint 3 (Weeks 5-6) / Gate G4 preparation, ERP-4 defines a complete 
 | **`1.1.0`** | 2026-10-23 | Sprint 3 / Gate G4 | Group 9 / Role 4 (Issue #43) | Added module-specific profiling, cleaning, mapping rules, 143-row synthetic dirty-data pack (`dirty-data-v1.csv`), expected profile manifest (`expected-profile.json`), target mapping template (`mapping-template.json`), and comprehensive automated migration test suite. |
 | **`1.2.0`** | 2026-10-23 | Sprint 2 / Gate G2 | Group 9 / Role 4 (Issue #182 / ERP4-26) | Integrated shared Migration Kit profiler (`@cs/kit` / `KIT-03`), configured column quality metrics and exact duplicate candidate assertions, added formula-safe CSV data health export, Fastify 5 routes, React UI screen, and 20 automated tests. |
 | **`1.3.0`** | 2026-10-23 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #183 / ERP4-27) | Implemented canonical 12 V1 cleaning rules (`@cs/kit`), field-level change audit ledger (`kit_clean_log`), rule toggle execution (`FR-CL-05`), formula-safe audit CSV export, Fastify 5 endpoints, React review screen (`DataCleaningReviewPage`), and 20 automated tests. |
+| **`1.4.0`** | 2026-10-24 | Sprint 3 / Gate G3 | Group 9 / Role 4 (Issue #184 / ERP4-28) | Implemented source-to-target field mapping templates, strict type coercion rules, enum translation tables, required target column enforcement guards, reproducible named templates, Fastify 5 endpoints, React mapping screen (`DataMappingConfigPage`), and automated test suite. |
+| **`1.5.0`** | 2026-10-24 | Sprint 2 / UI Shell | Group 9 / Role 3 (Issue #172 / ERP4-16) | Implemented module route manifest under `/erp4`, accessible ModuleShell with keyboard skip links and landmarks, dynamic document title sync, hierarchical breadcrumbs, JWT session auth guards, and 34 automated web tests. |
+| **`1.6.0`** | 2026-10-24 | Sprint 2 / Paginated Data Tables | Group 9 / Role 3 (Issue #173 / ERP4-17) | Implemented main paginated data tables for Chart of Accounts and Journal Entries utilizing shared `@cs/ui` Table and Pagination primitives, bounded page sizing (pageSize <= 100), predictable column sorting, and DOM virtualization guard. |
+
+
