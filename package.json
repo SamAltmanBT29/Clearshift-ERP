@@ -22,6 +22,7 @@
     "lint": "eslint .",
     "validate:frontend": "node scripts/validate-frontend.js",
     "mock:erp-4": "node --experimental-strip-types scripts/mock-erp-4.ts",
+    "cs-kit": "node_modules/.bin/tsx apps/migration-kit/cli/index.ts",
     "security:scan": "node --experimental-strip-types infra/security/scan-secrets.ts",
     "erp1:test": "vitest run apps/erp/modules/erp-1",
     "erp1:seed": "node sample-data/erp-1/seed.ts",
