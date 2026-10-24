@@ -28,6 +28,8 @@ export * from "./migration/profiling-config.js";
 export * from "./migration/cleaning-config.js";
 export { hasFormulaPrefix } from "./migration/cleaning-config.js";
 export * from "./kit/rejection-context.js";
+export * from "./migration/target-adapter.js";
+export * from "./migration/batch-runner.js";
 
 export * from "./domain/index.js";
 
