@@ -52,6 +52,7 @@ import type {
   NewHrImportReceipt,
   NewHrLeave,
   NewHrPayrollTotal,
+  NewHrDuplicateCandidate,
 } from './repository.js';
 
 /** Applies the bounded page window to an already ordered array. */
@@ -68,6 +69,7 @@ interface HrStore {
   payrollTotals: Map<string, HrPayrollTotal>;
   importReceipts: Map<string, HrImportReceipt>;
   identityUsers: Map<string, HrIdentityUser>;
+  duplicateCandidates: Map<string, any>;
 }
 
 function emptyStore(): HrStore {
@@ -78,6 +80,7 @@ function emptyStore(): HrStore {
     payrollTotals: new Map(),
     importReceipts: new Map(),
     identityUsers: new Map(),
+    duplicateCandidates: new Map(),
   };
 }
 
@@ -89,6 +92,7 @@ function cloneStore(store: HrStore): HrStore {
     payrollTotals: new Map(store.payrollTotals),
     importReceipts: new Map(store.importReceipts),
     identityUsers: new Map(store.identityUsers),
+    duplicateCandidates: new Map(store.duplicateCandidates),
   };
 }
 
@@ -525,5 +529,40 @@ export class InMemoryHrRepository implements HrRepository {
     };
     this.store.importReceipts.set(created.id, created);
     return { ...created };
+  }
+
+  async createDuplicateCandidate(candidate: NewHrDuplicateCandidate): Promise<void> {
+    const id = candidate.id ?? randomUUID();
+    this.store.duplicateCandidates.set(id, { ...candidate, id });
+  }
+
+  async getDuplicateCandidateById(id: string): Promise<any | null> {
+    const found = this.store.duplicateCandidates.get(id);
+    return found ? { ...found } : null;
+  }
+
+  async listDuplicateCandidates(query: { status: string; limit: number; offset: number }) {
+    const rows = Array.from(this.store.duplicateCandidates.values())
+      .filter((c) => c.status === query.status);
+
+    return {
+      items: rows.slice(query.offset, query.offset + query.limit),
+      total: rows.length,
+    };
+  }
+
+  async resolveDuplicateCandidate(decision: any): Promise<void> {
+    const candidate = this.store.duplicateCandidates.get(decision.candidate_id);
+    if (!candidate) {
+      throw new Error('Candidate not found');
+    }
+    this.store.duplicateCandidates.set(candidate.id, {
+      ...candidate,
+      status: decision.decision === 'MERGED' ? 'MERGED' : 'REJECTED',
+      resolved_at: new Date().toISOString(),
+      resolved_by: decision.decided_by,
+      decision: decision.decision,
+      rationale: decision.notes,
+    });
   }
 }

@@ -25,6 +25,7 @@ import { identityUsersRoutes } from './identity-users.js';
 import { leaveRoutes } from './leave.js';
 import { payrollTotalsRoutes } from './payroll-totals.js';
 import { importRoutes } from './import.js';
+import { duplicatesRoutes } from './duplicates.js';
 
 export interface ErpHrRoutesOptions {
   hrService: HrService;
@@ -38,6 +39,7 @@ export const erpHrRoutes: FastifyPluginAsync<ErpHrRoutesOptions> = async (fastif
   await fastify.register(payrollTotalsRoutes, childOpts);
   await fastify.register(identityUsersRoutes, childOpts);
   await fastify.register(importRoutes, childOpts);
+  await fastify.register(duplicatesRoutes, childOpts);
 };
 
 export {
@@ -47,4 +49,5 @@ export {
   leaveRoutes,
   payrollTotalsRoutes,
   importRoutes,
+  duplicatesRoutes,
 };

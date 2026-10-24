@@ -43,6 +43,7 @@ import {
   erp5ImportReceipts,
   erp5Leave,
   erp5PayrollTotals,
+  erp5DuplicateCandidates,
 } from './schema.js';
 import type {
   HrDepartmentUpdates,
@@ -54,6 +55,7 @@ import type {
   NewHrImportReceipt,
   NewHrLeave,
   NewHrPayrollTotal,
+  NewHrDuplicateCandidate,
 } from '../src/services/repository.js';
 
 /** The database handle the repository works on. */
@@ -343,6 +345,46 @@ export class DrizzleHrRepository implements HrRepository {
       })
       .returning();
     return toHrImportReceipt(rows[0]!);
+  }
+
+  async createDuplicateCandidate(candidate: NewHrDuplicateCandidate): Promise<void> {
+    await this.db.insert(erp5DuplicateCandidates).values(candidate as any);
+  }
+
+  async getDuplicateCandidateById(id: string): Promise<any | null> {
+    const rows = await this.db
+      .select()
+      .from(erp5DuplicateCandidates)
+      .where(eq(erp5DuplicateCandidates.id, id))
+      .limit(1);
+    return rows[0] ? rows[0] : null;
+  }
+
+  async listDuplicateCandidates(query: { status: string; limit: number; offset: number }) {
+    const rows = await this.db
+      .select()
+      .from(erp5DuplicateCandidates)
+      .where(eq(erp5DuplicateCandidates.status, query.status))
+      .limit(query.limit)
+      .offset(query.offset);
+
+    return {
+      items: rows,
+      total: rows.length,
+    };
+  }
+
+  async resolveDuplicateCandidate(decision: any): Promise<void> {
+    await this.db
+      .update(erp5DuplicateCandidates)
+      .set({
+        status: decision.decision === 'MERGED' ? 'MERGED' : 'REJECTED',
+        resolved_at: new Date(),
+        resolved_by: decision.decided_by,
+        decision: decision.decision,
+        rationale: decision.notes,
+      })
+      .where(eq(erp5DuplicateCandidates.id, decision.candidate_id));
   }
 
   // ── Query layer ───────────────────────────────────────────────────────────

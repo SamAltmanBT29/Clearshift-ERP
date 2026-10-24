@@ -122,6 +122,16 @@ export interface NewHrDuplicateCandidate {
   confidence: number;
 }
 
+/** Decisions for duplicate candidates. */
+export interface HrDuplicateDecision {
+  candidate_id: string;
+  decision: 'MERGED' | 'REJECTED';
+  decided_by: string;
+  decided_at: Date;
+  notes?: string;
+}
+
+
 /**
  * Data-access contract of the ERP-5 module.
 
@@ -186,6 +196,9 @@ export interface HrRepository {
 
   // ── Duplicate candidates ──────────────────────────────────────────────────
   createDuplicateCandidate(candidate: NewHrDuplicateCandidate): Promise<void>;
+  getDuplicateCandidateById(id: string): Promise<any | null>;
+  listDuplicateCandidates(query: { status: string; limit: number; offset: number }): Promise<HrPage<any>>;
+  resolveDuplicateCandidate(decision: HrDuplicateDecision): Promise<void>;
 
   // ── Transaction boundary ──────────────────────────────────────────────────
 
