@@ -39,7 +39,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         value={filters.type || ''}
         onChange={(e) => {
           const val = e.target.value as AccountType | '';
-          onFilterChange({ type: val ? val : undefined, page: 1 });
+          const update: Partial<AccountsFilterQuery> = { page: 1 };
+          if (val) update.type = val;
+          onFilterChange(update);
         }}
         disabled={isLoading}
         aria-label="Filter by account type"
@@ -47,7 +49,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <option value="">All Account Types</option>
         <option value="asset">Asset</option>
         <option value="liability">Liability</option>
-        <option value="equity">Equity</option>
         <option value="income">Income</option>
         <option value="expense">Expense</option>
       </select>
@@ -61,10 +62,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         value={typeof filters.isActive === 'boolean' ? String(filters.isActive) : ''}
         onChange={(e) => {
           const val = e.target.value;
-          onFilterChange({
-            isActive: val === 'true' ? true : val === 'false' ? false : undefined,
-            page: 1,
-          });
+          const update: Partial<AccountsFilterQuery> = { page: 1 };
+          if (val === 'true') update.isActive = true;
+          else if (val === 'false') update.isActive = false;
+          onFilterChange(update);
         }}
         disabled={isLoading}
         aria-label="Filter by status"

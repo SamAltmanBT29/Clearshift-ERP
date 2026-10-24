@@ -92,6 +92,7 @@ export interface NewErp1ImportReceipt {
   requestHash: string;
   sourceSystem?: string | null;
   sourceId?: string | null;
+  kind?: 'created' | 'linked';
   outcome?: string;
   responsePayload?: string | null;
 }
@@ -106,6 +107,7 @@ export interface Erp1ImportReceipt {
   requestHash: string;
   sourceSystem: string | null;
   sourceId: string | null;
+  kind?: 'created' | 'linked';
   outcome: string;
   responsePayload: string | null;
   createdAt: string;
@@ -470,6 +472,7 @@ export class InMemoryErp1Repository implements Erp1Repository {
       requestHash: receipt.requestHash,
       sourceSystem: receipt.sourceSystem ?? null,
       sourceId: receipt.sourceId ?? null,
+      kind: receipt.kind ?? 'created',
       outcome: receipt.outcome ?? 'loaded',
       responsePayload: receipt.responsePayload ?? null,
       createdAt: new Date().toISOString(),

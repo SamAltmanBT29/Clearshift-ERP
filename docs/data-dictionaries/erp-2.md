@@ -581,3 +581,104 @@ In accordance with BR-ERP2-01 and SDS §4.9, purchase order status transitions i
 - **Received -> Closed**: Terminates order lifecycle.
 - **Closed**: Permanent terminal state. No transition buttons or actions are rendered. Backward transitions (e.g. `Sent -> Draft`) or cancellations are rejected.
 - **Confirmation Dialog**: Each forward transition triggers `ConfirmActionDialog`, presenting the operator with the implications of the state advance and requiring an explicit confirmation click (`Confirm Transition`) before dispatching `PATCH /purchase-orders/:id/status`.
+
+---
+
+## 15. Loading, Empty, Error, and Access-Denied States Specification (ERP2-19 / Issue #135)
+
+### 15.1 Overview & Architecture Boundaries
+
+ERP-2 Vendors & Purchasing provides production-grade operational state views in strict conformance with the ClearShift V1 Master Architecture Specification and SDS ClearShift ERP v2.0 §4.3 & §4.9. All screen state representations integrate with shared platform components and adhere to the following invariants:
+- **Zero Information Leakage**: Technical database dumps, Node.js filepaths, and raw execution stack traces are intercepted and sanitized before rendering to the DOM.
+- **Accessible State Semantics**: Screen readers receive appropriate ARIA roles (`status` with `aria-busy="true"` for loading, `alert` for errors, `region` for empty and access-denied screens).
+- **Recoverable vs Deterministic Actions**: Transient data fetch errors present a recoverable "Try Again" action; deterministic 403 authorization refusals never display a retry button.
+
+### 15.2 Animated Loading Skeleton Placeholder (AC1)
+
+During initial data fetching and tab switches, the table displays an animated skeleton placeholder:
+- **Components**: `VendorsLoadingSkeleton`, `PurchaseOrdersLoadingSkeleton`, and `SkeletonTable` (`apps/erp/modules/erp-2/web/src/components/StateViews.tsx`).
+- **Semantics**: Rendered with `role="status"`, `aria-busy="true"`, and accessible label (`Loading vendors table` / `Loading purchase orders table`).
+- **Animation**: Placeholder cells utilize the `.cs-skeleton-cell` CSS class with shimmering CSS keyframe animation (`cs-shimmer 1.5s infinite`).
+- **Lifecycle**: Replaced seamlessly with the populated data table upon resolution of the asynchronous query.
+
+### 15.3 Zero-Data Condition & Action Callouts (AC2)
+
+The system distinguishes between an empty catalog (zero-data condition) and an active filter producing zero matches:
+- **Zero-Data State (Initial Catalog Empty)**:
+  - Vendors: Renders "No vendors in supplier master" with guidance: "No vendor profiles have been recorded in the supplier master yet. Add your first vendor to establish supplier coordinates." Includes a prominent call-to-action button: `Add Vendor` (navigating to `/erp2/vendors/new`).
+  - Purchase Orders: Renders "No purchase orders in ledger" with guidance: "No purchase orders have been recorded in the procurement ledger yet. Create your first purchase order to begin tracking supplier orders." Includes a call-to-action button: `New Purchase Order` (navigating to `/erp2/purchase-orders/new`).
+- **Filtered Zero-Records State**:
+  - When filters (e.g. search string, currency, or status) yield zero matches, displays "No matching vendors found" / "No matching purchase orders found" with a call-to-action button: `Clear all filters` or `Reset Search`.
+
+### 15.4 Error Sanitization & Recoverable Alert Banner (AC3)
+
+On API failure, the interface displays an accessible alert banner with recoverable action while hiding raw internal technical details:
+- **Error Sanitization (`sanitizeErrorMessage`)**:
+  - Strips multiline JavaScript stack frames (`at ...`), Node.js internal paths, and module paths (`node_modules`).
+  - Masks internal SQL and ORM syntax error dumps (`syntax error`, `relation`, `drizzle-orm`, `postgres`, `pg-protocol`) and network socket failures (`ECONNREFUSED`, `ENOTFOUND`).
+  - Converts low-level errors into safe operator-facing diagnostics (`A database connection error occurred while communicating with the server. Please try again or contact support.`).
+  - Preserves user-facing domain validation messages and API envelope messages.
+- **Alert Banner**:
+  - Renders with `role="alert"` and accessible label.
+  - Displays correlation reference ID (`Reference ID: <code>...</code>`) when provided by the backend error envelope.
+  - Includes a `Try Again` retry action button that triggers a re-fetch without page reload.
+
+### 15.5 HTTP 403 Forbidden Access-Denied View & Role Guidance (AC4)
+
+When an API endpoint responds with HTTP 403 Forbidden:
+- **Access-Denied State (`AccessDeniedState`)**:
+  - Rendered with `role="region"` (or `role="alert"`), `aria-label="Access denied state"`, and title "Access Denied".
+  - Explains the missing permission: displays `Required permission: module.read (or module.write)`.
+  - Informs the operator: "Please contact your system administrator to assign the necessary role to your account."
+  - **No Retry Button**: Because 403 Forbidden is a permanent authorization refusal, the component explicitly omits retry buttons to prevent misleading the user.
+
+---
+
+## 16. Create Form with Field-Level Validation & Modals Specification (ERP2-20 / Issue #136)
+
+### 16.1 Overview & Scope
+
+Issue #136 (`[ERP2-20]`) implements responsive, accessible entity creation modals with comprehensive client-side and server-side validation for Vendors and Purchase Orders within ERP-2:
+- **`VendorCreateModal`**: Provides an accessible modal dialog wrapping `VendorForm` with instant field validation, double-submission locking, and field error mapping conforming to SDS §4.3 & §4.9.
+- **`PurchaseOrderCreateModal`**: Accessible dialog wrapping `PurchaseOrderForm` with multi-line items, dynamic line additions/removals, live client decimal total calculation, and read-only canonical order totals.
+- **Seamless List Integration**: In `VendorsListPage`, header quick actions (`+ Add Vendor`, `+ New Purchase Order`) open their respective modals; on completion, the modal closes, the newly created record prepends to the active table view cache (`setVendors((prev) => [created, ...prev])`), total count increments, and an accessible confirmation toast displays.
+
+### 16.2 Field-Level Client-Side Validation Rules (AC1)
+
+Forms execute client validation prior to payload submission and provide live feedback on change:
+
+| Field | Entity | Validation Rule | Error Message |
+|---|---|---|---|
+| Legal Name (`name`) | Vendor | Non-empty trimmed string, max 255 chars | `Name is required` |
+| Tax Number (`tax_number`) | Vendor | Non-empty trimmed string, max 64 chars | `Tax number is required` |
+| Email (`email`) | Vendor | Non-empty RFC-compliant email string | `Valid email is required` |
+| Phone (`phone`) | Vendor | Optional; regex `^\+?[0-9\s\-()]{7,25}$` if provided | `Phone number must be a valid format (min 7 digits, e.g. +1-555-0199)` |
+| Currency (`currency`) | Both | 3-letter ISO 4217 uppercase code (e.g., `USD`) | `Currency must be a 3-letter ISO code (e.g. USD)` |
+| Bank Details (`bank_details`) | Vendor | Optional; minimum 4 characters if provided | `Bank details must be at least 4 characters` |
+| Vendor UUID (`vendor_id`) | PO | Required RFC 4122 UUID matching supplier master | `Valid Vendor UUID is required` |
+| Order Date (`order_date`) | PO | Required ISO format `YYYY-MM-DD` | `Order date must be in YYYY-MM-DD format` |
+| Lines (`lines`) | PO | At least 1 item line required | `At least one line item is required` |
+| Product UUID (`product_id`) | PO Line | Required RFC 4122 UUID matching ERP-1 catalog | `Product UUID is required (ERP-1)` |
+| Quantity (`quantity`) | PO Line | Positive decimal string (`> 0`) | `Quantity must be > 0` |
+| Unit Price (`price`) | PO Line | Non-negative decimal string (`>= 0`) | `Price must be >= 0` |
+
+### 16.3 Inflight Double-Submission Prevention (AC2)
+
+- Upon submitting the form, `isSubmitting` / `isLoading` is set to `true`.
+- The submission button is disabled and its label switches from `"Create Vendor"` / `"Create Purchase Order"` to `"Saving..."`.
+- Cancel buttons are disabled to prevent state inconsistencies during flight.
+- Secondary clicks or rapid double-clicks on the submission button are ignored.
+- The disabled state is released in a `finally` block on error or when the modal closes upon completion.
+
+### 16.4 Server Validation Error Mapping (AC3)
+
+When the server returns an HTTP 400 Bad Request:
+- Form-level error alerts display the top-level error message in a `cs-error-box` with `role="alert"`.
+- Detailed field issues (from `err.details` array containing `path` / `field` and `message`) map directly to input fields via `setFieldErrors`.
+- Each invalid field sets `aria-invalid="true"`, applies the `.cs-input-error` class, and links via `aria-describedby` to a `<span role="alert" class="cs-field-error">` containing the server message.
+
+### 16.5 Modal Lifecycle, Cache Update & Confirmation Toast (AC4)
+
+- **Modal Closure**: On successful API response, `isOpen` transitions to `false` and the form resets.
+- **Cache Prepending**: In `VendorsListPage`, the newly returned entity is immediately prepended to local table state (`setVendors((prev) => [created, ...prev])`) and the total counter is incremented by 1 without requiring a full page refresh.
+- **Confirmation Toast**: An accessible notification banner (`.cs-erp2-toast-banner`) announces the creation outcome with an explicit close button.

@@ -17,6 +17,7 @@ import {
 } from "./services/repository.js";
 import { erpOrdersRoutes } from "./routes/index.js";
 import * as domainRules from "./domain/index.js";
+export * from "./migration/cleaning-config.js";
 
 export {
   erp3Resolver,
